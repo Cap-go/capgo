@@ -31,7 +31,8 @@ vi.mock('../supabase/functions/_backend/utils/organization_invitation_posthog.ts
   sanitizeOrganizationInvitationFailureReason: (_error: unknown, fallback: string) => fallback,
 }))
 
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
+  ...(await import('./helpers/pg-checkout-release-mocks.ts')),
   closeClient: closeClientMock,
   getPgClient: getPgClientMock,
 }))

@@ -45,7 +45,8 @@ vi.mock('../supabase/functions/_backend/utils/bento.ts', () => ({
   syncBentoSubscriberTags: syncBentoSubscriberTagsMock,
 }))
 
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
+  ...(await import('./helpers/pg-checkout-release-mocks.ts')),
   closeClient: closeClientMock,
   getDrizzleClient: getDrizzleClientMock,
   getPgClient: getPgClientMock,
@@ -65,6 +66,7 @@ const INTENT_TEST_NAME = 'intent_targeted'
 const BUILDER_INTENT_TEST_NAME = 'builder_intent_targeted'
 const BUILDER_TODO_TEST_NAME = 'builder_todo_list_v4'
 const NEW_CHANNEL_TEST_NAME = 'new_channel'
+const WEBNATIVE_TEST_NAMES = ['webnativeapp_publish_intent', 'webnativeapp_development_environment'] as const
 
 async function loadABTestsModule() {
   return await import(/* @vite-ignore */ modulePath) as ABTestsModule
@@ -116,6 +118,11 @@ function enableNewChannelTest(module: ABTestsModule) {
     ...module.AB_TESTS_CONFIG[NEW_CHANNEL_TEST_NAME]!,
     treatment_percentage: 50,
   }
+}
+
+function enableWebNativeTests(module: ABTestsModule) {
+  for (const testName of WEBNATIVE_TEST_NAMES)
+    module.AB_TESTS_CONFIG[testName].treatment_percentage = 10
 }
 
 function intentAssignment(branch: 'A' | 'B' = 'A') {
@@ -180,6 +187,8 @@ describe('new-user A/B test assignment', () => {
       ...module.AB_TESTS_CONFIG[NEW_CHANNEL_TEST_NAME]!,
       treatment_percentage: 0,
     }
+    for (const testName of WEBNATIVE_TEST_NAMES)
+      module.AB_TESTS_CONFIG[testName].treatment_percentage = 0
     vi.useRealTimers()
     vi.restoreAllMocks()
   })
@@ -501,7 +510,9 @@ describe('new-user A/B test assignment', () => {
   })
 
   it('keeps a persisted branch stable and synchronizes its Bento tag', async () => {
-    const { syncNewUserABTests } = await loadABTestsModule()
+    const module = await loadABTestsModule()
+    enableWebNativeTests(module)
+    const { syncNewUserABTests } = module
     vi.spyOn(Math, 'random').mockReturnValue(0)
     pgQueryMock.mockResolvedValueOnce({
       rows: [{
@@ -709,7 +720,9 @@ describe('new-user A/B test assignment', () => {
   })
 
   it('preserves a manual branch A assignment while filling other missing tests', async () => {
-    const { getOrCreateUserABTests } = await loadABTestsModule()
+    const module = await loadABTestsModule()
+    enableWebNativeTests(module)
+    const { getOrCreateUserABTests } = module
     const manualAssignment = intentAssignment('A')
     const existing = {
       new_emails: intentAssignment('B'),
@@ -1245,7 +1258,9 @@ describe('new-user A/B test assignment', () => {
   })
 
   it('locks the primary user row and assigns only missing tests inside one transaction', async () => {
-    const { getOrCreateUserABTests } = await loadABTestsModule()
+    const module = await loadABTestsModule()
+    enableWebNativeTests(module)
+    const { getOrCreateUserABTests } = module
     const existing = {
       new_emails: { assigned_at: FIXED_DATE.toISOString(), branch: 'B' },
     }

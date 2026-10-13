@@ -101,9 +101,9 @@ async function replaceApiKeyBindings(
     }
   }
 
-  let pgClient: ReturnType<typeof getPgClient> | undefined
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
   try {
-    pgClient = getPgClient(c)
+    pgClient = await getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
     if (globalPermissions !== undefined) {
       validateApiKeyGlobalPermissionsForBindings(globalPermissions, bindings, c.get('requestId'))
@@ -222,9 +222,9 @@ async function replaceApiKeyGlobalPermissionsForExistingBindings(
     }
   }
 
-  let pgClient: ReturnType<typeof getPgClient> | undefined
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
   try {
-    pgClient = getPgClient(c)
+    pgClient = await getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
 
     await drizzle.transaction(async (tx) => {

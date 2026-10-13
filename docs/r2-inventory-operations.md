@@ -4,29 +4,96 @@ Merge the schema PR first, then the queue consumer, then the historical scanner.
 
 ## Queue consumer
 
-The dedicated Worker uses one database connection per event batch, releases it before publication, and awaits all work before returning. Configure a Hyperdrive connection with query caching **disabled**; stale inventory reads are unsafe. Existing environment bindings follow the files Worker. Preproduction currently shares the production `capgo` bucket: use an isolated bucket and matching `INVENTORY_BUCKET`/R2 binding when testing there; do not attach a second notification rule to production casually.
+R2 inventory is production-only. Only the `prod` Worker environment and its four queues are configured; alpha and preproduction do not deploy inventory. The dedicated Worker uses one database connection per event batch, releases it before publication, and awaits all work before returning. Configure a Hyperdrive connection with query caching **disabled**; stale inventory reads are unsafe. The dedicated `HYPERDRIVE_R2_INVENTORY` binding selects the inventory database independently of the files Worker.
 
 Inventory configuration is the `INVENTORY_CONFIG` constant in `supabase/functions/_backend/utils/r2_inventory.ts`; tombstones are retained for seven days. No Vault secret or runtime enablement switch is required. To pause a deployed consumer for maintenance, pause delivery in Cloudflare so messages do not burn their five-delivery budget.
 
-Capgo releases deploy the inventory consumer through the `Deploy R2 inventory consumer` job in `.github/workflows/build_and_deploy.yml`. It waits for any required schema deployments, creates missing inventory queues, then deploys the Worker from the resolved immutable release tag. Stable releases use `prod`; alpha releases use `alpha`. Both queue provisioning and Worker deployment reject stale release targets. The Cloudflare deployment token requires Workers and Queues write permissions.
+Stable Capgo releases deploy the inventory consumer through the `Deploy R2 inventory consumer` job in `.github/workflows/build_and_deploy.yml`. It waits for any required schema deployments, creates missing production inventory queues, then deploys the Worker with `--env=prod` from the resolved immutable release tag. Alpha releases skip this job. The provisioning script accepts only `prod` and rejects other environments before API access. Both queue provisioning and Worker deployment reject stale release targets. The Cloudflare deployment token requires Workers and Queues write permissions.
 
 Bucket event notification rules remain a manual activation step. You can deploy and validate the consumer before connecting the bucket; until a rule is created, R2 notifications do not enter the event queue.
 
 Manual deployment commands (run after the schema exists, when not using the release workflow):
 
 ```sh
-bun scripts/ensure-r2-inventory-queues.ts alpha
-bunx wrangler deploy --config cloudflare_workers/r2_inventory/wrangler.jsonc --env alpha
-bunx wrangler r2 bucket notification create capgo-alpha --event-types object-create object-delete --queue capgo-r2-inventory-alpha --description capgo-r2-inventory
+bun scripts/ensure-r2-inventory-queues.ts prod
+bunx wrangler deploy --config cloudflare_workers/r2_inventory/wrangler.jsonc --env prod
+bunx wrangler r2 bucket notification create capgo --event-types object-create object-delete --queue capgo-r2-inventory-prod --description capgo-r2-inventory
 ```
 
-The release workflow does not create the bucket notification rule. For a reviewed production activation, inspect existing rules and use `prod`/`capgo` in the manual notification command. Queue creation is idempotent, but notification-rule creation is not: inspect existing rules before creating one. All four queues retain messages for four days. Existing queues require verifying their retention manually; the setup script does not silently change shared infrastructure.
+The release workflow does not create the bucket notification rule. For a reviewed production activation, inspect existing rules before running the manual notification command. Queue creation is idempotent, but notification-rule creation is not. All four queues retain messages for four days; the provisioning script repairs retention drift and verifies the final settings while preserving other queue settings.
 
-The event consumer has batch size 100, timeout 10 seconds, concurrency one, and four retries (at most five deliveries). The repair queue has batches of ten and concurrency one. Each invocation opens at most one database connection at a time, so both queues together use at most two active inventory database connections per environment. Repairs release the database connection before issuing up to two concurrent HEAD requests; ordinary uploads never perform HEAD. Consumer handlers return as soon as their work finishes, with no artificial pacing delay. The ten-second timeout coalesces small batches; it is not a minimum batch size or a rate limiter. Measure actual throughput, database WAL/latency and backlog.
+The event consumer has batch size 100, timeout 10 seconds, concurrency one, and four retries (at most five deliveries). The repair queue has batches of ten and concurrency one. Each invocation opens at most one database connection at a time, so both queues together use at most two active inventory database connections in production. Repairs release the database connection before issuing up to two concurrent HEAD requests; ordinary uploads never perform HEAD. Consumer handlers return as soon as their work finishes, with no artificial pacing delay. The ten-second timeout coalesces small batches; it is not a minimum batch size or a rate limiter. Measure actual throughput, database WAL/latency and backlog.
 
 This bound applies to queue consumers. A separately run backfill holds another connection; pause queue delivery during a backfill if the same two-connection budget must cover that operation. Hyperdrive's retained pool connections and other application traffic have separate connection budgets.
 
 Test a synthetic creation and deletion, then confirm the row transitions and queue acknowledgement. Monitor source/repair backlog, oldest-message age, failed batches and both DLQs. A maximum event timestamp is not a watermark because delivery can be out of order. Re-drive expired events through repair/reconciliation, never blind replay. Tombstone collection stays off until an initial backfill and complete reconciliation are verified.
+
+## PlanetScale production destination
+
+Production notifications and repairs both write to the standalone PlanetScale Postgres database `capgo/capgo-r2-inventory`, branch `main`, database `postgres`. The production inventory Worker binds Hyperdrive `capgo-r2-inventory-planetscale-prod` with caching disabled. There is no fallback to the primary database: a missing inventory binding fails the batch and leaves valid messages available for retry.
+
+The standalone database needs `r2_objects`, its lifecycle trigger and enum, and `r2_inventory_checkpoints`. Its `manifest` table is reserved for a separate replication setup; the notification consumer does not access it. The checkpoint schema is recorded in `cloudflare_workers/r2_inventory/sql/20261009_checkpoints.sql` and was prepared on the target before this binding change. This is a standalone database setup, not a Supabase migration. Run it only once against an empty checkpoint schema, with a separately created runtime role; rerunning it fails atomically rather than silently accepting a different schema.
+
+The Hyperdrive origin uses the `r2_inventory_consumer` role. It can select, insert and update the two inventory tables and use the object-state enum. It has no inherited database-wide or administrative roles, no access to `manifest`, and no delete or schema-creation permission. Runtime credentials are stored in Hyperdrive, never in repository files. These explicit grants were verified on the target, and Cloudflare accepted the restricted origin connection.
+
+### Manifest reservation lease schema preparation
+
+`supabase/migrations/20261013093816_r2_objects_manifest_lease.sql` records the
+additive lease schema in the repository's migration history. Applying Supabase
+migrations does **not** update the authoritative standalone PlanetScale inventory.
+The lease preparation requires a separate reviewed schema deployment to that
+inventory database; merging this PR alone does not complete that deployment.
+
+The column is nullable `timestamptz`, with no default or existing-row backfill.
+The four lifecycle states stay unchanged. The partial index contains only
+`to_be_uploaded` rows with a non-null lease and supports bucket-scoped queries
+ordered by `(manifest_lease_expires_at, r2_key)` with an expiry cutoff and limit.
+Reservations and cleanup do not use this field yet. Future reservations will
+extend it using `GREATEST(COALESCE(existing_expiry, database_now), database_now +
+interval '30 minutes')`.
+
+For a later authorized PlanetScale deployment, use an existing administrator
+connection to the production destination above, not the restricted Hyperdrive
+runtime role. Apply the migration's exact `ALTER TABLE` and `COMMENT ON COLUMN`
+statements in a short transaction with `SET LOCAL lock_timeout = '5s'`. If the
+lock times out, roll back and retry later; do not wait indefinitely behind active
+inventory work. Commit those statements before building the index.
+
+Then apply the migration's same index definition with `CONCURRENTLY`, outside a
+transaction, so notifications, repairs and backfill writes can continue:
+
+```sql
+CREATE INDEX CONCURRENTLY r2_objects_expired_manifest_leases_idx
+ON public.r2_objects (bucket_name, manifest_lease_expires_at, r2_key)
+WHERE r2_state = 'to_be_uploaded'::public.r2_object_state
+AND manifest_lease_expires_at IS NOT NULL;
+```
+
+The regular index statement in the migration is for transactional Supabase
+migration execution. Do not run that regular build on the large live inventory.
+Even the initially empty partial index requires table scans during construction;
+schedule the concurrent build with capacity available, deferring it if necessary
+while the historical backfill runs without modifying that backfill. Afterward,
+verify the column's type, nullability and absent default, the column comment, and
+the index definition plus `pg_index.indisvalid` / `indisready`. A failed concurrent
+build can leave an invalid index: inspect and remove only that invalid index with
+`DROP INDEX CONCURRENTLY public.r2_objects_expired_manifest_leases_idx` before
+retrying. Do not use `IF NOT EXISTS` to accept an invalid or mismatched index.
+This deployment needs no credential, binding, consumer or R2 object changes.
+
+### Starting without the old inventory history
+
+This change starts a new inventory; it does not import existing Supabase inventory rows or historical R2 objects. The first insertion of a bucket's admission checkpoint records the database statement-start time as its initial event floor. That floor is preserved on subsequent `ON CONFLICT DO NOTHING` insertions. The existing guard prevents moving it backwards or deleting it.
+
+Notifications older than this initial boundary need verification against R2 when no newer event or observation covers them. This prevents a delayed pre-cutover creation from resurrecting an object whose deletion was recorded only in the old database. The first batch can therefore generate repairs. Ordinary notifications created after the boundary follow the usual batched SQL path without a HEAD per upload. Historic coverage still requires the separate backfill, and file cleanup must remain disabled until both inventory coverage and manifest replication are verified.
+
+Each queue retains concurrency one, so at most two inventory application connections are active in production. Hyperdrive's origin pool has a soft limit of five; it may retain idle connections and this is not a hard two-connection limit on Postgres.
+
+### Release and rollback
+
+The normal Capgo release workflow deploys the changed inventory binding. The bucket's existing notification rule and four queues are reused, so no bucket reconfiguration or new application secret is needed. After deployment, verify the deployed Hyperdrive binding, both queue backlogs and DLQs, successful batch logs, and new inventory rows in PlanetScale. Source ingestion in Supabase stops when the old consumer is replaced.
+
+If a cutover fails, pause delivery of both inventory queues before exhausting their five-delivery budget, inspect the failure and repair the target. Do not simply point back to Supabase after successful PlanetScale acknowledgements: Supabase then lacks the acknowledged interval. A rollback needs a resumable reconciliation of that interval (including deletions) before the old inventory can be trusted again. No data is automatically deleted by this PR.
 
 ## Ordering and repair
 

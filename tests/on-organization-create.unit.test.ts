@@ -7,6 +7,9 @@ const {
   supabaseAdminMock,
   syncOrgOnboardingIntentForOrgMock,
   sendEventToTrackingMock,
+  resolveSignupAttributionForUserMock,
+  resolveSignupAttributionForOrgMock,
+  orgSignupPluginUpdateMock,
 } = vi.hoisted(() => ({
   createStripeCustomerMock: vi.fn(async () => 'Solo'),
   finalizePendingStripeCustomerMock: vi.fn(async () => 'Solo'),
@@ -14,6 +17,9 @@ const {
   supabaseAdminMock: vi.fn(),
   syncOrgOnboardingIntentForOrgMock: vi.fn(async () => undefined),
   sendEventToTrackingMock: vi.fn(async () => undefined),
+  resolveSignupAttributionForUserMock: vi.fn(async () => ({})),
+  resolveSignupAttributionForOrgMock: vi.fn(async () => ({})),
+  orgSignupPluginUpdateMock: vi.fn(),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/stripe_org.ts', () => ({
@@ -52,6 +58,11 @@ vi.mock('../supabase/functions/_backend/utils/posthog.ts', () => ({
   groupIdentifyPosthog: vi.fn(async () => undefined),
 }))
 
+vi.mock('../supabase/functions/_backend/utils/signup_attribution.ts', () => ({
+  resolveSignupAttributionForUser: resolveSignupAttributionForUserMock,
+  resolveSignupAttributionForOrg: resolveSignupAttributionForOrgMock,
+}))
+
 vi.mock('../supabase/functions/_backend/utils/hono.ts', async () => {
   const actual = await vi.importActual('../supabase/functions/_backend/utils/hono.ts')
   return {
@@ -84,6 +95,12 @@ function mockOrgReload(customerId: string | null) {
               single: async () => ({ data: createOrg(customerId), error: null }),
             }),
           }),
+          update: (payload: { signup_plugin?: string }) => {
+            orgSignupPluginUpdateMock(payload)
+            return {
+              eq: async () => ({ error: null }),
+            }
+          },
         }
       }
       if (table === 'users') {
@@ -106,6 +123,50 @@ describe('on_organization_create stripe bootstrap', () => {
     backgroundTaskMock.mockImplementation(async (_c: unknown, task: unknown) => task)
     createStripeCustomerMock.mockResolvedValue('Solo')
     finalizePendingStripeCustomerMock.mockResolvedValue('Solo')
+    resolveSignupAttributionForUserMock.mockResolvedValue({})
+    resolveSignupAttributionForOrgMock.mockResolvedValue({})
+  })
+
+  it('persists signup_plugin and attaches attribution tags on Org Created', async () => {
+    resolveSignupAttributionForUserMock.mockResolvedValue({
+      signup_plugin: 'capacitor-updater',
+      signup_source: 'plugin_capacitor-updater',
+      first_touch_type: 'plugin',
+    })
+    resolveSignupAttributionForOrgMock.mockResolvedValue({
+      signup_plugin: 'capacitor-updater',
+      signup_source: 'plugin_capacitor-updater',
+      first_touch_type: 'plugin',
+    })
+    mockOrgReload('cus_already_linked')
+    const { app } = await import('../supabase/functions/_backend/triggers/on_organization_create.ts')
+
+    const response = await app.request('http://localhost/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        table: 'orgs',
+        type: 'INSERT',
+        record: createOrg(null),
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(orgSignupPluginUpdateMock).toHaveBeenCalledWith({ signup_plugin: 'capacitor-updater' })
+    expect(sendEventToTrackingMock).toHaveBeenCalled()
+    const trackingCalls = sendEventToTrackingMock.mock.calls as unknown as Array<
+      [_context: unknown, payload: { event?: string, user_id?: string, tags?: Record<string, unknown> }]
+    >
+    const trackingPayload = trackingCalls.find(call => call[1]?.event === 'Org Created')?.[1]
+    expect(trackingPayload).toMatchObject({
+      user_id: 'user-1',
+      tags: {
+        owner_org: ORG_ID,
+        signup_plugin: 'capacitor-updater',
+        signup_source: 'plugin_capacitor-updater',
+        first_touch_type: 'plugin',
+      },
+    })
   })
 
   it('does not create a Stripe customer when reload finds a real customer_id', async () => {

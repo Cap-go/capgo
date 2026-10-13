@@ -28,7 +28,7 @@ app.post('/', middlewareKey(), async (c) => {
   if (!usesVersionId && (typeof appId !== 'string' || !appId || typeof versionName !== 'string' || !versionName))
     return quickError(400, 'error_version_id_invalid', 'version_id or app_id and name are required')
 
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   try {
     await getDrizzleClient(pgClient).transaction(async (tx) => {
       const auth = c.get('auth')

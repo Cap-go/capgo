@@ -359,7 +359,8 @@ CREATE TYPE "public"."stats_action" AS ENUM (
     'webview_dom_content_loaded',
     'webview_page_loaded',
     'app_nav',
-    'channelPaused'
+    'channelPaused',
+    'update_check_error'
 );
 
 
@@ -22509,6 +22510,9 @@ CREATE TABLE IF NOT EXISTS "public"."build_requests" (
     "ai_analyzed" boolean DEFAULT false NOT NULL,
     "started_at" timestamp with time zone,
     "completed_at" timestamp with time zone,
+    "ios_dependency_manager" "text",
+    "xcode_version" "text",
+    CONSTRAINT "build_requests_ios_dependency_manager_check" CHECK ((("ios_dependency_manager" IS NULL) OR ("ios_dependency_manager" = ANY (ARRAY['cocoapods'::"text", 'spm'::"text"])))),
     CONSTRAINT "build_requests_platform_check" CHECK ((("platform")::"text" = ANY (ARRAY[('ios'::character varying)::"text", ('android'::character varying)::"text"]))),
     CONSTRAINT "build_requests_run_interval_check" CHECK ((("started_at" IS NULL) OR ("completed_at" IS NULL) OR ("completed_at" >= "started_at")))
 );
@@ -22530,6 +22534,14 @@ COMMENT ON COLUMN "public"."build_requests"."started_at" IS 'Builder-reported jo
 
 
 COMMENT ON COLUMN "public"."build_requests"."completed_at" IS 'Builder-reported job completion (UTC). Used for capacity reconstruction.';
+
+
+
+COMMENT ON COLUMN "public"."build_requests"."ios_dependency_manager" IS 'iOS dependency manager detected by the CLI (cocoapods or spm). NULL for Android builds or CLIs that do not report it.';
+
+
+
+COMMENT ON COLUMN "public"."build_requests"."xcode_version" IS 'Xcode version of the builder runner that ran the build (its major is the iOS SDK). NULL until a runner claims the build or when the builder does not report it.';
 
 
 
@@ -23359,7 +23371,13 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "apps_with_preview" bigint DEFAULT 0 NOT NULL,
     "plan_credits" integer DEFAULT 0 NOT NULL,
     "users_with_2fa" bigint DEFAULT 0 NOT NULL,
-    "apps_with_store_url" bigint DEFAULT 0 NOT NULL
+    "apps_with_store_url" bigint DEFAULT 0 NOT NULL,
+    "refunds_count" bigint DEFAULT 0 NOT NULL,
+    "refunds_amount" double precision DEFAULT 0 NOT NULL,
+    "build_requests_day_ios_cocoapods" integer DEFAULT 0 NOT NULL,
+    "build_requests_day_ios_spm" integer DEFAULT 0 NOT NULL,
+    "build_requests_day_ios_unknown" integer DEFAULT 0 NOT NULL,
+    "build_requests_day_ios_sdk" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL
 );
 
 
@@ -23687,6 +23705,30 @@ COMMENT ON COLUMN "public"."global_stats"."users_with_2fa" IS 'Snapshot of users
 
 
 COMMENT ON COLUMN "public"."global_stats"."apps_with_store_url" IS 'Number of apps with at least one App Store or Google Play link at snapshot day end.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."refunds_count" IS 'Number of Stripe refunds created on the snapshot UTC day (failed and canceled refunds excluded).';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."refunds_amount" IS 'Total USD amount refunded on the snapshot UTC day, in dollars (failed and canceled refunds excluded).';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."build_requests_day_ios_cocoapods" IS 'iOS native build requests on the snapshot UTC day whose project uses CocoaPods.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."build_requests_day_ios_spm" IS 'iOS native build requests on the snapshot UTC day whose project uses Swift Package Manager.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."build_requests_day_ios_unknown" IS 'iOS native build requests on the snapshot UTC day without a reported dependency manager (older CLI).';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."build_requests_day_ios_sdk" IS 'iOS native build requests on the snapshot UTC day by iOS SDK (Xcode major), e.g. {"26": 120, "27": 4, "unknown": 3}. unknown = never claimed by a runner or not reported.';
 
 
 
@@ -24109,6 +24151,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "support_channel_url" "text",
     "support_channel_set_at" timestamp with time zone,
     "auto_top_up_monthly_limit" numeric(18,6) DEFAULT 0 NOT NULL,
+    "signup_plugin" "text",
     CONSTRAINT "orgs_max_apikey_expiration_days_valid" CHECK ((("max_apikey_expiration_days" IS NULL) OR (("max_apikey_expiration_days" >= 1) AND ("max_apikey_expiration_days" <= 365)))),
     CONSTRAINT "orgs_password_policy_config_min_length_check" CHECK ((("password_policy_config" IS NULL) OR (("jsonb_typeof"("password_policy_config") = 'object'::"text") AND ((NOT ("password_policy_config" ? 'min_length'::"text")) OR (("jsonb_typeof"(("password_policy_config" -> 'min_length'::"text")) = 'number'::"text") AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric = "trunc"((("password_policy_config" ->> 'min_length'::"text"))::numeric)) AND (((("password_policy_config" ->> 'min_length'::"text"))::numeric >= (6)::numeric) AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric <= (72)::numeric))))))),
     CONSTRAINT "orgs_required_encryption_key_valid" CHECK ((("required_encryption_key" IS NULL) OR ("length"(("required_encryption_key")::"text") = ANY (ARRAY[20, 21])))),
@@ -24187,6 +24230,10 @@ COMMENT ON COLUMN "public"."orgs"."support_channel_set_at" IS 'When the support 
 
 
 COMMENT ON COLUMN "public"."orgs"."auto_top_up_monthly_limit" IS 'Maximum credits (USD, 1:1) that auto top-up may buy per calendar month (UTC). 0 means no limit; otherwise it must be at least auto_top_up_threshold. Auto top-up stops once the next charge would exceed it.';
+
+
+
+COMMENT ON COLUMN "public"."orgs"."signup_plugin" IS 'Plugin name from signup ref=plugin_<name> for SQL attribution. No PII.';
 
 
 
@@ -24315,6 +24362,7 @@ CREATE TABLE IF NOT EXISTS "public"."r2_objects" (
     "first_seen_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "revision" bigint DEFAULT 1 NOT NULL,
+    "manifest_lease_expires_at" timestamp with time zone,
     CONSTRAINT "r2_objects_bucket_check" CHECK ((("octet_length"("bucket_name") >= 1) AND ("octet_length"("bucket_name") <= 256))),
     CONSTRAINT "r2_objects_cleanup_check" CHECK ((("cleanup_requested_at" IS NULL) OR ("r2_state" = ANY (ARRAY['to_be_deleted'::"public"."r2_object_state", 'deleted'::"public"."r2_object_state"])))),
     CONSTRAINT "r2_objects_key_check" CHECK ((("octet_length"("r2_key") >= 1) AND ("octet_length"("r2_key") <= 1024))),
@@ -24340,6 +24388,10 @@ COMMENT ON COLUMN "public"."r2_objects"."last_event_at" IS 'Latest accepted R2 e
 
 
 COMMENT ON COLUMN "public"."r2_objects"."last_reconciled_at" IS 'Conservative request-start boundary of an applied direct R2 observation.';
+
+
+
+COMMENT ON COLUMN "public"."r2_objects"."manifest_lease_expires_at" IS 'Expiry for future manifest upload reservations and cleanup; NULL means no lease. Future reservations extend it with GREATEST(COALESCE(existing_expiry, database_now), database_now + interval ''30 minutes'').';
 
 
 
@@ -24418,6 +24470,25 @@ ALTER TABLE "public"."roles" OWNER TO "postgres";
 
 
 COMMENT ON TABLE "public"."roles" IS 'Canonical RBAC roles. Scope_type indicates the native scope the role is defined for.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."sso_provider_org_links" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "sso_provider_id" "uuid" NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "role_mapping" "jsonb",
+    "linked_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "sso_provider_org_links_role_mapping_object_check" CHECK ((("role_mapping" IS NULL) OR ("jsonb_typeof"("role_mapping") = 'object'::"text")))
+);
+
+
+ALTER TABLE "public"."sso_provider_org_links" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."sso_provider_org_links" IS 'Orgs sharing an SSO provider owned by another org (same company, same IdP). Each link carries the role mapping applied to that org on every SSO login. Written only by /private/sso/providers/:id/links.';
 
 
 
@@ -24595,6 +24666,39 @@ ALTER SEQUENCE "public"."stripe_info_id_seq" OWNER TO "postgres";
 
 
 ALTER SEQUENCE "public"."stripe_info_id_seq" OWNED BY "public"."stripe_info"."id";
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."stripe_refunds" (
+    "id" character varying NOT NULL,
+    "charge_id" character varying NOT NULL,
+    "customer_id" character varying,
+    "amount" bigint NOT NULL,
+    "currency" character varying NOT NULL,
+    "status" character varying NOT NULL,
+    "reason" character varying,
+    "refunded_at" timestamp with time zone NOT NULL,
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL
+);
+
+
+ALTER TABLE "public"."stripe_refunds" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."stripe_refunds" IS 'Stripe refunds synced from the charge.refunded webhook, used for daily refund stats.';
+
+
+
+COMMENT ON COLUMN "public"."stripe_refunds"."id" IS 'Stripe refund id (re_...).';
+
+
+
+COMMENT ON COLUMN "public"."stripe_refunds"."amount" IS 'Refunded amount in the smallest currency unit (cents for USD).';
+
+
+
+COMMENT ON COLUMN "public"."stripe_refunds"."refunded_at" IS 'Stripe refund creation time.';
 
 
 
@@ -25658,6 +25762,16 @@ ALTER TABLE ONLY "public"."roles"
 
 
 
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_provider_org_key" UNIQUE ("sso_provider_id", "org_id");
+
+
+
 ALTER TABLE ONLY "public"."sso_providers"
     ADD CONSTRAINT "sso_providers_domain_key" UNIQUE ("domain");
 
@@ -25680,6 +25794,11 @@ ALTER TABLE ONLY "public"."storage_usage"
 
 ALTER TABLE ONLY "public"."stripe_info"
     ADD CONSTRAINT "stripe_info_pkey" PRIMARY KEY ("customer_id");
+
+
+
+ALTER TABLE ONLY "public"."stripe_refunds"
+    ADD CONSTRAINT "stripe_refunds_pkey" PRIMARY KEY ("id");
 
 
 
@@ -26095,6 +26214,10 @@ CREATE INDEX "idx_build_requests_app_created_at" ON "public"."build_requests" US
 
 
 
+CREATE INDEX "idx_build_requests_created_at_platform" ON "public"."build_requests" USING "btree" ("created_at", "platform");
+
+
+
 CREATE INDEX "idx_build_requests_job" ON "public"."build_requests" USING "btree" ("builder_job_id");
 
 
@@ -26451,6 +26574,10 @@ CREATE INDEX "processed_stripe_events_customer_id_date_id_idx" ON "public"."proc
 
 
 
+CREATE INDEX "r2_objects_expired_manifest_leases_idx" ON "public"."r2_objects" USING "btree" ("bucket_name", "manifest_lease_expires_at", "r2_key") WHERE (("r2_state" = 'to_be_uploaded'::"public"."r2_object_state") AND ("manifest_lease_expires_at" IS NOT NULL));
+
+
+
 CREATE INDEX "r2_objects_expired_tombstones_idx" ON "public"."r2_objects" USING "btree" ("bucket_name", "tombstone_expires_at", "r2_key") WHERE (("r2_state" = 'deleted'::"public"."r2_object_state") AND ("cleanup_requested_at" IS NULL));
 
 
@@ -26495,7 +26622,19 @@ CREATE INDEX "si_customer_status_trial_idx" ON "public"."stripe_info" USING "btr
 
 
 
+CREATE INDEX "sso_provider_org_links_org_id_idx" ON "public"."sso_provider_org_links" USING "btree" ("org_id");
+
+
+
 CREATE INDEX "stripe_info_paid_at_idx" ON "public"."stripe_info" USING "btree" ("paid_at") WHERE ("paid_at" IS NOT NULL);
+
+
+
+CREATE INDEX "stripe_refunds_charge_id_idx" ON "public"."stripe_refunds" USING "btree" ("charge_id");
+
+
+
+CREATE INDEX "stripe_refunds_refunded_at_idx" ON "public"."stripe_refunds" USING "btree" ("refunded_at");
 
 
 
@@ -27462,6 +27601,21 @@ ALTER TABLE ONLY "public"."role_permissions"
 
 
 
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_linked_by_fkey" FOREIGN KEY ("linked_by") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_sso_provider_id_fkey" FOREIGN KEY ("sso_provider_id") REFERENCES "public"."sso_providers"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."sso_providers"
     ADD CONSTRAINT "sso_providers_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
 
@@ -27843,6 +27997,14 @@ CREATE POLICY "Deny all access" ON "public"."daily_revenue_metrics" USING (false
 
 
 CREATE POLICY "Deny all access" ON "public"."processed_stripe_events" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny all access" ON "public"."sso_provider_org_links" TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny all access" ON "public"."stripe_refunds" USING (false) WITH CHECK (false);
 
 
 
@@ -28672,6 +28834,9 @@ CREATE POLICY "roles_update" ON "public"."roles" FOR UPDATE TO "authenticated" U
 
 
 
+ALTER TABLE "public"."sso_provider_org_links" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."sso_providers" ENABLE ROW LEVEL SECURITY;
 
 
@@ -28682,6 +28847,9 @@ ALTER TABLE "public"."storage_usage" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."stripe_info" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."stripe_refunds" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."tmp_users" ENABLE ROW LEVEL SECURITY;
@@ -28738,6 +28906,12 @@ CREATE PUBLICATION "capgo_google_eu_2_pub" WITH (publish = 'insert, update, dele
 ALTER PUBLICATION "capgo_google_eu_2_pub" OWNER TO "postgres";
 
 
+CREATE PUBLICATION "capgo_planetscale_r2_pub" WITH (publish = 'insert, update, delete, truncate');
+
+
+ALTER PUBLICATION "capgo_planetscale_r2_pub" OWNER TO "postgres";
+
+
 
 
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
@@ -28764,6 +28938,10 @@ ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."channels";
 
 
 ALTER PUBLICATION "capgo_google_eu_2_pub" ADD TABLE ONLY "public"."manifest";
+
+
+
+ALTER PUBLICATION "capgo_planetscale_r2_pub" ADD TABLE ONLY "public"."manifest";
 
 
 
@@ -32374,6 +32552,10 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 
 
 
+GRANT ALL ON TABLE "public"."sso_provider_org_links" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."sso_providers" TO "anon";
 GRANT ALL ON TABLE "public"."sso_providers" TO "authenticated";
 GRANT ALL ON TABLE "public"."sso_providers" TO "service_role";
@@ -32413,6 +32595,10 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "anon";
 GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "authenticated";
 GRANT ALL ON SEQUENCE "public"."stripe_info_id_seq" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."stripe_refunds" TO "service_role";
 
 
 

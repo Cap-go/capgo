@@ -6,7 +6,8 @@ import { trackEvent } from './analytics/track'
 import { createRSA } from './api/crypto'
 import { checkAlerts } from './api/update'
 import { getConfigWriteTarget, writeConfigUpdater } from './config'
-import { baseKey, baseKeyPub, baseKeyPubV2, baseKeyV2, getConfigForWrite, promptAndSyncCapacitor } from './utils'
+import { offerCapgoAppIdPrompt } from './key/capgoAppIdPrompt'
+import { baseKey, baseKeyPub, baseKeyPubV2, baseKeyV2, canPromptInteractively, getConfigForWrite, promptAndSyncCapacitor } from './utils'
 
 interface SaveOptions {
   key?: string
@@ -18,6 +19,7 @@ interface Options {
   force?: boolean
   setupChannel?: boolean
   keyDir?: string
+  skipCapgoAppIdPrompt?: boolean
 }
 
 function ensureCapacitorUpdaterConfig(config: any) {
@@ -195,6 +197,11 @@ export async function createKeyInternal(options: Options, silent = false, existi
     log.success('Your app will be the only one having it')
     log.success('Only your users can decrypt your update')
     log.success('Only you can send them an update')
+
+    await offerCapgoAppIdPrompt({
+      skip: options.skipCapgoAppIdPrompt,
+      interactive: canPromptInteractively(),
+    })
 
     // Ask user if they want to sync with Capacitor
     // No parameters needed - not part of onboarding flow, so no need to track cancellation
