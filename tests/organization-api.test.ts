@@ -1363,10 +1363,8 @@ describe('[POST] /organization', () => {
     }
   }
 
-  it('starts Website Live requests on the classic plan while no Website Live plan exists', async () => {
-    const { count } = await getSupabaseClient().from('plans').select('name', { count: 'exact', head: true }).eq('kind', 'website')
-    expect(count).toBe(0)
-    await expectCreatedOrganizationPlan(0, 'Solo', { updateMode: 'website' })
+  it('starts Website Live requests on the Website Live plan', async () => {
+    await expectCreatedOrganizationPlan(0, 'Website Live', { updateMode: 'website' })
   })
 
   it('create organization', async () => {
