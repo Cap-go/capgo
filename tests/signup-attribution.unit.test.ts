@@ -6,6 +6,7 @@ import {
   mergeSignupAttribution,
   mergeUrlPrecedenceSignupAttribution,
   parseCapgoAttributionCookieValue,
+  parseFirstTouchFromPathname,
   parseSignupAttributionRecord,
   resolveConsoleSignupAttribution,
   serializeCapgoAttributionCookie,
@@ -223,6 +224,21 @@ describe('signup attribution parsing', () => {
       utm_term: 'capacitor',
       signup_source: 'plugin_updater',
     })
+  })
+
+  it('does not treat pathname first touch as URL referral over cookie ref', () => {
+    const merged = mergeUrlPrecedenceSignupAttribution(
+      {},
+      mergeSignupAttribution(
+        parseFirstTouchFromPathname('/login'),
+        parseSignupAttributionRecord({ ref: 'plugin_old', signup_source: 'plugin_old' }),
+      ),
+    )
+
+    expect(merged.signup_ref).toBe('plugin_old')
+    expect(merged.signup_source).toBe('plugin_old')
+    expect(merged.first_touch_type).toBe('console')
+    expect(merged.first_touch_path).toBe('/login')
   })
 
   it('keeps ref and signup_source on the same source when URL precedes cookie', () => {

@@ -26,6 +26,23 @@ describe('captureConsoleAttributionFromLocation', () => {
     window.history.replaceState({}, '', '/')
   })
 
+  it('keeps referral-only cookie ref when landing on /login without query params', () => {
+    writeTestCookie(parseSignupAttributionRecord({
+      ref: 'plugin_old',
+      signup_source: 'plugin_old',
+    }))
+
+    window.history.replaceState({}, '', '/login')
+    captureConsoleAttributionFromLocation()
+
+    expect(readTestCookie()).toMatchObject({
+      ref: 'plugin_old',
+      signup_source: 'plugin_old',
+      first_touch_type: 'console',
+      first_touch_path: '/login',
+    })
+  })
+
   it('prefers URL ref over an existing cookie when login already has first touch', () => {
     writeTestCookie(parseSignupAttributionRecord({
       ref: 'plugin_old',

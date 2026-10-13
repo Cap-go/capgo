@@ -82,8 +82,10 @@ export function captureConsoleAttributionFromLocation(): void {
   const pathTouch = hasFirstTouch(existing)
     ? {}
     : parseFirstTouchFromPathname(window.location.pathname)
-  const incoming = mergeSignupAttribution(fromSearch, pathTouch)
-  const merged = mergeUrlPrecedenceSignupAttribution(incoming, existing)
+  const merged = mergeUrlPrecedenceSignupAttribution(
+    fromSearch,
+    mergeSignupAttribution(pathTouch, existing),
+  )
   if (!hasSignupAttributionFields(merged))
     return
 

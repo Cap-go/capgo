@@ -333,9 +333,23 @@ export function resolveConsoleSignupAttribution(
   return merged
 }
 
+function hasUrlReferralIdentityFields(attribution: ResolvedSignupAttribution): boolean {
+  if (attribution.signup_ref || attribution.signup_source)
+    return true
+  for (const key of SIGNUP_UTM_KEYS) {
+    const firstKey = `first_${key}` as FirstSignupUtmKey
+    if (attribution[firstKey])
+      return true
+  }
+  return false
+}
+
 function referralIdentityBundle(
   attribution: ResolvedSignupAttribution,
 ): Pick<ResolvedSignupAttribution, 'signup_ref' | 'signup_plugin' | 'signup_source'> | null {
+  if (!hasUrlReferralIdentityFields(attribution))
+    return null
+
   const signup_source = attribution.signup_source ?? deriveSignupSourceFromRecord(attribution)
   if (!attribution.signup_ref && !signup_source)
     return null
