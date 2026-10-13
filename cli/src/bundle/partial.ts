@@ -29,8 +29,15 @@ const log = {
 
 const RETRYABLE_EXISTENCE_CHECK_HTTP_STATUSES = new Set([429, 502, 503, 504])
 
+/** Upper bound for Retry-After on manifest existence probes (seconds or HTTP-date). */
+const EXISTENCE_CHECK_MAX_RETRY_AFTER_DELAY_MS = 30_000
+
 function isRetryableExistenceCheckHttpStatus(status: number): boolean {
   return RETRYABLE_EXISTENCE_CHECK_HTTP_STATUSES.has(status)
+}
+
+function capExistenceCheckRetryAfterDelayMs(delayMs: number): number {
+  return Math.min(delayMs, EXISTENCE_CHECK_MAX_RETRY_AFTER_DELAY_MS)
 }
 
 function getExistenceCheckRetryDelayMs(response: Response, retryDelays: readonly number[], attempt: number): number | undefined {
@@ -46,13 +53,13 @@ function getExistenceCheckRetryDelayMs(response: Response, retryDelays: readonly
     const retryAfterSeconds = Number(retryAfter)
     const retryAfterMs = retryAfterSeconds * 1000
     if (Number.isSafeInteger(retryAfterSeconds) && Number.isFinite(retryAfterMs))
-      return retryAfterMs
+      return capExistenceCheckRetryAfterDelayMs(retryAfterMs)
   }
   const retryAt = Date.parse(retryAfter)
   if (Number.isFinite(retryAt)) {
     const waitMs = retryAt - Date.now()
     if (waitMs >= 0)
-      return waitMs
+      return capExistenceCheckRetryAfterDelayMs(waitMs)
   }
   return scheduledDelay
 }
