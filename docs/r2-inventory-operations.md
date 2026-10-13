@@ -169,7 +169,7 @@ Apply these prerequisites separately before deploying the production API Worker:
    as an inventory administrator in a short transaction with a five-second lock
    timeout. It installs the exact additive helper and grants EXECUTE only to
    `r2_inventory_consumer`; it does not grant table DELETE or manifest access.
-   Supabase migration `20261013143210` records the service-role equivalent only.
+   Supabase migration `20261013165559` records the service-role equivalent only.
    Verify owner `postgres`, empty search path, revoked PUBLIC EXECUTE, helper limit
    1–1000, and that the runtime still lacks direct DELETE. Apply no unrelated grants.
 3. Verify Hyperdrive `capgo-r2-inventory-planetscale-prod` still targets the standalone
