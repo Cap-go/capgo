@@ -12,12 +12,15 @@ export type CliErrorCategory
     | 'unknown'
 
 function getStatus(error: unknown): number | undefined {
-  if (error && typeof error === 'object' && 'status' in error) {
-    const status = (error as { status?: unknown }).status
-    if (typeof status === 'number')
-      return status
-  }
-  return undefined
+  if (!error || typeof error !== 'object')
+    return undefined
+  const candidate = error as { status?: unknown, context?: { status?: unknown } }
+  if (typeof candidate.status === 'number')
+    return candidate.status
+  const contextStatus = candidate.context && typeof candidate.context === 'object'
+    ? (candidate.context as { status?: unknown }).status
+    : undefined
+  return typeof contextStatus === 'number' ? contextStatus : undefined
 }
 
 function collectErrorMessages(error: unknown): string {
