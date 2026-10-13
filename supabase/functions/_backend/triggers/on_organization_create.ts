@@ -16,6 +16,7 @@ import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+/** Processes committed org creation with stable analytics identity and notification claims. */
 app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c) => {
   const queuedRecord = c.get('webhookBody') as Database['public']['Tables']['orgs']['Row']
   cloudlog({ requestId: c.get('requestId'), message: 'record', record: queuedRecord })

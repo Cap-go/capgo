@@ -573,6 +573,7 @@ function logAcceptedEvent(c: Context, identity: AcceptedEventIdentity, acceptedA
   })
 }
 
+/** Accepts authenticated client events while reserving creation evidence for database handlers. */
 app.post('/', middlewareAuth(), async (c) => {
   const acceptedAt = Date.now()
   const body = await parseBody<TrackEventBody>(c)

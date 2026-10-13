@@ -39,7 +39,7 @@ acceptances. Invitation tracking is outside this change.
 
 pgmq messages become visible only after the business transaction commits;
 rollback removes the queued message too. The organization-creation handler awaits
-PostHog with a one-second timeout and require a confirmed `delivered` outcome
+PostHog with a one-second timeout and requires a confirmed `delivered` outcome
 (including retrying HTTP-200 quota limits, rejection, or ambiguous responses). Failures
 retry through the existing queue budget of at most five reads. Client
 `/private/events` submissions cannot use `Org Created`. This is
@@ -50,6 +50,8 @@ contract from older captures.
 Existing Bento work continues independently of PostHog failures.
 The existing `org:created` email uses its per-org permanent notification claim
 so analytics retries cannot resend it beyond the former cron throttle window.
+Transient notification failures also retry the queue; already-claimed notifications
+and other terminal outcomes do not trigger another attempt.
 
 ## Direct production cutover
 

@@ -75,6 +75,7 @@ const ORG_ID = 'b0dfb856-7ed2-4420-bfca-64d67fe65a4e'
 const USER_ID = '550e8400-e29b-41d4-a716-446655440000'
 const CREATED_AT = '2026-10-01T12:00:00.000Z'
 
+/** Builds an org fixture with a stable creator UUID and database creation time. */
 function createOrg(customerId: string | null) {
   return {
     id: ORG_ID,
@@ -182,6 +183,7 @@ describe('on_organization_create stripe bootstrap', () => {
   it('retains business time and deduplication identity on delayed queue retries', async () => {
     mockOrgReload('cus_already_linked')
     const { app } = await import('../supabase/functions/_backend/triggers/on_organization_create.ts')
+    /** Replays the same committed insert payload to exercise delayed delivery. */
     const request = () => app.request('http://localhost/', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },

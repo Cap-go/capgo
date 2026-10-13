@@ -3,7 +3,7 @@ import type { EmailPreferenceKey, NotificationAudience } from './org_email_notif
 import type { PostHogGroups } from './posthog.ts'
 import type { PostHogCapturePayload } from './posthog_delivery.ts'
 import { cloudlogErr, serializeError } from './logging.ts'
-import { sendNotifToOrgMembers, sendNotifToOrgMembersOnce } from './org_email_notifications.ts'
+import { sendNotifToOrgMembers, sendNotifToOrgMembersOnceWithResult } from './org_email_notifications.ts'
 import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
 import { deliverPosthogEvent, trackPosthogEvent } from './posthog.ts'
 import { backgroundTask } from './utils.ts'
@@ -118,6 +118,7 @@ function getTrackingTimestamp(timestamp?: number | Date) {
   return date.toISOString()
 }
 
+/** Captures analytics and requires confirmed delivery when lifecycle retries depend on it. */
 async function executeTracking(c: Context, payload: SendEventToTrackingPayload, options: SendEventToTrackingOptions) {
   if (options.posthog === false)
     return
@@ -142,6 +143,7 @@ async function executeTracking(c: Context, payload: SendEventToTrackingPayload, 
   }, options.strict || options.requirePosthogDelivery)
 }
 
+/** Sends optional org notifications, propagating transient failures in strict mode. */
 async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayload, strict = false) {
   if (!payload.sentToBento)
     return
@@ -181,9 +183,9 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
       if (bento.once) {
         // Permanent per-(event, org, uniqId) claim: per-entity alerts (e.g. an
         // incompatible bundle version) must not re-email org admins on retries.
-        // Discard the boolean: false is often benign (already claimed, no
-        // recipients, Bento unset). Under strict, only thrown errors fail closed.
-        await sendNotifToOrgMembersOnce(
+        // Only transient failures must retry; already-claimed and other terminal
+        // outcomes have no remaining notification work.
+        const result = await sendNotifToOrgMembersOnceWithResult(
           c,
           bento.event,
           bento.preferenceKey,
@@ -193,7 +195,7 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
           getDrizzleClient(pgClient),
           bento.audience,
         )
-        return
+        return result !== 'failed'
       }
       await sendNotifToOrgMembers(
         c,
@@ -213,6 +215,7 @@ async function executeBentoTracking(c: Context, payload: SendEventToTrackingPayl
   }, strict)
 }
 
+/** Runs analytics and optional email work, awaiting both before retrying required delivery. */
 export async function sendEventToTracking(c: Context, payload: SendEventToTrackingPayload, options: SendEventToTrackingOptions = {}) {
   const trackingTask = executeTracking(c, payload, options)
   if (options.background === false) {
