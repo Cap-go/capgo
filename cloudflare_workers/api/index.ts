@@ -71,6 +71,7 @@ import { app as replication } from '../../supabase/functions/_backend/public/rep
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
 import { app as translation } from '../../supabase/functions/_backend/public/translation.ts'
 import { app as webhooks } from '../../supabase/functions/_backend/public/webhooks/index.ts'
+import { app as websiteLiveStore } from '../../supabase/functions/_backend/public/website_live_store/index.ts'
 import { app as canceled_org_retention_alerts } from '../../supabase/functions/_backend/triggers/canceled_org_retention_alerts.ts'
 import { app as credit_usage_alerts } from '../../supabase/functions/_backend/triggers/credit_usage_alerts.ts'
 import { app as credit_usage_posthog } from '../../supabase/functions/_backend/triggers/credit_usage_posthog.ts'
@@ -135,6 +136,7 @@ app.route('/channel', channel)
 app.route('/device', device)
 app.route('/organization', organization)
 app.route('/notifications', notifications)
+app.route('/website_live_store', websiteLiveStore)
 app.route('/statistics', statistics)
 app.route('/webhooks', webhooks)
 app.route('/app', appEndpoint)
