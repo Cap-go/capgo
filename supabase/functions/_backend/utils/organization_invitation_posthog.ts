@@ -5,8 +5,7 @@ import { trackPosthogEvent } from './posthog.ts'
 export type OrganizationInvitationFlow = 'authenticated_pending_invite' | 'new_user_magic_link'
 export type OrganizationInvitationAccountState = 'already_existed' | 'created'
 export type OrganizationInvitationEvent
-  = 'organization_membership_invitation_accepted'
-    | 'organization_membership_invitation_declined'
+  = 'organization_membership_invitation_declined'
     | 'organization_membership_invitation_failed'
     | 'organization_membership_invitation_viewed'
 
@@ -32,7 +31,7 @@ interface OrganizationInvitationPosthogBaseInput {
 
 type OrganizationInvitationPosthogInput
   = | OrganizationInvitationPosthogBaseInput & {
-    event: Extract<OrganizationInvitationEvent, 'organization_membership_invitation_accepted' | 'organization_membership_invitation_declined'>
+    event: Extract<OrganizationInvitationEvent, 'organization_membership_invitation_declined'>
     invitationId: number | string
   }
   | OrganizationInvitationPosthogBaseInput & {
@@ -83,7 +82,7 @@ export function sanitizeOrganizationInvitationFailureReason(
 }
 
 export async function organizationInvitationInsertId(input: {
-  event: Extract<OrganizationInvitationEvent, 'organization_membership_invitation_accepted' | 'organization_membership_invitation_declined'>
+  event: Extract<OrganizationInvitationEvent, 'organization_membership_invitation_declined'>
   flow: OrganizationInvitationFlow
   invitationId: number | string
   userId: string
@@ -102,8 +101,7 @@ export async function captureOrganizationInvitationPosthogEvent(
     let insertId: string | undefined
     if (
       input.invitationId !== undefined
-      && (input.event === 'organization_membership_invitation_accepted'
-        || input.event === 'organization_membership_invitation_declined')
+      && input.event === 'organization_membership_invitation_declined'
     ) {
       insertId = await organizationInvitationInsertId({
         event: input.event,

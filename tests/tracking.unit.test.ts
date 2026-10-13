@@ -7,15 +7,19 @@ const {
   pgClientEndMock,
   pgClientMock,
   notifToOrgMembersMock,
+  notifToOrgMembersOnceMock,
   posthogMock,
+  posthogDeliveryMock,
 } = vi.hoisted(() => ({
   backgroundTaskMock: vi.fn(),
   cloudlogErrMock: vi.fn(),
   drizzleClientMock: { mocked: true },
   notifToOrgMembersMock: vi.fn(),
+  notifToOrgMembersOnceMock: vi.fn(),
   pgClientEndMock: vi.fn().mockResolvedValue(undefined),
   pgClientMock: { mocked: true, end: vi.fn().mockResolvedValue(undefined) },
   posthogMock: vi.fn(),
+  posthogDeliveryMock: vi.fn(),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
@@ -24,15 +28,18 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
 
 vi.mock('../supabase/functions/_backend/utils/posthog.ts', () => ({
   trackPosthogEvent: posthogMock,
+  deliverPosthogEvent: posthogDeliveryMock,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/org_email_notifications.ts', () => ({
   sendNotifToOrgMembers: notifToOrgMembersMock,
+  sendNotifToOrgMembersOnce: notifToOrgMembersOnceMock,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
   getDrizzleClient: vi.fn(() => drizzleClientMock),
   getPgClient: vi.fn(() => ({ ...pgClientMock, end: pgClientEndMock })),
+  closeClient: (_c: unknown, client: { end: () => Promise<void> }) => client.end(),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
@@ -52,20 +59,67 @@ function createContext() {
 beforeEach(() => {
   backgroundTaskMock.mockImplementation((_c: unknown, promise: Promise<unknown>) => promise)
   notifToOrgMembersMock.mockResolvedValue(true)
+  notifToOrgMembersOnceMock.mockResolvedValue(true)
   pgClientEndMock.mockResolvedValue(undefined)
   posthogMock.mockResolvedValue(true)
+  posthogDeliveryMock.mockResolvedValue({ outcome: 'delivered', legacy_success: true })
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
   backgroundTaskMock.mockReset()
   notifToOrgMembersMock.mockReset()
+  notifToOrgMembersOnceMock.mockReset()
   pgClientEndMock.mockReset()
   posthogMock.mockReset()
+  posthogDeliveryMock.mockReset()
   cloudlogErrMock.mockReset()
 })
 
 describe('sendEventToTracking', () => {
+  it.each(['quota_limited', 'permanent_failure', 'ambiguous', 'retryable'])('rejects %s despite a legacy successful HTTP response when delivery is required', async (outcome) => {
+    posthogDeliveryMock.mockResolvedValue({ outcome, legacy_success: true })
+    const { sendEventToTracking } = await import('../supabase/functions/_backend/utils/tracking.ts')
+    await expect(sendEventToTracking(createContext(), {
+      channel: 'org-created',
+      event: 'Org Created',
+    }, { background: false, requirePosthogDelivery: true })).rejects.toThrow()
+  })
+
+  it('awaits confirmed delivery with immutable event properties and a bounded timeout', async () => {
+    const { sendEventToTracking } = await import('../supabase/functions/_backend/utils/tracking.ts')
+    await sendEventToTracking(createContext(), {
+      channel: 'org-created',
+      event: 'Org Created',
+      user_id: '550e8400-e29b-41d4-a716-446655440000',
+      occurred_at: '2026-10-01T12:00:00.000Z',
+      nonPersonTags: { org_id: 'org-id', $insert_id: 'org-created:org-id' },
+      timeoutMs: 1000,
+    }, { background: false, requirePosthogDelivery: true })
+    expect(posthogDeliveryMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      user_id: '550e8400-e29b-41d4-a716-446655440000',
+      timestamp: '2026-10-01T12:00:00.000Z',
+      nonPersonTags: { org_id: 'org-id', $insert_id: 'org-created:org-id' },
+      timeoutMs: 1000,
+    }))
+    expect(posthogMock).not.toHaveBeenCalled()
+  })
+
+  it('preserves Bento work when required PostHog delivery fails', async () => {
+    posthogDeliveryMock.mockResolvedValue({ outcome: 'quota_limited', legacy_success: true })
+    const { sendEventToTracking } = await import('../supabase/functions/_backend/utils/tracking.ts')
+    await expect(sendEventToTracking(createContext(), {
+      channel: 'org-created',
+      event: 'Org Created',
+      sentToBento: true,
+      user_id: 'user-id',
+      groups: { organization: 'org-id' },
+      bento: { data: {}, event: 'org:created', preferenceKey: 'onboarding', uniqId: 'org:created:org-id', once: true },
+    }, { background: false, strict: true, requirePosthogDelivery: true })).rejects.toThrow('posthog tracking returned false')
+    expect(notifToOrgMembersOnceMock).toHaveBeenCalledOnce()
+    expect(notifToOrgMembersMock).not.toHaveBeenCalled()
+  })
+
   it('forwards the accepted canonical ID and frozen time to PostHog', async () => {
     const { sendEventToTracking } = await import('../supabase/functions/_backend/utils/tracking.ts')
     await sendEventToTracking(createContext(), {

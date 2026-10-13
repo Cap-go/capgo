@@ -31,7 +31,7 @@ describe('organization invitation PostHog events', () => {
 
   it('builds deterministic, opaque insert ids for successful membership changes', async () => {
     const input = {
-      event: 'organization_membership_invitation_accepted' as const,
+      event: 'organization_membership_invitation_declined' as const,
       flow: 'new_user_magic_link' as const,
       invitationId: 451,
       userId: '550e8400-e29b-41d4-a716-446655440000',
@@ -49,7 +49,7 @@ describe('organization invitation PostHog events', () => {
   it('uses the Capgo user UUID and event-only properties without PII', async () => {
     await captureOrganizationInvitationPosthogEvent(context, {
       accountState: 'created',
-      event: 'organization_membership_invitation_accepted',
+      event: 'organization_membership_invitation_declined',
       flow: 'new_user_magic_link',
       invitationId: 451,
       pendingInvitationCount: 1,
@@ -58,7 +58,7 @@ describe('organization invitation PostHog events', () => {
 
     expect(trackPosthogEventMock).toHaveBeenCalledWith(context, expect.objectContaining({
       channel: 'organization-invitation',
-      event: 'organization_membership_invitation_accepted',
+      event: 'organization_membership_invitation_declined',
       setPersonProperties: false,
       user_id: '550e8400-e29b-41d4-a716-446655440000',
     }))

@@ -178,7 +178,7 @@ describe('magic-link invitation acceptance telemetry', () => {
     })
   })
 
-  it('emits created only after a new account membership is finalized', async () => {
+  it('leaves successful new-account capture to the committed role-binding handler', async () => {
     supabaseAdminMock.mockReturnValue(buildAdmin({}))
     getPgClientMock.mockReturnValue(buildPgPool())
     createUserMock.mockResolvedValue({ data: { user: { id: FUTURE_USER_ID } }, error: null })
@@ -186,16 +186,10 @@ describe('magic-link invitation acceptance telemetry', () => {
     const response = await acceptRequest()
 
     expect(response.status).toBe(200)
-    expect(captureInvitationEventMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      accountState: 'created',
-      event: 'organization_membership_invitation_accepted',
-      flow: 'new_user_magic_link',
-      invitationId: invitation.id,
-      userId: FUTURE_USER_ID,
-    }))
+    expect(captureInvitationEventMock).not.toHaveBeenCalled()
   })
 
-  it('accepts for an already-existing account and emits already_existed', async () => {
+  it('accepts for an already-existing account without a duplicate success capture', async () => {
     supabaseAdminMock.mockReturnValue(buildAdmin({ existingUserId: EXISTING_USER_ID }))
     getPgClientMock.mockReturnValue(buildPgPool())
     signInMock.mockResolvedValue({
@@ -210,11 +204,7 @@ describe('magic-link invitation acceptance telemetry', () => {
 
     expect(response.status).toBe(200)
     expect(createUserMock).not.toHaveBeenCalled()
-    expect(captureInvitationEventMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      accountState: 'already_existed',
-      event: 'organization_membership_invitation_accepted',
-      userId: EXISTING_USER_ID,
-    }))
+    expect(captureInvitationEventMock).not.toHaveBeenCalled()
   })
 
   it('accepts when tmp invite finalization is handled atomically in Postgres', async () => {
@@ -233,11 +223,7 @@ describe('magic-link invitation acceptance telemetry', () => {
     const response = await acceptRequest()
 
     expect(response.status).toBe(200)
-    expect(captureInvitationEventMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      event: 'organization_membership_invitation_accepted',
-      invitationId: invitation.id,
-      userId: EXISTING_USER_ID,
-    }))
+    expect(captureInvitationEventMock).not.toHaveBeenCalled()
     expect(captureInvitationEventMock).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       event: 'organization_membership_invitation_failed',
     }))
@@ -252,12 +238,7 @@ describe('magic-link invitation acceptance telemetry', () => {
 
     expect(response.status).toBe(200)
     expect(deleteUserMock).not.toHaveBeenCalled()
-    expect(captureInvitationEventMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      accountState: 'created',
-      event: 'organization_membership_invitation_accepted',
-      invitationId: invitation.id,
-      userId: FUTURE_USER_ID,
-    }))
+    expect(captureInvitationEventMock).not.toHaveBeenCalled()
     expect(captureInvitationEventMock).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       event: 'organization_membership_invitation_failed',
     }))
@@ -280,7 +261,7 @@ describe('magic-link invitation acceptance telemetry', () => {
 
     expect(first.status).toBe(200)
     expect(retry.status).toBe(404)
-    expect(captureInvitationEventMock.mock.calls.filter(([, event]) => event.event === 'organization_membership_invitation_accepted')).toHaveLength(1)
+    expect(captureInvitationEventMock.mock.calls.filter(([, event]) => event.event === 'organization_membership_invitation_accepted')).toHaveLength(0)
   })
 
   it.each([

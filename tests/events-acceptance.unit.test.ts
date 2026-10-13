@@ -92,6 +92,12 @@ describe('/private/events durable acceptance', () => {
     expect(sendTracking.mock.calls[0][2]).toEqual({ posthog: false })
   })
 
+  it.each(['Org Created', 'organization_membership_invitation_accepted'])('reserves %s for committed database handlers', async (event) => {
+    expect((await request({ event })).status).toBe(400)
+    expect(queueSend).not.toHaveBeenCalled()
+    expect(sendTracking).not.toHaveBeenCalled()
+  })
+
   it('returns the same accepted event ID across retries, scoped to authenticated actor and authorized org', async () => {
     const payload = { client_event_id: clientEventId, org_id: 'org-a', user_id: 'spoofed-actor', timestamp: acceptedAt - 1000 }
     const first = await (await request(payload)).json() as { status: string, event_id: string } as { status: string, event_id: string }

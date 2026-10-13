@@ -6,7 +6,7 @@ type OrganizationInvitationSuccessEvent
     | 'organization_membership_invitation_declined'
 
 type OrganizationInvitationEvent
-  = OrganizationInvitationSuccessEvent
+  = Exclude<OrganizationInvitationSuccessEvent, 'organization_membership_invitation_accepted'>
     | 'organization_membership_invitation_failed'
     | 'organization_membership_invitation_skipped'
     | 'organization_membership_invitation_viewed'
@@ -69,7 +69,7 @@ export function captureOrganizationInvitationEvent(input: OrganizationInvitation
       input.userId,
       getLocalConfig().supaHost,
       {
-        ...(input.invitationId && (input.event === 'organization_membership_invitation_accepted' || input.event === 'organization_membership_invitation_declined')
+        ...(input.invitationId && input.event === 'organization_membership_invitation_declined'
           ? { $insert_id: invitationInsertId(input.event, input.userId, input.invitationId) }
           : {}),
         account_state: 'already_existed',
@@ -102,6 +102,10 @@ export async function runTrackedOrganizationInvitationMutation(
     })
     throw error
   }
+
+  // Successful acceptance is captured from the committed role-binding queue.
+  if (input.successEvent === 'organization_membership_invitation_accepted')
+    return
 
   captureOrganizationInvitationEvent({
     event: input.successEvent,

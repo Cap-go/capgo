@@ -220,7 +220,6 @@ async function ensureOrgMembership(
 app.post('/', async (c) => {
   let membershipFinalized = false
   let telemetryUserId: string | undefined
-  let telemetryInvitationId: number | undefined
 
   try {
     const rawBody = await parseBody<AcceptInvitation>(c)
@@ -251,7 +250,6 @@ app.post('/', async (c) => {
       return quickError(404, 'failed_to_accept_invitation', 'Invitation not found', { error: 'Invitation not found' })
     }
 
-    telemetryInvitationId = invitation.id
 
     const { data: existingUser, error: existingUserError } = await supabaseAdmin
       .from('users')
@@ -306,14 +304,6 @@ app.post('/', async (c) => {
         return membershipError
 
       membershipFinalized = true
-      await captureOrganizationInvitationPosthogEvent(c, {
-        accountState: 'already_existed',
-        event: 'organization_membership_invitation_accepted',
-        flow: 'new_user_magic_link',
-        invitationId: telemetryInvitationId,
-        pendingInvitationCount: 1,
-        userId,
-      })
 
       return c.json({
         access_token: session.session?.access_token,
@@ -380,14 +370,6 @@ app.post('/', async (c) => {
             return membershipError
 
           membershipFinalized = true
-          await captureOrganizationInvitationPosthogEvent(c, {
-            accountState: 'already_existed',
-            event: 'organization_membership_invitation_accepted',
-            flow: 'new_user_magic_link',
-            invitationId: telemetryInvitationId,
-            pendingInvitationCount: 1,
-            userId: session.user.id,
-          })
 
           return c.json({
             access_token: session.session?.access_token,
@@ -474,14 +456,6 @@ app.post('/', async (c) => {
         return membershipError
       }
       membershipFinalized = true
-      await captureOrganizationInvitationPosthogEvent(c, {
-        accountState: 'created',
-        event: 'organization_membership_invitation_accepted',
-        flow: 'new_user_magic_link',
-        invitationId: telemetryInvitationId,
-        pendingInvitationCount: 1,
-        userId: user.user.id,
-      })
 
       return c.json({
         access_token: session.session?.access_token,

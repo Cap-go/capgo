@@ -59,7 +59,7 @@ describe('organization invitation client telemetry', () => {
     )
   })
 
-  it('emits accepted only after the membership mutation succeeds', async () => {
+  it('leaves successful acceptance capture to the committed role-binding handler', async () => {
     let membershipFinalized = false
     pushEventForUserMock.mockImplementation(() => {
       expect(membershipFinalized).toBe(true)
@@ -75,15 +75,8 @@ describe('organization invitation client telemetry', () => {
       return INVITATION_ID
     })
 
-    expect(pushEventForUserMock).toHaveBeenCalledWith(
-      'organization_membership_invitation_accepted',
-      USER_ID,
-      'https://sb.capgo.app',
-      expect.objectContaining({
-        $insert_id: expect.stringContaining(`${USER_ID}:${INVITATION_ID}`),
-        pending_invitation_count: 2,
-      }),
-    )
+    expect(membershipFinalized).toBe(true)
+    expect(pushEventForUserMock).not.toHaveBeenCalled()
   })
 
   it('emits declined only after the invitation deletion succeeds', async () => {
@@ -141,9 +134,9 @@ describe('organization invitation client telemetry', () => {
 
   it('uses a deterministic insert id and ignores PostHog failures', async () => {
     const input = {
-      failureReason: 'acceptance_failed' as const,
+      failureReason: 'decline_failed' as const,
       pendingInvitationCount: 1,
-      successEvent: 'organization_membership_invitation_accepted' as const,
+      successEvent: 'organization_membership_invitation_declined' as const,
       userId: USER_ID,
     }
 
