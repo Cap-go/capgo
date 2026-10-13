@@ -9,6 +9,8 @@ import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { createStripeCustomer, finalizePendingStripeCustomer, isPendingStripeCustomerId } from '../utils/stripe_org.ts'
 import { buildOnboardingIntentBentoEventData, parseOrgOnboardingIntent, syncOrgOnboardingIntentForOrg } from '../utils/org_onboarding_intent.ts'
+import { resolveSignupAttributionForOrg, resolveSignupAttributionForUser } from '../utils/signup_attribution.ts'
+import { parseSignupAttributionRecord, signupAttributionEventTags } from '../../shared/signup-attribution.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
@@ -41,6 +43,39 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
   }
 
   const org = orgRow ?? queuedRecord
+
+  let signupPlugin = parseSignupAttributionRecord({
+    signup_plugin: org.signup_plugin,
+  }).signup_plugin ?? null
+  if (!signupPlugin) {
+    try {
+      const creatorAttribution = await resolveSignupAttributionForUser(c, org.created_by)
+      signupPlugin = creatorAttribution.signup_plugin ?? null
+      if (signupPlugin) {
+        const { error: signupPluginUpdateError } = await supabaseAdmin(c)
+          .from('orgs')
+          .update({ signup_plugin: signupPlugin })
+          .eq('id', org.id)
+        if (signupPluginUpdateError) {
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'org signup_plugin persist failed',
+            orgId: org.id,
+            error: signupPluginUpdateError.message,
+          })
+        }
+      }
+    }
+    catch (error) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'creator signup attribution lookup failed',
+        orgId: org.id,
+        userId: org.created_by,
+        error,
+      })
+    }
+  }
 
   let trialPlanName: string | null | undefined
   if (!org.customer_id) {
@@ -90,6 +125,22 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     cloudlogErr({ requestId: c.get('requestId'), message: 'syncOrgOnboardingIntentForOrg failed', error })
   }))
 
+  const orgForAttribution = signupPlugin ? { ...org, signup_plugin: signupPlugin } : org
+  let orgCreatedAttributionTags: ReturnType<typeof signupAttributionEventTags> = {}
+  try {
+    orgCreatedAttributionTags = signupAttributionEventTags(
+      await resolveSignupAttributionForOrg(c, orgForAttribution),
+    )
+  }
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'org created attribution tags lookup failed',
+      orgId: org.id,
+      error,
+    })
+  }
+
   await sendEventToTracking(c, {
     bento: {
       cron: '* * * * *',
@@ -101,8 +152,12 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     channel: 'org-created',
     event: 'Org Created',
     sentToBento: true,
-    user_id: org.id,
+    user_id: org.created_by,
     groups: { organization: org.id },
+    tags: {
+      owner_org: org.id,
+      ...orgCreatedAttributionTags,
+    },
   })
 
   return c.json(BRES)

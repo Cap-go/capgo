@@ -600,7 +600,7 @@ function isSuccessfulQueueResult(result: ProcessedQueueMessage): boolean {
 
 async function deleteSuccessfulChunkMessages(
   c: Context,
-  db: ReturnType<typeof getPgClient>,
+  db: Awaited<ReturnType<typeof getPgClient>>,
   queueName: string,
   chunkResults: ProcessedQueueMessage[],
 ): Promise<void> {
@@ -617,7 +617,7 @@ async function deleteSuccessfulChunkMessages(
 
 async function processQueueMessageChunks(
   c: Context,
-  db: ReturnType<typeof getPgClient>,
+  db: Awaited<ReturnType<typeof getPgClient>>,
   queueName: string,
   messagesToProcess: Message[],
   processConcurrency: number,
@@ -641,7 +641,7 @@ async function processQueueMessageChunks(
 
 async function persistQueueCfIds(
   c: Context,
-  db: ReturnType<typeof getPgClient>,
+  db: Awaited<ReturnType<typeof getPgClient>>,
   queueName: string,
   results: ProcessedQueueMessage[],
 ): Promise<void> {
@@ -671,7 +671,7 @@ async function persistQueueCfIds(
 
 async function deleteUncheckpointedSuccessMessages(
   c: Context,
-  db: ReturnType<typeof getPgClient>,
+  db: Awaited<ReturnType<typeof getPgClient>>,
   queueName: string,
   successMessages: ProcessedQueueMessage[],
 ): Promise<void> {
@@ -793,7 +793,7 @@ async function reportQueueFailures(c: Context, queueName: string, messagesFailed
   return actionableFailures.length
 }
 
-async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE, waitForCompletion = false): Promise<QueueProcessResult> {
+async function processQueue(c: Context, db: Awaited<ReturnType<typeof getPgClient>>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE, waitForCompletion = false): Promise<QueueProcessResult> {
   const messages = await readQueue(c, db, queueName, batchSize)
 
   if (messages === null) {
@@ -930,7 +930,7 @@ async function extractErrorDetails(response: Response): Promise<{
 }
 
 // Reads messages from the queue and logs them
-async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<Message[] | null> {
+async function readQueue(c: Context, db: Awaited<ReturnType<typeof getPgClient>>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<Message[] | null> {
   const queueKey = 'readQueue'
   const startTime = Date.now()
   let messages: Message[] = []
@@ -1029,7 +1029,7 @@ export async function http_post_helper(
 }
 
 // Helper function to delete multiple messages from the queue in a single batch
-async function delete_queue_message_batch(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
+async function delete_queue_message_batch(c: Context, db: Awaited<ReturnType<typeof getPgClient>>, queueName: string, msgIds: number[]) {
   try {
     if (msgIds.length === 0)
       return
@@ -1045,7 +1045,7 @@ async function delete_queue_message_batch(c: Context, db: ReturnType<typeof getP
 }
 
 // Helper function to archive multiple messages from the queue in a single batch
-async function archive_queue_messages(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
+async function archive_queue_messages(c: Context, db: Awaited<ReturnType<typeof getPgClient>>, queueName: string, msgIds: number[]) {
   try {
     if (msgIds.length === 0)
       return
@@ -1078,7 +1078,7 @@ async function archive_queue_messages(c: Context, db: ReturnType<typeof getPgCli
 // Helper function to mass update queue messages with CF IDs
 async function mass_edit_queue_messages_cf_ids(
   c: Context,
-  db: ReturnType<typeof getPgClient>,
+  db: Awaited<ReturnType<typeof getPgClient>>,
   updates: Array<{ msg_id: number, cf_id: string, queue: string }>,
 ) {
   try {
@@ -1123,9 +1123,9 @@ async function runQueueSync(
   waitForCompletion = false,
 ): Promise<QueueProcessResult> {
   cloudlog({ requestId: c.get('requestId'), message: `[Queue Sync] Starting ${executionMode} execution for queue: ${queueName} with batch size: ${finalBatchSize}` })
-  let db: ReturnType<typeof getPgClient> | null = null
+  let db: Awaited<ReturnType<typeof getPgClient>> | null = null
   try {
-    db = getPgClient(c)
+    db = await getPgClient(c)
     const result = await processQueue(c, db, queueName, finalBatchSize, waitForCompletion)
     cloudlog({
       requestId: c.get('requestId'),

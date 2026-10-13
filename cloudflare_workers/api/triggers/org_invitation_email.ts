@@ -22,7 +22,7 @@ interface OrgInvitationEmail {
 }
 
 export async function sendOrgInvitationEmail(c: Context<MiddlewareKeyVariables>, invitationId: string) {
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   try {
     await withPgTransaction(pgPool, async (client) => {
       // Cover the queue's 15-second HTTP timeout plus the Worker's 30-second

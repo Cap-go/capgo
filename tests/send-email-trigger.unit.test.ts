@@ -15,7 +15,7 @@ vi.mock('hono/adapter', async () => ({
 
 vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
   ...await vi.importActual('../supabase/functions/_backend/utils/pg.ts'),
-  getPgClient: () => ({ connect: async () => ({ query: queryMock, release: releaseMock }) }),
+  getPgClient: async () => ({ connect: async () => ({ query: queryMock, release: releaseMock }) }),
   closeClient: vi.fn(),
 }))
 

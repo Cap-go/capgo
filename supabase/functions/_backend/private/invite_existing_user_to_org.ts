@@ -177,7 +177,7 @@ app.post('/', middlewareAuth, async (c) => {
     })
   }
 
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   try {
     const { rows } = await pgPool.query<{ status: string }>(
       'SELECT public.queue_org_invitation_email($1, $2::bigint, $3::uuid) AS status',

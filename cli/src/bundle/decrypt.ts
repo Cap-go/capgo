@@ -5,7 +5,7 @@ import { cwd } from 'node:process'
 import { intro, log, outro } from '@clack/prompts'
 import { parse } from '@std/semver'
 import { trackEvent } from '../analytics/track'
-import { decryptChecksum, decryptChecksumV3, decryptSource } from '../api/crypto'
+import { decryptSource, formatDecryptedChecksumForError, verifyDecryptedBundleChecksum } from '../api/crypto'
 import { checkAlerts } from '../api/update'
 import { getChecksum } from '../checksum'
 import { CliUserError } from '../shared/cli-user-error'
@@ -19,6 +19,7 @@ const HEX_CHECKSUM_MIN_VERSION_V5 = '5.30.0'
 const HEX_CHECKSUM_MIN_VERSION_V6 = '6.30.0'
 const HEX_CHECKSUM_MIN_VERSION_V7 = '7.30.0'
 
+/** Resolve the RSA public key from CLI options, local key file, or capacitor config. */
 function resolvePublicKey(options: BundleDecryptOptions, extConfig: Awaited<ReturnType<typeof getConfig>>) {
   const fallbackKeyPath = options.key || baseKeyPubV2
   let publicKey = extConfig.config.plugins?.CapacitorUpdater?.publicKey
@@ -33,6 +34,7 @@ function resolvePublicKey(options: BundleDecryptOptions, extConfig: Awaited<Retu
   return { publicKey, fallbackKeyPath }
 }
 
+/** Map OpenSSL RSA decrypt failures on ivSessionKey to a user-facing CLI error. */
 function toIvSessionKeyDecryptError(error: unknown): CliUserError | null {
   if (!(error instanceof Error))
     return null
@@ -42,6 +44,7 @@ function toIvSessionKeyDecryptError(error: unknown): CliUserError | null {
   return null
 }
 
+/** Decrypt a Capgo bundle zip and verify its RSA-encrypted checksum against the payload SHA-256. */
 export async function decryptZipInternal(
   zipPath: string,
   ivsessionKey: string,
@@ -117,16 +120,27 @@ export async function decryptZipInternal(
         supportsV3Checksum = !isDeprecatedPluginVersion(coerced, HEX_CHECKSUM_MIN_VERSION_V5, HEX_CHECKSUM_MIN_VERSION_V6, HEX_CHECKSUM_MIN_VERSION_V7)
       }
 
-      if (!silent)
-        log.info(`Decrypting checksum with ${supportsV3Checksum ? 'V3' : 'V2'} (based on updater version ${updaterVersion || 'unknown'})`)
+      if (!silent) {
+        const versionHint = supportsV3Checksum
+          ? 'updater supports V3 checksum format'
+          : updaterVersion
+            ? 'updater may use legacy V2 checksum format'
+            : 'updater version unknown'
+        log.info(`Verifying encrypted checksum (trying V2 and V3 RSA encodings; ${versionHint})`)
+      }
 
-      const decryptedChecksum = supportsV3Checksum
-        ? decryptChecksumV3(options.checksum, options.keyData ?? publicKey)
-        : decryptChecksum(options.checksum, options.keyData ?? publicKey)
-      checksumMatches = checksum === decryptedChecksum
+      const { matches, decryptedPlaintexts } = verifyDecryptedBundleChecksum(
+        checksum,
+        options.checksum,
+        options.keyData ?? publicKey,
+      )
+      checksumMatches = matches
 
       if (!checksumMatches) {
-        const message = `Checksum does not match ${checksum} !== ${decryptedChecksum}`
+        const decryptedSummary = decryptedPlaintexts.length > 0
+          ? decryptedPlaintexts.map(formatDecryptedChecksumForError).join(', ')
+          : '(unable to decrypt checksum with the configured public key)'
+        const message = `Checksum does not match ${checksum} !== ${decryptedSummary}`
         if (!silent)
           log.error(message)
         throw new Error(message)
@@ -156,6 +170,7 @@ export async function decryptZipInternal(
   }
 }
 
+/** CLI entry point for bundle zip decryption with interactive logging. */
 export async function decryptZip(zipPath: string, ivsessionKey: string, options: BundleDecryptOptions) {
   await decryptZipInternal(zipPath, ivsessionKey, options, false)
 }

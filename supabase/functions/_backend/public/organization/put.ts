@@ -1,12 +1,12 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { z } from 'zod'
 import { HTTPException } from 'hono/http-exception'
-import { safeParseSchema } from '../../utils/schema_validation.ts'
+import { z } from 'zod'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { closeClient, getPgClient } from '../../utils/pg.ts'
+import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
+import { safeParseSchema } from '../../utils/schema_validation.ts'
 import { createSignedImageUrl, getStorageAllowedOrigins, resolveWritableImageValue } from '../../utils/storage.ts'
 import { getStripeCustomerName, isDeterministicStripeCustomerUpdateError, updateCustomerOrganizationName } from '../../utils/stripe.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
@@ -61,7 +61,6 @@ interface OrganizationPutBody {
 
 interface PgTransactionClient {
   query: <T = unknown>(text: string, params?: unknown[]) => Promise<{ rows: T[], rowCount?: number | null }>
-  release: () => void
 }
 
 const ORGANIZATION_UPDATE_COLUMNS = {
@@ -271,10 +270,10 @@ async function sanitizeOrgNameForSync(
   name: string,
 ) {
   // Direct SQL avoids Kong/PostgREST upstream flakes under parallel test load.
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   let client: PgTransactionClient | null = null
   try {
-    client = await pgPool.connect() as PgTransactionClient
+    client = await checkoutPgClient(pgPool) as PgTransactionClient
     const result = await client.query<{ strip_html: string | null }>(
       'SELECT public.strip_html($1) AS strip_html',
       [name],
@@ -296,7 +295,7 @@ async function sanitizeOrgNameForSync(
     return sanitizedName
   }
   finally {
-    client?.release()
+    releasePgClient(pgPool, client)
     await closeClient(c, pgPool)
   }
 }
@@ -320,13 +319,13 @@ async function updateOrg(
   updateFields: OrgUpdateFields,
   options?: { expectedCurrentName?: string, expectedCurrentFields?: OrgUpdateFields },
 ) {
-  let pgPool: ReturnType<typeof getPgClient> | null = null
+  let pgPool: Awaited<ReturnType<typeof getPgClient>> | null = null
   let dbClient: PgTransactionClient | null = null
   let transactionStarted = false
   let data: OrgRow | undefined
   try {
-    pgPool = getPgClient(c)
-    dbClient = await pgPool.connect() as PgTransactionClient
+    pgPool = await getPgClient(c)
+    dbClient = await checkoutPgClient(pgPool) as PgTransactionClient
     await dbClient.query('BEGIN')
     transactionStarted = true
     // Use the primary connection with the request role and claims so RLS and audit triggers remain authoritative.
@@ -349,7 +348,7 @@ async function updateOrg(
     })
   }
   finally {
-    dbClient?.release()
+    releasePgClient(pgPool, dbClient)
     if (pgPool)
       await closeClient(c, pgPool)
   }
@@ -395,10 +394,10 @@ async function getOrgForNameSync(
   orgId: string,
 ): Promise<OrgRow> {
   // Direct SQL avoids Kong/PostgREST upstream flakes under parallel test load.
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   let client: PgTransactionClient | null = null
   try {
-    client = await pgPool.connect() as PgTransactionClient
+    client = await checkoutPgClient(pgPool) as PgTransactionClient
     const result = await client.query<OrgRow>(
       'SELECT * FROM public.orgs WHERE id = $1::uuid LIMIT 1',
       [orgId],
@@ -410,7 +409,7 @@ async function getOrgForNameSync(
     return data
   }
   finally {
-    client?.release()
+    releasePgClient(pgPool, client)
     await closeClient(c, pgPool)
   }
 }
