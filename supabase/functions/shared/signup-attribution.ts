@@ -7,6 +7,8 @@ export const FIRST_TOUCH_TYPES = [
   'pricing',
   'home',
   'solutions',
+  'console',
+  'cli',
   'other',
 ] as const
 
@@ -89,8 +91,14 @@ function readSignupRef(record: AttributionRecord): string | undefined {
     ?? readAttributionString(record.attribution_ref)
 }
 
-function readSignupSource(record: AttributionRecord, signupRef: string | undefined): string | undefined {
-  return readAttributionString(record.signup_source) ?? signupRef
+function readSignupSource(
+  record: AttributionRecord,
+  partial: ResolvedSignupAttribution,
+): string | undefined {
+  const explicit = readAttributionString(record.signup_source)
+  if (explicit)
+    return explicit
+  return deriveSignupSourceFromRecord(partial)
 }
 
 function readSignupPlugin(record: AttributionRecord, signupRef: string | undefined): string | undefined {
@@ -135,7 +143,6 @@ export function parseSignupAttributionRecord(record: AttributionRecord | null | 
 
   const signup_ref = readSignupRef(record)
   const signup_plugin = readSignupPlugin(record, signup_ref)
-  const signup_source = readSignupSource(record, signup_ref)
   const first_touch_type = readFirstTouchType(record)
   const first_touch_path = readFirstTouchPath(record)
   const resolved: ResolvedSignupAttribution = {}
@@ -144,8 +151,6 @@ export function parseSignupAttributionRecord(record: AttributionRecord | null | 
     resolved.signup_ref = signup_ref
   if (signup_plugin)
     resolved.signup_plugin = signup_plugin
-  if (signup_source)
-    resolved.signup_source = signup_source
   if (first_touch_type)
     resolved.first_touch_type = first_touch_type
   if (first_touch_path)
@@ -157,10 +162,128 @@ export function parseSignupAttributionRecord(record: AttributionRecord | null | 
       resolved[`first_${key}`] = value
   }
 
-  return resolved
+  const reconciled = reconcileLegacyFirstTouchPair(resolved)
+  const signup_source = readSignupSource(record, reconciled)
+  if (signup_source)
+    reconciled.signup_source = signup_source
+
+  return reconciled
 }
 
 export const SIGNUP_ATTRIBUTION_COOKIE_WINDOW_MS = 48 * 60 * 60 * 1000
+export const CAPGO_ATTRIBUTION_COOKIE_MAX_AGE_SECONDS = 180 * 24 * 60 * 60
+
+export function normalizeFirstTouchPath(pathname: string): string {
+  const raw = pathname?.trim() || '/'
+  const withoutTrailing = raw.replace(/\/+$/, '') || '/'
+  return withoutTrailing.startsWith('/') ? withoutTrailing : `/${withoutTrailing}`
+}
+
+export function classifyFirstTouchType(normalizedPath: string): FirstTouchType {
+  const path = normalizeFirstTouchPath(normalizedPath).toLowerCase()
+  if (path === '/' || path === '')
+    return 'home'
+  if (path === '/pricing' || path.startsWith('/pricing/'))
+    return 'pricing'
+  if (path === '/blog' || path.startsWith('/blog/'))
+    return 'blog'
+  if (path === '/docs' || path.startsWith('/docs/'))
+    return 'docs'
+  if (path === '/plugins' || path.startsWith('/plugins/'))
+    return 'plugin'
+  if (path === '/solutions' || path.startsWith('/solutions/'))
+    return 'solutions'
+  if (path === '/login-cli' || path.startsWith('/login-cli/'))
+    return 'cli'
+  if (path === '/login' || path.startsWith('/login/'))
+    return 'console'
+  if (path === '/register' || path.startsWith('/register/'))
+    return 'console'
+  return 'other'
+}
+
+export function parseFirstTouchFromPathname(pathname: string): Pick<ResolvedSignupAttribution, 'first_touch_type' | 'first_touch_path'> {
+  const first_touch_path = readFirstTouchPath({ first_touch_path: normalizeFirstTouchPath(pathname) })
+  if (!first_touch_path)
+    return {}
+  return {
+    first_touch_path,
+    first_touch_type: classifyFirstTouchType(first_touch_path),
+  }
+}
+
+export function buildFirstTouchAttributionFromLocation(search: string, pathname: string): ResolvedSignupAttribution {
+  const params = search.startsWith('?') ? search.slice(1) : search
+  const fromSearch = parseSignupAttributionSearchParams(new URLSearchParams(params))
+  return mergeSignupAttribution(fromSearch, parseFirstTouchFromPathname(pathname))
+}
+
+export function hasFirstTouch(attribution: ResolvedSignupAttribution): boolean {
+  return Boolean(attribution.first_touch_type && attribution.first_touch_path)
+}
+
+export function deriveSignupSourceFromRecord(attribution: ResolvedSignupAttribution): string | undefined {
+  if (attribution.signup_ref)
+    return attribution.signup_ref
+
+  if (attribution.first_utm_source)
+    return attribution.first_utm_source
+
+  const path = attribution.first_touch_path
+  const type = attribution.first_touch_type
+  if (!path || !type)
+    return undefined
+
+  const segments = path.split('/').filter(Boolean)
+  switch (type) {
+    case 'home':
+      return 'home'
+    case 'pricing':
+      return 'pricing'
+    case 'console':
+      return 'console'
+    case 'cli':
+      return 'cli'
+    case 'blog': {
+      const slug = segments[segments.indexOf('blog') + 1]
+      return slug ? `blog:${slug}` : 'blog'
+    }
+    case 'docs': {
+      const docsIndex = segments.indexOf('docs')
+      const section = docsIndex >= 0 ? segments.slice(docsIndex + 1).join('/') : ''
+      return section ? `docs:${section}` : 'docs'
+    }
+    case 'plugin': {
+      const slug = segments[segments.indexOf('plugins') + 1]
+      return slug ? `plugin:${slug}` : 'plugin'
+    }
+    case 'solutions': {
+      const solutionsIndex = segments.indexOf('solutions')
+      const rest = solutionsIndex >= 0 ? segments.slice(solutionsIndex + 1).join('/') : ''
+      return rest ? `solutions:${rest}` : 'solutions'
+    }
+    case 'other':
+    default: {
+      const compact = segments.join('/')
+      return compact ? `other:${compact}` : 'other'
+    }
+  }
+}
+
+function reconcileLegacyFirstTouchPair(attribution: ResolvedSignupAttribution): ResolvedSignupAttribution {
+  if (!attribution.first_touch_path || attribution.first_touch_type !== 'other')
+    return attribution
+  const normalized = normalizeFirstTouchPath(attribution.first_touch_path)
+  const expected = classifyFirstTouchType(normalized)
+  if (expected === 'console' || expected === 'cli') {
+    return {
+      ...attribution,
+      first_touch_type: expected,
+      first_touch_path: normalized,
+    }
+  }
+  return attribution
+}
 
 export function hasSignupAttributionFields(attribution: ResolvedSignupAttribution): boolean {
   if (
@@ -196,20 +319,23 @@ export function isWithinSignupAttributionWindow(
   return nowMs - createdMs <= SIGNUP_ATTRIBUTION_COOKIE_WINDOW_MS
 }
 
-/** Console signup attribution: metadata wins; cookie fills gaps only during the signup window. */
+/** Console signup attribution: metadata wins per field; session cookie fills gaps during the signup window. */
 export function resolveConsoleSignupAttribution(
   metadata: ResolvedSignupAttribution,
   cookie: ResolvedSignupAttribution,
   userCreatedAt?: string,
   nowMs = Date.now(),
 ): ResolvedSignupAttribution {
-  if (hasSignupAttributionFields(metadata))
-    return metadata
-
   if (!isWithinSignupAttributionWindow(userCreatedAt, nowMs))
     return metadata
 
-  return mergeSignupAttribution(metadata, cookie)
+  const merged = mergeSignupAttribution(metadata, cookie)
+  if (!merged.signup_source) {
+    const derived = deriveSignupSourceFromRecord(merged)
+    if (derived)
+      merged.signup_source = derived
+  }
+  return merged
 }
 
 export function mergeSignupAttribution(
@@ -299,4 +425,27 @@ export function parseSignupAttributionSearchParams(search: URLSearchParams): Res
       record[key] = value
   }
   return parseSignupAttributionRecord(record)
+}
+
+export function attributionRecordForCapgoCookie(attribution: ResolvedSignupAttribution): Record<string, string> {
+  const record: Record<string, string> = {}
+  if (attribution.signup_ref)
+    record.ref = attribution.signup_ref
+  if (attribution.first_utm_source)
+    record.utm_source = attribution.first_utm_source
+  if (attribution.first_utm_medium)
+    record.utm_medium = attribution.first_utm_medium
+  if (attribution.first_utm_campaign)
+    record.utm_campaign = attribution.first_utm_campaign
+  if (attribution.first_touch_type)
+    record.first_touch_type = attribution.first_touch_type
+  if (attribution.first_touch_path)
+    record.first_touch_path = attribution.first_touch_path
+  if (attribution.signup_source)
+    record.signup_source = attribution.signup_source
+  return record
+}
+
+export function serializeCapgoAttributionCookie(attribution: ResolvedSignupAttribution): string {
+  return JSON.stringify(attributionRecordForCapgoCookie(attribution))
 }

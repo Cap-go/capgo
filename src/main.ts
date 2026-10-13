@@ -9,6 +9,7 @@ import { installDeepLinkHandler } from '~/services/deepLinks'
 import { isDocumentNavigationPending, replaceDocument } from '~/services/documentNavigation'
 import { getNativeExternalPurchaseRedirect, isNativeAppStoreContext, isNativeExternalPurchaseRestrictedPath } from '~/services/nativeCompliance'
 import { posthogLoader } from '~/services/posthog'
+import { captureConsoleAttributionFromLocation } from '~/services/signupAttribution'
 import { getErrorMessage, isComponentResolutionErrorMessage, isKnownCrawlerNoiseErrorMessage, isStaleAssetErrorMessage } from '~/services/staleAssetErrors'
 import { getLocalConfig } from '~/services/supabase'
 import { getAllowedConfirmationHosts, resolveConfirmationUrl } from '~/utils/safeRedirect'
@@ -304,6 +305,7 @@ router.beforeEach((to, from, next) => {
 
 const config = getLocalConfig()
 posthogLoader(config.supaHost)
+captureConsoleAttributionFromLocation()
 
 // install all modules under `modules/`
 type UserModule = (ctx: { app: typeof app, router: Router }) => void
