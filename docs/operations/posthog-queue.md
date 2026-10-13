@@ -31,29 +31,22 @@ Supabase user UUID, its timestamp is the queued organization `created_at`, and
 group, and signup-attribution properties remain; event-only properties add
 `org_id` and `capture_source: database_trigger`.
 
-`organization_membership_invitation_accepted` is produced only by
-`on_user_org_access` for `INSERT` records of direct user/org bindings whose reason is
-`Accepted invitation`. Both dashboard and magic-link acceptance transactions
-already enqueue these bindings. Its distinct ID is `principal_id` (the Supabase
-user UUID), timestamp is `granted_at`, organization group and `org_id` use the
-binding's org UUID, and `$insert_id` is
-`organization-invitation-accepted:<binding UUID>`. It also carries
-`capture_source: database_trigger`. Browser and magic-link request handlers
-leave success capture to this queue; viewed, failed, skipped, and declined
-events retain their existing producers. Acceptance no longer carries `flow`,
-`entry_path`, `account_state`, or `pending_invitation_count`: the committed
-binding does not contain those values.
+Invitation events retain their existing browser/request producers and helper,
+including `flow`, `account_state`, `entry_path`, and
+`pending_invitation_count`. The standalone admin invitation dashboard filters
+even overall counts by `flow`, so removing that dimension would hide successful
+acceptances. Invitation tracking is outside this change.
 
 pgmq messages become visible only after the business transaction commits;
-rollback removes the queued message too. Both lifecycle handlers await
+rollback removes the queued message too. The organization-creation handler awaits
 PostHog with a one-second timeout and require a confirmed `delivered` outcome
 (including retrying HTTP-200 quota limits, rejection, or ambiguous responses). Failures
 retry through the existing queue budget of at most five reads. Client
-`/private/events` submissions cannot use these two success names. This is
+`/private/events` submissions cannot use `Org Created`. This is
 positive evidence going forward, not a lossless audit: delivery can still
 exhaust retries, and missing events cannot establish historical absence.
-Use `capture_source = 'database_trigger'` when relying on server-owned evidence:
-previously loaded browser code can still send legacy captures directly to PostHog.
+The `capture_source` property distinguishes this future organization-creation
+contract from older captures.
 Existing Bento work continues independently of PostHog failures.
 The existing `org:created` email uses its per-org permanent notification claim
 so analytics retries cannot resend it beyond the former cron throttle window.

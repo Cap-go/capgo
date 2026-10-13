@@ -6,7 +6,6 @@ const {
   syncBentoFirstOrgOnUserCreateMock,
   syncBentoSubscriberTagsMock,
   supabaseFromMock,
-  sendEventToTrackingMock,
 } = vi.hoisted(() => {
   const maybeSingle = vi.fn(async () => ({ data: { email: 'invitee@example.com' }, error: null }))
   const eq = vi.fn(() => ({ maybeSingle }))
@@ -17,18 +16,12 @@ const {
     syncBentoFirstOrgOnUserCreateMock: vi.fn(async () => undefined),
     syncBentoSubscriberTagsMock: vi.fn(async () => true),
     supabaseFromMock: { eq, from, maybeSingle, select },
-    sendEventToTrackingMock: vi.fn(async () => undefined),
   }
 })
 
 vi.mock('../supabase/functions/_backend/utils/bento_first_org.ts', () => ({
   syncBentoFirstOrgOnRoleBindingWrite: syncBentoFirstOrgOnRoleBindingWriteMock,
   syncBentoFirstOrgOnUserCreate: syncBentoFirstOrgOnUserCreateMock,
-}))
-
-vi.mock('../supabase/functions/_backend/utils/tracking.ts', async () => ({
-  ...(await vi.importActual('../supabase/functions/_backend/utils/tracking.ts')),
-  sendEventToTracking: sendEventToTrackingMock,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/bento.ts', async () => {
@@ -146,47 +139,6 @@ describe('first-organization lifecycle trigger route', () => {
     expect(response.status).toBe(200)
     expect(syncBentoFirstOrgOnRoleBindingWriteMock).toHaveBeenCalledOnce()
     expect(syncBentoSubscriberTagsMock).not.toHaveBeenCalled()
-    expect(sendEventToTrackingMock).not.toHaveBeenCalled()
-  })
-
-  it('captures a committed acceptance using the binding UUID and database timestamp', async () => {
-    const first = await requestRoleBindingWrite('INSERT')
-    const retry = await requestRoleBindingWrite('INSERT')
-    expect(first.status).toBe(200)
-    expect(retry.status).toBe(200)
-    expect(sendEventToTrackingMock).toHaveBeenCalledTimes(2)
-    expect(sendEventToTrackingMock).toHaveBeenCalledWith(expect.anything(), {
-      channel: 'organization-invitation',
-      event: 'organization_membership_invitation_accepted',
-      user_id: USER_ID,
-      occurred_at: roleBindingRecord.granted_at,
-      timeoutMs: 1000,
-      groups: { organization: ORG_ID },
-      nonPersonTags: {
-        org_id: ORG_ID,
-        $insert_id: `organization-invitation-accepted:${ROLE_BINDING_ID}`,
-        capture_source: 'database_trigger',
-      },
-    }, { background: false, strict: true, requirePosthogDelivery: true })
-  })
-
-  it.each([
-    ['UPDATE', roleBindingRecord],
-    ['INSERT', { ...roleBindingRecord, principal_type: 'apikey' }],
-    ['INSERT', { ...roleBindingRecord, scope_type: 'app' }],
-    ['INSERT', { ...roleBindingRecord, is_direct: false }],
-  ] as const)('does not capture unrelated membership writes (%s)', async (type, record) => {
-    await requestRoleBindingWrite(type, API_SECRET, record)
-    expect(sendEventToTrackingMock).not.toHaveBeenCalled()
-  })
-
-  it('returns 5xx so the existing queue retries PostHog delivery failures', async () => {
-    sendEventToTrackingMock.mockRejectedValueOnce(new Error('PostHog unavailable'))
-    const response = await requestRoleBindingWrite('INSERT')
-    expect(response.status).toBeGreaterThanOrEqual(500)
-    expect(response.status).toBeLessThan(600)
-    expect(syncBentoFirstOrgOnRoleBindingWriteMock).toHaveBeenCalledOnce()
-    expect(syncBentoSubscriberTagsMock).toHaveBeenCalledOnce()
   })
 
   it('returns 5xx so the queue retries when lifecycle delivery fails', async () => {
@@ -198,7 +150,6 @@ describe('first-organization lifecycle trigger route', () => {
     expect(response.status).toBeLessThan(600)
     expect(syncBentoFirstOrgOnRoleBindingWriteMock).toHaveBeenCalledOnce()
     expect(syncBentoSubscriberTagsMock).not.toHaveBeenCalled()
-    expect(sendEventToTrackingMock).toHaveBeenCalledOnce()
   })
 
   it.each([
@@ -210,7 +161,6 @@ describe('first-organization lifecycle trigger route', () => {
     expect(response.status).toBe(400)
     expect(syncBentoFirstOrgOnRoleBindingWriteMock).not.toHaveBeenCalled()
     expect(syncBentoSubscriberTagsMock).not.toHaveBeenCalled()
-    expect(sendEventToTrackingMock).not.toHaveBeenCalled()
   })
 
   it.each([
