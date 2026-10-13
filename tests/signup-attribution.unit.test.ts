@@ -4,6 +4,7 @@ import {
   classifyFirstTouchType,
   deriveSignupSourceFromRecord,
   mergeSignupAttribution,
+  mergeUrlPrecedenceSignupAttribution,
   parseCapgoAttributionCookieValue,
   parseSignupAttributionRecord,
   resolveConsoleSignupAttribution,
@@ -208,6 +209,34 @@ describe('signup attribution parsing', () => {
       first_touch_path: '/plugins/capacitor-updater/',
       signup_source: 'plugin_updater',
     })
+  })
+
+  it('serializes utm_content and utm_term in capgo attribution cookies', () => {
+    const serialized = serializeCapgoAttributionCookie(parseSignupAttributionRecord({
+      ref: 'plugin_updater',
+      utm_content: 'hero-cta',
+      utm_term: 'capacitor',
+    }))
+    expect(JSON.parse(serialized)).toEqual({
+      ref: 'plugin_updater',
+      utm_content: 'hero-cta',
+      utm_term: 'capacitor',
+      signup_source: 'plugin_updater',
+    })
+  })
+
+  it('keeps ref and signup_source on the same source when URL precedes cookie', () => {
+    const merged = mergeUrlPrecedenceSignupAttribution(
+      parseSignupAttributionRecord({ utm_source: 'newsletter' }),
+      parseSignupAttributionRecord({
+        ref: 'plugin_stale',
+        signup_source: 'plugin_stale',
+      }),
+    )
+
+    expect(merged.signup_ref).toBeUndefined()
+    expect(merged.signup_source).toBe('newsletter')
+    expect(merged.first_utm_source).toBe('newsletter')
   })
 
   it('builds PostHog set_once and event tag payloads without PII fields', () => {

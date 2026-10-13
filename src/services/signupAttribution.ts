@@ -1,14 +1,15 @@
 import type { User } from '@supabase/supabase-js'
 import type { ResolvedSignupAttribution } from '../../supabase/functions/shared/signup-attribution.ts'
 import {
-  buildFirstTouchAttributionFromLocation,
   CAPGO_ATTRIBUTION_COOKIE_MAX_AGE_SECONDS,
   CAPGO_ATTRIBUTION_COOKIE_NAME,
   hasFirstTouch,
   hasSignupAttributionFields,
   mergeSignupAttribution,
+  mergeUrlPrecedenceSignupAttribution,
   normalizeFirstTouchPath,
   parseCapgoAttributionCookieValue,
+  parseFirstTouchFromPathname,
   parseSignupAttributionRecord,
   parseSignupAttributionSearchParams,
   resolveConsoleSignupAttribution,
@@ -59,7 +60,7 @@ function readLocationSignupAttribution(): ResolvedSignupAttribution {
 
   const fromUrl = parseSignupAttributionSearchParams(new URLSearchParams(window.location.search))
   const cookie = readCapgoAttributionCookie()
-  return mergeSignupAttribution(fromUrl, cookie)
+  return mergeUrlPrecedenceSignupAttribution(fromUrl, cookie)
 }
 
 function isConsoleAttributionCapturePath(pathname: string): boolean {
@@ -76,11 +77,13 @@ export function captureConsoleAttributionFromLocation(): void {
     return
 
   const existing = readCapgoAttributionCookie()
-  if (hasFirstTouch(existing))
-    return
 
-  const incoming = buildFirstTouchAttributionFromLocation(window.location.search, window.location.pathname)
-  const merged = mergeSignupAttribution(existing, incoming)
+  const fromSearch = parseSignupAttributionSearchParams(new URLSearchParams(window.location.search))
+  const pathTouch = hasFirstTouch(existing)
+    ? {}
+    : parseFirstTouchFromPathname(window.location.pathname)
+  const incoming = mergeSignupAttribution(fromSearch, pathTouch)
+  const merged = mergeUrlPrecedenceSignupAttribution(incoming, existing)
   if (!hasSignupAttributionFields(merged))
     return
 

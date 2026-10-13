@@ -333,6 +333,52 @@ export function resolveConsoleSignupAttribution(
   return merged
 }
 
+function referralIdentityBundle(
+  attribution: ResolvedSignupAttribution,
+): Pick<ResolvedSignupAttribution, 'signup_ref' | 'signup_plugin' | 'signup_source'> | null {
+  const signup_source = attribution.signup_source ?? deriveSignupSourceFromRecord(attribution)
+  if (!attribution.signup_ref && !signup_source)
+    return null
+
+  const bundle: Pick<ResolvedSignupAttribution, 'signup_ref' | 'signup_plugin' | 'signup_source'> = {}
+  if (attribution.signup_ref)
+    bundle.signup_ref = attribution.signup_ref
+  const signup_plugin = attribution.signup_plugin ?? signupPluginFromRef(attribution.signup_ref)
+  if (signup_plugin)
+    bundle.signup_plugin = signup_plugin
+  if (signup_source)
+    bundle.signup_source = signup_source
+  return bundle
+}
+
+/** Merge URL attribution before cookie; ref and signup_source always come from the same winning source. */
+export function mergeUrlPrecedenceSignupAttribution(
+  fromUrl: ResolvedSignupAttribution,
+  fromCookie: ResolvedSignupAttribution,
+): ResolvedSignupAttribution {
+  const merged = mergeSignupAttribution(fromUrl, fromCookie)
+  const urlIdentity = referralIdentityBundle(fromUrl)
+  const cookieIdentity = referralIdentityBundle(fromCookie)
+  const identity = urlIdentity ?? cookieIdentity
+  if (!identity)
+    return merged
+
+  const next: ResolvedSignupAttribution = { ...merged }
+  if (identity.signup_ref)
+    next.signup_ref = identity.signup_ref
+  else
+    delete next.signup_ref
+  if (identity.signup_plugin)
+    next.signup_plugin = identity.signup_plugin
+  else
+    delete next.signup_plugin
+  if (identity.signup_source)
+    next.signup_source = identity.signup_source
+  else
+    delete next.signup_source
+  return next
+}
+
 export function mergeSignupAttribution(
   ...sources: Array<ResolvedSignupAttribution | null | undefined>
 ): ResolvedSignupAttribution {
@@ -432,6 +478,10 @@ export function attributionRecordForCapgoCookie(attribution: ResolvedSignupAttri
     record.utm_medium = attribution.first_utm_medium
   if (attribution.first_utm_campaign)
     record.utm_campaign = attribution.first_utm_campaign
+  if (attribution.first_utm_content)
+    record.utm_content = attribution.first_utm_content
+  if (attribution.first_utm_term)
+    record.utm_term = attribution.first_utm_term
   if (attribution.first_touch_type)
     record.first_touch_type = attribution.first_touch_type
   if (attribution.first_touch_path)
