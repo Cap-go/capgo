@@ -179,26 +179,25 @@ export function normalizeFirstTouchPath(pathname: string): string {
   return withoutTrailing.startsWith('/') ? withoutTrailing : `/${withoutTrailing}`
 }
 
+const FIRST_TOUCH_PATH_PREFIXES: ReadonlyArray<{ prefix: string, type: FirstTouchType }> = [
+  { prefix: '/pricing', type: 'pricing' },
+  { prefix: '/blog', type: 'blog' },
+  { prefix: '/docs', type: 'docs' },
+  { prefix: '/plugins', type: 'plugin' },
+  { prefix: '/solutions', type: 'solutions' },
+  { prefix: '/login-cli', type: 'cli' },
+  { prefix: '/login', type: 'console' },
+  { prefix: '/register', type: 'console' },
+]
+
 export function classifyFirstTouchType(normalizedPath: string): FirstTouchType {
   const path = normalizeFirstTouchPath(normalizedPath).toLowerCase()
   if (path === '/' || path === '')
     return 'home'
-  if (path === '/pricing' || path.startsWith('/pricing/'))
-    return 'pricing'
-  if (path === '/blog' || path.startsWith('/blog/'))
-    return 'blog'
-  if (path === '/docs' || path.startsWith('/docs/'))
-    return 'docs'
-  if (path === '/plugins' || path.startsWith('/plugins/'))
-    return 'plugin'
-  if (path === '/solutions' || path.startsWith('/solutions/'))
-    return 'solutions'
-  if (path === '/login-cli' || path.startsWith('/login-cli/'))
-    return 'cli'
-  if (path === '/login' || path.startsWith('/login/'))
-    return 'console'
-  if (path === '/register' || path.startsWith('/register/'))
-    return 'console'
+  for (const { prefix, type } of FIRST_TOUCH_PATH_PREFIXES) {
+    if (path === prefix || path.startsWith(`${prefix}/`))
+      return type
+  }
   return 'other'
 }
 
@@ -222,52 +221,45 @@ export function hasFirstTouch(attribution: ResolvedSignupAttribution): boolean {
   return Boolean(attribution.first_touch_type && attribution.first_touch_path)
 }
 
+function segmentAfter(segments: string[], key: string): string | undefined {
+  const index = segments.indexOf(key)
+  return index >= 0 ? segments[index + 1] : undefined
+}
+
+function labeledSignupSource(prefix: string, detail?: string): string {
+  return detail ? `${prefix}:${detail}` : prefix
+}
+
+function deriveLandingSignupSource(type: FirstTouchType, segments: string[]): string {
+  if (type === 'home' || type === 'pricing' || type === 'console' || type === 'cli')
+    return type
+  if (type === 'blog')
+    return labeledSignupSource('blog', segmentAfter(segments, 'blog'))
+  if (type === 'docs') {
+    const docsIndex = segments.indexOf('docs')
+    const section = docsIndex >= 0 ? segments.slice(docsIndex + 1).join('/') : ''
+    return labeledSignupSource('docs', section || undefined)
+  }
+  if (type === 'plugin')
+    return labeledSignupSource('plugin', segmentAfter(segments, 'plugins'))
+  if (type === 'solutions') {
+    const solutionsIndex = segments.indexOf('solutions')
+    const rest = solutionsIndex >= 0 ? segments.slice(solutionsIndex + 1).join('/') : ''
+    return labeledSignupSource('solutions', rest || undefined)
+  }
+  const compact = segments.join('/')
+  return labeledSignupSource('other', compact || undefined)
+}
+
 export function deriveSignupSourceFromRecord(attribution: ResolvedSignupAttribution): string | undefined {
   if (attribution.signup_ref)
     return attribution.signup_ref
-
   if (attribution.first_utm_source)
     return attribution.first_utm_source
-
-  const path = attribution.first_touch_path
-  const type = attribution.first_touch_type
+  const { first_touch_path: path, first_touch_type: type } = attribution
   if (!path || !type)
     return undefined
-
-  const segments = path.split('/').filter(Boolean)
-  switch (type) {
-    case 'home':
-      return 'home'
-    case 'pricing':
-      return 'pricing'
-    case 'console':
-      return 'console'
-    case 'cli':
-      return 'cli'
-    case 'blog': {
-      const slug = segments[segments.indexOf('blog') + 1]
-      return slug ? `blog:${slug}` : 'blog'
-    }
-    case 'docs': {
-      const docsIndex = segments.indexOf('docs')
-      const section = docsIndex >= 0 ? segments.slice(docsIndex + 1).join('/') : ''
-      return section ? `docs:${section}` : 'docs'
-    }
-    case 'plugin': {
-      const slug = segments[segments.indexOf('plugins') + 1]
-      return slug ? `plugin:${slug}` : 'plugin'
-    }
-    case 'solutions': {
-      const solutionsIndex = segments.indexOf('solutions')
-      const rest = solutionsIndex >= 0 ? segments.slice(solutionsIndex + 1).join('/') : ''
-      return rest ? `solutions:${rest}` : 'solutions'
-    }
-    case 'other':
-    default: {
-      const compact = segments.join('/')
-      return compact ? `other:${compact}` : 'other'
-    }
-  }
+  return deriveLandingSignupSource(type, path.split('/').filter(Boolean))
 }
 
 function reconcileLegacyFirstTouchPair(attribution: ResolvedSignupAttribution): ResolvedSignupAttribution {
