@@ -9,6 +9,7 @@ log_path="${BACKGROUND_LOG_PATH:-}"
 workdir="${BACKGROUND_WORKDIR:-$PWD}"
 wait_timeout_ms="${BACKGROUND_WAIT_TIMEOUT_MS:-60000}"
 wait_interval_ms="${BACKGROUND_WAIT_INTERVAL_MS:-500}"
+ready_log_text="${BACKGROUND_READY_LOG_TEXT:-}"
 tail_lines="${BACKGROUND_TAIL_LINES:-200}"
 wait_on_version="${BACKGROUND_WAIT_ON_VERSION:-8.0.1}"
 
@@ -70,8 +71,41 @@ if ! kill -0 "${pid}" 2>/dev/null; then
   exit 1
 fi
 
+# A previous service can still answer the same health URL during replacement.
+# Require the new process's own readiness banner before probing that URL.
+if [[ -n "${ready_log_text}" ]]; then
+  readiness_started_at=${SECONDS}
+  readiness_timeout_seconds=$(( (wait_timeout_ms + 999) / 1000 ))
+  until grep -Fq -- "${ready_log_text}" "${log_path}"; do
+    if ! kill -0 "${pid}" 2>/dev/null; then
+      printf '%s\n' "::error::${service_name} exited before its readiness banner." >&2
+      dump_log_tail
+      exit 1
+    fi
+    if (( SECONDS - readiness_started_at >= readiness_timeout_seconds )); then
+      printf '%s\n' "::error::${service_name} did not emit its readiness banner." >&2
+      dump_log_tail
+      exit 1
+    fi
+    sleep 0.2
+  done
+  # Share the readiness timeout between the banner and the HTTP probe.
+  wait_timeout_ms=$(( wait_timeout_ms - (SECONDS - readiness_started_at) * 1000 ))
+  if (( wait_timeout_ms <= 0 )); then
+    printf '%s\n' "::error::${service_name} failed to become ready within its startup budget." >&2
+    dump_log_tail
+    exit 1
+  fi
+fi
+
 if ! bunx "wait-on@${wait_on_version}" "${wait_on_resources[@]}" --timeout "${wait_timeout_ms}" --interval "${wait_interval_ms}" --log --verbose; then
   printf '%s\n' "::error::${service_name} failed to become ready." >&2
+  dump_log_tail
+  exit 1
+fi
+
+if ! kill -0 "${pid}" 2>/dev/null; then
+  printf '%s\n' "::error::${service_name} exited before it became ready." >&2
   dump_log_tail
   exit 1
 fi
