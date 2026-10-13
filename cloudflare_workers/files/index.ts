@@ -1,5 +1,5 @@
 import { WorkerEntrypoint } from 'cloudflare:workers'
-import { FILE_READ_TRACKING_QUERY_PARAMS, getAttachmentFileIdFromReadPath, hasDeletedFileMarker } from '../../supabase/functions/_backend/files/file_read_cache.ts'
+import { getAttachmentFileIdFromReadPath, hasDeletedFileMarker } from '../../supabase/functions/_backend/files/file_read_cache.ts'
 import { app as files } from '../../supabase/functions/_backend/files/files.ts'
 import { handlePreviewRequest, isPreviewSubdomain } from '../../supabase/functions/_backend/files/preview.ts'
 import { app as download_link } from '../../supabase/functions/_backend/private/download_link.ts'
@@ -7,6 +7,7 @@ import { app as upload_link } from '../../supabase/functions/_backend/private/up
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
+import { buildWorkersCacheKey } from './cache_key.ts'
 
 // Upload handlers issue size receipts consumed by manifest finalization.
 export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions/_backend/files/uploadHandler.ts'
@@ -14,7 +15,7 @@ export { AttachmentUploadHandler, UploadHandler } from '../../supabase/functions
 const functionName = 'files'
 const app = createHono(functionName, version)
 
-type CachedFilesLoopback = {
+interface CachedFilesLoopback {
   fetch: (request: Request, init?: { cf?: { cacheKey: string } }) => Promise<Response>
 }
 
@@ -22,59 +23,6 @@ type FilesExecutionContext = ExecutionContext & {
   exports?: {
     CachedFiles?: CachedFilesLoopback
   }
-}
-
-function getRequestHostname(request: Request): string {
-  return request.headers.get('host') || new URL(request.url).hostname
-}
-
-function hasAttachmentReadPath(pathname: string): boolean {
-  return pathname.startsWith('/files/read/attachments/') || pathname.startsWith('/private/files/read/attachments/')
-}
-
-function normalizeSearch(url: URL, ignoredParams: readonly string[] = []): string {
-  const searchParams = new URLSearchParams(url.search)
-  for (const param of ignoredParams) {
-    searchParams.delete(param)
-  }
-  searchParams.sort()
-  const search = searchParams.toString()
-  return search ? `?${search}` : ''
-}
-
-function isCacheableAttachmentRead(request: Request): boolean {
-  if (request.method !== 'GET' || request.headers.has('range'))
-    return false
-
-  return hasAttachmentReadPath(new URL(request.url).pathname)
-}
-
-function isCacheablePreviewRead(request: Request): boolean {
-  if (request.method !== 'GET' || request.headers.has('range'))
-    return false
-
-  const hostname = getRequestHostname(request).toLowerCase()
-  if (!isPreviewSubdomain(hostname))
-    return false
-
-  const firstLabel = hostname.split('.', 1)[0]
-  if (/^c\d+-/.test(firstLabel))
-    return false
-
-  return new URL(request.url).pathname !== '/.capgo/preview.json'
-}
-
-function buildWorkersCacheKey(request: Request): string | null {
-  const url = new URL(request.url)
-  if (isCacheableAttachmentRead(request))
-    return `/files-cache${url.pathname}${normalizeSearch(url, FILE_READ_TRACKING_QUERY_PARAMS)}`
-
-  if (isCacheablePreviewRead(request)) {
-    const hostname = getRequestHostname(request).toLowerCase()
-    return `/preview-cache/${hostname}${url.pathname}${normalizeSearch(url)}`
-  }
-
-  return null
 }
 
 // Middleware to route preview subdomain requests

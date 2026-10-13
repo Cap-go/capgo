@@ -7,6 +7,8 @@ import { Hono } from 'hono/tiny'
 import { quickError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { reserveManifestPaths, usesManifestInventory, withManifestInventory } from '../utils/manifest_inventory.ts'
+import { getManifestReceiptBucket } from '../utils/manifest_size_receipt.ts'
 import { createManifestUploadResponse, ManifestUploadRequestError, parseManifestUploadRequestBody, resolveManifestUploadPublicBaseUrl, validateManifestUploadRequest } from '../utils/manifest_upload.ts'
 import { closeClient, getAppByIdPg, getDrizzleClient, getPgClient, logPgError } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
@@ -100,6 +102,9 @@ app.post('/', middlewareKey({ usePostgres: true, readOnly: false, rateLimitScope
         secret: capabilitySecret,
         keyId: getEnv(c, 'MANIFEST_UPLOAD_CAPABILITY_KEY_ID'),
         publicBaseUrl,
+        reservePaths: usesManifestInventory(c)
+          ? (prefix, suffixes, sizes) => withManifestInventory(c, db => reserveManifestPaths(db, getManifestReceiptBucket(getEnv(c, 'ENV_NAME')), prefix, suffixes, sizes))
+          : undefined,
       })
     }
     catch (error) {
