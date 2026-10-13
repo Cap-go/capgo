@@ -3,6 +3,7 @@ import type { ResolvedSignupAttribution } from '../../supabase/functions/shared/
 import {
   CAPGO_ATTRIBUTION_COOKIE_MAX_AGE_SECONDS,
   CAPGO_ATTRIBUTION_COOKIE_NAME,
+  classifyFirstTouchType,
   hasFirstTouch,
   hasSignupAttributionFields,
   mergeSignupAttribution,
@@ -81,10 +82,12 @@ export function captureConsoleAttributionFromLocation(): void {
   const fromSearch = parseSignupAttributionSearchParams(new URLSearchParams(window.location.search))
   const pathTouch = hasFirstTouch(existing)
     ? {}
-    : parseFirstTouchFromPathname(window.location.pathname)
+    : existing.first_touch_path
+      ? { first_touch_type: classifyFirstTouchType(existing.first_touch_path) }
+      : parseFirstTouchFromPathname(window.location.pathname)
   const merged = mergeUrlPrecedenceSignupAttribution(
     fromSearch,
-    mergeSignupAttribution(pathTouch, existing),
+    mergeSignupAttribution(existing, pathTouch),
   )
   if (!hasSignupAttributionFields(merged))
     return
