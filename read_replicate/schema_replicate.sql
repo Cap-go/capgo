@@ -840,6 +840,13 @@ CREATE INDEX idx_app_versions_deleted_at_id ON public.app_versions USING btree (
 
 
 --
+-- Name: idx_app_versions_deleted_manifest_retry; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_versions_deleted_manifest_retry ON public.app_versions USING btree (updated_at NULLS FIRST, id) WHERE (deleted = true);
+
+
+--
 -- Name: idx_app_versions_deleted_with_manifest; Type: INDEX; Schema: public; Owner: -
 --
 
