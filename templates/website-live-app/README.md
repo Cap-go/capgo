@@ -25,8 +25,10 @@ The website URL is not in the config. The backend returns it.
 
 The Capgo native builder runs Fastlane directly on the uploaded project. It does **not** run `bun install`, a web build or `cap sync`. Because of that, everything `cap sync` generates is committed:
 
-- `ios/App/App/public/`, `ios/App/App/capacitor.config.json`
-- `android/app/src/main/assets/public/`, `android/app/src/main/assets/capacitor.config.json`, `capacitor.plugins.json`
+- `ios/App/App/capacitor.config.json`
+- `android/app/src/main/assets/capacitor.config.json`, `capacitor.plugins.json`
+
+The web assets copied into `ios/App/App/public/` and `android/app/src/main/assets/public/` are not committed (they only duplicate `www/`): run `bunx cap copy` before packing, as the publish workflow does.
 - `ios/capacitor-cordova-ios-plugins/`, `android/capacitor-cordova-android-plugins/`
 
 The native `.gitignore` files were edited so these paths stay tracked.
@@ -85,6 +87,7 @@ xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -conf
 From the repo root:
 
 ```sh
+bunx cap copy                                        # in templates/website-live-app
 bun scripts/pack-website-live-template.ts            # -> dist/website-live-template.zip
 ```
 

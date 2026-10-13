@@ -93,7 +93,8 @@ lint/tmp/
 # capacitor-cordova-android-plugins  (committed: Website Live template is built without cap sync)
 
 # Copied web assets
-# app/src/main/assets/public  (committed: Website Live template is built without cap sync)
+# Copied from www/ by scripts/pack-website-live-template.ts
+app/src/main/assets/public
 
 # Generated Config files
 # app/src/main/assets/capacitor.config.json  (committed: Website Live template is built without cap sync)

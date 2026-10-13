@@ -1,7 +1,8 @@
 App/build
 App/Pods
 App/output
-# App/App/public  (committed: Website Live template is built without cap sync)
+# Copied from www/ by scripts/pack-website-live-template.ts
+App/App/public
 DerivedData
 xcuserdata
 

@@ -147,6 +147,12 @@ function main() {
   for (const file of files)
     contents.set(file, readFileSync(join(templateDir, file)))
 
+  // The native public folders are not committed: `cap copy` fills them from www/.
+  for (const required of ['ios/App/App/public/index.html', 'android/app/src/main/assets/public/index.html']) {
+    if (!contents.has(required))
+      fail(`${required} missing: run "bunx cap copy" in templates/website-live-app`)
+  }
+
   // The builder may only parse JSON configs (same reasoning as the CLI): ship a resolved one.
   const androidConfig = JSON.parse(readText('android/app/src/main/assets/capacitor.config.json'))
   delete androidConfig.packageClassList
