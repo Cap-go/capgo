@@ -54,7 +54,21 @@ async function getInitialPlanForMau(c: Context<MiddlewareKeyVariables>, estimate
   return plan
 }
 
-async function createPendingStripeInfo(c: Context<MiddlewareKeyVariables>, orgId: string, estimatedMau: number, kind: InitialPlanKind) {
+async function hasWebsiteLivePlan(c: Context<MiddlewareKeyVariables>) {
+  const { data, error } = await supabaseAdmin(c)
+    .from('plans')
+    .select('name')
+    .eq('kind', 'website')
+    .not('stripe_id', 'is', null)
+    .limit(1)
+  if (error)
+    throw simpleError('cannot_get_plan', 'Cannot get plan', { error: error.message })
+  return (data?.length ?? 0) > 0
+}
+
+async function createPendingStripeInfo(c: Context<MiddlewareKeyVariables>, orgId: string, estimatedMau: number, requestedKind: InitialPlanKind) {
+  // Website Live stays hidden until its plan row exists; such requests start on the classic plan.
+  const kind = requestedKind === 'website' && !(await hasWebsiteLivePlan(c)) ? 'full' : requestedKind
   const plan = await getInitialPlanForMau(c, estimatedMau, kind)
   const pendingCustomerId = `pending_${orgId}`
   const trialAt = new Date()
