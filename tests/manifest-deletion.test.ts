@@ -87,7 +87,9 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await pool.end()
-  await admin.query(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`)
+  // All fixture clients must close normally. FORCE can terminate a socket
+  // during its graceful shutdown and surface an uncaught pg pool error in CI.
+  await admin.query(`DROP DATABASE IF EXISTS ${dbName}`)
   await admin.end()
 })
 
