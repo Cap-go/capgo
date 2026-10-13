@@ -14,9 +14,9 @@ import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { getDotfileDeltaStorageCandidateKeys } from '../utils/manifest_encoding.ts'
 import { createManifestSizeReceipt, MANIFEST_SIZE_RECEIPT_HEADER } from '../utils/manifest_size_receipt.ts'
 import { MANIFEST_UPLOAD_CAPABILITY_HEADER, verifyManifestUploadCapability } from '../utils/manifest_upload_capability.ts'
-import { closeClient, getAppByIdPg, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { throwDatabaseUnavailable } from '../utils/pg_auth_lookup.ts'
-import { getAppByAppIdPg, getUserIdFromApikey } from '../utils/pg_files.ts'
+import { getAppByAppIdPg, getAppPlanStatePg, getUserIdFromApikey } from '../utils/pg_files.ts'
 import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
 import { buildRateLimitInfo, onPremiseAppResponse } from '../utils/rateLimitInfo.ts'
 import { checkPermissionPgFreshRetry } from '../utils/rbac.ts'
@@ -1283,12 +1283,13 @@ async function checkWriteAppAccess(c: Context, next: Next) {
       })
     }
 
-    const appPlan = await getAppByIdPg(c, app_id, drizzleClient, ATTACHMENT_PLAN_LIMIT)
-    if (!appPlan) {
-      throw quickError(503, 'upstream_unavailable', 'App plan state temporarily unavailable', { app_id })
-    }
+    const appPlan = await getAppPlanStatePg(c, app_id, drizzleClient, ATTACHMENT_PLAN_LIMIT)
+    if (appPlan.kind === 'db_error')
+      throwDatabaseUnavailable(c, 'checkWriteAppAccess.getAppPlanStatePg', appPlan.error, { app_id })
+    if (appPlan.kind === 'not_found')
+      throw quickError(404, 'app_not_found', 'App not found', { app_id })
 
-    if (!appPlan.plan_valid) {
+    if (!appPlan.value.plan_valid) {
       // Keep the explicit on_premise_app 429 (with Retry-After / Cache-Control) —
       // the edge cache contract depends on that error code and headers.
       return onPremiseAppResponse(c)

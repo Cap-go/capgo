@@ -41,7 +41,6 @@ vi.mock('../supabase/functions/_backend/utils/rate_limit.ts', () => ({
 
 vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
   closeClient: closeClientMock,
-  getAppByIdPg: vi.fn(),
   getDatabaseURL: vi.fn(() => 'postgres://test'),
   getDrizzleClient: vi.fn(() => ({})),
   getPgClient: getPgClientMock,
@@ -49,6 +48,7 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
 
 vi.mock('../supabase/functions/_backend/utils/pg_files.ts', () => ({
   getAppByAppIdPg: vi.fn(),
+  getAppPlanStatePg: vi.fn(),
   getUserIdFromApikey: vi.fn(),
 }))
 

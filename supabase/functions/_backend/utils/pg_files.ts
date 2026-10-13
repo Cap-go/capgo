@@ -1,9 +1,9 @@
 import type { Context } from 'hono'
-import type { getDrizzleClient } from './pg.ts'
+import type { getDrizzleClient, PlanAction } from './pg.ts'
 import type { PgAuthLookupResult } from './pg_auth_lookup.ts'
 import { eq, sql } from 'drizzle-orm'
 import { cloudlog } from './logging.ts'
-import { logPgError } from './pg.ts'
+import { buildPlanValidationExpression, logPgError } from './pg.ts'
 import { withAuthPgRetry } from './pg_auth_retry.ts'
 import * as schema from './postgres_schema.ts'
 
@@ -71,6 +71,39 @@ export async function getAppByAppIdPg(
   }
   catch (e: unknown) {
     logPgError(c, 'getAppByAppIdPg', e)
+    return { kind: 'db_error', error: e }
+  }
+}
+
+/**
+ * Get app owner_org and plan validity for the given plan actions.
+ * Distinguishes database errors from a missing app so callers can return a
+ * retryable database_unavailable instead of masking the failure.
+ */
+export async function getAppPlanStatePg(
+  c: Context,
+  appId: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  actions: PlanAction[],
+): Promise<PgAuthLookupResult<{ owner_org: string, plan_valid: boolean }>> {
+  try {
+    const app = await withAuthPgRetry(() => drizzleClient
+      .select({
+        owner_org: schema.apps.owner_org,
+        plan_valid: buildPlanValidationExpression(actions, schema.apps.owner_org),
+      })
+      .from(schema.apps)
+      .where(eq(schema.apps.app_id, appId))
+      .limit(1)
+      .then(data => data[0]))
+
+    if (!app)
+      return { kind: 'not_found' }
+
+    return { kind: 'ok', value: app }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAppPlanStatePg', e)
     return { kind: 'db_error', error: e }
   }
 }
