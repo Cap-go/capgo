@@ -178,9 +178,13 @@ Apply these prerequisites separately before deploying the production API Worker:
    binding uses that independently selected existing origin; alpha/preprod have no
    inventory binding. Confirm both consumer queues, their DLQs and notifications are
    healthy. The four production queue bindings only read metrics in this feature.
-4. Deploy the API and files Workers together after these prerequisites. Their v2
-   receipt signing secret remains separate from upload capability secrets. No
-   bucket rule, backfill, replica or packed protocol change is required.
+4. For initial activation, deploy the API Worker first and verify it accepts both
+   v1 and v2 receipts before deploying the files Worker that mints v2. Use this
+   controlled order even when a normal release deploys these Workers in parallel:
+   the previous API only verifies v1. Keep the receipt secret separate from upload
+   capability secrets. No bucket rule, backfill, replica or packed protocol change
+   is required. Roll back files first; do not revert API v2 verification while
+   completed uploads can still submit v2 receipts.
 
 The existing every-minute API callback runs notification flushing and expiry as
 independent tasks. Expiry never runs on API requests or in alpha/preprod. Fresh
