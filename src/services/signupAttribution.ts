@@ -7,6 +7,7 @@ import {
   hasFirstTouch,
   hasSignupAttributionFields,
   mergeSignupAttribution,
+  normalizeFirstTouchPath,
   parseCapgoAttributionCookieValue,
   parseSignupAttributionRecord,
   parseSignupAttributionSearchParams,
@@ -62,7 +63,7 @@ function readLocationSignupAttribution(): ResolvedSignupAttribution {
 }
 
 function isConsoleAttributionCapturePath(pathname: string): boolean {
-  const path = pathname.replace(/\/+$/, '') || '/'
+  const path = normalizeFirstTouchPath(pathname)
   return path === '/login' || path === '/login-cli'
 }
 

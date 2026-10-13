@@ -175,7 +175,10 @@ export const CAPGO_ATTRIBUTION_COOKIE_MAX_AGE_SECONDS = 180 * 24 * 60 * 60
 
 export function normalizeFirstTouchPath(pathname: string): string {
   const raw = pathname?.trim() || '/'
-  const withoutTrailing = raw.replace(/\/+$/, '') || '/'
+  let end = raw.length
+  while (end > 0 && raw.charCodeAt(end - 1) === 47)
+    end--
+  const withoutTrailing = raw.slice(0, end) || '/'
   return withoutTrailing.startsWith('/') ? withoutTrailing : `/${withoutTrailing}`
 }
 
