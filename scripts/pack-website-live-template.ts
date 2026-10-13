@@ -147,10 +147,10 @@ function main() {
   for (const file of files)
     contents.set(file, readFileSync(join(templateDir, file)))
 
-  // The native public folders are not committed: `cap copy` fills them from www/.
-  for (const required of ['ios/App/App/public/index.html', 'android/app/src/main/assets/public/index.html']) {
+  // Web copies and the Cordova plugins module are not committed: `cap sync` generates them.
+  for (const required of ['ios/App/App/public/index.html', 'android/app/src/main/assets/public/index.html', 'android/capacitor-cordova-android-plugins/build.gradle']) {
     if (!contents.has(required))
-      fail(`${required} missing: run "bunx cap copy" in templates/website-live-app`)
+      fail(`${required} missing: run "bunx cap sync" in templates/website-live-app`)
   }
 
   // The builder may only parse JSON configs (same reasoning as the CLI): ship a resolved one.

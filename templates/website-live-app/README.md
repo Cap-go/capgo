@@ -28,7 +28,7 @@ The Capgo native builder runs Fastlane directly on the uploaded project. It does
 - `ios/App/App/capacitor.config.json`
 - `android/app/src/main/assets/capacitor.config.json`, `capacitor.plugins.json`
 
-The web assets copied into `ios/App/App/public/` and `android/app/src/main/assets/public/` are not committed (they only duplicate `www/`): run `bunx cap copy` before packing, as the publish workflow does.
+The web assets copied into `ios/App/App/public/` and `android/app/src/main/assets/public/` and the `android/capacitor-cordova-android-plugins` module are not committed (they are generated): run `bunx cap sync` before packing, as the publish workflow does.
 - `ios/capacitor-cordova-ios-plugins/`, `android/capacitor-cordova-android-plugins/`
 
 The native `.gitignore` files were edited so these paths stay tracked.
@@ -87,7 +87,7 @@ xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -conf
 From the repo root:
 
 ```sh
-bunx cap copy                                        # in templates/website-live-app
+bunx cap sync                                        # in templates/website-live-app
 bun scripts/pack-website-live-template.ts            # -> dist/website-live-template.zip
 ```
 

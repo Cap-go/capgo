@@ -32,9 +32,9 @@ jobs:
       - name: Install template dependencies
         working-directory: templates/website-live-app
         run: bun install --frozen-lockfile
-      - name: Copy web assets into the native projects
+      - name: Generate synced native files
         working-directory: templates/website-live-app
-        run: bunx cap copy
+        run: bunx cap sync
       - name: Pack template
         run: bun scripts/pack-website-live-template.ts
       - name: Publish release asset
