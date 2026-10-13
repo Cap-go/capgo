@@ -3160,6 +3160,7 @@ export type Database = {
           first_seen_at: string
           last_event_at: string | null
           last_reconciled_at: string | null
+          manifest_lease_expires_at: string | null
           r2_key: string
           r2_last_modified_at: string | null
           r2_state: Database["public"]["Enums"]["r2_object_state"]
@@ -3175,6 +3176,7 @@ export type Database = {
           first_seen_at?: string
           last_event_at?: string | null
           last_reconciled_at?: string | null
+          manifest_lease_expires_at?: string | null
           r2_key: string
           r2_last_modified_at?: string | null
           r2_state: Database["public"]["Enums"]["r2_object_state"]
@@ -3190,6 +3192,7 @@ export type Database = {
           first_seen_at?: string
           last_event_at?: string | null
           last_reconciled_at?: string | null
+          manifest_lease_expires_at?: string | null
           r2_key?: string
           r2_last_modified_at?: string | null
           r2_state?: Database["public"]["Enums"]["r2_object_state"]

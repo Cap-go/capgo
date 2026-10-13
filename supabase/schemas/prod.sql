@@ -24362,6 +24362,7 @@ CREATE TABLE IF NOT EXISTS "public"."r2_objects" (
     "first_seen_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "revision" bigint DEFAULT 1 NOT NULL,
+    "manifest_lease_expires_at" timestamp with time zone,
     CONSTRAINT "r2_objects_bucket_check" CHECK ((("octet_length"("bucket_name") >= 1) AND ("octet_length"("bucket_name") <= 256))),
     CONSTRAINT "r2_objects_cleanup_check" CHECK ((("cleanup_requested_at" IS NULL) OR ("r2_state" = ANY (ARRAY['to_be_deleted'::"public"."r2_object_state", 'deleted'::"public"."r2_object_state"])))),
     CONSTRAINT "r2_objects_key_check" CHECK ((("octet_length"("r2_key") >= 1) AND ("octet_length"("r2_key") <= 1024))),
@@ -24387,6 +24388,10 @@ COMMENT ON COLUMN "public"."r2_objects"."last_event_at" IS 'Latest accepted R2 e
 
 
 COMMENT ON COLUMN "public"."r2_objects"."last_reconciled_at" IS 'Conservative request-start boundary of an applied direct R2 observation.';
+
+
+
+COMMENT ON COLUMN "public"."r2_objects"."manifest_lease_expires_at" IS 'Expiry for future manifest upload reservations and cleanup; NULL means no lease. Future reservations extend it with GREATEST(COALESCE(existing_expiry, database_now), database_now + interval ''30 minutes'').';
 
 
 
@@ -26566,6 +26571,10 @@ CREATE INDEX "platform_impersonation_sessions_expires_at_idx" ON "public"."platf
 
 
 CREATE INDEX "processed_stripe_events_customer_id_date_id_idx" ON "public"."processed_stripe_events" USING "btree" ("customer_id", "date_id");
+
+
+
+CREATE INDEX "r2_objects_expired_manifest_leases_idx" ON "public"."r2_objects" USING "btree" ("bucket_name", "manifest_lease_expires_at", "r2_key") WHERE (("r2_state" = 'to_be_uploaded'::"public"."r2_object_state") AND ("manifest_lease_expires_at" IS NOT NULL));
 
 
 
