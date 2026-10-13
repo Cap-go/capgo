@@ -4,17 +4,17 @@ import { sendNotifToOrgMembers } from './org_email_notifications.ts'
 import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
 import { sendEventToTracking } from './tracking.ts'
 
-/** Bento event: the email template that explains the CocoaPods end of support lives in Bento. */
+/** Bento event: the email template that explains why to leave CocoaPods lives in Bento. */
 export const COCOAPODS_DEPRECATION_EVENT = 'org:ios_cocoapods_deprecation'
-/** Capgo Cloud Build stops building CocoaPods iOS projects on this date. */
-export const COCOAPODS_END_OF_SUPPORT = '2026-12-01'
+/** The CocoaPods trunk becomes read-only on this date: no new or updated pods after it. */
+export const COCOAPODS_TRUNK_READ_ONLY = '2026-12-02'
 const MIGRATION_GUIDE_URL = 'https://capacitorjs.com/docs/ios/spm'
 /** At most one reminder per app and per week while the app keeps building with CocoaPods. */
 const REMINDER_CRON = '0 0 * * 1'
 
 /**
  * Emails the org admins (Bento event COCOAPODS_DEPRECATION_EVENT) when an iOS build still uses
- * CocoaPods: Capgo Cloud Build only builds Swift Package Manager projects from December 2026.
+ * CocoaPods: the CocoaPods trunk freezes in December 2026, so pods stop getting updates and security fixes.
  * Best effort: never fails the build request.
  */
 export async function notifyCocoaPodsDeprecation(c: Context, input: {
@@ -27,7 +27,7 @@ export async function notifyCocoaPodsDeprecation(c: Context, input: {
     const sent = await sendNotifToOrgMembers(c, COCOAPODS_DEPRECATION_EVENT, 'builder_onboarding', {
       app_id: input.appId,
       ios_dependency_manager: input.iosDependencyManager,
-      end_of_support: COCOAPODS_END_OF_SUPPORT,
+      trunk_read_only: COCOAPODS_TRUNK_READ_ONLY,
       migration_guide_url: MIGRATION_GUIDE_URL,
     }, input.orgId, input.appId, REMINDER_CRON, getDrizzleClient(pgClient))
     if (sent === true) {
