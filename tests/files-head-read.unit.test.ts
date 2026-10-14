@@ -32,8 +32,8 @@ vi.mock('../supabase/functions/_backend/files/retry.ts', () => ({
   DEFAULT_RETRY_PARAMS: {},
   RetryBucket: class RetryBucketMock {
     constructor() { }
-    get() {
-      return retryGetMock()
+    get(key: string) {
+      return retryGetMock(key)
     }
 
     head(key: string) {
@@ -248,30 +248,65 @@ describe('files attachment HEAD reads on workerd/R2', () => {
     expect(createStatsBandwidthMock).not.toHaveBeenCalled()
   })
 
-  it('heads dotfile delta paths using legacy and WAF-safe storage keys', async () => {
+  it.each(['HEAD', 'GET'])('requires exact physical keys for CLI %s while preserving device aliases', async (method) => {
     const hash = 'a'.repeat(64)
     const legacyKey = `orgs/test-org/apps/com.test.app/delta/${hash}_.htaccess`
     const safeKey = `orgs/test-org/apps/com.test.app/delta/${hash}_%2Ehtaccess`
-    const headCalls: string[] = []
-    retryHeadMock.mockImplementation(async (key: string) => {
-      headCalls.push(key)
-      if (key === legacyKey)
-        return createR2HeadObject(4)
-      return null
-    })
+    retryHeadMock.mockImplementation(async (key: string) => key === legacyKey ? { ...createR2HeadObject(4), key: legacyKey } : null)
+    retryGetMock.mockImplementation(async (key: string) => key === legacyKey ? { ...createR2Object(4), key: legacyKey } : null)
     const appGlobal = await createFilesApp()
-    const dotfileReadUrl = `http://localhost/files/read/attachments/${encodeURIComponent(safeKey)}?nocache=test`
-
+    const url = `http://localhost/files/read/attachments/${encodeURIComponent(safeKey)}`
+    const env = { MANIFEST_SIZE_RECEIPT_SECRET: 'receipt-secret', ATTACHMENT_BUCKET: {} }
     const response = await appGlobal.fetch(
-      new Request(dotfileReadUrl, { method: 'HEAD', headers: { 'x-cli-version': '7.0.0' } }),
-      { MANIFEST_SIZE_RECEIPT_SECRET: 'receipt-secret', ATTACHMENT_BUCKET: {} },
-      { waitUntil: () => { } } as any,
+      new Request(`${url}${method === 'HEAD' ? '?nocache=' : ''}`, { method, headers: method === 'GET' ? { 'x-cli-version': '8.82.0' } : {} }),
+      env,
+      { waitUntil: () => {} } as any,
     )
+    expect(response.status).toBe(404)
+    expect(response.headers.get('x-capgo-manifest-size-receipt')).toBeNull()
+    expect(retryHeadMock).not.toHaveBeenCalledWith(legacyKey)
+    expect(retryGetMock).not.toHaveBeenCalledWith(legacyKey)
 
-    expect(response.status).toBe(200)
-    expect(headCalls[0]).toBe(safeKey)
-    expect(headCalls).toContain(legacyKey)
-    expect(headCalls).not.toContain(`orgs/test-org/apps/com.test.app/delta/${hash}_%252Ehtaccess`)
+    const deviceResponse = await appGlobal.fetch(new Request(url, { method }), env, { waitUntil: () => {} } as any)
+    expect(deviceResponse.status).toBe(200)
+    expect(deviceResponse.headers.get('x-capgo-manifest-size-receipt')).toBeNull()
+
+    const exactResponse = await appGlobal.fetch(
+      new Request(`http://localhost/files/read/attachments/${encodeURIComponent(legacyKey)}?nocache=test`, { method }),
+      env,
+      { waitUntil: () => {} } as any,
+    )
+    const { verifyManifestSizeReceiptFacts } = await import('../supabase/functions/_backend/utils/manifest_size_receipt.ts')
+    const receipt = exactResponse.headers.get('x-capgo-manifest-size-receipt')!
+    expect(exactResponse.status).toBe(200)
+    expect(await verifyManifestSizeReceiptFacts('receipt-secret', 'capgo', [{ path: legacyKey, receipt }])).not.toBeNull()
+    expect(await verifyManifestSizeReceiptFacts('receipt-secret', 'capgo', [{ path: safeKey, receipt }])).toBeNull()
+  })
+
+  it.each(['HEAD', 'GET'])('rejects CLI %s cached aliases that have no receipt for the exact physical key', async (method) => {
+    const hash = 'a'.repeat(64)
+    const legacyKey = `orgs/test-org/apps/com.test.app/delta/${hash}_.htaccess`
+    const safeKey = `orgs/test-org/apps/com.test.app/delta/${hash}_%2Ehtaccess`
+    const { createManifestSizeReceipt } = await import('../supabase/functions/_backend/utils/manifest_size_receipt.ts')
+    const receipt = await createManifestSizeReceipt('receipt-secret', 'capgo', legacyKey, { size: 4, source: 'r2_read', evidenceAt: Date.now() - 60_000 })
+    globalThis.caches = { default: {
+      match: async (request: Request) => new URL(request.url).pathname.startsWith('/deleted/') ? null : new Response('cached bytes', { headers: { 'content-length': '4', 'x-capgo-manifest-size-receipt': receipt } }),
+      put: async () => {},
+    } } as any
+    retryHeadMock.mockImplementation(async (key: string) => key === legacyKey ? { ...createR2HeadObject(4), key: legacyKey } : null)
+    const appGlobal = await createFilesApp()
+    const url = `http://localhost/files/read/attachments/${encodeURIComponent(safeKey)}`
+    const env = { MANIFEST_SIZE_RECEIPT_SECRET: 'receipt-secret', ATTACHMENT_BUCKET: {} }
+    const response = await appGlobal.fetch(
+      new Request(`${url}?nocache=test`, { method }),
+      env,
+      { waitUntil: () => {} } as any,
+    )
+    expect(response.status).toBe(404)
+    expect(response.headers.get('x-capgo-manifest-size-receipt')).toBeNull()
+    expect(retryHeadMock).not.toHaveBeenCalledWith(legacyKey)
+    const deviceResponse = await appGlobal.fetch(new Request(url, { method }), env, { waitUntil: () => {} } as any)
+    expect(deviceResponse.status).toBe(200)
   })
 
   it('does not add generic percent decode candidates for non-dotfile attachment paths', async () => {
@@ -337,6 +372,85 @@ describe('files attachment HEAD reads on workerd/R2', () => {
     )
 
     expect(response.headers.get('x-capgo-manifest-size-receipt')).not.toBeNull()
+  })
+
+  it('uses local read evidence even when provider upload metadata is ahead of the clock', async () => {
+    retryHeadMock.mockResolvedValue({ ...createR2HeadObject(12), uploaded: new Date(Date.now() + 10_000) })
+    const response = await fetchHead(await createFilesApp())
+    expect(response.status).toBe(200)
+    const { verifyManifestSizeReceiptFacts } = await import('../supabase/functions/_backend/utils/manifest_size_receipt.ts')
+    expect(await verifyManifestSizeReceiptFacts('receipt-secret', 'capgo', [{ path: filePath, receipt: response.headers.get('x-capgo-manifest-size-receipt')! }])).toEqual([expect.objectContaining({ source: 'r2_read', size: 12 })])
+  })
+
+  it('captures read evidence before awaiting R2 metadata', async () => {
+    const start = Date.now()
+    let clock = start
+    const dateNow = vi.spyOn(Date, 'now').mockImplementation(() => clock)
+    retryHeadMock.mockImplementation(async () => {
+      clock += 10_000
+      return createR2HeadObject(12)
+    })
+    try {
+      const response = await fetchHead(await createFilesApp())
+      const { verifyManifestSizeReceiptFacts } = await import('../supabase/functions/_backend/utils/manifest_size_receipt.ts')
+      expect(await verifyManifestSizeReceiptFacts('receipt-secret', 'capgo', [{ path: filePath, receipt: response.headers.get('x-capgo-manifest-size-receipt')! }])).toEqual([
+        expect.objectContaining({ source: 'r2_read', evidenceAt: start, signedAt: start + 10_000 }),
+      ])
+    }
+    finally { dateNow.mockRestore() }
+  })
+
+  it('preserves the original cached receipt and does not refresh its signing or evidence times', async () => {
+    const { createManifestSizeReceipt, verifyManifestSizeReceiptFacts } = await import('../supabase/functions/_backend/utils/manifest_size_receipt.ts')
+    const evidenceAt = Date.now() - 60_000
+    const originalReceipt = await createManifestSizeReceipt('receipt-secret', 'capgo', filePath, { size: 12, source: 'r2_read', evidenceAt })
+    globalThis.caches = {
+      default: {
+        match: async (request: Request) => new URL(request.url).pathname.startsWith('/deleted/')
+          ? null
+          : new Response('cached bytes', {
+              headers: { 'content-length': '12', 'x-capgo-manifest-size-receipt': originalReceipt },
+            }),
+        put: async () => {},
+      },
+    } as any
+    retryHeadMock.mockResolvedValue(createR2HeadObject(12))
+    const response = await fetchHead(await createFilesApp())
+    expect(response.headers.get('x-capgo-manifest-size-receipt')).toBe(originalReceipt)
+    expect(await verifyManifestSizeReceiptFacts('receipt-secret', 'capgo', [{ path: filePath, receipt: originalReceipt }])).toEqual([
+      expect.objectContaining({ evidenceAt }),
+    ])
+  })
+
+  it('cannot mint a receipt from an old cache entry when R2 has no object', async () => {
+    globalThis.caches = {
+      default: {
+        match: async (request: Request) => new URL(request.url).pathname.startsWith('/deleted/')
+          ? null
+          : new Response('cached bytes', {
+              headers: { 'content-length': '12', 'x-capgo-manifest-size-receipt': 'legacy-cached-value' },
+            }),
+        put: async () => {},
+      },
+    } as any
+    retryHeadMock.mockResolvedValue(null)
+    const response = await fetchHead(await createFilesApp())
+    expect(response.status).toBe(404)
+    expect(response.headers.get('x-capgo-manifest-size-receipt')).toBeNull()
+  })
+
+  it('stores the original receipt with cached R2 bytes', async () => {
+    const put = vi.fn(async (_request: Request, _response: Response) => {})
+    globalThis.caches = { default: { match: async () => null, put } } as any
+    retryGetMock.mockResolvedValue(createR2Object(12))
+    const response = await (await createFilesApp()).fetch(
+      new Request(plainReadUrl, { headers: { 'x-cli-version': '7.0.0' } }),
+      { MANIFEST_SIZE_RECEIPT_SECRET: 'receipt-secret', ATTACHMENT_BUCKET: {} },
+      { waitUntil: () => {} } as any,
+    )
+    expect(put).toHaveBeenCalled()
+    const cached = put.mock.calls[0]![1] as Response
+    expect(cached.headers.get('x-capgo-manifest-size-receipt')).toBe(response.headers.get('x-capgo-manifest-size-receipt'))
   })
 
   it('adds a complete-size receipt to CLI cache hits', async () => {

@@ -1,21 +1,22 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
+import { parseSignupAttributionRecord, signupAttributionEventTags } from '../../shared/signup-attribution.ts'
 import { syncBentoSubscriberTags } from '../utils/bento.ts'
 import { buildBillingPlanBentoTags } from '../utils/billing_bento_tags.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { groupIdentifyPosthog } from '../utils/posthog.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
-import { createStripeCustomer, finalizePendingStripeCustomer, isPendingStripeCustomerId } from '../utils/stripe_org.ts'
 import { buildOnboardingIntentBentoEventData, parseOrgOnboardingIntent, syncOrgOnboardingIntentForOrg } from '../utils/org_onboarding_intent.ts'
+import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { resolveSignupAttributionForOrg, resolveSignupAttributionForUser } from '../utils/signup_attribution.ts'
-import { parseSignupAttributionRecord, signupAttributionEventTags } from '../../shared/signup-attribution.ts'
+import { createStripeCustomer, finalizePendingStripeCustomer, isPendingStripeCustomerId } from '../utils/stripe_org.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+/** Processes committed org creation with stable analytics identity and notification claims. */
 app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c) => {
   const queuedRecord = c.get('webhookBody') as Database['public']['Tables']['orgs']['Row']
   cloudlog({ requestId: c.get('requestId'), message: 'record', record: queuedRecord })
@@ -24,6 +25,9 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
     throw simpleError('no_id', 'No id', { record: queuedRecord })
   }
+
+  if (!queuedRecord.created_at || !Number.isFinite(new Date(queuedRecord.created_at).getTime()))
+    throw simpleError('invalid_payload', 'Missing organization creation timestamp')
 
   // INSERT queue payloads omit customer_id when org-create assigns it in a later
   // AFTER INSERT trigger; reload the committed row before Stripe bootstrap.
@@ -143,7 +147,7 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
 
   await sendEventToTracking(c, {
     bento: {
-      cron: '* * * * *',
+      once: true,
       data: onboardingBentoData,
       event: 'org:created',
       preferenceKey: 'onboarding',
@@ -151,14 +155,22 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     },
     channel: 'org-created',
     event: 'Org Created',
+    // pgmq.send is part of the org INSERT transaction; delivery starts after commit.
+    occurred_at: new Date(queuedRecord.created_at).toISOString(),
+    timeoutMs: 1000,
     sentToBento: true,
-    user_id: org.created_by,
+    user_id: queuedRecord.created_by,
     groups: { organization: org.id },
+    nonPersonTags: {
+      org_id: org.id,
+      $insert_id: `org-created:${org.id}`,
+      capture_source: 'database_trigger',
+    },
     tags: {
       owner_org: org.id,
       ...orgCreatedAttributionTags,
     },
-  })
+  }, { background: false, strict: true, requirePosthogDelivery: true })
 
   return c.json(BRES)
 })

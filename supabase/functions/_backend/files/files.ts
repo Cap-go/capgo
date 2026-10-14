@@ -12,7 +12,7 @@ import { quickError, simpleError, simpleRateLimit } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { getDotfileDeltaStorageCandidateKeys } from '../utils/manifest_encoding.ts'
-import { createManifestSizeReceipt, MANIFEST_SIZE_RECEIPT_HEADER } from '../utils/manifest_size_receipt.ts'
+import { createManifestSizeReceipt, getManifestReceiptBucket, MANIFEST_SIZE_RECEIPT_HEADER, manifestSizeReceiptEvidenceFromR2, verifyManifestSizeReceiptFacts } from '../utils/manifest_size_receipt.ts'
 import { MANIFEST_UPLOAD_CAPABILITY_HEADER, verifyManifestUploadCapability } from '../utils/manifest_upload_capability.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { throwDatabaseLookupError, throwDatabaseUnavailable } from '../utils/pg_auth_lookup.ts'
@@ -427,9 +427,6 @@ async function getSupabaseStorageResponse(c: Context, fileId: string): Promise<R
     await saveBandwidthUsage(c, getTransferredBytesFromResponse(response))
   }
   const attachmentResponse = withAttachmentResponseHeaders(response, fileId, method !== 'HEAD')
-  const storedObjectSize = getStoredObjectSizeFromResponse(attachmentResponse)
-  if (storedObjectSize != null)
-    await addManifestSizeReceipt(c, attachmentResponse.headers, fileId, storedObjectSize)
   return attachmentResponse
 }
 
@@ -455,10 +452,15 @@ async function getHandler(c: Context): Promise<Response> {
 
   const cache = await getFileReadCache()
   const rawFileId = getRawAttachmentRouteId(c)
-  const candidateKeys = [...new Set(
-    getSafeAttachmentReadCandidateKeys(fileId, rawFileId)
-      .flatMap(key => getDotfileDeltaStorageCandidateKeys(key)),
-  )]
+  // Receipt-aware CLI checks must test the exact key they will put in the manifest.
+  // Devices retain legacy alias reads, but an alias cannot satisfy upload existence.
+  const wantsReceipt = shouldAddManifestSizeReceipt(c)
+  const candidateKeys = wantsReceipt
+    ? [fileId]
+    : [...new Set(
+        getSafeAttachmentReadCandidateKeys(fileId, rawFileId)
+          .flatMap(key => getDotfileDeltaStorageCandidateKeys(key)),
+      )]
   const cacheKey = buildFileReadCacheRequest(c.req.raw)
   let response = cache ? await cache.match(cacheKey) : null
   if (response != null) {
@@ -470,9 +472,6 @@ async function getHandler(c: Context): Promise<Response> {
     const cachedResponse = ensureNoTransformResponse(response)
     response = cachedResponse
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
-    if (!isHead) {
-      await saveBandwidthUsage(c, getTransferredBytesFromResponse(cachedResponse))
-    }
     // Best-effort restore: if a live file is cached but missing in R2, write it back.
     await backgroundTask(c, async () => {
       try {
@@ -503,9 +502,32 @@ async function getHandler(c: Context): Promise<Response> {
     })
     const cachedHeaders = new Headers(cachedResponse.headers)
     cachedHeaders.delete(MANIFEST_SIZE_RECEIPT_HEADER)
-    const storedObjectSize = getStoredObjectSizeFromResponse(cachedResponse)
-    if (storedObjectSize != null)
-      await addManifestSizeReceipt(c, cachedHeaders, fileId, storedObjectSize)
+    const secret = getEnv(c, 'MANIFEST_SIZE_RECEIPT_SECRET')
+    if (wantsReceipt) {
+      const originalReceipt = cachedResponse.headers.get(MANIFEST_SIZE_RECEIPT_HEADER)
+      const facts = originalReceipt ? await verifyManifestSizeReceiptFacts(secret, getManifestReceiptBucket(getEnv(c, 'ENV_NAME')), [{ path: fileId, receipt: originalReceipt }]) : null
+      if (facts?.[0]?.version === 2) {
+        // Cache evidence keeps its original receipt, including its original signing time.
+        cachedHeaders.set(MANIFEST_SIZE_RECEIPT_HEADER, originalReceipt!)
+      }
+      else {
+        // Older caches cannot attest current R2 presence. CLI existence checks may
+        // obtain actual metadata; ordinary cached downloads do not do this work.
+        const readStartedAt = Date.now()
+        try {
+          const objectInfo = await headFirstExistingAttachmentCandidate(new RetryBucket(bucket, DEFAULT_RETRY_PARAMS), candidateKeys)
+          if (!objectInfo || objectInfo.key !== fileId)
+            return notFoundAttachmentResponse(c, isHead)
+          await addManifestSizeReceipt(c, cachedHeaders, objectInfo, readStartedAt)
+        }
+        catch (error) {
+          cloudlogErr({ requestId: c.get('requestId'), message: 'Cached file receipt R2 metadata unavailable', fileId, error })
+          throw quickError(503, 'upstream_unavailable', 'File storage evidence temporarily unavailable', { fileId }, error, { alert: false })
+        }
+      }
+    }
+    if (!isHead)
+      await saveBandwidthUsage(c, getTransferredBytesFromResponse(cachedResponse))
     const responseWithRequestHeaders = new Response(cachedResponse.body, {
       headers: cachedHeaders,
       status: cachedResponse.status,
@@ -547,6 +569,7 @@ async function getHandler(c: Context): Promise<Response> {
     // HEAD must use R2 metadata only (head()), never bucket.get() — streaming a
     // multi-MB body and stripping it breaks HTTP/2 Content-Length on Workers.
     let objectInfo: R2Object | null = null
+    const readStartedAt = Date.now()
     try {
       objectInfo = await headFirstExistingAttachmentCandidate(new RetryBucket(bucket, DEFAULT_RETRY_PARAMS), candidateKeys)
     }
@@ -561,7 +584,7 @@ async function getHandler(c: Context): Promise<Response> {
     }
 
     const headers = objectHeaders(objectInfo)
-    await addManifestSizeReceipt(c, headers, fileId, objectInfo.size)
+    await addManifestSizeReceipt(c, headers, objectInfo, readStartedAt)
     headers.set('Content-Disposition', `attachment; filename="${objectInfo.key}"`)
 
     if (rangeHeaderFromRequest) {
@@ -580,6 +603,7 @@ async function getHandler(c: Context): Promise<Response> {
   }
 
   let object: R2ObjectBody | null = null
+  const readStartedAt = Date.now()
   try {
     for (const candidateKey of candidateKeys) {
       object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(candidateKey, {
@@ -604,20 +628,18 @@ async function getHandler(c: Context): Promise<Response> {
   if (object.range != null && c.req.header('range')) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeader(object.size, object.range) })
     headers.set('content-range', rangeHeader(object.size, object.range))
-    await addManifestSizeReceipt(c, headers, fileId, object.size)
+    await addManifestSizeReceipt(c, headers, object, readStartedAt)
     response = new Response(object.body, { headers, status: 206 })
     return response
   }
   headers.set('Content-Disposition', `attachment; filename="${object.key}"`)
+  await addManifestSizeReceipt(c, headers, object, readStartedAt)
   response = new Response(object.body, { headers })
   if (cache && !await isAttachmentVersionDeleted(c, fileId)) {
     const cacheResponse = response.clone()
-    await backgroundTask(c, () => {
-      cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId })
-      return cache.put(cacheKey, cacheResponse)
-    })
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId })
+    await backgroundTask(c, cache.put(cacheKey, cacheResponse))
   }
-  await addManifestSizeReceipt(c, response.headers, fileId, object.size)
   return response
 }
 
@@ -647,30 +669,19 @@ function shouldAddManifestSizeReceipt(c: Context): boolean {
   return hasNoCacheQuery || (cliVersion != null && cliVersion.trim().length > 0)
 }
 
-function getStoredObjectSizeFromResponse(response: Response): number | null {
-  const contentRange = response.headers.get('content-range')
-  if (contentRange) {
-    const match = /^bytes \d+-\d+\/(\d+)$/i.exec(contentRange)
-    if (match) {
-      const completeSize = Number(match[1])
-      if (Number.isSafeInteger(completeSize) && completeSize >= 0)
-        return completeSize
-    }
-  }
-
-  const rawContentLength = response.headers.get('content-length')
-  if (!rawContentLength || !/^\d+$/.test(rawContentLength))
-    return null
-
-  const contentLength = Number(rawContentLength)
-  return Number.isSafeInteger(contentLength) ? contentLength : null
-}
-
-async function addManifestSizeReceipt(c: Context, headers: Headers, path: string, size: number) {
+async function addManifestSizeReceipt(c: Context, headers: Headers, object: R2Object, readStartedAt: number) {
   headers.delete(MANIFEST_SIZE_RECEIPT_HEADER)
   const secret = getEnv(c, 'MANIFEST_SIZE_RECEIPT_SECRET')
-  if (secret && shouldAddManifestSizeReceipt(c))
-    headers.set(MANIFEST_SIZE_RECEIPT_HEADER, await createManifestSizeReceipt(secret, path, size))
+  // Inventory evidence must describe the exact key the manifest will register.
+  if (secret && shouldAddManifestSizeReceipt(c) && object.key === c.get('fileId')) {
+    try {
+      headers.set(MANIFEST_SIZE_RECEIPT_HEADER, await createManifestSizeReceipt(secret, getManifestReceiptBucket(getEnv(c, 'ENV_NAME')), object.key, manifestSizeReceiptEvidenceFromR2(object, 'r2_read', readStartedAt)))
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'File manifest size receipt evidence unavailable', error })
+      throw quickError(503, 'upstream_unavailable', 'File storage evidence temporarily unavailable', undefined, error, { alert: false })
+    }
+  }
 }
 
 function rangeHeader(objLen: number, r2Range: R2Range): string {
