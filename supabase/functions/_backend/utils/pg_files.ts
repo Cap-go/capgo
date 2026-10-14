@@ -48,52 +48,54 @@ export async function getUserIdFromApikey(
 
 /**
  * Get app owner_org and plan validity for the given plan actions.
- * Each attempt runs on a fresh primary client: a Hyperdrive Client whose
- * connection dropped is not queryable, so retrying on it cannot recover.
+ * The first attempt reuses the caller's primary client. A transient failure
+ * retries once on a fresh primary client: a Hyperdrive Client whose connection
+ * dropped is not queryable, so retrying on it cannot recover.
  * Distinguishes database errors from a missing app so callers can return a
  * retryable database_unavailable instead of masking the failure.
  */
 export async function getAppPlanStatePg(
   c: Context,
   appId: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: PlanAction[],
 ): Promise<PgAuthLookupResult<{ owner_org: string, plan_valid: boolean }>> {
   if (actions.length === 0)
     throw new Error('getAppPlanStatePg requires at least one plan action')
 
-  let lastError: unknown
-  for (let attempt = 0; attempt < 2; attempt++) {
-    let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
-    try {
-      pgClient = await getPgClient(c, false)
-      const app = await getDrizzleClient(pgClient)
-        .select({
-          owner_org: schema.apps.owner_org,
-          plan_valid: buildPlanValidationExpression(actions, schema.apps.owner_org),
-        })
-        .from(schema.apps)
-        .where(eq(schema.apps.app_id, appId))
-        .limit(1)
-        .then(data => data[0])
+  const query = (client: ReturnType<typeof getDrizzleClient>) => client
+    .select({
+      owner_org: schema.apps.owner_org,
+      plan_valid: buildPlanValidationExpression(actions, schema.apps.owner_org),
+    })
+    .from(schema.apps)
+    .where(eq(schema.apps.app_id, appId))
+    .limit(1)
+    .then(data => data[0])
+  const toResult = (app: { owner_org: string, plan_valid: boolean } | undefined): PgAuthLookupResult<{ owner_org: string, plan_valid: boolean }> =>
+    app ? { kind: 'ok', value: app } : { kind: 'not_found' }
 
-      if (!app)
-        return { kind: 'not_found' }
-
-      return { kind: 'ok', value: app }
-    }
-    catch (e: unknown) {
-      logPgError(c, `getAppPlanStatePg attempt ${attempt + 1}`, e)
-      lastError = e
-      if (attempt === 0 && isTransientPgError(e)) {
-        await waitAuthPgRetryJitter()
-        continue
-      }
-      break
-    }
-    finally {
-      if (pgClient)
-        await closeClient(c, pgClient)
-    }
+  try {
+    return toResult(await query(drizzleClient))
   }
-  return { kind: 'db_error', error: lastError }
+  catch (e: unknown) {
+    logPgError(c, 'getAppPlanStatePg', e)
+    if (!isTransientPgError(e))
+      return { kind: 'db_error', error: e }
+  }
+
+  await waitAuthPgRetryJitter()
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
+  try {
+    pgClient = await getPgClient(c, false)
+    return toResult(await query(getDrizzleClient(pgClient)))
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAppPlanStatePg retry', e)
+    return { kind: 'db_error', error: e }
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
+  }
 }

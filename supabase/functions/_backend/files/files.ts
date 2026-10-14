@@ -1251,7 +1251,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     }
 
     // One primary read for ownership + plan gating
-    const appLookup = await getAppPlanStatePg(c, app_id, ATTACHMENT_PLAN_LIMIT)
+    const appLookup = await getAppPlanStatePg(c, app_id, drizzleClient, ATTACHMENT_PLAN_LIMIT)
     if (appLookup.kind === 'db_error')
       throwDatabaseLookupError(c, 'checkWriteAppAccess.getAppPlanStatePg', appLookup.error, { app_id })
 
