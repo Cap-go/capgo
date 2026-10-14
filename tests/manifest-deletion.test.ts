@@ -6,10 +6,9 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { getPgClient, closeClient, restoreObjectFromTrash, moveObjectToTrash, deleteObject } = vi.hoisted(() => ({
+const { getPgClient, closeClient, moveObjectToTrash, deleteObject } = vi.hoisted(() => ({
   getPgClient: vi.fn(),
   closeClient: vi.fn(),
-  restoreObjectFromTrash: vi.fn(async (..._args: any[]) => true),
   moveObjectToTrash: vi.fn(),
   deleteObject: vi.fn(),
 }))
@@ -20,7 +19,7 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', async importOriginal => ({
 }))
 vi.mock('../supabase/functions/_backend/utils/s3.ts', () => ({
   getPath: vi.fn(),
-  s3: { restoreObjectFromTrash, moveObjectToTrash, deleteObject },
+  s3: { moveObjectToTrash, deleteObject },
 }))
 
 const { deleteVersionManifestBatch } = await import('../supabase/functions/_backend/utils/manifest_cleanup.ts')
@@ -53,8 +52,7 @@ async function seedVersion(id: number, count: number, deleted = true, trackedCou
 
 async function state(id: number) {
   const result = await pool.query(`SELECT av.manifest_count, av.manifest, a.manifest_bundle_count,
-    (SELECT count(*)::int FROM public.manifest WHERE app_version_id = av.id) AS rows,
-    (SELECT count(*)::int FROM public.manifest_trash_restore_pending WHERE app_version_id = av.id) AS pending
+    (SELECT count(*)::int FROM public.manifest WHERE app_version_id = av.id) AS rows
     FROM public.app_versions av JOIN public.apps a USING (app_id) WHERE av.id = $1`, [id])
   return result.rows[0]
 }
@@ -73,15 +71,17 @@ beforeAll(async () => {
       total_file_size bigint, payload_hash bytea, manifest bytea, size_receipts_provided boolean, manifest_size bigint, manifest_size_payload_hash bytea);
     CREATE TABLE public.manifest_trash_restore_pending (app_version_id bigint REFERENCES public.app_versions ON DELETE CASCADE,
       s3_path text, created_at timestamptz DEFAULT now(), PRIMARY KEY (app_version_id, s3_path));`)
-  // Apply the actual migration, including its ownership/permission contract.
+  await pool.query(`INSERT INTO public.apps (app_id) VALUES ('com.test.legacy.restore');
+    INSERT INTO public.app_versions (id, app_id) VALUES (999, 'com.test.legacy.restore');
+    INSERT INTO public.manifest_trash_restore_pending (app_version_id, s3_path) VALUES (999, 'delta/legacy');`)
+  // Apply the actual migration to existing recovery state as well as fresh schemas.
   await pool.query(await readFile(new URL('../supabase/migrations/20261013151417_retain_manifest_delta_objects.sql', import.meta.url), 'utf8'))
   getPgClient.mockResolvedValue(pool)
 })
 
 beforeEach(async () => {
   vi.clearAllMocks()
-  restoreObjectFromTrash.mockResolvedValue(true)
-  await pool.query('TRUNCATE public.apps, public.app_versions, public.manifest, public.manifest_per_version, public.manifest_trash_restore_pending CASCADE')
+  await pool.query('TRUNCATE public.apps, public.app_versions, public.manifest, public.manifest_per_version CASCADE')
   await pool.query('INSERT INTO public.apps (app_id) VALUES ($1)', [appId])
 })
 
@@ -103,7 +103,6 @@ describe('manifest deletion Postgres effects', () => {
     expect(pool.totalCount).toBeLessThanOrEqual(4)
     expect(moveObjectToTrash).not.toHaveBeenCalled()
     expect(deleteObject).not.toHaveBeenCalled()
-    expect(restoreObjectFromTrash).not.toHaveBeenCalled()
   })
 
   it('commits partial batches then finishes after interruption without double accounting', async () => {
@@ -139,29 +138,29 @@ describe('manifest deletion Postgres effects', () => {
     expect(await state(1)).toMatchObject({ manifest: null, manifest_count: '0', manifest_bundle_count: '0' })
   })
 
-  it('sweeps stale counts and pending-only versions without discarding recovery or premature finalization', async () => {
-    await seedVersion(1, 0, true, 2)
-    await seedVersion(2, 0)
-    await pool.query('UPDATE public.apps SET manifest_bundle_count = 1')
-    await pool.query(`INSERT INTO public.manifest_trash_restore_pending (app_version_id, s3_path) VALUES (2, 'delta/pending')`)
-    expect((await pool.query('SELECT public.sweep_deleted_version_manifests(1) AS count')).rows[0].count).toBe('1')
-    expect(await state(1)).toMatchObject({ manifest_count: '2', manifest_bundle_count: '1' })
-    expect(await state(2)).toMatchObject({ pending: 1 })
-    expect((await pool.query('SELECT public.sweep_deleted_version_manifests(100) AS count')).rows[0].count).toBe('2')
-    await onVersionUpdateTestUtils.deleteManifest(c, record(1))
-    restoreObjectFromTrash.mockResolvedValue(false)
-    await expect(onVersionUpdateTestUtils.deleteManifest(c, record(2))).rejects.toThrow('Cannot restore')
-    expect(await state(2)).toMatchObject({ pending: 1 })
-    restoreObjectFromTrash.mockResolvedValue(true)
-    await onVersionUpdateTestUtils.deleteManifest(c, record(2))
-    expect(await state(2)).toMatchObject({ pending: 0, manifest_bundle_count: '0' })
+  it('fully removes the legacy recovery table, including existing records', async () => {
+    expect((await pool.query('SELECT to_regclass(\'public.manifest_trash_restore_pending\') AS table_name')).rows[0].table_name).toBeNull()
   })
 
-  it('rotates bounded sweeps past permanently failing versions without changing counters', async () => {
-    await seedVersion(1, 0)
-    await seedVersion(2, 1)
-    await seedVersion(3, 1)
-    await pool.query('INSERT INTO public.manifest_trash_restore_pending (app_version_id, s3_path) VALUES (1, \'delta/failed\')')
+  it('sweeps stale counts, JSON manifests and legacy zero-count rows without premature finalization', async () => {
+    await seedVersion(1, 0, true, 2)
+    await seedVersion(2, 0)
+    await seedVersion(3, 1, true, 0)
+    await pool.query('UPDATE public.apps SET manifest_bundle_count = 2')
+    await pool.query(`UPDATE public.app_versions SET manifest = '[{"file_name":"legacy"}]' WHERE id = 2`)
+    expect((await pool.query('SELECT public.sweep_deleted_version_manifests(100) AS count')).rows[0].count).toBe('3')
+    expect(await state(1)).toMatchObject({ manifest_count: '2', manifest_bundle_count: '2' })
+    expect(await state(2)).toMatchObject({ manifest: [{ file_name: 'legacy' }] })
+    await onVersionUpdateTestUtils.deleteManifest(c, record(1))
+    await onVersionUpdateTestUtils.deleteManifest(c, record(2))
+    await onVersionUpdateTestUtils.deleteManifest(c, record(3))
+    expect(await state(3)).toMatchObject({ rows: 0, manifest_count: '0', manifest_bundle_count: '0' })
+    expect((await pool.query('SELECT public.sweep_deleted_version_manifests(100) AS count')).rows[0].count).toBe('0')
+  })
+
+  it('rotates bounded sweeps past unfinished versions without changing counters', async () => {
+    for (let id = 1; id <= 3; id++)
+      await seedVersion(id, 1)
     await pool.query('UPDATE public.app_versions SET updated_at = \'2020-01-01\'::timestamptz + id * interval \'1 second\'')
     const touched: number[] = []
     for (let i = 0; i < 3; i++) {
@@ -169,21 +168,20 @@ describe('manifest deletion Postgres effects', () => {
       touched.push(Number((await pool.query('SELECT id FROM public.app_versions ORDER BY updated_at DESC LIMIT 1')).rows[0].id))
     }
     expect(touched).toEqual([1, 2, 3])
-    expect(await state(1)).toMatchObject({ pending: 1, manifest_bundle_count: '2' })
-    expect(await state(2)).toMatchObject({ rows: 1, manifest_count: '1' })
-    expect(await state(3)).toMatchObject({ rows: 1, manifest_count: '1' })
+    expect(await state(1)).toMatchObject({ rows: 1, manifest_count: '1', manifest_bundle_count: '3' })
   })
 
-  it('rotates a full failed recovery batch so later live objects are recovered on the next pass', async () => {
-    await seedVersion(1, 1)
-    await pool.query('INSERT INTO public.manifest_trash_restore_pending (app_version_id, s3_path) SELECT 1, \'delta/a-\' || lpad(i::text, 3, \'0\') FROM generate_series(1,100) i')
-    await pool.query('INSERT INTO public.manifest_trash_restore_pending (app_version_id, s3_path) VALUES (1, \'delta/z-recoverable\')')
-    restoreObjectFromTrash.mockImplementation(async (_c: unknown, path: string) => path === 'delta/z-recoverable')
-    await expect(onVersionUpdateTestUtils.deleteManifest(c, record(1))).rejects.toThrow('Cannot restore')
-    expect(await state(1)).toMatchObject({ rows: 1, pending: 101 })
-    await expect(onVersionUpdateTestUtils.deleteManifest(c, record(1))).rejects.toThrow('Cannot restore')
-    expect(await state(1)).toMatchObject({ rows: 1, pending: 100 })
-    expect((await pool.query('SELECT count(*)::int AS count FROM public.manifest_trash_restore_pending WHERE s3_path = \'delta/z-recoverable\'')).rows[0].count).toBe(0)
+  it('requires a concurrent index prebuild on large databases and accepts that prebuilt index', async () => {
+    const migration = await readFile(new URL('../supabase/migrations/20261013151417_retain_manifest_delta_objects.sql', import.meta.url), 'utf8')
+    await pool.query('INSERT INTO public.app_versions (id, app_id) SELECT i, $1 FROM generate_series(1,10001) i', [appId])
+    await pool.query('DROP INDEX public.idx_app_versions_deleted_manifest_retry')
+    try {
+      await expect(pool.query(migration)).rejects.toThrow('Prebuild the index')
+    }
+    finally {
+      await pool.query(await readFile(new URL('../scripts/ops/deleted_manifest_retry_index.sql', import.meta.url), 'utf8'))
+    }
+    await pool.query(migration)
   })
 
   it('serializes upload finalization with deletion and rejects a stale upload after cleanup', async () => {
@@ -206,13 +204,6 @@ describe('manifest deletion Postgres effects', () => {
     await onVersionUpdateTestUtils.deleteManifest(c, record(1))
     await expect(persistVersionManifestEntries(c, record(1), upload, { trustFileSizes: true })).rejects.toThrow('Deleted versions cannot receive manifest entries')
     expect(await state(1)).toMatchObject({ rows: 0, manifest_count: '0', manifest_bundle_count: '0' })
-  })
-
-  it('leaves tracking intact when an old worker records recovery after the drain', async () => {
-    await seedVersion(1, 1)
-    await pool.query('INSERT INTO public.manifest_trash_restore_pending (app_version_id, s3_path) VALUES (1, \'delta/recorded\')')
-    await expect(deleteVersionManifestBatch(database, 1)).rejects.toThrow('Pending manifest restores remain')
-    expect(await state(1)).toMatchObject({ rows: 1, pending: 1, manifest_bundle_count: '1' })
   })
 
   it('does not remove references or counters for a live version', async () => {

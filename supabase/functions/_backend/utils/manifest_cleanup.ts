@@ -1,6 +1,5 @@
 import type { getDrizzleClient } from './pg.ts'
 import { sql } from 'drizzle-orm'
-import { simpleError } from './hono.ts'
 
 export const MANIFEST_CLEANUP_BATCH_SIZE = 1000
 export const MANIFEST_CLEANUP_MAX_BATCHES = 20
@@ -21,14 +20,6 @@ export async function deleteVersionManifestBatch(database: ReturnType<typeof get
     `)
     if (!version.rows[0] || (!version.rows[0].deleted && !version.rows[0].deleted_at))
       return { deleted: 0, complete: true }
-
-    // Recheck after locking: an old worker may have recorded recovery since
-    // this pass drained it. Leave tracking intact and retry that recovery.
-    const pending = await tx.execute<{ remaining: boolean }>(sql`
-      SELECT EXISTS (SELECT 1 FROM public.manifest_trash_restore_pending WHERE app_version_id = ${versionId}) AS remaining
-    `)
-    if (pending.rows[0]?.remaining)
-      throw simpleError('manifest_cleanup_incomplete', 'Pending manifest restores remain', { id: versionId })
 
     // Start on the app_version_id index; no all-manifest scan, ID array, sort,
     // cross-version reference check, or per-file lock/connection is needed.

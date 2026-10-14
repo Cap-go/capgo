@@ -217,7 +217,7 @@ describe('queue_consumer legacy message compatibility', () => {
     expect(__queueConsumerTestUtils__.prepareQueueHttpBody('cron_email', body)).toEqual(body)
   })
 
-  it.concurrent('checks legacy recovery even for already deleted zero-count versions', () => {
+  it.concurrent('retries database cleanup even for already deleted zero-count versions', () => {
     const deletedAt = '2026-07-07T00:40:00.096Z'
     const appVersionRow = (value: Record<string, unknown>) => value as Parameters<typeof onVersionUpdateTestUtils.getDeletedVersionAction>[0]
 

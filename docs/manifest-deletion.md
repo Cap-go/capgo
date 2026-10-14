@@ -22,26 +22,25 @@ Cleanup and manifest persistence take the existing per-version advisory lock and
 lock the version row. Persistence rechecks deletion while locked, so an upload
 that passed its earlier route check cannot insert into a deleted version.
 
-Recovery rows already in `manifest_trash_restore_pending` are retained. Before
-removing references, the handler restores at most 100 recorded paths per pass,
-in waves of ten, committing successful restores and retaining failures. Failed
-paths receive `last_attempted_at` and rotate behind unattempted paths using the
-version/retry index, so persistent failures cannot starve later recovery. Recovery
-runs even for versions with zero manifest rows/count. The sweeper rotates versions by their last requeue time and also revisits
-pending-only versions and leaves counter finalization to the handler. Normal
-cleanup never creates a pending restore. Keep the table and recovery helper
-through cutover: old workers can still record recovery entries. Removal requires
-a separate approved cleanup after cutover and recovery verification.
+The manifest-file trash/delete/restore system is fully removed, including its
+restore helper and `manifest_trash_restore_pending` table. The migration drops
+that table and any records it contains; there is no recovery drain or replacement
+collector. The sweeper only requeues database cleanup, rotates versions by their
+last requeue time, and leaves counter finalization to the handler.
+Sweeper retries also finish ZIP and metadata cleanup after the final database
+batch, including deletions that exceeded the original five queue attempts.
 
-Deploy the migration before or with the handler. Complete the worker cutover and
-allow old in-flight handlers to drain before relying on zero new delta trash
-operations. Do not deploy a replacement physical collector with this change.
+Deploy the handler and drain old in-flight handlers before applying the migration
+that drops the recovery table. On databases with more than 10,000 versions,
+prebuild the retry index using `scripts/ops/deleted_manifest_retry_index.sql`,
+outside a transaction. The migration refuses an inline index build above that
+size and bounds lock waits and statement duration on smaller databases.
 Channel unlinking, bundle cache purge, metadata/storage-statistics updates and
 canonical version-owned ZIP trash/retry remain part of version deletion.
 
 The sweeper remains a service-role-only cron RPC, called once per sweep. Its
 candidate search starts from deleted versions ordered by `updated_at, id`
-(`idx_app_versions_deleted_manifest_retry`); each manifest/pending probe uses the
-`app_version_id` index or `(app_version_id, s3_path)` primary key. It updates at
+(`idx_app_versions_deleted_manifest_retry`); each manifest probe uses the
+`app_version_id` index. It updates at
 most the requested batch. No new RLS function, public RPC, cron, or extension is
 introduced. Cleanup queries target one version; they do not scan all manifests.

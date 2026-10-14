@@ -1,7 +1,6 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { isVersionDeleted, purgeFileReadCache } from '../files/file_read_cache.ts'
 import { isCanonicalAppVersionR2Path } from '../utils/app_version_r2_path.ts'
@@ -126,7 +125,7 @@ function getDeletedVersionAction(
     || record.deleted_at !== oldRecord?.deleted_at
   if (deletionStateChanged)
     return 'delete'
-  // Counts alone cannot reveal legacy rows or outstanding trash recovery.
+  // Counts alone cannot reveal legacy manifest rows.
   return 'cleanup_manifest'
 }
 
@@ -289,65 +288,6 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
   return c.json(BRES)
 }
 
-// Only previously recorded recovery performs per-object I/O. Normal cleanup
-// never creates trash or restore records. Keep this through the old-worker cutover.
-const PENDING_RESTORE_BATCH_SIZE = 100
-const PENDING_RESTORE_CONCURRENCY = 10
-
-type ManifestCleanupDatabase = ReturnType<typeof getDrizzleClient>
-
-async function retryPendingTrashRestores(c: Context, database: ManifestCleanupDatabase, versionId: number, deadline: number) {
-  const pending = await database.execute<{ s3_path: string }>(sql`
-    SELECT s3_path FROM public.manifest_trash_restore_pending
-    WHERE app_version_id = ${versionId}
-    ORDER BY last_attempted_at ASC NULLS FIRST, s3_path LIMIT ${PENDING_RESTORE_BATCH_SIZE}
-  `)
-  const failedPaths: string[] = []
-  for (let offset = 0; offset < pending.rows.length; offset += PENDING_RESTORE_CONCURRENCY) {
-    if (Date.now() >= deadline)
-      throw simpleError('manifest_cleanup_incomplete', 'Manifest recovery budget exhausted', { id: versionId })
-    const restoredPaths: string[] = []
-    const waveFailures: string[] = []
-    await Promise.all(pending.rows.slice(offset, offset + PENDING_RESTORE_CONCURRENCY).map(async ({ s3_path }) => {
-      try {
-        if (await s3.restoreObjectFromTrash(c, s3_path))
-          restoredPaths.push(s3_path)
-        else
-          waveFailures.push(s3_path)
-      }
-      catch (error) {
-        cloudlog({ requestId: c.get('requestId'), message: 'pending manifest restore failed', s3_path, error })
-        waveFailures.push(s3_path)
-      }
-    }))
-    // Commit each successful wave; failures and interrupted calls stay recorded.
-    if (restoredPaths.length > 0) {
-      await database.execute(sql`
-        DELETE FROM public.manifest_trash_restore_pending
-        WHERE app_version_id = ${versionId} AND s3_path = ANY(${sql.param(restoredPaths)}::text[])
-      `)
-    }
-    if (waveFailures.length > 0) {
-      await database.execute(sql`
-        UPDATE public.manifest_trash_restore_pending SET last_attempted_at = now()
-        WHERE app_version_id = ${versionId} AND s3_path = ANY(${sql.param(waveFailures)}::text[])
-      `)
-      failedPaths.push(...waveFailures)
-    }
-  }
-  if (failedPaths.length > 0) {
-    throw simpleError('cannot_restore_manifest_s3_from_trash', 'Cannot restore re-referenced manifest file from trash', {
-      s3_path: failedPaths[0],
-      failedCount: failedPaths.length,
-    })
-  }
-  const remaining = await database.execute<{ remaining: boolean }>(sql`
-    SELECT EXISTS (SELECT 1 FROM public.manifest_trash_restore_pending WHERE app_version_id = ${versionId}) AS remaining
-  `)
-  if (remaining.rows[0]?.remaining)
-    throw simpleError('manifest_cleanup_incomplete', 'Pending manifest restores remain', { id: versionId })
-}
-
 /**
  * Delete only this version's database references. Delta bytes remain in R2 until
  * a separately enabled collector owns reclamation. Committed progress survives
@@ -359,7 +299,6 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
   const pool = await getPgClient(c, false)
   try {
     const database = getDrizzleClient(pool)
-    await retryPendingTrashRestores(c, database, record.id, deadline)
     let deleted = 0
     for (let batch = 0; batch < MANIFEST_CLEANUP_MAX_BATCHES && Date.now() < deadline; batch++) {
       const progress = await deleteVersionManifestBatch(database, record.id)
@@ -394,7 +333,7 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     }
   }
 
-  // Release manifest database references after required legacy recovery, before ACK.
+  // Release only manifest database references before ACK; delta objects stay in R2.
   await deleteManifest(c, record)
 
   const { data, error: dbError } = await supabaseAdmin(c)
@@ -476,9 +415,9 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), a
   if (deletedVersionAction === 'delete')
     return deleteIt(c, workRecord)
   if (deletedVersionAction === 'cleanup_manifest') {
-    cloudlog({ requestId: c.get('requestId'), message: 'cleaning manifest for already deleted version', ...versionUpdateLogFields(workRecord, oldRecord) })
-    await deleteManifest(c, workRecord)
-    return c.json(BRES)
+    cloudlog({ requestId: c.get('requestId'), message: 'retrying cleanup for already deleted version', ...versionUpdateLogFields(workRecord, oldRecord) })
+    // Sweeper retries must also finish metadata/ZIP work after the last batch.
+    return deleteIt(c, workRecord)
   }
 
   if (!workRecord.r2_path && !workRecord.manifest) {

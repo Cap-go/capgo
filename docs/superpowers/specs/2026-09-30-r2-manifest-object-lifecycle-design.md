@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-30
 
-**Status:** Historical idea and migration proposal. Current deleted-version behavior is documented in [manifest deletion](../../manifest-deletion.md); physical delta trash has been removed while legacy recovery remains.
+**Status:** Historical idea and migration proposal. Current deleted-version behavior is documented in [manifest deletion](../../manifest-deletion.md); physical delta trash and recovery have been removed.
 
 **Scope:** Delta-manifest database rows, shared R2 objects, CLI upload compatibility, garbage collection, Cloudflare Queues, and replication/operational cost
 
