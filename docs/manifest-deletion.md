@@ -31,7 +31,18 @@ Sweeper retries also finish ZIP and metadata cleanup after the final database
 batch, including deletions that exceeded the original five queue attempts.
 
 Deploy the handler and drain old in-flight handlers before applying the migration
-that drops the recovery table. On databases with more than 10,000 versions,
+that drops the recovery table. First run the database-only
+`scripts/reclaim_deleted_version_manifests.ts` with an explicit `SUPABASE_DB_URL`.
+It replaces the old manual R2 trash script: it marks legacy zero-count versions
+for requeue without touching objects or app counters. Its one-time scan uses the
+existing `(deleted_at, id)` index in 50-version pages, shares version locks with
+cleanup, preserves timestamp microseconds, and handles null deletion dates.
+Each committed page saves a local checkpoint; failures retain the prior
+checkpoint and write a report containing the affected version IDs. Rerun with the
+same database/checkpoint to resume. `MANIFEST_REQUEUE_CHECKPOINT` can override the
+default file in the temporary directory. This is a rollout operation, not a cron.
+
+On databases with more than 10,000 versions,
 prebuild the retry index using `scripts/ops/deleted_manifest_retry_index.sql`,
 outside a transaction. The migration refuses an inline index build above that
 size and bounds lock waits and statement duration on smaller databases.
@@ -40,7 +51,8 @@ canonical version-owned ZIP trash/retry remain part of version deletion.
 
 The sweeper remains a service-role-only cron RPC, called once per sweep. Its
 candidate search starts from deleted versions ordered by `updated_at, id`
-(`idx_app_versions_deleted_manifest_retry`); each manifest probe uses the
-`app_version_id` index. It updates at
+(`idx_app_versions_deleted_manifest_pending`), filtered to positive counters or
+legacy JSON. Finished versions leave that index; normal sweeps never probe
+manifest rows or scan finished deletion history. It updates at
 most the requested batch. No new RLS function, public RPC, cron, or extension is
 introduced. Cleanup queries target one version; they do not scan all manifests.

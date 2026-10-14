@@ -2206,8 +2206,8 @@
     },
     {
       "constraintOwned": false,
-      "definition": "CREATE INDEX idx_app_versions_deleted_manifest_retry ON public.app_versions USING btree (updated_at NULLS FIRST, id) WHERE (deleted = true)",
-      "name": "idx_app_versions_deleted_manifest_retry",
+      "definition": "CREATE INDEX idx_app_versions_deleted_manifest_pending ON public.app_versions USING btree (updated_at NULLS FIRST, id) WHERE ((deleted = true) AND ((manifest_count > 0) OR (manifest IS NOT NULL)))",
+      "name": "idx_app_versions_deleted_manifest_pending",
       "table": "app_versions",
       "valid": true
     },

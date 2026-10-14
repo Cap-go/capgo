@@ -5,6 +5,7 @@ import { env } from 'node:process'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { INITIAL_MANIFEST_REQUEUE_CURSOR, requeueDeletedManifestBatch } from '../scripts/reclaim_deleted_version_manifests.ts'
 
 const { getPgClient, closeClient, moveObjectToTrash, deleteObject } = vi.hoisted(() => ({
   getPgClient: vi.fn(),
@@ -148,6 +149,14 @@ describe('manifest deletion Postgres effects', () => {
     await seedVersion(3, 1, true, 0)
     await pool.query('UPDATE public.apps SET manifest_bundle_count = 2')
     await pool.query(`UPDATE public.app_versions SET manifest = '[{"file_name":"legacy"}]' WHERE id = 2`)
+    expect((await pool.query('SELECT public.sweep_deleted_version_manifests(100) AS count')).rows[0].count).toBe('2')
+    const client = await pool.connect()
+    try {
+      await requeueDeletedManifestBatch(client, INITIAL_MANIFEST_REQUEUE_CURSOR)
+    }
+    finally {
+      client.release()
+    }
     expect((await pool.query('SELECT public.sweep_deleted_version_manifests(100) AS count')).rows[0].count).toBe('3')
     expect(await state(1)).toMatchObject({ manifest_count: '2', manifest_bundle_count: '2' })
     expect(await state(2)).toMatchObject({ manifest: [{ file_name: 'legacy' }] })
@@ -174,7 +183,7 @@ describe('manifest deletion Postgres effects', () => {
   it('requires a concurrent index prebuild on large databases and accepts that prebuilt index', async () => {
     const migration = await readFile(new URL('../supabase/migrations/20261014101115_retain_manifest_delta_objects.sql', import.meta.url), 'utf8')
     await pool.query('INSERT INTO public.app_versions (id, app_id) SELECT i, $1 FROM generate_series(1,10001) i', [appId])
-    await pool.query('DROP INDEX public.idx_app_versions_deleted_manifest_retry')
+    await pool.query('DROP INDEX public.idx_app_versions_deleted_manifest_pending')
     try {
       await expect(pool.query(migration)).rejects.toThrow('Prebuild the index')
     }
@@ -182,6 +191,56 @@ describe('manifest deletion Postgres effects', () => {
       await pool.query(await readFile(new URL('../scripts/ops/deleted_manifest_retry_index.sql', import.meta.url), 'utf8'))
     }
     await pool.query(migration)
+  })
+
+  it('resumes legacy requeue across bounded timestamp/id pages, microseconds and null dates without changing app counters', async () => {
+    await pool.query(`INSERT INTO public.app_versions (id, app_id, deleted, deleted_at)
+      SELECT i, $1, i <= 102, CASE WHEN i <= 100 THEN '2026-01-01 00:00:00.123456+00'::timestamptz
+        + ((i - 1) % 2) * interval '1 microsecond' ELSE NULL END FROM generate_series(1,103) i`, [appId])
+    await pool.query(`INSERT INTO public.manifest (app_version_id, file_name, file_hash, s3_path, file_size)
+      SELECT i, 'file.js', 'hash', 'delta/shared.js', 1 FROM generate_series(1,103) i`)
+    await pool.query('UPDATE public.apps SET manifest_bundle_count = 103')
+    const client = await pool.connect()
+    try {
+      const first = await requeueDeletedManifestBatch(client, INITIAL_MANIFEST_REQUEUE_CURSOR)
+      expect(first).toMatchObject({ scanned: 50, requeued: 50, cursor: { id: '99', phase: 'dated' } })
+      expect(first.cursor.deletedAt).toContain('.123456')
+      let cursor = first.cursor
+      let marked = first.requeued
+      while (cursor.phase !== 'done') {
+        const next = await requeueDeletedManifestBatch(client, cursor)
+        expect(next.scanned).toBeLessThanOrEqual(50)
+        marked += next.requeued
+        cursor = next.cursor
+      }
+      expect(marked).toBe(102)
+    }
+    finally {
+      client.release()
+    }
+    expect(await state(103)).toMatchObject({ rows: 1, manifest_count: '0', manifest_bundle_count: '103' })
+    expect((await pool.query('SELECT count(*)::int AS count FROM public.app_versions WHERE manifest_count = 1')).rows[0].count).toBe(102)
+    expect(moveObjectToTrash).not.toHaveBeenCalled()
+    expect(deleteObject).not.toHaveBeenCalled()
+  })
+
+  it('rolls back legacy requeue on a competing cleanup lock and can retry the same checkpoint', async () => {
+    await seedVersion(1, 1, true, 0)
+    const blocker = await pool.connect()
+    const client = await pool.connect()
+    try {
+      await blocker.query('BEGIN')
+      await blocker.query('SELECT pg_catalog.pg_advisory_xact_lock(1::bigint)')
+      await expect(requeueDeletedManifestBatch(client, INITIAL_MANIFEST_REQUEUE_CURSOR)).rejects.toMatchObject({ versionIds: ['1'] })
+      expect(await state(1)).toMatchObject({ manifest_count: '0', rows: 1 })
+      await blocker.query('ROLLBACK')
+      expect(await requeueDeletedManifestBatch(client, INITIAL_MANIFEST_REQUEUE_CURSOR)).toMatchObject({ requeued: 1 })
+    }
+    finally {
+      await blocker.query('ROLLBACK')
+      blocker.release()
+      client.release()
+    }
   })
 
   it('serializes upload finalization with deletion and rejects a stale upload after cleanup', async () => {

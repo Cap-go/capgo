@@ -9,13 +9,13 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM pg_catalog.pg_index
     WHERE indexrelid = pg_catalog.to_regclass(
-      'public.idx_app_versions_deleted_manifest_retry')
+      'public.idx_app_versions_deleted_manifest_pending')
       AND indisvalid AND indisready
   ) THEN
     RETURN;
   END IF;
   IF pg_catalog.to_regclass(
-    'public.idx_app_versions_deleted_manifest_retry') IS NOT NULL
+    'public.idx_app_versions_deleted_manifest_pending') IS NOT NULL
   THEN
     RAISE EXCEPTION 'Repair the invalid deleted manifest retry index first';
   END IF;
@@ -29,8 +29,9 @@ BEGIN
 END;
 $$;
 
-CREATE INDEX IF NOT EXISTS idx_app_versions_deleted_manifest_retry
-ON public.app_versions (updated_at ASC NULLS FIRST, id) WHERE deleted = true;
+CREATE INDEX IF NOT EXISTS idx_app_versions_deleted_manifest_pending
+ON public.app_versions (updated_at ASC NULLS FIRST, id) WHERE deleted = true
+AND (manifest_count > 0 OR manifest IS NOT null);
 
 CREATE OR REPLACE FUNCTION public.sweep_deleted_version_manifests(
     p_batch_size integer DEFAULT 100
@@ -47,14 +48,14 @@ BEGIN
     p_batch_size := 100;
   END IF;
 
-  -- Preserve the deleted-version indexed key path and bounded manifest probes.
+  -- Finished versions leave this partial index. No historical-version scans
+  -- or per-version manifest probes belong in steady-state sweeps.
   WITH candidates AS MATERIALIZED (
     SELECT av.id
     FROM public.app_versions AS av
     WHERE av.deleted = true
       AND (
         av.manifest_count > 0 OR av.manifest IS NOT NULL
-        OR EXISTS (SELECT 1 FROM public.manifest AS m WHERE m.app_version_id = av.id)
       )
     ORDER BY av.updated_at ASC NULLS FIRST, av.id
     LIMIT p_batch_size
