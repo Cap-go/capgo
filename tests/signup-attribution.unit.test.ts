@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildFirstTouchAttributionFromLocation,
+  classifyFirstTouchType,
+  deriveSignupSourceFromRecord,
   mergeSignupAttribution,
+  mergeUrlPrecedenceSignupAttribution,
   parseCapgoAttributionCookieValue,
+  parseFirstTouchFromPathname,
   parseSignupAttributionRecord,
   resolveConsoleSignupAttribution,
+  serializeCapgoAttributionCookie,
   signupAttributionEventTags,
   signupAttributionToPostHogSetOnce,
   signupPluginFromRef,
@@ -145,6 +151,108 @@ describe('signup attribution parsing', () => {
     const cookie = parseSignupAttributionRecord({ ref: 'plugin_other' })
 
     expect(resolveConsoleSignupAttribution(metadata, cookie, createdAt, now).signup_plugin).toBe('from_metadata')
+  })
+
+  it('merges cookie first touch when metadata only has signup ref during the signup window', () => {
+    const now = Date.parse('2026-10-12T12:00:00.000Z')
+    const createdAt = '2026-10-12T11:00:00.000Z'
+    const metadata = parseSignupAttributionRecord({ ref: 'plugin_updater' })
+    const cookie = parseSignupAttributionRecord({
+      first_touch_type: 'docs',
+      first_touch_path: '/docs/intro/',
+      utm_source: 'newsletter',
+    })
+
+    expect(resolveConsoleSignupAttribution(metadata, cookie, createdAt, now)).toEqual({
+      signup_ref: 'plugin_updater',
+      signup_plugin: 'updater',
+      signup_source: 'plugin_updater',
+      first_touch_type: 'docs',
+      first_touch_path: '/docs/intro/',
+      first_utm_source: 'newsletter',
+    })
+  })
+
+  it('classifies console and cli login paths', () => {
+    expect(classifyFirstTouchType('/login')).toBe('console')
+    expect(classifyFirstTouchType('/login/')).toBe('console')
+    expect(classifyFirstTouchType('/login-cli')).toBe('cli')
+    expect(buildFirstTouchAttributionFromLocation('', '/login-cli')).toMatchObject({
+      first_touch_type: 'cli',
+      first_touch_path: '/login-cli',
+    })
+  })
+
+  it('derives signup_source from utm and landing labels', () => {
+    expect(deriveSignupSourceFromRecord(parseSignupAttributionRecord({ ref: 'plugin_x' }))).toBe('plugin_x')
+    expect(deriveSignupSourceFromRecord(parseSignupAttributionRecord({ utm_source: 'linkedin' }))).toBe('linkedin')
+    expect(deriveSignupSourceFromRecord(parseSignupAttributionRecord({
+      first_touch_type: 'console',
+      first_touch_path: '/login',
+    }))).toBe('console')
+    expect(deriveSignupSourceFromRecord(parseSignupAttributionRecord({
+      first_touch_type: 'docs',
+      first_touch_path: '/docs/getting-started/',
+    }))).toBe('docs:getting-started')
+  })
+
+  it('serializes cookies with website-compatible ref keys', () => {
+    const serialized = serializeCapgoAttributionCookie(parseSignupAttributionRecord({
+      ref: 'plugin_updater',
+      utm_source: 'docs',
+      first_touch_type: 'plugin',
+      first_touch_path: '/plugins/capacitor-updater/',
+    }))
+    expect(JSON.parse(serialized)).toEqual({
+      ref: 'plugin_updater',
+      utm_source: 'docs',
+      first_touch_type: 'plugin',
+      first_touch_path: '/plugins/capacitor-updater/',
+      signup_source: 'plugin_updater',
+    })
+  })
+
+  it('serializes utm_content and utm_term in capgo attribution cookies', () => {
+    const serialized = serializeCapgoAttributionCookie(parseSignupAttributionRecord({
+      ref: 'plugin_updater',
+      utm_content: 'hero-cta',
+      utm_term: 'capacitor',
+    }))
+    expect(JSON.parse(serialized)).toEqual({
+      ref: 'plugin_updater',
+      utm_content: 'hero-cta',
+      utm_term: 'capacitor',
+      signup_source: 'plugin_updater',
+    })
+  })
+
+  it('does not treat pathname first touch as URL referral over cookie ref', () => {
+    const merged = mergeUrlPrecedenceSignupAttribution(
+      {},
+      mergeSignupAttribution(
+        parseFirstTouchFromPathname('/login'),
+        parseSignupAttributionRecord({ ref: 'plugin_old', signup_source: 'plugin_old' }),
+      ),
+    )
+
+    expect(merged.signup_ref).toBe('plugin_old')
+    expect(merged.signup_source).toBe('plugin_old')
+    expect(merged.first_touch_type).toBe('console')
+    expect(merged.first_touch_path).toBe('/login')
+  })
+
+  it('keeps ref and signup_source on the same source when URL precedes cookie', () => {
+    const merged = mergeUrlPrecedenceSignupAttribution(
+      parseSignupAttributionRecord({ utm_source: 'newsletter' }),
+      parseSignupAttributionRecord({
+        ref: 'plugin_stale',
+        signup_source: 'plugin_stale',
+      }),
+    )
+
+    expect(merged.signup_ref).toBeUndefined()
+    expect(merged.signup_source).toBe('newsletter')
+    expect(merged.first_utm_source).toBe('newsletter')
   })
 
   it('builds PostHog set_once and event tag payloads without PII fields', () => {
