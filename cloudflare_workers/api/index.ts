@@ -50,6 +50,7 @@ import { app as sso_verify_dns } from '../../supabase/functions/_backend/private
 import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
 import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
+import { app as stripe_past_due } from '../../supabase/functions/_backend/private/stripe_past_due.ts'
 import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
 import { app as update_delivery_stats } from '../../supabase/functions/_backend/private/update_delivery_stats.ts'
 import { app as validate_password_compliance } from '../../supabase/functions/_backend/private/validate_password_compliance.ts'
@@ -108,6 +109,7 @@ import { app as updates_cache_purge } from '../../supabase/functions/_backend/tr
 import { app as webhook_delivery } from '../../supabase/functions/_backend/triggers/webhook_delivery.ts'
 import { app as webhook_dispatcher } from '../../supabase/functions/_backend/triggers/webhook_dispatcher.ts'
 import { BRES, createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
+import { runScheduledManifestPlaceholderExpiry } from '../../supabase/functions/_backend/utils/manifest_placeholder_expiry.ts'
 import { flushQueuedPluginNotifications } from '../../supabase/functions/_backend/utils/plugin_notification_flush.ts'
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
 import { processApiQueueBatch } from './queue.ts'
@@ -183,6 +185,7 @@ appPrivate.route('/bundle_install_stats', bundle_install_stats)
 appPrivate.route('/release_live', release_live)
 appPrivate.route('/stripe_checkout', stripe_checkout)
 appPrivate.route('/stripe_portal', stripe_portal)
+appPrivate.route('/stripe_past_due', stripe_past_due)
 appPrivate.route('/verify_email_otp', verify_email_otp)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/request_manifest_upload', request_manifest_upload)
@@ -294,5 +297,8 @@ export default {
   queue: processApiQueueBatch,
   scheduled(_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
     ctx.waitUntil(runScheduledPluginNotificationFlush(env, ctx))
+    ctx.waitUntil(runScheduledManifestPlaceholderExpiry(env).catch((error) => {
+      console.error(JSON.stringify({ event: 'r2_manifest_expiry_failed', error: error instanceof Error ? error.message : 'Unknown error' }))
+    }))
   },
 }

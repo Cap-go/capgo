@@ -7,9 +7,9 @@ import { findChannel } from '../api/channels'
 import { getActiveAppVersions, getVersionData } from '../api/versions'
 import { sendUpdateNotificationsForChannels } from '../notifications/send-update'
 import { printPreviewQrForResolvedTarget, resolveChannelPreviewTarget } from '../preview/qr'
-import { formatTable } from '../terminal-table'
 import { CliUserError } from '../shared/cli-user-error'
-import { channelUpdatePackageCliError, checkCompatibilityNativePackages, createCapgoClient, findSavedKey, getAppId, getBundleVersion, getCompatibilityDetails, getConfig, getOrganizationId, invokeCapgoCliApi, isCompatible, resolveUserIdFromApiKey, sendEvent } from '../utils'
+import { formatTable } from '../terminal-table'
+import { channelUpdatePackageCliError, checkCompatibilityNativePackages, createCapgoClient, findSavedKey, getAppId, getBundleVersion, getCapgoCliHttpStatus, getCompatibilityDetails, getConfig, getOrganizationId, invokeCapgoCliApi, isCompatible, readCapgoCliApiErrorPayload, resolveUserIdFromApiKey, sendEvent } from '../utils'
 
 /**
  * Display a compatibility table for the given packages
@@ -82,7 +82,37 @@ export function rejectOrAcceptIncompatibleChannelBundle(params: {
       log.warn('Proceeding because --accept-incompatible was set.')
     return
   }
-  throw new Error(params.errorMessage)
+  throw new CliUserError(params.errorMessage)
+}
+
+// Backend error codes for a channel write that the API key may not do.
+const CHANNEL_WRITE_DENIED_ERROR_CODES = new Set(['cannot_access_app', 'cannot_promote_bundle', 'cannot_find_channel', 'cannot_find_version'])
+
+async function isChannelWriteDenied(error: unknown) {
+  const status = getCapgoCliHttpStatus(error)
+  if (status === 401 || status === 403)
+    return true
+  const payload = await readCapgoCliApiErrorPayload(error)
+  return !!payload?.error && CHANNEL_WRITE_DENIED_ERROR_CODES.has(payload.error)
+}
+
+/**
+ * A permission denial is a user outcome (CliUserError). Network failures and
+ * other API errors stay plain errors so error tracking still captures them.
+ */
+export async function throwChannelWriteError(error: Error, silent: boolean): Promise<never> {
+  const packageError = await channelUpdatePackageCliError(error)
+  if (packageError) {
+    if (!silent)
+      log.error(packageError)
+    throw new Error(packageError)
+  }
+  if (!silent)
+    log.error('Cannot set channel because this API key does not have the required RBAC permission.')
+  const message = 'API key is not allowed to set this channel'
+  if (await isChannelWriteDenied(error))
+    throw new CliUserError(message)
+  throw new Error(message, { cause: error })
 }
 
 export async function setChannelInternal(channel: string, appId: string, options: OptionsSetChannel, silent = false, showFrame = true) {
@@ -254,7 +284,11 @@ export async function setChannelInternal(channel: string, appId: string, options
   if (channelError || !existingChannel) {
     if (!silent)
       log.error(`Cannot find channel ${channel}`)
-    throw new Error(`Cannot find channel ${channel}`)
+    // No row, or the key cannot read the app: the channel is missing for this key.
+    const channelStatus = channelError ? getCapgoCliHttpStatus(channelError) : undefined
+    if (!channelError || channelStatus === 401 || channelStatus === 403 || channelStatus === 404)
+      throw new CliUserError(`Cannot find channel ${channel}`, { appId, channel })
+    throw new Error(`Cannot find channel ${channel}`, { cause: channelError })
   }
 
   // Disable unlinks only when a rollout bundle is linked; match API promote gating.
@@ -642,17 +676,8 @@ export async function setChannelInternal(channel: string, appId: string, options
       },
       apiHost: options.apiHost,
     })
-    if (error) {
-      const packageError = await channelUpdatePackageCliError(error)
-      if (packageError) {
-        if (!silent)
-          log.error(packageError)
-        throw new Error(packageError)
-      }
-      if (!silent)
-        log.error('Cannot set channel because this API key does not have the required RBAC permission.')
-      throw new Error('API key is not allowed to set this channel')
-    }
+    if (error)
+      await throwChannelWriteError(error, silent)
   }
   else {
     const channelBody: Record<string, unknown> = {
@@ -753,17 +778,8 @@ export async function setChannelInternal(channel: string, appId: string, options
       body: channelBody,
       apiHost: options.apiHost,
     })
-    if (dbError) {
-      const packageError = await channelUpdatePackageCliError(dbError)
-      if (packageError) {
-        if (!silent)
-          log.error(packageError)
-        throw new Error(packageError)
-      }
-      if (!silent)
-        log.error('Cannot set channel because this API key does not have the required RBAC permission.')
-      throw new Error('API key is not allowed to set this channel')
-    }
+    if (dbError)
+      await throwChannelWriteError(dbError, silent)
   }
 
   if (sendUpdateNotification && bundleLinkChanged) {

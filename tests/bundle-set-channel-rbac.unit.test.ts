@@ -15,7 +15,8 @@ vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
   checkPermissionPg: (...args: unknown[]) => checkPermissionPgMock(...args),
 }))
 
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
+  ...(await import('./helpers/pg-checkout-release-mocks.ts')),
   closeClient: (...args: unknown[]) => closeClientMock(...args),
   getDrizzleClient: (...args: unknown[]) => getDrizzleClientMock(...args),
   getPgClient: () => pgClientMock,

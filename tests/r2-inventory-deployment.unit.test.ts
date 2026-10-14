@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ensureR2InventoryQueues, INVENTORY_RETENTION_SECONDS } from '../scripts/ensure-r2-inventory-queues.ts'
 import { createQueueApi } from '../scripts/lib/posthog-queues.ts'
 
-const names = (env = 'prod') => ['', '-dlq', '-repair', '-repair-dlq'].map(suffix => `capgo-r2-inventory-${env}${suffix}`)
+const names = () => ['', '-dlq', '-repair', '-repair-dlq'].map(suffix => `capgo-r2-inventory-prod${suffix}`)
 function fixtures(): QueueInfo[] {
   return names().map((queue_name, index) => ({ queue_id: `queue-${index}`, queue_name, settings: { message_retention_period: INVENTORY_RETENTION_SECONDS } }))
 }
@@ -66,17 +66,23 @@ afterEach(() => {
 })
 
 describe('r2 inventory deployment queue provisioning', () => {
-  it.each(['alpha', 'prod', 'preprod'] as const)('creates only missing %s queues and verifies four-day retention from the API', async (env) => {
+  it('creates only missing production queues and verifies four-day retention from the API', async () => {
     const { queues, requests } = cloudflare([])
-    await ensureR2InventoryQueues(createQueueApi(), env)
-    expect([...queues.values()].map(queue => queue.queue_name)).toEqual(names(env))
+    await ensureR2InventoryQueues(createQueueApi(), 'prod')
+    expect([...queues.values()].map(queue => queue.queue_name)).toEqual(names())
     expect([...queues.values()].every(queue => queue.settings?.message_retention_period === 345600)).toBe(true)
-    expect(requests.filter(request => request.method === 'POST').map(request => request.body.queue_name)).toEqual(names(env))
+    expect(requests.filter(request => request.method === 'POST').map(request => request.body.queue_name)).toEqual(names())
     expect(requests.filter(request => request.path && request.method === 'GET')).toHaveLength(8)
     expect(console.log).toHaveBeenCalledTimes(4)
     requests.length = 0
-    await ensureR2InventoryQueues(createQueueApi(), env)
+    await ensureR2InventoryQueues(createQueueApi(), 'prod')
     expect(requests.every(request => request.method === 'GET')).toBe(true)
+  })
+
+  it.each(['alpha', 'preprod', 'unsupported', ''])('rejects %j inventory provisioning before any API request', async (environment) => {
+    const { fetchMock } = cloudflare([])
+    await expect(ensureR2InventoryQueues(createQueueApi(), environment)).rejects.toThrow('R2 inventory is production-only')
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('reuses existing queues without attempting creation or changing consumers or queued messages', async () => {
@@ -148,7 +154,7 @@ describe('r2 inventory deployment queue provisioning', () => {
     expect(console.log).not.toHaveBeenCalled()
   })
 
-  it.each([{ args: [] }, { args: ['unsupported'] }, { args: ['prod', 'extra'] }])('rejects invalid CLI arguments before API access: %j', ({ args }) => {
+  it.each([{ args: [] }, { args: ['alpha'] }, { args: ['preprod'] }, { args: ['unsupported'] }, { args: ['prod', 'extra'] }])('rejects invalid CLI arguments before API access: %j', ({ args }) => {
     const result = spawnSync('bun', ['scripts/ensure-r2-inventory-queues.ts', ...args], {
       cwd: new URL('..', import.meta.url),
       env: { ...process.env, CLOUDFLARE_API_TOKEN: '', CLOUDFLARE_ACCOUNT_ID: '' },
@@ -157,7 +163,8 @@ describe('r2 inventory deployment queue provisioning', () => {
     })
     expect(result.error).toBeUndefined()
     expect(result.status).toBe(1)
-    expect(result.stderr).toMatch(/Usage:|Expected alpha/)
+    expect(result.stderr).toContain('Usage: bun scripts/ensure-r2-inventory-queues.ts prod')
+    expect(result.stderr).not.toContain('Set CLOUDFLARE_API_TOKEN')
   })
 
   it('rejects missing credentials before attempting API access', () => {

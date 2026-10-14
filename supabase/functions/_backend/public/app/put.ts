@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
-import type { PoolClient } from 'pg'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
+import type { PgQueryClient } from '../../utils/pg.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { eq, sql } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
@@ -51,11 +51,11 @@ export async function persistAppOnboarding(
   appId: string,
   patch: NonNullable<ReturnType<typeof parseAppOnboardingPatch>> | undefined,
   apikey: Database['public']['Tables']['apikeys']['Row'],
-  transactionClient?: PoolClient,
+  transactionClient?: PgQueryClient,
   completePendingOnboarding = false,
   settings?: AppSettings,
 ) {
-  const pool = transactionClient ? null : getPgClient(c)
+  const pool = transactionClient ? null : await getPgClient(c)
   try {
     const drizzle = getDrizzleClient(transactionClient ?? pool!, { logger: false })
     return await retryAppOnboardingWrite(drizzle, async (tx) => {

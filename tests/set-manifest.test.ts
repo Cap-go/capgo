@@ -1,6 +1,5 @@
-import { randomUUID } from 'node:crypto'
+import { createHmac, randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createManifestSizeReceipt } from '../supabase/functions/_backend/utils/manifest_size_receipt.ts'
 import {
   API_SECRET,
   APIKEY_TEST_ALL,
@@ -14,6 +13,12 @@ import {
   resetAppData,
   USER_ID,
 } from './test-utils.ts'
+
+// Reproduce receipts issued by older deployments without exposing a v1 production signer.
+function legacyManifestSizeReceipt(secret: string, path: string, size: number): string {
+  const signature = createHmac('sha256', secret).update(`capgo-manifest-size:v1\n${path}\n${size}`).digest('base64url')
+  return `v1.${size}.${signature}`
+}
 
 const id = randomUUID()
 const APP_ID = `com.demo.set-manifest.${id}`
@@ -140,7 +145,7 @@ describe('[POST] /private/set_manifest', () => {
     const sizes = [321, 654]
     const manifest = await Promise.all(entries.map(async (entry, index) => ({
       ...entry,
-      file_size_receipt: await createManifestSizeReceipt(MANIFEST_SIZE_RECEIPT_SECRET, entry.s3_path, sizes[index]!),
+      file_size_receipt: await legacyManifestSizeReceipt(MANIFEST_SIZE_RECEIPT_SECRET, entry.s3_path, sizes[index]!),
     })))
 
     const response = await fetchTestRequest(getEndpointUrl('/private/set_manifest'), {
@@ -210,7 +215,7 @@ describe('[POST] /private/set_manifest', () => {
 
     const manifest = await Promise.all(entries.map(async entry => ({
       ...entry,
-      file_size_receipt: await createManifestSizeReceipt(MANIFEST_SIZE_RECEIPT_SECRET, entry.s3_path, 321),
+      file_size_receipt: await legacyManifestSizeReceipt(MANIFEST_SIZE_RECEIPT_SECRET, entry.s3_path, 321),
     })))
     const receiptRetry = await fetchTestRequest(getEndpointUrl('/private/set_manifest'), {
       method: 'POST',
@@ -254,7 +259,7 @@ describe('[POST] /private/set_manifest', () => {
     )
     const manifest = await Promise.all(manifestEntries(version.owner_org).map(async entry => ({
       ...entry,
-      file_size_receipt: await createManifestSizeReceipt(MANIFEST_SIZE_RECEIPT_SECRET, entry.s3_path, 321),
+      file_size_receipt: await legacyManifestSizeReceipt(MANIFEST_SIZE_RECEIPT_SECRET, entry.s3_path, 321),
     })))
 
     const response = await fetchTestRequest(getEndpointUrl('/private/set_manifest'), {
@@ -277,7 +282,7 @@ describe('[POST] /private/set_manifest', () => {
     const name = `${BUNDLE_NAME}-mixed-receipts`
     const version = await createUploadVersion('r2-direct', name)
     const manifest = manifestEntries(version.owner_org)
-    manifest[0]!.file_size_receipt = await createManifestSizeReceipt(MANIFEST_SIZE_RECEIPT_SECRET, manifest[0]!.s3_path, 321)
+    manifest[0]!.file_size_receipt = await legacyManifestSizeReceipt(MANIFEST_SIZE_RECEIPT_SECRET, manifest[0]!.s3_path, 321)
 
     const response = await fetchTestRequest(getEndpointUrl('/private/set_manifest'), {
       method: 'POST',
@@ -296,7 +301,7 @@ describe('[POST] /private/set_manifest', () => {
     const version = await createUploadVersion('r2-direct', name)
     const manifest = await Promise.all(manifestEntries(version.owner_org).map(async entry => ({
       ...entry,
-      file_size_receipt: await createManifestSizeReceipt(API_SECRET, entry.s3_path, 321),
+      file_size_receipt: await legacyManifestSizeReceipt(API_SECRET, entry.s3_path, 321),
     })))
 
     const response = await fetchTestRequest(getEndpointUrl('/private/set_manifest'), {
