@@ -20,16 +20,6 @@ export function normalizeBillingAccount(value: string | null | undefined): Billi
   return value === 'us' ? 'us' : 'ee'
 }
 
-export function getNewCustomersBillingAccount(c: Context): BillingAccount {
-  const flag = getEnv(c, 'STRIPE_NEW_CUSTOMERS_ACCOUNT').trim().toLowerCase()
-  if (!flag || flag === 'ee')
-    return 'ee'
-  // The flag must not bypass the fail-closed readiness check.
-  if (flag === 'us')
-    return isStripeAccountReadyForNewCustomers(c, 'us') ? 'us' : 'ee'
-  throw new Error(`Invalid STRIPE_NEW_CUSTOMERS_ACCOUNT value: ${JSON.stringify(flag)}`)
-}
-
 export function getRequestCountry(c: Context): string | null {
   // Cloudflare sets request.cf.country; the header covers Supabase/proxied requests.
   const raw = (c.req.raw as { cf?: { country?: unknown } } | undefined)?.cf?.country ?? c.req.header('cf-ipcountry')
@@ -39,25 +29,23 @@ export function getRequestCountry(c: Context): string | null {
   return /^[A-Z]{2}$/.test(country) ? country : null
 }
 
-export function getSuggestedBillingAccount(c: Context): BillingAccount {
-  if (canChooseUsBillingAccount(c))
-    return 'us'
-  return getNewCustomersBillingAccount(c)
-}
-
 // The US entity is only offered to US visitors: it bills without automatic tax.
 export function canChooseUsBillingAccount(c: Context): boolean {
   return getRequestCountry(c) === 'US' && isStripeAccountReadyForNewCustomers(c, 'us')
 }
 
-// New orgs: the geo suggestion is only pre-selected in the UI. US needs the confirmed choice,
-// so a failed or skipped region prompt never lands a customer on the US entity unasked.
+// US visitors default to the US entity once it is ready; everyone else stays on EE.
+export function getSuggestedBillingAccount(c: Context): BillingAccount {
+  return canChooseUsBillingAccount(c) ? 'us' : 'ee'
+}
+
+// New orgs: an explicit user choice wins, otherwise fall back to the geo suggestion.
 export function resolveNewOrgBillingAccount(c: Context, requested?: BillingAccount | null): BillingAccount {
   if (requested === 'us')
-    return canChooseUsBillingAccount(c) ? 'us' : getNewCustomersBillingAccount(c)
+    return canChooseUsBillingAccount(c) ? 'us' : 'ee'
   if (requested === 'ee')
     return 'ee'
-  return getNewCustomersBillingAccount(c)
+  return getSuggestedBillingAccount(c)
 }
 
 export function getStripeSecretKeyEnvName(account: BillingAccount): string {

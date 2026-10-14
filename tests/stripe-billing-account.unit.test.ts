@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
   canChooseUsBillingAccount,
-  getNewCustomersBillingAccount,
   getPlanCreditProductId,
   getPlanPriceId,
   getPlanProductId,
@@ -19,9 +18,7 @@ import {
   resolvePlanCreditProductId,
 } from '../supabase/functions/_backend/utils/stripe_billing.ts'
 
-const mockedEnv: Record<string, string> = {
-  STRIPE_NEW_CUSTOMERS_ACCOUNT: 'ee',
-}
+const mockedEnv: Record<string, string> = {}
 
 vi.mock('hono/adapter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('hono/adapter')>()
@@ -48,7 +45,6 @@ function createGeoContext(country?: string, header?: string) {
 }
 
 afterEach(() => {
-  mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT = 'ee'
   delete mockedEnv.STRIPE_SECRET_KEY_US
   delete mockedEnv.STRIPE_WEBHOOK_SECRET_US
 })
@@ -65,45 +61,6 @@ const SOLO_PLAN = {
 }
 
 describe('stripe billing account helpers', () => {
-  it('defaults new customers to ee', () => {
-    expect(getNewCustomersBillingAccount(createContext())).toBe('ee')
-    const previousFlag = mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT
-    try {
-      mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT = ''
-      expect(getNewCustomersBillingAccount(createContext())).toBe('ee')
-    }
-    finally {
-      mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT = previousFlag
-    }
-  })
-
-  it('routes new customers to us when flag is set and the US account is ready', () => {
-    const previousFlag = mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT
-    try {
-      mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT = 'us'
-      // Fail closed: the flag alone must not route customers to an account whose webhook is not wired.
-      expect(getNewCustomersBillingAccount(createContext())).toBe('ee')
-      mockedEnv.STRIPE_SECRET_KEY_US = 'sk_test_us'
-      expect(getNewCustomersBillingAccount(createContext())).toBe('ee')
-      mockedEnv.STRIPE_WEBHOOK_SECRET_US = 'whsec_test_us'
-      expect(getNewCustomersBillingAccount(createContext())).toBe('us')
-    }
-    finally {
-      mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT = previousFlag
-    }
-  })
-
-  it('throws on invalid STRIPE_NEW_CUSTOMERS_ACCOUNT values', () => {
-    const previousFlag = mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT
-    try {
-      mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT = 'typo'
-      expect(() => getNewCustomersBillingAccount(createContext())).toThrow(/Invalid STRIPE_NEW_CUSTOMERS_ACCOUNT/)
-    }
-    finally {
-      mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT = previousFlag
-    }
-  })
-
   it('normalizes billing account values', () => {
     expect(normalizeBillingAccount('us')).toBe('us')
     expect(normalizeBillingAccount('ee')).toBe('ee')
@@ -231,6 +188,15 @@ describe('new org billing account from location', () => {
     expect(resolveNewOrgBillingAccount(createGeoContext('US'), 'us')).toBe('us')
   })
 
+  it('defaults US visitors to us and everyone else to ee', () => {
+    expect(resolveNewOrgBillingAccount(createGeoContext('US'))).toBe('ee')
+    mockedEnv.STRIPE_SECRET_KEY_US = 'sk_test_us'
+    mockedEnv.STRIPE_WEBHOOK_SECRET_US = 'whsec_test_us'
+    expect(resolveNewOrgBillingAccount(createGeoContext('US'))).toBe('us')
+    expect(resolveNewOrgBillingAccount(createGeoContext('FR'))).toBe('ee')
+    expect(resolveNewOrgBillingAccount(createGeoContext())).toBe('ee')
+  })
+
   it('only offers the US entity to US visitors', () => {
     mockedEnv.STRIPE_SECRET_KEY_US = 'sk_test_us'
     mockedEnv.STRIPE_WEBHOOK_SECRET_US = 'whsec_test_us'
@@ -239,14 +205,6 @@ describe('new org billing account from location', () => {
     expect(canChooseUsBillingAccount(createGeoContext())).toBe(false)
     // US bills without automatic tax, so a non-US caller cannot pick it through the API.
     expect(resolveNewOrgBillingAccount(createGeoContext('FR'), 'us')).toBe('ee')
-  })
-
-  it('needs a confirmed choice before using the US entity', () => {
-    mockedEnv.STRIPE_SECRET_KEY_US = 'sk_test_us'
-    mockedEnv.STRIPE_WEBHOOK_SECRET_US = 'whsec_test_us'
-    // No choice sent (region prompt failed or skipped): stay on the default account.
-    expect(resolveNewOrgBillingAccount(createGeoContext('US'))).toBe('ee')
-    expect(resolveNewOrgBillingAccount(createGeoContext('US'), null)).toBe('ee')
   })
 
   it('falls back to ee when us is requested but not configured', () => {

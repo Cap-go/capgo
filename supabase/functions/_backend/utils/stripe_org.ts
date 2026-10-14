@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { createCustomer, getNewCustomersBillingAccount, getPlanProductId, normalizeBillingAccount, planProductIdOrFilter, type BillingAccount } from './stripe.ts'
+import { createCustomer, getPlanProductId, normalizeBillingAccount, planProductIdOrFilter, type BillingAccount } from './stripe.ts'
 import { getDefaultPlan, getStripeCustomer, supabaseAdmin } from './supabase.ts'
 
 type OrgRow = Database['public']['Tables']['orgs']['Row']
@@ -115,7 +115,7 @@ async function resolveBillingAccountForCreate(c: Context, org: OrgRow): Promise<
     if (stripeInfo?.billing_account)
       return normalizeBillingAccount(stripeInfo.billing_account)
   }
-  return getNewCustomersBillingAccount(c)
+  return 'ee'
 }
 
 async function trialPlanNameForCustomer(c: Context, customerId: string, fallbackPlanName?: string | null) {

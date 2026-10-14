@@ -21,7 +21,6 @@ export type { BillingAccount } from './stripe_billing.ts'
 export {
   findPlanByProductId,
   getBillingAccountForCustomer,
-  getNewCustomersBillingAccount,
   getPlanCreditProductId,
   getPlanProductId,
   getStripeWebhookSecret,
