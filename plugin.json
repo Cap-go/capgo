@@ -9,7 +9,7 @@
     "url": "https://capgo.app"
   },
   "homepage": "https://capgo.app/docs/",
-  "repository": "https://github.com/Cap-go/capgo",
+  "repository": "https://github.com/Cap-go/capgo.app",
   "license": "AGPL-3.0",
   "keywords": ["capacitor", "live-updates", "ota", "mobile", "deployment"],
   "extensions": {
@@ -32,8 +32,8 @@
         ],
         "brandColor": "#119EFF",
         "brandColorDark": "#119EFF",
-        "logo": "./assets/logo.png",
-        "composerIcon": "./assets/composer-icon.png"
+        "logo": "./assets/plugin/logo.png",
+        "composerIcon": "./assets/plugin/composer-icon.png"
       }
     }
   }
