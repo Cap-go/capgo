@@ -24,8 +24,9 @@ export function getNewCustomersBillingAccount(c: Context): BillingAccount {
   const flag = getEnv(c, 'STRIPE_NEW_CUSTOMERS_ACCOUNT').trim().toLowerCase()
   if (!flag || flag === 'ee')
     return 'ee'
+  // The flag must not bypass the fail-closed readiness check.
   if (flag === 'us')
-    return 'us'
+    return isStripeAccountReadyForNewCustomers(c, 'us') ? 'us' : 'ee'
   throw new Error(`Invalid STRIPE_NEW_CUSTOMERS_ACCOUNT value: ${JSON.stringify(flag)}`)
 }
 
@@ -39,18 +40,24 @@ export function getRequestCountry(c: Context): string | null {
 }
 
 export function getSuggestedBillingAccount(c: Context): BillingAccount {
-  if (getRequestCountry(c) === 'US' && isStripeAccountReadyForNewCustomers(c, 'us'))
+  if (canChooseUsBillingAccount(c))
     return 'us'
   return getNewCustomersBillingAccount(c)
 }
 
-// New orgs: an explicit user choice wins, otherwise fall back to the geo suggestion.
+// The US entity is only offered to US visitors: it bills without automatic tax.
+export function canChooseUsBillingAccount(c: Context): boolean {
+  return getRequestCountry(c) === 'US' && isStripeAccountReadyForNewCustomers(c, 'us')
+}
+
+// New orgs: the geo suggestion is only pre-selected in the UI. US needs the confirmed choice,
+// so a failed or skipped region prompt never lands a customer on the US entity unasked.
 export function resolveNewOrgBillingAccount(c: Context, requested?: BillingAccount | null): BillingAccount {
   if (requested === 'us')
-    return isStripeAccountReadyForNewCustomers(c, 'us') ? 'us' : getNewCustomersBillingAccount(c)
+    return canChooseUsBillingAccount(c) ? 'us' : getNewCustomersBillingAccount(c)
   if (requested === 'ee')
     return 'ee'
-  return getSuggestedBillingAccount(c)
+  return getNewCustomersBillingAccount(c)
 }
 
 export function getStripeSecretKeyEnvName(account: BillingAccount): string {
@@ -79,6 +86,14 @@ export function isStripeConfiguredForAccount(c: Context, account: BillingAccount
 // Fail closed: no new customers on an account whose webhook is not wired, or their subscriptions never sync.
 export function isStripeAccountReadyForNewCustomers(c: Context, account: BillingAccount): boolean {
   return isStripeConfiguredForAccount(c, account) && getStripeWebhookSecret(c, account).trim().startsWith('whsec_')
+}
+
+// A customer lives on an account whose key is missing: never fake success for it.
+export class BillingAccountUnavailableError extends Error {
+  constructor(readonly billingAccount: BillingAccount) {
+    super(`Stripe account ${billingAccount} is not configured`)
+    this.name = 'BillingAccountUnavailableError'
+  }
 }
 
 export class IncompleteUsPlanConfigError extends Error {

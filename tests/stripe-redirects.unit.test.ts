@@ -131,6 +131,28 @@ describe('stripe redirect URL allowlist', () => {
     expect(createSession).not.toHaveBeenCalled()
   })
 
+  it('fails loudly when a US customer has no US Stripe key', async () => {
+    mockBillingAccountLookup('us')
+    const createSession = vi.fn()
+    vi.mocked(Stripe).mockImplementation(function () {
+      return {
+        billingPortal: {
+          sessions: { create: createSession },
+        },
+      } as any
+    } as any)
+
+    const { createPortal, createCheckout, cancelSubscription } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const { BillingAccountUnavailableError } = await import('../supabase/functions/_backend/utils/stripe_billing.ts')
+
+    const portalError = await createPortal(createContext(), 'cus_us', '/app/usage').catch(error => error)
+    expect(portalError.cause).toMatchObject({ error: 'billing_account_unavailable' })
+    const checkoutError = await createCheckout(createContext(), 'cus_us', 'month', 'prod_test', '/app/usage', '/app/usage').catch(error => error)
+    expect(checkoutError.cause).toMatchObject({ error: 'billing_account_unavailable' })
+    await expect(cancelSubscription(createContext(), 'cus_us')).rejects.toBeInstanceOf(BillingAccountUnavailableError)
+    expect(createSession).not.toHaveBeenCalled()
+  })
+
   it('rejects external return URLs for billing portal', async () => {
     const createSession = vi.fn()
     const stripeClient = {

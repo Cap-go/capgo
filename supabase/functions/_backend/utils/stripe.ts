@@ -5,7 +5,7 @@ import Stripe from 'stripe'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import {
-
+  BillingAccountUnavailableError,
   getBillingAccountForCustomer,
   getPlanPriceId,
   getStripeSecretKey,
@@ -207,6 +207,24 @@ async function getStripeContextForCustomer(c: Context, customerId: string) {
   return buildStripeContext(c, billingAccount)
 }
 
+// EE without a key is the local/dev no-Stripe mode. Any other account without a key holds real
+// customers we can no longer reach, so fail loudly instead of faking success.
+function assertBillingAccountReachable(c: Context, billingAccount: BillingAccount, customerId: string) {
+  if (billingAccount === 'ee' || isStripeConfiguredForAccount(c, billingAccount))
+    return
+  cloudlogErr({ requestId: c.get('requestId'), message: 'Stripe account not configured for customer', billingAccount, customerId })
+  throw new BillingAccountUnavailableError(billingAccount)
+}
+
+function assertBillingAccountReachableForUser(c: Context, billingAccount: BillingAccount, customerId: string) {
+  try {
+    assertBillingAccountReachable(c, billingAccount, customerId)
+  }
+  catch (error) {
+    throw simpleError('billing_account_unavailable', 'Billing is temporarily unavailable for this organization', { billingAccount }, error)
+  }
+}
+
 function getSubscriptionProductId(c: Context, item: Stripe.SubscriptionItem | null) {
   if (!item)
     return null
@@ -402,7 +420,8 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 }
 
 export async function createPortal(c: Context, customerId: string, callbackUrl: string) {
-  const { stripe, configured } = await getStripeContextForCustomer(c, customerId)
+  const { stripe, configured, billingAccount } = await getStripeContextForCustomer(c, customerId)
+  assertBillingAccountReachableForUser(c, billingAccount, customerId)
   if (!configured)
     return { url: '' }
   const allowedReturnUrl = getAllowedRedirectUrl(c, callbackUrl, 'return_url')
@@ -512,7 +531,8 @@ export async function syncStripeCustomerCountry(c: Context, customerId: string |
 }
 
 export async function cancelSubscription(c: Context, customerId: string) {
-  const { stripe, configured } = await getStripeContextForCustomer(c, customerId)
+  const { stripe, configured, billingAccount } = await getStripeContextForCustomer(c, customerId)
+  assertBillingAccountReachable(c, billingAccount, customerId)
   if (!configured)
     return
 
@@ -819,6 +839,7 @@ export interface ExtraMauCheckout {
 
 export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string, datafastAttribution?: DatafastAttribution, affonsoReferral?: string | null, extraMau?: ExtraMauCheckout) {
   const billingAccount = await getBillingAccountForCustomer(c, customerId)
+  assertBillingAccountReachableForUser(c, billingAccount, customerId)
   if (!isStripeConfiguredForAccount(c, billingAccount))
     return { url: '' }
   const resolvedPlanId = await resolveCheckoutPlanProductId(c, planId, billingAccount)
@@ -899,6 +920,7 @@ export async function createOneTimeCheckout(
   affonsoReferral?: string | null,
 ) {
   const billingAccount = await getBillingAccountForCustomer(c, customerId)
+  assertBillingAccountReachableForUser(c, billingAccount, customerId)
   if (!isStripeConfiguredForAccount(c, billingAccount))
     return { url: '' }
 

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import {
+  canChooseUsBillingAccount,
   getNewCustomersBillingAccount,
   getPlanCreditProductId,
   getPlanPriceId,
@@ -76,10 +77,15 @@ describe('stripe billing account helpers', () => {
     }
   })
 
-  it('routes new customers to us when flag is set', () => {
+  it('routes new customers to us when flag is set and the US account is ready', () => {
     const previousFlag = mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT
     try {
       mockedEnv.STRIPE_NEW_CUSTOMERS_ACCOUNT = 'us'
+      // Fail closed: the flag alone must not route customers to an account whose webhook is not wired.
+      expect(getNewCustomersBillingAccount(createContext())).toBe('ee')
+      mockedEnv.STRIPE_SECRET_KEY_US = 'sk_test_us'
+      expect(getNewCustomersBillingAccount(createContext())).toBe('ee')
+      mockedEnv.STRIPE_WEBHOOK_SECRET_US = 'whsec_test_us'
       expect(getNewCustomersBillingAccount(createContext())).toBe('us')
     }
     finally {
@@ -222,8 +228,25 @@ describe('new org billing account from location', () => {
     mockedEnv.STRIPE_SECRET_KEY_US = 'sk_test_us'
     mockedEnv.STRIPE_WEBHOOK_SECRET_US = 'whsec_test_us'
     expect(resolveNewOrgBillingAccount(createGeoContext('US'), 'ee')).toBe('ee')
-    expect(resolveNewOrgBillingAccount(createGeoContext('FR'), 'us')).toBe('us')
-    expect(resolveNewOrgBillingAccount(createGeoContext('US'))).toBe('us')
+    expect(resolveNewOrgBillingAccount(createGeoContext('US'), 'us')).toBe('us')
+  })
+
+  it('only offers the US entity to US visitors', () => {
+    mockedEnv.STRIPE_SECRET_KEY_US = 'sk_test_us'
+    mockedEnv.STRIPE_WEBHOOK_SECRET_US = 'whsec_test_us'
+    expect(canChooseUsBillingAccount(createGeoContext('US'))).toBe(true)
+    expect(canChooseUsBillingAccount(createGeoContext('FR'))).toBe(false)
+    expect(canChooseUsBillingAccount(createGeoContext())).toBe(false)
+    // US bills without automatic tax, so a non-US caller cannot pick it through the API.
+    expect(resolveNewOrgBillingAccount(createGeoContext('FR'), 'us')).toBe('ee')
+  })
+
+  it('needs a confirmed choice before using the US entity', () => {
+    mockedEnv.STRIPE_SECRET_KEY_US = 'sk_test_us'
+    mockedEnv.STRIPE_WEBHOOK_SECRET_US = 'whsec_test_us'
+    // No choice sent (region prompt failed or skipped): stay on the default account.
+    expect(resolveNewOrgBillingAccount(createGeoContext('US'))).toBe('ee')
+    expect(resolveNewOrgBillingAccount(createGeoContext('US'), null)).toBe('ee')
   })
 
   it('falls back to ee when us is requested but not configured', () => {

@@ -1200,7 +1200,7 @@ export async function customerToSegmentOrg(
     trial1: false,
     trial0: false,
     paying: false,
-    payingMonthly: plan?.price_m_id === price_id,
+    payingMonthly: !!price_id && (plan?.price_m_id === price_id || plan?.price_m_id_us === price_id),
     overuse: false,
     canceled: await isCanceledOrg(c, orgId),
     issueSegment: false,

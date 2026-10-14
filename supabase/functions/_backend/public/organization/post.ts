@@ -10,7 +10,7 @@ import { parseOrgOnboardingDevelopmentEnvironment, parseOrgOnboardingIntent } fr
 import { closeClient, getPgClient } from '../../utils/pg.ts'
 import { safeParseSchema } from '../../utils/schema_validation.ts'
 import { getPlanProductId } from '../../utils/stripe.ts'
-import { isStripeAccountReadyForNewCustomers, resolveNewOrgBillingAccount } from '../../utils/stripe_billing.ts'
+import { canChooseUsBillingAccount, resolveNewOrgBillingAccount } from '../../utils/stripe_billing.ts'
 import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
@@ -295,7 +295,7 @@ export async function post(
   const ownerEmail = await getOwnerEmail(c, auth)
   const orgId = crypto.randomUUID()
   // An explicit US choice must not be silently moved to the EE entity.
-  if (body.billingAccount === 'us' && !isStripeAccountReadyForNewCustomers(c, 'us'))
+  if (body.billingAccount === 'us' && !canChooseUsBillingAccount(c))
     throw simpleError('billing_account_unavailable', 'US billing is not available', { billingAccount: 'us' })
   const billingAccount = resolveNewOrgBillingAccount(c, body.billingAccount)
   const pendingCustomerId = await createPendingStripeInfo(c, orgId, estimatedMau, billingAccount, body.billingAccount === 'us')
