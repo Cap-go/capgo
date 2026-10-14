@@ -99,7 +99,7 @@ describe('cleanup producer Postgres transactions', () => {
     expect((await checkpoint(db, bucket)).cursor).toBe(key)
   }))
 
-  it.concurrent('preserves a concurrently committed reservation that wins the row lock', () => fixture(async (db, peer, bucket, prefix) => {
+  it.concurrent('preserves a concurrently committed reservation that wins the row lock', ({ expect }) => fixture(async (db, peer, bucket, prefix) => {
     const key = `${prefix}file`
     await seed(db, bucket, [key])
     const run = await lease(db, bucket)
