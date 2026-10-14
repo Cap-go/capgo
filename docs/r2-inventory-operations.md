@@ -48,9 +48,10 @@ The column is nullable `timestamptz`, with no default or existing-row backfill.
 The four lifecycle states stay unchanged. The partial index contains only
 `to_be_uploaded` rows with a non-null lease and supports bucket-scoped queries
 ordered by `(manifest_lease_expires_at, r2_key)` with an expiry cutoff and limit.
-Reservations and cleanup do not use this field yet. Future reservations will
-extend it using `GREATEST(COALESCE(existing_expiry, database_now), database_now +
-interval '30 minutes')`.
+Manifest reservations and registration extend it using
+`GREATEST(COALESCE(existing_expiry, database_now), database_now + interval '30 minutes')`;
+see "Manifest reservations and receipt registration" and "Placeholder expiry
+deployment and limits" below.
 
 For a later authorized PlanetScale deployment, use an existing administrator
 connection to the production destination above, not the restricted Hyperdrive
@@ -104,3 +105,129 @@ Admission checkpoints protect the event horizon. Requests lock the bucket admiss
 Normal notifications are acknowledged after their database transaction commits. Ambiguous notifications wait for successful repair publication; publication failures retry only those messages. Repair consumers batch database work while acknowledging successfully applied keys and retrying only keys with failed HEAD requests or revision conflicts. All messages for a duplicated failed key retry together, and successful absence checks are applied as observations. Database snapshot or write failures retry all unconfirmed repair messages. No acknowledgement precedes the database commit for its observation. Ambiguous rows stay unchanged, so a publication failure can safely replay and retry publication. Invalid event and repair payloads are published directly in batches to their respective DLQs, then acknowledged only after publication succeeds. If publication fails, only those rejected messages retry; valid peers still proceed. Transient processing failures keep the existing five-delivery retry budget and automatic DLQ forwarding.
 
 Directly rejected messages use an `invalid_inventory_message` envelope containing the original `body`, queue name, message ID, timestamp, attempt count and validation reason. Ordinary JSON payloads remain previewable in Cloudflare; non-JSON bodies use V8 serialization. A crash after publication and before acknowledgement can duplicate DLQ entries: deduplicate on `(originalQueue, originalMessageId)` and replay the original `body` after fixing the cause. Automatic retry-exhaustion DLQ entries retain their original payload without this envelope. No recovery consumer is installed; the existing setup script creates both DLQs with four-day retention, and deployment configures their producer bindings.
+
+## Manifest reservations and receipt registration
+
+The production API Worker independently selects the uncached inventory Hyperdrive;
+there is no primary Supabase inventory fallback. Each reservation or finalization
+opens one inventory connection for the whole request and releases it in `finally`.
+The primary authorization connection and inventory connection have separate budgets;
+API concurrency adds to the existing event/repair consumer budget. Alpha and preprod
+keep the previous upload flow. Isolated local tests can explicitly select
+`LOCAL_R2_INVENTORY_DB_URL`; this must never point at production.
+
+Reservations query at most 100 files × 20 candidates per chunk, using the inventory
+primary key `(bucket_name, r2_key)`. Generation zero preserves the existing path.
+Generations 1–19 and the rare UUID directory follow the encryption session, if any,
+without changing the existing name/hash/Brotli encoding. Usable present or pending
+keys are reused; deleted keys and committed retirement are never reactivated.
+Conditional upserts validate state and extend a nonshortening 30-minute database
+lease atomically. At most two rechecks operate only on unresolved files, followed by
+one UUID reservation attempt. Database failures abort rather than generating paths.
+Added paths retain both the manifest limit and R2's 1024-byte key limit. An added
+candidate too long for R2 is unavailable; a usable original path can still succeed.
+Numbered/UUID paths use existing literal packing. Tombstone pruning remains disabled.
+
+Files and completed TUS writes mint only opaque v2 size receipts under the existing
+header, below the CLI's 128-character bound. HMAC binds bucket and physical key to
+size, signing time, evidence source/time and authenticated R2 identity. Read evidence
+starts before actual R2 metadata/body access. Upload evidence uses the `uploaded`
+timestamp returned by `put`/multipart completion, conservatively rounded down for
+ordering; signing happens after success. Cached receipts retain their original token
+and timestamps; old cache entries need an actual metadata read to mint v2. No
+inventory connection is added to files uploads or cached device downloads. CLI existence checks require the exact reserved physical key, including cached
+GETs and HEADs. Receipt-aware requests bypass the outer Managed Files cache and
+reach the inner cache evidence gate. A legacy dotfile alias counts as missing for that protocol, so the
+published CLI uploads the canonical reserved key; ordinary device alias reads
+retain their existing behavior. Canonical put/multipart ETags are retained losslessly
+in the receipt, allowing normal notifications to match registration without per-file
+HEAD repair. An exceptional upload-clock ambiguity uses a direct metadata read
+instead of treating a successful write as fresh local-clock evidence.
+
+Finalization verifies every receipt before inventory or primary manifest writes. It
+locks/evaluates at most 500 keys per SQL statement in one bounded Drizzle transaction
+(up to the existing 10,000-file manifest limit), then releases the connection before
+the existing primary manifest transaction. Missing v2 rows require evidence newer
+than the retained admission floor. Deleted/pending rows reject contradictory,
+equal or ambiguous evidence; deleted rows require a boundary clearly newer than
+both event and reconciliation history. A five-second safety band covers event/local
+clock ambiguity and sub-millisecond database precision. Present rows ignore stale
+metadata. Retirement rejects every flow regardless of freshness. v1 and receiptless
+flows only check retirement and do not write inventory or leases. Receipt facts never
+manufacture `last_event_at`. A later primary failure can leave an unreferenced
+inventory row; this safe orphan is an explicit consequence of separate databases.
+Finalized-manifest idempotent retries retain the existing behavior.
+
+## Placeholder expiry deployment and limits
+
+Apply these prerequisites separately before deploying the production API Worker:
+
+1. Verify the nullable lease column from migration `20261013093816` and build/verify
+   its exact partial expiry index **concurrently** as described above. Read-only
+   target inspection on 2026-10-13 found the column but no expiry index; a merged
+   Supabase migration does not establish PlanetScale deployment.
+2. Apply `cloudflare_workers/r2_inventory/sql/20261013_manifest_placeholder_expiry.sql`
+   as an inventory administrator in a short transaction with a five-second lock
+   timeout. It installs the exact additive helper and grants EXECUTE only to
+   `r2_inventory_consumer`; it does not grant table DELETE or manifest access.
+   Supabase migration `20261013165559` records the service-role equivalent only.
+   Verify owner `postgres`, empty search path, revoked PUBLIC EXECUTE, helper limit
+   1–1000, and that the runtime still lacks direct DELETE. Apply no unrelated grants.
+3. Verify Hyperdrive `capgo-r2-inventory-planetscale-prod` still targets the standalone
+   inventory using the restricted role, with caching disabled. The API production
+   binding uses that independently selected existing origin; alpha/preprod have no
+   inventory binding. Confirm both consumer queues, their DLQs and notifications are
+   healthy. The four production queue bindings only read metrics in this feature.
+4. For initial activation, deploy the API Worker first and verify it accepts both
+   v1 and v2 receipts before deploying the files Worker that mints v2. Use this
+   controlled order even when a normal release deploys these Workers in parallel:
+   the previous API only verifies v1. Keep the receipt secret separate from upload
+   capability secrets. No bucket rule, backfill, replica or packed protocol change
+   is required. Roll back files first; do not revert API v2 verification while
+   completed uploads can still submit v2 receipts.
+
+The existing every-minute API callback runs notification flushing and expiry as
+independent tasks. Expiry never runs on API requests or in alpha/preprod. Fresh
+private Queue `metrics()` calls must show zero backlog count and bytes in **all
+four** queues; missing metrics, failure, timeout, backlog or a DLQ message skips
+expiry. Metrics are best-effort approximate health readings, not a strict completion
+watermark. In particular, maximum observed event time is never used as completeness.
+Health reads time out in five seconds and their authorization expires after fifteen
+seconds; a new invocation obtains fresh readings. Expiry is capped at 10,000 rows,
+1,000 per transaction, with a 20-second invocation work budget (each in-flight helper
+has a five-second statement limit and one-second lock limit). It opens one inventory
+connection per invocation. There is no pacing floor, new PostgreSQL cron or renewal API.
+
+The service-only helper first locks the bucket admission checkpoint `FOR UPDATE`.
+This conflicts with the event consumer's existing `FOR SHARE` held across its
+INSERT-then-SELECT transaction, so an expired placeholder cannot disappear in that
+gap and cause a creation to be acknowledged without recording it. Missing admission
+history skips deletion. Repair snapshots retain revision/discovery-time CAS; expiry
+conflicts return failed keys for the existing retry path, with unchanged concurrency
+and at most five deliveries. Batches use the partial index and `SKIP LOCKED`, deleting
+only `to_be_uploaded` rows with a non-null elapsed lease. No extra first-seen age
+condition, R2 HEAD/copy/delete, retirement reversal or physical cleanup is introduced.
+
+Read-only production catalog estimates on 2026-10-13 showed about 18.7 million
+inventory rows (12 GB table; 26 GB primary-key index) and two checkpoint rows.
+The expiry helper runs once per bounded internal batch, reachable only by the
+service runtime role; no new anonymous/authenticated RLS, view or public RPC
+function call is introduced. It touches one indexed checkpoint and at most 1,000
+indexed placeholders. The row lifecycle trigger is constant-time per changed row.
+
+Local PostgreSQL 17 verification used 100,000 synthetic inventory rows. The expiry
+selection returned 1,000 rows through `r2_objects_expired_manifest_leases_idx` in
+0.343 ms (1,218 buffer hits); representative key lookup used `r2_objects_pkey` in
+0.064 ms; admission locking used its primary key in 0.031 ms. No sequential scan
+appeared in those measured plans. Real isolated 5,000- and 10,000-file reservation
+and registration tests passed, together with ingestion/repair/expiry concurrency.
+These measurements establish indexed bounded work, not production throughput.
+A read-only production lookup of 2,000 synthetic missing keys used
+`r2_objects_pkey` in 3.463 ms (8 buffer hits, 2 reads), without scanning inventory.
+The absent production expiry index prevented validating that plan on live rows;
+its exact definition and readiness must be checked after separate application.
+Production deployment must verify expiry plans and pool capacity against actual traffic;
+no production schema, credentials, handlers or backfill were mutated for this PR.
+
+References: [R2 returned object metadata](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/),
+[Queue metrics limitations](https://developers.cloudflare.com/api/resources/queues/methods/get_metrics/).
