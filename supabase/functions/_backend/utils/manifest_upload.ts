@@ -58,6 +58,7 @@ export interface ManifestUploadCapabilityOptions {
   publicBaseUrl: string
   nowUnix?: number
   concurrency?: number
+  reservePaths?: (prefix: string, suffixes: string[], sizes: number[]) => Promise<string[]>
 }
 
 const TOP_LEVEL_FIELDS = new Set([
@@ -196,7 +197,7 @@ function normalizeBaseUrl(value: string): string {
 }
 
 async function mapWithConcurrency<T, U>(values: T[], concurrency: number, mapper: (value: T, index: number) => Promise<U>): Promise<U[]> {
-  const output = new Array<U>(values.length)
+  const output: U[] = []
   let nextIndex = 0
   const workers = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
     while (nextIndex < values.length) {
@@ -260,7 +261,7 @@ export async function createManifestUploadResponse(
   }, nowUnix).catch(() => signingUnavailable())
   const seenPaths = new Set<string>()
 
-  const entries = await mapWithConcurrency(
+  const originalSuffixes = await mapWithConcurrency(
     request.entries,
     Math.max(1, Math.min(options.concurrency ?? DEFAULT_CRYPTO_CONCURRENCY, DEFAULT_CRYPTO_CONCURRENCY)),
     async (entry, index) => {
@@ -272,14 +273,20 @@ export async function createManifestUploadResponse(
         invalidEntry(index, 'file_name')
       seenPaths.add(normalizedS3Path)
 
-      const capability = await capabilitySigner.create(normalizedS3Path)
-      return {
-        id: entry.id,
-        s3_path_suffix: s3PathSuffix,
-        upload_token: capability.uploadToken,
-      }
+      return s3PathSuffix
     },
   )
+
+  const suffixes = options.reservePaths
+    ? await options.reservePaths(defaultS3PathPrefix, originalSuffixes, request.entries.map(entry => entry.uploaded_bytes_size))
+    : originalSuffixes
+  const entries = await mapWithConcurrency(suffixes, DEFAULT_CRYPTO_CONCURRENCY, async (suffix, index) => {
+    const path = `${defaultS3PathPrefix}${suffix}`
+    if (path.length > MAX_S3_PATH_LENGTH || !suffix || suffixes.length !== request.entries.length)
+      invalidEntry(index, 'file_name')
+    const capability = await capabilitySigner.create(path)
+    return { id: request.entries[index].id, s3_path_suffix: suffix, upload_token: capability.uploadToken }
+  })
 
   return {
     protocol_version: 1,
