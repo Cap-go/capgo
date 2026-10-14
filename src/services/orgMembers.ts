@@ -29,7 +29,7 @@ export interface OrgMember2faStatusRow {
 
 export interface OrgMemberPasswordPolicyStatusRow {
   user_id: string
-  email: string
+  email: string | null
   password_policy_compliant: boolean
   first_name: string | null
   last_name: string | null

@@ -116,9 +116,10 @@ describe('console Better Auth', () => {
     const rejectedMagic = randomUUID()
     try {
       await database.query('INSERT INTO public.orgs (id, name, management_email, created_by) VALUES ($1, $2, $3, $4)', [orgId, 'Console Invitation Test', owner.email, owner.user.id])
+      await database.query('INSERT INTO public.org_users (org_id, user_id, rbac_role_name) VALUES ($1, $2, \'org_super_admin\') ON CONFLICT DO NOTHING', [orgId, owner.user.id])
       for (const [id, token, role] of [[invitedId, magic, 'org_member'], [rejectedId, rejectedMagic, 'missing_test_role']]) {
-        await database.query(`INSERT INTO public.tmp_users (email, org_id, future_uuid, invite_magic_string, first_name, last_name, rbac_role_name)
-          VALUES ($1, $2, $3, $4, 'Invited', 'Test', $5)`, [`console-invite-${id}@example.com`, orgId, id, token, role])
+        await database.query(`INSERT INTO public.tmp_users (email, org_id, future_uuid, invite_magic_string, first_name, last_name, rbac_role_name, invited_by_user_id)
+          VALUES ($1, $2, $3, $4, 'Invited', 'Test', $5, $6)`, [`console-invite-${id}@example.com`, orgId, id, token, role, owner.user.id])
       }
       const accepted = await request('/auth/console-accept-invitation', { magic_invite_string: magic, password, opt_for_newsletters: false })
       expect(accepted.status, await accepted.clone().text()).toBe(200)
@@ -129,7 +130,8 @@ describe('console Better Auth', () => {
       expect((await database.query('SELECT is_invite FROM public.org_users WHERE user_id = $1 AND org_id = $2', [invitedId, orgId])).rows[0].is_invite).toBe(false)
       expect((await database.query('SELECT id FROM public.tmp_users WHERE invite_magic_string = $1', [magic])).rows).toHaveLength(0)
       const rejected = await request('/auth/console-accept-invitation', { magic_invite_string: rejectedMagic, password, opt_for_newsletters: false })
-      expect(rejected.status).toBe(500)
+      expect(rejected.status, await rejected.clone().text()).toBe(403)
+      expect(await rejected.text()).toBe('Invitation role exceeds inviter privileges')
       expect((await database.query('SELECT id FROM public.console_auth_user WHERE id = $1', [rejectedId])).rows).toHaveLength(0)
       expect((await database.query('SELECT id FROM auth.users WHERE id = $1', [rejectedId])).rows).toHaveLength(0)
       expect((await database.query('SELECT id FROM public.tmp_users WHERE invite_magic_string = $1', [rejectedMagic])).rows).toHaveLength(1)

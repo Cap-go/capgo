@@ -64,7 +64,7 @@ describe('org members HTTP API', () => {
 
     expect(response.status).toBe(200)
     const data = await response.json() as Array<{
-      user_id: string
+      'user_id': string
       '2fa_enabled': boolean
     }>
     expect(Array.isArray(data)).toBe(true)
@@ -83,14 +83,15 @@ describe('org members HTTP API', () => {
     expect(response.status).toBe(200)
     const data = await response.json() as Array<{
       user_id: string
-      email: string
+      email: null
       password_policy_compliant: boolean
     }>
     expect(Array.isArray(data)).toBe(true)
-    if (data.length > 0) {
-      expect(typeof data[0]?.user_id).toBe('string')
-      expect(typeof data[0]?.email).toBe('string')
-      expect(typeof data[0]?.password_policy_compliant).toBe('boolean')
+    expect(data.length).toBeGreaterThan(0)
+    for (const member of data) {
+      expect(typeof member.user_id).toBe('string')
+      expect(member.email).toBeNull()
+      expect(typeof member.password_policy_compliant).toBe('boolean')
     }
   })
 
