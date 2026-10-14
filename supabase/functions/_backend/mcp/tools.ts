@@ -81,6 +81,7 @@ const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: fal
 // Deletes, cancellations and overwrites of existing settings. OpenAI plugin guidelines count
 // overwrites as destructive even when they can be undone, so clients ask before running them.
 const DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } satisfies McpToolAnnotations
+// Writes that reach a system outside Capgo: an email inbox, a third-party URL, devices or push providers.
 const EXTERNAL = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true } satisfies McpToolAnnotations
 
 const appId = z.string().min(1).describe('App ID in reverse-domain form, e.g. com.example.app')
@@ -212,13 +213,13 @@ const accountTools: McpTool[] = [
   apiTool({
     name: 'capgo_invite_organization_member',
     title: 'Invite organization member',
-    description: 'Invite a user to an organization by email.',
+    description: 'Invite a user to an organization by email. Capgo sends an invitation email to that address.',
     input: {
       orgId,
       email: z.string().email(),
       invite_type: z.enum(['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin']).describe('Role granted to the invited user'),
     },
-    annotations: WRITE,
+    annotations: EXTERNAL,
     request: input => ({ method: 'POST', path: '/organization/members', body: input }),
   }),
   apiTool({
@@ -372,7 +373,7 @@ const bundleTools: McpTool[] = [
   apiTool({
     name: 'capgo_create_bundle_from_url',
     title: 'Register external bundle',
-    description: 'Register a bundle hosted at an external https URL (zip). To upload local files use the Capgo CLI instead: npx @capgo/cli@latest bundle upload.',
+    description: 'Register a bundle hosted at an external https URL (zip). Devices on a channel serving this bundle download it from that URL. To upload local files use the Capgo CLI instead: npx @capgo/cli@latest bundle upload.',
     input: {
       appId,
       version: z.string().min(1).describe('Semver version name, e.g. 1.2.3'),
@@ -381,7 +382,7 @@ const bundleTools: McpTool[] = [
       session_key: z.string().optional().describe('Encryption session key when the bundle is encrypted'),
       key_id: z.string().optional(),
     },
-    annotations: WRITE,
+    annotations: EXTERNAL,
     request: ({ appId: id, ...rest }) => ({ method: 'POST', path: '/bundle', body: compact({ app_id: id, ...rest }) }),
   }),
   apiTool({

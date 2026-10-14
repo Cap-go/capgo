@@ -121,6 +121,22 @@ describe('hosted MCP protocol', () => {
     }
   })
 
+  it.concurrent('marks tools that reach systems outside Capgo as open-world', () => {
+    const openWorld = [
+      'capgo_invite_organization_member', // sends an invitation email
+      'capgo_create_bundle_from_url', // devices download from a third-party URL
+      'capgo_fetch_store_metadata',
+      'capgo_add_webhook',
+      'capgo_test_webhook',
+      'capgo_retry_webhook_delivery',
+      'capgo_send_notification',
+      'capgo_trigger_update_check',
+    ]
+    const byName = new Map(MCP_TOOLS.map(tool => [tool.name, tool]))
+    for (const name of openWorld)
+      expect(byName.get(name)?.annotations.openWorldHint, name).toBe(true)
+  })
+
   it.concurrent('replays tool calls as public API requests', async () => {
     const { ctx, calls } = fakeContext([{ id: 1, name: '1.0.0' }])
     const response = await handleJsonRpcMessage({
