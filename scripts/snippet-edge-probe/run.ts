@@ -7,6 +7,7 @@
  *
  *   snippet-edge-probe.capgo.app         probe snippet (probe-snippet.js)
  *   snippet-edge-test.capgo.app          the real snippet, worker URLs -> test origin
+ *   snippet-edge-alias.capgo.app         the real snippet too, sharing IP limits with the test host
  *   snippet-edge-probe-origin.capgo.app  test origin worker (origin-worker.ts)
  *
  * Checks:
@@ -15,6 +16,7 @@
  *   3. snippet and worker of the zone share Cache API entries (same key)
  *   4. Logpush keeps the X-Capgo-Edge-Stat response header, by size
  *   5. real snippet end to end: learn, answer without origin, purge, IP limit
+ *   6. Cache API keys on another hostname of the zone (IP limits shared by hosts)
  *
  * Env: CLOUDFLARE_API_TOKEN with, on capgo.app: Snippets Edit, DNS Edit,
  * Cache Purge, Logs Edit, Zone Read. Wrangler (Worker deploy, R2 bucket)
@@ -22,9 +24,10 @@
  *
  *   bun scripts/snippet-edge-probe/run.ts setup [--dry-run]
  *   bun scripts/snippet-edge-probe/run.ts test
- *   bun scripts/snippet-edge-probe/run.ts logs       # Logpush part, 1-5 min after test
+ *   bun scripts/snippet-edge-probe/run.ts logs [run] # Logpush part, 1-5 min after test
  *   bun scripts/snippet-edge-probe/run.ts teardown
  */
+import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -34,6 +37,7 @@ import process from 'node:process'
 const ZONE_NAME = 'capgo.app'
 const PROBE_HOST = 'snippet-edge-probe.capgo.app'
 const TEST_HOST = 'snippet-edge-test.capgo.app'
+const ALIAS_HOST = 'snippet-edge-alias.capgo.app'
 const ORIGIN_HOST = 'snippet-edge-probe-origin.capgo.app'
 const PROBE_SNIPPET = 'capgo_edge_probe'
 const TEST_SNIPPET = 'capgo_edge_probe_real'
@@ -105,8 +109,12 @@ async function buildTestSnippet() {
     .replace(/https:\/\/plugin\.[a-z]+\.capgo\.app/g, `https://${ORIGIN_HOST}`)
   if (source.includes('plugin.eu.capgo.app'))
     throw new Error('Test snippet still targets a production worker')
+  const ipLimitHosts = `const IP_LIMIT_HOSTS = { 'api.capgo.app': 'plugin.capgo.app', 'plugin.usecapgo.com': 'plugin.capgo.app' }`
+  if (!source.includes(ipLimitHosts))
+    throw new Error('IP_LIMIT_HOSTS changed: update the probe')
+  const testSource = source.replace(ipLimitHosts, `const IP_LIMIT_HOSTS = { '${ALIAS_HOST}': '${TEST_HOST}' }`)
   const path = join(tmpdir(), 'capgo-edge-probe-real.js')
-  writeFileSync(path, source)
+  writeFileSync(path, testSource)
   const result = await Bun.build({ entrypoints: [path], minify: true, target: 'browser', format: 'esm' })
   if (!result.success)
     throw new Error(result.logs.join('\n'))
@@ -134,7 +142,7 @@ async function setProbeRules(zone: string, add: boolean, dryRun = false) {
   const ours: SnippetRule[] = add
     ? [
         { description: 'capgo edge probe (test host only)', enabled: true, expression: `(http.host eq "${PROBE_HOST}")`, snippet_name: PROBE_SNIPPET },
-        { description: 'capgo edge probe real snippet (test host only)', enabled: true, expression: `(http.host eq "${TEST_HOST}")`, snippet_name: TEST_SNIPPET },
+        { description: 'capgo edge probe real snippet (test hosts only)', enabled: true, expression: `(http.host eq "${TEST_HOST}") or (http.host eq "${ALIAS_HOST}")`, snippet_name: TEST_SNIPPET },
       ]
     : []
   console.log(`Snippet rules kept as is: ${others.map(rule => `${rule.snippet_name} [${rule.expression}]`).join(', ') || 'none'}`)
@@ -158,7 +166,7 @@ async function setProbeRules(zone: string, add: boolean, dryRun = false) {
 
 async function ensureDns(zone: string, state: State) {
   state.dnsIds ??= []
-  for (const name of [PROBE_HOST, TEST_HOST]) {
+  for (const name of [PROBE_HOST, TEST_HOST, ALIAS_HOST]) {
     const found = await cf<{ id: string }[]>(`/zones/${zone}/dns_records?name=${name}`)
     if (found.length > 0)
       continue
@@ -206,7 +214,7 @@ async function ensureLogpush(zone: string, state: State) {
       destination_conf: destination,
       max_upload_interval_seconds: 30,
       output_options: { output_type: 'ndjson', field_names: ['ClientRequestHost', 'ClientRequestURI', 'EdgeResponseStatus', 'ResponseHeaders'] },
-      filter: JSON.stringify({ where: { or: [PROBE_HOST, TEST_HOST].map(value => ({ key: 'ClientRequestHost', operator: 'eq', value })) } }),
+      filter: JSON.stringify({ where: { or: [PROBE_HOST, TEST_HOST, ALIAS_HOST].map(value => ({ key: 'ClientRequestHost', operator: 'eq', value })) } }),
     }),
   })
   state.logpushJobId = job.id
@@ -314,7 +322,8 @@ async function test() {
     is_prod: true,
     defaultChannel: 'production',
   })
-  const post = (path: string, payload: string) => get(`https://${TEST_HOST}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload })
+  // The run id in the query lets `logs` keep this run's lines only (the snippet matches the path).
+  const post = (path: string, payload: string, host = TEST_HOST) => get(`https://${host}${path}?run=${run}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload })
   const served = (result: Awaited<ReturnType<typeof get>>) => result.headers.get('X-Capgo-Edge') === 'answer' ? 'snippet' : result.headers.get('X-Probe-Origin') ? 'origin' : `other(${result.status})`
   const e2e: Record<string, string> = {}
   e2e.first = served(await post('/updates', body('00000000-0000-4000-8000-000000000001')))
@@ -324,28 +333,47 @@ async function test() {
   await sleep(5000)
   e2e.afterPurge = served(await post('/updates', body('00000000-0000-4000-8000-000000000004')))
   e2e.afterRefill = served(await post('/updates', body('00000000-0000-4000-8000-000000000005')))
+  // Answers are stored per host, platform and default channel.
+  e2e.aliasFirst = served(await post('/updates', body('00000000-0000-4000-8000-000000000009'), ALIAS_HOST))
+  e2e.aliasSecond = served(await post('/updates', body('00000000-0000-4000-8000-00000000000a'), ALIAS_HOST))
+  e2e.otherChannel = served(await post('/updates', body('00000000-0000-4000-8000-00000000000b').replace('"production"', '"beta"')))
+  e2e.trailingSlash = served(await post('/updates/', body('00000000-0000-4000-8000-00000000000c')))
   e2e.ipLimit = served(await post('/updates', body('ffffffff-0000-4000-8000-000000000006', '0.1.0')))
   e2e.afterIpLimit = served(await post('/updates', body('00000000-0000-4000-8000-000000000007')))
+  // The limit was learned on the test host: the alias host must honour it.
+  e2e.aliasAfterIpLimit = served(await post('/updates', body('00000000-0000-4000-8000-00000000000d'), ALIAS_HOST))
   const stats = JSON.stringify([{ app_id: appId, device_id: '00000000-0000-4000-8000-000000000008', platform: 'ios', version_name: '1.0.0', version_os: '18', is_emulator: false, is_prod: true, action: 'app_moved_to_foreground' }])
   e2e.statsFirst = served(await post('/stats', stats))
   e2e.statsSecond = served(await post('/stats', stats))
   report.real_snippet = e2e
 
+  // 6. Cache API key on another hostname, without the snippet's error handling
+  const xkey = `x-${run}`
+  report.cross_host_cache = {
+    putTestHostKey: (await get(`https://${PROBE_HOST}/__probe__/xhost-put?host=${TEST_HOST}&key=${xkey}`)).body,
+    getTestHostKey: (await get(`https://${PROBE_HOST}/__probe__/xhost-get?host=${TEST_HOST}&key=${xkey}`)).body,
+    getAliasHostKey: (await get(`https://${PROBE_HOST}/__probe__/xhost-get?host=${ALIAS_HOST}&key=${xkey}`)).body,
+  }
+
   console.log(JSON.stringify(report, null, 2))
-  console.log(`\nLogpush ships every ~30s: run "bun scripts/snippet-edge-probe/run.ts logs" in 1-5 min (run id ${run}).`)
+  console.log(`\nLogpush ships every ~30s: run "bun scripts/snippet-edge-probe/run.ts logs ${run}" in 1-5 min.`)
 }
 
 async function logs() {
   const state = loadState()
+  const run = process.argv[3]
   const result = await get(`https://${ORIGIN_HOST}/logpush-dump`, { headers: { Authorization: `Bearer ${state.secret}` } })
   if (result.status !== 200)
     throw new Error(`logpush-dump: HTTP ${result.status}`)
-  const lines = result.body.lines as { host: string, uri: string, statLength: number | null }[]
+  const all = result.body.lines as { host: string, uri: string, statLength: number | null }[]
+  const lines = run ? all.filter(line => line.uri?.includes(`run=${run}`)) : all
   const headerLines = lines.filter(line => line.uri?.includes('/__probe__/header'))
   console.log(JSON.stringify({
     files: result.body.files,
     headerSizes: headerLines.map(line => ({ requested: Number(new URL(`https://x${line.uri}`).searchParams.get('size')), logged: line.statLength })),
-    realSnippetAnswersLogged: lines.filter(line => line.host === TEST_HOST && line.statLength).length,
+    realSnippetAnswersLogged: lines.filter(line => (line.host === TEST_HOST || line.host === ALIAS_HOST) && line.statLength).length,
+    // v2 stat header: no owner org.
+    statKeys: [...new Set(lines.filter(line => (line.host === TEST_HOST || line.host === ALIAS_HOST) && (line as any).stat).map(line => Object.keys(JSON.parse(Buffer.from((line as any).stat, 'base64url').toString())).sort().join(',')))],
   }, null, 2))
 }
 

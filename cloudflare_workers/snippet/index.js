@@ -1,6 +1,7 @@
 // Rules to match requests this Snippet will handle
 // Expression
-// (http.host eq "plugin.capgo.app")
+// (http.host eq "plugin.usecapgo.com")
+// or (http.host eq "plugin.capgo.app")
 // or (http.host eq "updater.capgo.com.cn")
 // or (http.host eq "updater.spencer.co")
 // or (http.request.full_uri wildcard "*api.capgo.app/updates*")
@@ -35,8 +36,9 @@ const EDGE_STAT_HEADER = 'X-Capgo-Edge-Stat'
 const EDGE_KIND_HEADER = 'X-Edge-Kind'
 // Paths Logpush ships (setup-snippet-edge-stats.ts): only those are answered.
 const EDGE_ANSWER_PATHS = new Set(['/updates', '/stats'])
-// Hosts of one zone that reach the same workers share the IP limit entries.
-const IP_LIMIT_HOSTS = { 'api.capgo.app': 'plugin.capgo.app' }
+// Hosts that reach the same workers share the IP limit entries (Cache API keys
+// on another hostname of the zone work in snippets: snippet-edge-probe).
+const IP_LIMIT_HOSTS = { 'api.capgo.app': 'plugin.capgo.app', 'plugin.usecapgo.com': 'plugin.capgo.app' }
 const MAX_EDGE_CHANNEL_LENGTH = 128
 const MAX_EDGE_ACTIONS = 128
 // Logpush header fields and the replay queue messages stay small.

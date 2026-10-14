@@ -68,6 +68,25 @@ export default {
       return json({ ok: true, colo })
     }
 
+    // Cache API key on another hostname of the zone than the request's.
+    if (url.pathname === '/__probe__/xhost-put' || url.pathname === '/__probe__/xhost-get') {
+      const host = q.get('host')
+      if (!['snippet-edge-test.capgo.app', 'snippet-edge-alias.capgo.app'].includes(host))
+        return json({ error: 'test hosts only' }, 400)
+      const key = `https://${host}/__probe__/xhost/${encodeURIComponent(q.get('key') ?? '')}`
+      try {
+        if (url.pathname === '/__probe__/xhost-get') {
+          const hit = await caches.default.match(key)
+          return json({ ok: true, hit: Boolean(hit), body: hit ? await hit.text() : null, colo })
+        }
+        await caches.default.put(key, new Response(`snippet:${url.hostname}:${colo}`, { headers: { 'Cache-Control': 'public, max-age=600' } }))
+        return json({ ok: true, colo })
+      }
+      catch (e) {
+        return json({ ok: false, error: String(e?.message ?? e), colo })
+      }
+    }
+
     if (url.pathname === '/__probe__/header') {
       const size = Math.min(Number(q.get('size') ?? '1024'), 64000)
       const value = 'A'.repeat(size)

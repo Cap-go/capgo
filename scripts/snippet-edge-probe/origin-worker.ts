@@ -17,8 +17,10 @@ function json(body: unknown, init: ResponseInit = {}) {
 }
 
 function fill(fields: Record<string, unknown>, appId: string) {
-  return encodeURIComponent(JSON.stringify({ v: 1, bps: 10000, ttl: 900, tags: `capgo-edge-probe-${appId}`, ...fields }))
+  return encodeURIComponent(JSON.stringify({ v: 2, bps: 10000, ttl: 900, tags: `capgo-edge-probe-${appId}`, ...fields }))
 }
+
+const STATS_ACTIONS = ['ping', 'app_moved_to_foreground', 'app_moved_to_background']
 
 function authorized(request: Request, env: Env) {
   return request.headers.get('Authorization') === `Bearer ${env.PROBE_SECRET}`
@@ -37,7 +39,9 @@ export default {
     const origin = { 'X-Probe-Origin': colo }
 
     // Fake plugin worker: what the real snippet calls on the test host.
-    if (request.method === 'POST' && url.pathname === '/updates') {
+    // The snippet only answers exact paths; the origin also takes a trailing slash.
+    const path = url.pathname.length > 1 ? url.pathname.replace(/\/$/, '') : url.pathname
+    if (request.method === 'POST' && path === '/updates') {
       const body = await request.json() as Record<string, any>
       if (typeof body.device_id === 'string' && body.device_id.startsWith('ffffffff')) {
         const resetAt = Math.floor(Date.now() / 1000) + 600
@@ -49,14 +53,14 @@ export default {
       if (body.version_name !== CURRENT_BUNDLE)
         return json({ version: CURRENT_BUNDLE, url: 'https://example.com/bundle.zip' }, { headers: origin })
       return json({ error: 'no_new_version_available', message: 'No new version available', kind: 'up_to_date' }, {
-        headers: { ...origin, 'X-Capgo-Edge-Fill': fill({ e: 'updates', n: CURRENT_BUNDLE, k: null, o: 'org-probe', a: true, cs: false }, body.app_id) },
+        headers: { ...origin, 'X-Capgo-Edge-Fill': fill({ e: 'updates', n: CURRENT_BUNDLE, k: null, cs: false }, body.app_id) },
       })
     }
-    if (request.method === 'POST' && url.pathname === '/stats') {
+    if (request.method === 'POST' && path === '/stats') {
       const body = await request.json() as any
       const events = Array.isArray(body) ? body : [body]
       const answer = Array.isArray(body) ? { status: 'ok', results: events.map((_: unknown, index: number) => ({ status: 'ok', index })) } : { status: 'ok' }
-      return json(answer, { headers: { ...origin, 'X-Capgo-Edge-Fill': fill({ e: 'stats' }, events[0]?.app_id) } })
+      return json(answer, { headers: { ...origin, 'X-Capgo-Edge-Fill': fill({ e: 'stats', actions: STATS_ACTIONS }, events[0]?.app_id) } })
     }
 
     if (url.pathname === '/ping')
