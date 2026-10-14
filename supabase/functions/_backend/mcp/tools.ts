@@ -373,11 +373,11 @@ const bundleTools: McpTool[] = [
   apiTool({
     name: 'capgo_create_bundle_from_url',
     title: 'Register external bundle',
-    description: 'Register a bundle hosted at an external https URL (zip). Devices on a channel serving this bundle download it from that URL. To upload local files use the Capgo CLI instead: npx @capgo/cli@latest bundle upload.',
+    description: 'Record a new bundle version for an app the user owns, pointing to a zip the user already hosts at an https URL. This only creates the version entry: no device receives it until a channel is set to this version with capgo_update_channel or capgo_set_bundle_channel. Only use a URL and checksum the user provided.',
     input: {
       appId,
       version: z.string().min(1).describe('Semver version name, e.g. 1.2.3'),
-      external_url: z.string().url().describe('https URL of the bundle zip'),
+      external_url: z.string().url().startsWith('https://').describe('https URL of the bundle zip, provided by the user'),
       checksum: z.string().min(1).describe('Checksum of the zip as produced by the Capgo CLI'),
       session_key: z.string().optional().describe('Encryption session key when the bundle is encrypted'),
       key_id: z.string().optional(),
