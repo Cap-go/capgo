@@ -10,7 +10,10 @@ import { cloudlog } from '../utils/logging.ts'
 import { ManifestInventoryConflict, reserveManifestPaths, usesManifestInventory, withManifestInventory } from '../utils/manifest_inventory.ts'
 import { getManifestReceiptBucket } from '../utils/manifest_size_receipt.ts'
 import { createManifestUploadResponse, ManifestUploadRequestError, parseManifestUploadRequestBody, resolveManifestUploadPublicBaseUrl, validateManifestUploadRequest } from '../utils/manifest_upload.ts'
-import { closeClient, getAppByIdPg, getDrizzleClient, getPgClient, logPgError } from '../utils/pg.ts'
+import { closeClient, getDrizzleClient, getPgClient, logPgError } from '../utils/pg.ts'
+import { throwDatabaseLookupError, throwDatabaseUnavailable } from '../utils/pg_auth_lookup.ts'
+import { isTransientPgError } from '../utils/pg_errors.ts'
+import { getAppPlanStatePg } from '../utils/pg_files.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { onPremiseAppResponse } from '../utils/rateLimitInfo.ts'
 import { checkPermissionPg } from '../utils/rbac.ts'
@@ -72,9 +75,12 @@ app.post('/', middlewareKey({ usePostgres: true, readOnly: false, rateLimitScope
     if (!version || !(await checkPermissionPg(c, 'app.upload_bundle', { appId: version.appId }, drizzleClient, auth.userId, apikey)))
       return quickError(404, 'error_version_not_found', 'Version not found')
 
-    const appPlan = await getAppByIdPg(c, version.appId, drizzleClient, ATTACHMENT_PLAN_LIMIT)
-    if (!appPlan)
-      return quickError(503, 'upstream_unavailable', 'App plan state temporarily unavailable')
+    const appPlanLookup = await getAppPlanStatePg(c, version.appId, pgClient, ATTACHMENT_PLAN_LIMIT)
+    if (appPlanLookup.kind === 'db_error')
+      throwDatabaseLookupError(c, 'request_manifest_upload.getAppPlanStatePg', appPlanLookup.error)
+    if (appPlanLookup.kind === 'not_found')
+      return quickError(404, 'error_version_not_found', 'Version not found')
+    const appPlan = appPlanLookup.value
     if (!appPlan.plan_valid)
       return onPremiseAppResponse(c)
 
@@ -130,6 +136,8 @@ app.post('/', middlewareKey({ usePostgres: true, readOnly: false, rateLimitScope
     if (error instanceof HTTPException)
       throw error
     logPgError(c, 'request_manifest_upload', error)
+    if (isTransientPgError(error))
+      throwDatabaseUnavailable(c, 'request_manifest_upload', error)
     return quickError(503, 'upstream_unavailable', 'Upload authorization state temporarily unavailable')
   }
   finally {
