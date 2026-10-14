@@ -25,12 +25,20 @@ const MAX_SUBREQUESTS = 5
 // stored per data center under the app's purge tags, then served here without
 // invoking a worker. Every served answer carries X-Capgo-Edge-Stat, which
 // Logpush ships to R2 so the worker replays its stats in batches.
+// Kill switch: false stops every edge answer and fill on the next paste. The
+// worker secret SNIPPET_EDGE_ANSWER only stops new fills; the setter script
+// purges the stored ones.
+const EDGE_ANSWERS_ENABLED = true
 const EDGE_FILL_HEADER = 'X-Capgo-Edge-Fill'
 const EDGE_IP_LIMIT_HEADER = 'X-Capgo-Edge-Ip-Limit'
 const EDGE_STAT_HEADER = 'X-Capgo-Edge-Stat'
 const EDGE_KIND_HEADER = 'X-Edge-Kind'
-const MAX_EDGE_VARIANTS = 32
-const MAX_EDGE_ACTIONS = 64
+// Paths Logpush ships (setup-snippet-edge-stats.ts): only those are answered.
+const EDGE_ANSWER_PATHS = new Set(['/updates', '/stats'])
+// Hosts of one zone that reach the same workers share the IP limit entries.
+const IP_LIMIT_HOSTS = { 'api.capgo.app': 'plugin.capgo.app' }
+const MAX_EDGE_CHANNEL_LENGTH = 128
+const MAX_EDGE_ACTIONS = 128
 // Logpush header fields and the replay queue messages stay small.
 const MAX_EDGE_STAT_BODY_BYTES = 6000
 // Logpush cuts response header fields at 8192 bytes (measured); a cut stat
@@ -50,13 +58,14 @@ function canSpend(budget, count = 1, reserve = 0) {
   return budget.used + count + reserve <= MAX_SUBREQUESTS
 }
 
-async function cacheMatch(budget, key) {
+/** `failClosed`: a lookup error reads as a hit, for entries that block an answer. */
+async function cacheMatch(budget, key, failClosed = false) {
   budget.used++
   try {
     return await caches.default.match(key)
   }
   catch {
-    return undefined
+    return failClosed ? true : undefined
   }
 }
 
@@ -87,14 +96,26 @@ function getCircuitBreakerCacheKey(hostname, colo, workerUrl) {
   return `https://${hostname}/__internal__/circuit-breaker/${colo}/${encodeURIComponent(workerUrl)}`
 }
 
-// One entry per app, endpoint and method: an on-prem or plan-upgrade answer,
-// or the edge answers. One lookup serves all three.
-function getEdgeCacheKey(hostname, appId, endpoint, method) {
-  return `https://${hostname}/__internal__/edge-v3/${encodeURIComponent(appId)}/${endpoint}/${method}`
+// One entry per app, endpoint, method and (for /updates) platform + default
+// channel: an on-prem or plan-upgrade answer, or the edge answer. One lookup
+// serves all three. A fill only writes its own entry: merging into entries
+// read before a purge would bring purged answers back.
+function getEdgeCacheKey(hostname, appId, endpoint, method, variant) {
+  return `https://${hostname}/__internal__/edge-v4/${encodeURIComponent(appId)}/${endpoint}/${method}${variant ? `/${variant}` : ''}`
+}
+
+/** /updates answers depend on platform and default channel; null when the channel is too long to key on. */
+function getEdgeVariant(endpoint, method, body) {
+  if (endpoint !== 'updates' || method !== 'POST' || !isPlainObject(body))
+    return ''
+  const channel = typeof body.defaultChannel === 'string' ? body.defaultChannel : ''
+  if (channel.length > MAX_EDGE_CHANNEL_LENGTH)
+    return null
+  return `${encodeURIComponent(typeof body.platform === 'string' ? body.platform : '')}/${encodeURIComponent(channel)}`
 }
 
 function getIpLimitCacheKey(hostname, ip) {
-  return `https://${hostname}/__internal__/edge-ip-limit-v1/${encodeURIComponent(ip)}`
+  return `https://${IP_LIMIT_HOSTS[hostname] ?? hostname}/__internal__/edge-ip-limit-v1/${encodeURIComponent(ip)}`
 }
 
 // Endpoints that should be checked for on-prem caching
@@ -278,7 +299,7 @@ function applyEdgeRateLimitCacheHeaders(headers, responseBody, cacheTtl) {
   }
 }
 
-async function setOnPremCache(budget, hostname, appId, endpoint, method, responseBody, status, responseHeaders) {
+async function setOnPremCache(budget, edgeKey, appId, endpoint, method, responseBody, status, responseHeaders) {
   const cacheTtl = getCacheTtlSeconds(responseHeaders, responseBody)
   if (!cacheTtl) {
     console.log(`On-prem cache SKIP for ${appId}/${endpoint}/${method} (missing cache TTL)`)
@@ -299,7 +320,7 @@ async function setOnPremCache(budget, hostname, appId, endpoint, method, respons
   applyEdgeRateLimitCacheHeaders(headers, responseBody, cacheTtl)
 
   const response = new Response(JSON.stringify(responseBody), { status, headers })
-  if (await cachePut(budget, getEdgeCacheKey(hostname, appId, endpoint, method), response))
+  if (await cachePut(budget, edgeKey, response))
     console.log(`On-prem cache SET for ${appId}/${endpoint}/${method} (${cacheTtl}s TTL)`)
 }
 
@@ -329,7 +350,7 @@ function buildOnPremResponse(appId, responseBody, status, responseHeaders) {
   })
 }
 
-async function setPlanUpgradeCache(budget, hostname, appId, endpoint, method, responseBody, status, responseHeaders) {
+async function setPlanUpgradeCache(budget, edgeKey, appId, endpoint, method, responseBody, status, responseHeaders) {
   const cacheTtl = getCacheTtlSeconds(responseHeaders, responseBody)
   if (!cacheTtl) {
     console.log(`Plan-upgrade cache SKIP for ${appId}/${endpoint}/${method} (missing cache TTL)`)
@@ -349,7 +370,7 @@ async function setPlanUpgradeCache(budget, hostname, appId, endpoint, method, re
   headers.set(EDGE_KIND_HEADER, 'plan')
   applyEdgeRateLimitCacheHeaders(headers, responseBody, cacheTtl)
   const response = new Response(JSON.stringify(responseBody), { status, headers })
-  if (await cachePut(budget, getEdgeCacheKey(hostname, appId, endpoint, method), response))
+  if (await cachePut(budget, edgeKey, response))
     console.log(`Plan-upgrade cache SET for ${appId}/${endpoint}/${method} (${cacheTtl}s TTL)`)
 }
 
@@ -438,10 +459,6 @@ function isAnswerablePluginVersion(pluginVersion, legacyChannelSelfStore) {
   return minor >= (legacyChannelSelfStore ? 34 : major === 5 ? 10 : 25)
 }
 
-function updatesVariantKey(body) {
-  return `${body.platform}|${typeof body.defaultChannel === 'string' ? body.defaultChannel : ''}`
-}
-
 /** The worker's canServeUpToDateFromCache, plus the request schema it validates first. */
 function isAnswerableUpdatesBody(body, appId, fill) {
   return isPlainObject(body)
@@ -452,7 +469,7 @@ function isAnswerableUpdatesBody(body, appId, fill) {
     && typeof body.version_build === 'string' && body.version_build !== 'unknown' && PLAIN_SEMVER_RE.test(fixSemver(body.version_build))
     && typeof body.is_emulator === 'boolean' && typeof body.is_prod === 'boolean'
     && isAnswerablePluginVersion(body.plugin_version, fill.cs)
-    && isOptionalString(body.defaultChannel)
+    && isOptionalString(body.defaultChannel, MAX_EDGE_CHANNEL_LENGTH)
     && isOptionalString(body.install_source, 64)
     && isOptionalString(body.key_id, 20)
     // A key mismatch is answered by the worker (key_id_mismatch for current plugins).
@@ -468,9 +485,14 @@ function isValidStatsMetadata(metadata) {
   return entries.length <= 30 && entries.every(([key, value]) => key.length <= 64 && typeof value === 'string' && value.length <= 2048)
 }
 
+/** parsePluginBody rejects a native version it cannot read as semver; anything but plain x.y.z goes to the worker. */
+function isAnswerableStatsVersionBuild(versionBuild) {
+  return versionBuild === undefined || versionBuild === '' || (typeof versionBuild === 'string' && PLAIN_SEMVER_RE.test(fixSemver(versionBuild)))
+}
+
 /**
- * The stats request schema, an action the worker already accepted for this
- * app, and never an install or a failure: rollout auto-pause compares those
+ * The stats request schema and an action the worker lists in its fill. The
+ * worker never lists installs or failures: rollout auto-pause compares those
  * two live, so they always reach the worker.
  */
 function isAnswerableStatsEvent(event, appId, actions) {
@@ -482,7 +504,8 @@ function isAnswerableStatsEvent(event, appId, actions) {
     && typeof event.version_os === 'string'
     && typeof event.is_emulator === 'boolean' && typeof event.is_prod === 'boolean'
     && typeof event.action === 'string' && event.action !== 'set' && !event.action.endsWith('_fail') && actions.includes(event.action)
-    && ['defaultChannel', 'channel', 'old_version_name', 'version_code', 'plugin_version', 'version_build'].every(key => isOptionalString(event[key]))
+    && ['defaultChannel', 'channel', 'old_version_name', 'version_code', 'plugin_version'].every(key => isOptionalString(event[key]))
+    && isAnswerableStatsVersionBuild(event.version_build)
     && isOptionalString(event.install_source, 64)
     && isOptionalString(event.custom_id, 36)
     && isOptionalString(event.key_id, 20)
@@ -521,29 +544,28 @@ function edgeAnswerResponse(body, statHeader) {
   })
 }
 
-/** Serves the request from the app's edge answers, or returns null to call the worker. */
-async function tryEdgeAnswer(budget, request, hostname, endpoint, appId, body, rawBody, doc) {
+/** Serves the request from the stored edge answer, or returns null to call the worker. */
+async function tryEdgeAnswer(budget, request, url, endpoint, appId, body, rawBody, doc) {
   // Browser callers need the worker's CORS answer; Logpush keeps small headers only.
-  if (request.headers.has('Origin') || rawBody.length > MAX_EDGE_STAT_BODY_BYTES || !APP_ID_RE.test(appId))
+  if (!EDGE_ANSWERS_ENABLED || !EDGE_ANSWER_PATHS.has(url.pathname) || request.headers.has('Origin') || rawBody.length > MAX_EDGE_STAT_BODY_BYTES || !APP_ID_RE.test(appId))
     return null
+  const fill = doc.fill
 
   if (endpoint === 'updates') {
-    const fill = doc.variants?.[updatesVariantKey(body)]
     if (!isLiveEdgeFill(fill, appId, body?.device_id) || typeof fill.r !== 'string' || !isAnswerableUpdatesBody(body, appId, fill))
       return null
     // An up-to-date answer confirms the bundle name: never give it to an IP
     // the worker's update enumeration guard limited.
     const ip = request.headers.get('cf-connecting-ip')
-    const statHeader = edgeStatHeader({ e: 'updates', b: rawBody, o: fill.o, a: fill.a, n: fill.n })
+    const statHeader = edgeStatHeader({ e: 'updates', b: rawBody, n: fill.n })
     if (!ip || !statHeader || !canSpend(budget, 1, 2))
       return null
-    if (await cacheMatch(budget, getIpLimitCacheKey(hostname, ip)))
+    if (await cacheMatch(budget, getIpLimitCacheKey(url.hostname, ip), true))
       return null
     return edgeAnswerResponse(fill.r, statHeader)
   }
 
   if (endpoint === 'stats') {
-    const fill = doc.stats
     const events = Array.isArray(body) ? body : [body]
     if (events.length === 0 || !isLiveEdgeFill(fill, appId, events[0]?.device_id) || !Array.isArray(fill.actions))
       return null
@@ -564,11 +586,13 @@ async function tryEdgeAnswer(budget, request, hostname, endpoint, appId, body, r
 function parseEdgeFill(value, endpoint) {
   try {
     const fill = JSON.parse(decodeURIComponent(value))
-    if (!isPlainObject(fill) || fill.v !== 1 || fill.e !== endpoint || typeof fill.tags !== 'string')
+    if (!isPlainObject(fill) || fill.v !== 2 || fill.e !== endpoint || typeof fill.tags !== 'string')
       return null
     if (typeof fill.bps !== 'number' || fill.bps <= 0 || fill.bps > 10000 || typeof fill.ttl !== 'number' || fill.ttl < 1 || fill.ttl > 3600)
       return null
-    if (endpoint === 'updates' && (typeof fill.n !== 'string' || typeof fill.o !== 'string' || typeof fill.a !== 'boolean' || typeof fill.cs !== 'boolean' || (fill.k !== null && typeof fill.k !== 'string')))
+    if (endpoint === 'updates' && (typeof fill.n !== 'string' || typeof fill.cs !== 'boolean' || (fill.k !== null && typeof fill.k !== 'string')))
+      return null
+    if (endpoint === 'stats' && (!Array.isArray(fill.actions) || fill.actions.length > MAX_EDGE_ACTIONS || !fill.actions.every(action => typeof action === 'string')))
       return null
     return fill
   }
@@ -577,38 +601,20 @@ function parseEdgeFill(value, endpoint) {
   }
 }
 
-/** Merges a fill into the app's edge answers entry and stores it (one subrequest). */
-async function storeEdgeFill(budget, hostname, appId, endpoint, method, doc, fill, body, responseText) {
-  const now = Date.now()
-  const entry = { ...fill, exp: now + fill.ttl * 1000 }
-  let next
-  if (endpoint === 'updates') {
+/** Stores the fill as the entry's only answer (one subrequest). */
+async function storeEdgeFill(budget, edgeKey, appId, endpoint, fill, responseText) {
+  const entry = { ...fill, exp: Date.now() + fill.ttl * 1000 }
+  if (endpoint === 'updates')
     entry.r = responseText
-    const variants = Object.entries(doc?.variants ?? {})
-      .filter(([, value]) => isPlainObject(value) && value.exp > now)
-    variants.push([updatesVariantKey(body), entry])
-    // Keep the freshest variants when an app has many platform/channel pairs.
-    variants.sort((a, b) => b[1].exp - a[1].exp)
-    next = { variants: Object.fromEntries(variants.slice(0, MAX_EDGE_VARIANTS)) }
-  }
-  else {
-    const events = Array.isArray(body) ? body : [body]
-    const previous = isPlainObject(doc?.stats) && doc.stats.exp > now && Array.isArray(doc.stats.actions) ? doc.stats.actions : []
-    const seen = events.map(event => event?.action).filter(action => typeof action === 'string')
-    entry.actions = [...new Set([...previous, ...seen])].slice(0, MAX_EDGE_ACTIONS)
-    next = { stats: entry }
-  }
-  const values = Object.values(next.variants ?? { stats: next.stats })
-  const maxAge = Math.max(1, Math.ceil((Math.max(...values.map(value => value.exp)) - now) / 1000))
-  const response = new Response(JSON.stringify(next), {
+  const response = new Response(JSON.stringify({ fill: entry }), {
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': `public, max-age=${maxAge}`,
+      'Cache-Control': `public, max-age=${fill.ttl}`,
       'Cache-Tag': fill.tags,
       [EDGE_KIND_HEADER]: 'answers',
     },
   })
-  if (await cachePut(budget, getEdgeCacheKey(hostname, appId, endpoint, method), response))
+  if (await cachePut(budget, edgeKey, response))
     console.log(`Edge answer SET for ${appId}/${endpoint}`)
 }
 
@@ -622,7 +628,7 @@ async function storeIpLimit(budget, hostname, ip, resetAtSec) {
 }
 
 /** Worker answer: learn the edge fill / IP limit it carries, without exposing them to the client. */
-async function handleEdgeHints(budget, response, request, hostname, appId, endpoint, method, doc, body, canCache) {
+async function handleEdgeHints(budget, response, request, hostname, edgeKey, appId, endpoint, canCache) {
   const fillHeader = response.headers.get(EDGE_FILL_HEADER)
   const ipLimitHeader = response.headers.get(EDGE_IP_LIMIT_HEADER)
   if (!fillHeader && !ipLimitHeader)
@@ -635,11 +641,11 @@ async function handleEdgeHints(budget, response, request, hostname, appId, endpo
   if (ipLimitHeader && canSpend(budget))
     await storeIpLimit(budget, hostname, request.headers.get('cf-connecting-ip'), Number.parseInt(ipLimitHeader, 10))
 
-  if (fillHeader && canCache && response.status === 200 && canSpend(budget)) {
+  if (EDGE_ANSWERS_ENABLED && fillHeader && edgeKey && canCache && response.status === 200 && canSpend(budget)) {
     const fill = parseEdgeFill(fillHeader, endpoint)
     if (fill) {
       const text = await response.text()
-      await storeEdgeFill(budget, hostname, appId, endpoint, method, doc, fill, body, text)
+      await storeEdgeFill(budget, edgeKey, appId, endpoint, fill, text)
       return new Response(text, { status: response.status, statusText: response.statusText, headers })
     }
   }
@@ -663,28 +669,31 @@ export default {
     let appId = null
     let endpoint = null
     let body
-    let edgeDoc = null
+    let edgeKey = null
     if (isCacheableEndpoint(url.pathname)) {
       endpoint = getEndpointName(url.pathname)
       body = parseJsonBody(requestBody)
       appId = extractAppIdFromRequest(request, url, body)
+      const variant = appId ? getEdgeVariant(endpoint, method, body) : null
+      edgeKey = variant === null ? null : getEdgeCacheKey(hostname, appId, endpoint, method, variant)
 
-      if (appId) {
-        const cached = await cacheMatch(budget, getEdgeCacheKey(hostname, appId, endpoint, method))
+      if (edgeKey) {
+        const cached = await cacheMatch(budget, edgeKey)
         if (cached) {
           if (cached.headers.get(EDGE_KIND_HEADER) !== 'answers') {
             console.log(`Edge cache HIT (${cached.headers.get(EDGE_KIND_HEADER)}) for ${appId}/${endpoint}/${method}`)
             return await withFreshRateLimitHeaders(cached)
           }
+          let edgeDoc = null
           try {
             edgeDoc = await cached.json()
           }
           catch {
             edgeDoc = null
           }
-          if (edgeDoc && method === 'POST') {
+          if (isPlainObject(edgeDoc) && method === 'POST') {
             const rawBody = new TextDecoder().decode(requestBody)
-            const answer = await tryEdgeAnswer(budget, request, hostname, endpoint, appId, body, rawBody, edgeDoc)
+            const answer = await tryEdgeAnswer(budget, request, url, endpoint, appId, body, rawBody, edgeDoc)
             if (answer)
               return answer
           }
@@ -1100,11 +1109,14 @@ export default {
     const fallbackUrls = zoneFallbackUrls[zone] || [WORKER_URL.EUROPE]
     // Set once a worker is skipped or fails; an on-prem answer seen after that is served but not cached.
     let fallbackFailure = false
+    // Budget order: a fetch for every worker left, then the /updates IP limit
+    // write (it keeps edge answers away from a limited IP), then the breaker.
+    const hintReserve = endpoint === 'updates' ? 1 : 0
 
     for (let index = 0; index < fallbackUrls.length; index++) {
       const workerUrl = fallbackUrls[index]
-      // Keep one subrequest for the worker fetch itself.
-      const circuit = canSpend(budget, 1, 1)
+      const fetchesLeft = fallbackUrls.length - index
+      const circuit = canSpend(budget, 1, fetchesLeft + (index > 0 ? hintReserve : 0))
         ? await readCircuit(budget, hostname, colo, workerUrl)
         : { healthy: true, hasEntry: false }
       // Skip unhealthy workers (circuit is open)
@@ -1134,14 +1146,13 @@ export default {
         if (response.status >= 500) {
           fallbackFailure = true
           console.log(`${workerUrl} returned ${response.status}, marking unhealthy`)
-          // Keep a subrequest for the next worker when there is one.
-          if (canSpend(budget, 1, index < fallbackUrls.length - 1 ? 1 : 0))
+          if (canSpend(budget, 1, fetchesLeft - 1 + hintReserve))
             await markUnhealthy(budget, hostname, colo, workerUrl)
           continue // try fallback
         }
 
         // Success (2xx, 3xx, 4xx) - worker is healthy
-        if (circuit.hasEntry && canSpend(budget))
+        if (circuit.hasEntry && canSpend(budget, 1, hintReserve))
           await cacheDelete(budget, getCircuitBreakerCacheKey(hostname, colo, workerUrl))
         console.log(`Request served by ${workerUrl}`)
 
@@ -1157,14 +1168,15 @@ export default {
             // served but not cached.
             if (isOnPremResponse(response.status, responseBody) && !response.headers.has(EDGE_IP_LIMIT_HEADER)) {
               console.log(`On-prem detected by ${workerUrl} for ${appId}${fallbackFailure ? ' (after fallback failure, not caching)' : ''}`)
-              if (!fallbackFailure)
-                await setOnPremCache(budget, hostname, appId, endpoint, method, responseBody, response.status, response.headers)
+              if (!fallbackFailure && edgeKey)
+                await setOnPremCache(budget, edgeKey, appId, endpoint, method, responseBody, response.status, response.headers)
               return buildOnPremResponse(appId, responseBody, response.status, response.headers)
             }
 
             if (isPlanUpgradeResponse(response.status, responseBody)) {
               // Cache plan-upgrade responses for a short TTL to reduce burst traffic
-              await setPlanUpgradeCache(budget, hostname, appId, endpoint, method, responseBody, response.status, response.headers)
+              if (edgeKey)
+                await setPlanUpgradeCache(budget, edgeKey, appId, endpoint, method, responseBody, response.status, response.headers)
 
               const newHeaders = new Headers(response.headers)
               newHeaders.set('Content-Type', 'application/json')
@@ -1180,7 +1192,7 @@ export default {
           catch {
             // Response is not JSON or parsing failed - skip on-prem cache check and return original response
           }
-          return await handleEdgeHints(budget, response, request, hostname, appId, endpoint, method, edgeDoc, body, !fallbackFailure)
+          return await handleEdgeHints(budget, response, request, hostname, edgeKey, appId, endpoint, !fallbackFailure)
         }
 
         return response
@@ -1189,7 +1201,7 @@ export default {
         // Network failure or timeout - mark unhealthy
         fallbackFailure = true
         console.log(`${workerUrl} failed: ${error.message}, marking unhealthy`)
-        if (canSpend(budget, 1, index < fallbackUrls.length - 1 ? 1 : 0))
+        if (canSpend(budget, 1, fetchesLeft - 1 + hintReserve))
           await markUnhealthy(budget, hostname, colo, workerUrl)
         // continue to next fallback
       }

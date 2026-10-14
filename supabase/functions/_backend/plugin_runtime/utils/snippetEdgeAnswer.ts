@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import { ALLOWED_STATS_ACTIONS } from '../plugins/stats_actions.ts'
 import { updatesAppCacheTag, updatesVersionsCacheTag } from './updatesCacheTag.ts'
 import { hasUpdatesPurgeTarget, parseEdgeShareBps } from './updatesEdgeCache.ts'
 import { getEnv, isListedLimitedApp } from './utils.ts'
@@ -24,7 +25,9 @@ import { getEnv, isListedLimitedApp } from './utils.ts'
  *
  * Switch: worker secret `SNIPPET_EDGE_ANSWER` (off | on | N% of devices). Only
  * turn it on once the Logpush -> R2 -> queue pipeline runs, otherwise the
- * stats of answered requests are lost.
+ * stats of answered requests are lost. The secret only stops new fills:
+ * `bun run snippet-edge-answer:set` also purges SNIPPET_EDGE_ANSWERS_TAG, and
+ * so must a LIMITED_APPS change (`bun run snippet-edge-answer:purge`).
  */
 export const SNIPPET_EDGE_FILL_HEADER = 'X-Capgo-Edge-Fill'
 /** On an update enumeration limit answer: unix seconds until the IP limit resets. */
@@ -32,9 +35,17 @@ export const SNIPPET_EDGE_IP_LIMIT_HEADER = 'X-Capgo-Edge-Ip-Limit'
 export const SNIPPET_EDGE_ANSWER_DEFAULT_TTL_SECONDS = 900
 const SNIPPET_EDGE_ANSWER_MIN_TTL_SECONDS = 10
 const SNIPPET_EDGE_ANSWER_MAX_TTL_SECONDS = 3600
+/** On every snippet entry: one purge drops them all. */
+export const SNIPPET_EDGE_ANSWERS_TAG = 'capgo-snippet-edge-answers'
+/**
+ * Actions the snippet may answer: the worker answers them all alike for a
+ * cloud app with a valid plan. Installs and failures always reach the worker
+ * (rollout auto-pause compares them live).
+ */
+export const SNIPPET_EDGE_STATS_ACTIONS = ALLOWED_STATS_ACTIONS.filter(action => action !== 'set' && !action.endsWith('_fail'))
 
 interface SnippetFillBase {
-  v: 1
+  v: 2
   /** Share of devices the snippet answers, in basis points. */
   bps: number
   ttl: number
@@ -47,27 +58,28 @@ export interface SnippetUpdatesFill extends SnippetFillBase {
   /** Bundle the channel serves: the snippet answers only devices already on it. */
   n: string
   k: string | null
-  o: string
-  a: boolean
   /** Legacy channel_self store bound: old plugin versions keep the worker path. */
   cs: boolean
 }
 
 export interface SnippetStatsFill extends SnippetFillBase {
   e: 'stats'
+  actions: string[]
 }
 
 export interface SnippetUpdatesAnswer {
-  ownerOrg: string
-  allowDeviceCustomId: boolean
   versionName: string
   keyId: string | null
+  /** Unix ms when the trial behind plan_valid ends, null when no date bounds it. */
+  planValidUntil: number | null
 }
 
 /** Stats replay of a snippet-answered request (see snippetEdgeReplay.ts). */
 export interface SnippetEdgeReplay {
   endpoint: 'updates' | 'stats'
-  updates?: Pick<SnippetUpdatesAnswer, 'ownerOrg' | 'allowDeviceCustomId' | 'versionName'>
+  updates?: { versionName: string }
+  /** Unix ms of the snippet answer (Logpush EdgeStartTimestamp). */
+  eventTime?: number
 }
 
 const replayRequests = new WeakMap<Request, SnippetEdgeReplay>()
@@ -96,7 +108,7 @@ export function getSnippetEdgeAnswerTtlSeconds(c: Context) {
   return Math.min(Math.max(raw, SNIPPET_EDGE_ANSWER_MIN_TTL_SECONDS), SNIPPET_EDGE_ANSWER_MAX_TTL_SECONDS)
 }
 
-function fillBase(c: Context, appId: string, blockProviderInfraRequests: boolean): SnippetFillBase | null {
+function fillBase(c: Context, appId: string, blockProviderInfraRequests: boolean, planValidUntil: number | null): SnippetFillBase | null {
   // A replayed request has no snippet in front of it.
   if (getSnippetEdgeReplay(c))
     return null
@@ -106,13 +118,19 @@ function fillBase(c: Context, appId: string, blockProviderInfraRequests: boolean
   const bps = getSnippetEdgeAnswerBps(c)
   if (bps <= 0)
     return null
+  // A trial ends at midnight UTC without a write, so without a purge.
+  const ttl = planValidUntil === null
+    ? getSnippetEdgeAnswerTtlSeconds(c)
+    : Math.min(getSnippetEdgeAnswerTtlSeconds(c), Math.floor((planValidUntil - Date.now()) / 1000))
+  if (ttl < 1)
+    return null
   return {
-    v: 1,
+    v: 2,
     bps,
-    ttl: getSnippetEdgeAnswerTtlSeconds(c),
+    ttl,
     // Both scopes: the answer depends on the channel (main tag) and on the
     // served bundle row (versions tag: deleted, key_id).
-    tags: `${updatesAppCacheTag(appId)},${updatesVersionsCacheTag(appId)}`,
+    tags: `${updatesAppCacheTag(appId)},${updatesVersionsCacheTag(appId)},${SNIPPET_EDGE_ANSWERS_TAG}`,
   }
 }
 
@@ -127,7 +145,7 @@ function setFillHeader(c: Context, fill: SnippetUpdatesFill | SnippetStatsFill) 
  * bundle: no override, no rollout, valid plan (the read-cache contract).
  */
 export function setSnippetUpdatesFill(c: Context, appId: string, answer: SnippetUpdatesAnswer, opts: { blockProviderInfraRequests: boolean, legacyChannelSelfStore: boolean }) {
-  const base = fillBase(c, appId, opts.blockProviderInfraRequests)
+  const base = fillBase(c, appId, opts.blockProviderInfraRequests, answer.planValidUntil)
   if (!base)
     return
   setFillHeader(c, {
@@ -135,18 +153,29 @@ export function setSnippetUpdatesFill(c: Context, appId: string, answer: Snippet
     e: 'updates',
     n: answer.versionName,
     k: answer.keyId,
-    o: answer.ownerOrg,
-    a: answer.allowDeviceCustomId,
     cs: opts.legacyChannelSelfStore,
   })
 }
 
 /** Call on an all-ok /stats answer of a cloud app with a valid plan. */
-export function setSnippetStatsFill(c: Context, appId: string, blockProviderInfraRequests: boolean) {
-  const base = fillBase(c, appId, blockProviderInfraRequests)
+export function setSnippetStatsFill(c: Context, appId: string, opts: { blockProviderInfraRequests: boolean, planValidUntil: number | null }) {
+  const base = fillBase(c, appId, opts.blockProviderInfraRequests, opts.planValidUntil)
   if (!base)
     return
-  setFillHeader(c, { ...base, e: 'stats' })
+  setFillHeader(c, { ...base, e: 'stats', actions: SNIPPET_EDGE_STATS_ACTIONS })
+}
+
+/** Replayed answers older than this skip device state: a newer live write may exist. */
+const SNIPPET_EDGE_REPLAY_DEVICE_MAX_AGE_MS = 10 * 60 * 1000
+
+/**
+ * Analytics Engine stamps rows at write time, so a replayed device row looks
+ * newer than it is. Skip it once it is old enough that the device has likely
+ * been seen live since; the next check of the device writes it again.
+ */
+export function isStaleSnippetEdgeReplay(c: Context, nowMs = Date.now()) {
+  const eventTime = getSnippetEdgeReplay(c)?.eventTime
+  return typeof eventTime === 'number' && nowMs - eventTime > SNIPPET_EDGE_REPLAY_DEVICE_MAX_AGE_MS
 }
 
 /**

@@ -11,7 +11,8 @@
  *
  * Run it once, before deploying a plugin worker whose wrangler config binds
  * these queues and bucket, and before `bun run snippet-edge-answer:set`.
- * Every step is skipped when it already exists.
+ * Every step is skipped when it already exists; an existing Logpush job is
+ * updated when its settings differ.
  *
  * Env:
  *   CLOUDFLARE_API_TOKEN   Logs Edit + Zone Read + Zone WAF/Rulesets Edit (custom log fields)
@@ -30,7 +31,7 @@ export const REPLAY_QUEUE = 'capgo-snippet-edge-stats-replay'
 export const DLQ = 'capgo-snippet-edge-stats-dlq'
 export const LOGPUSH_JOB_NAME = 'capgo-snippet-edge-stats'
 export const STAT_HEADER = 'x-capgo-edge-stat'
-/** Logpush files are only read once by the replay: keep them a day for debugging. */
+/** The replay deletes each file once queued: the lifecycle only clears files it never read. */
 const RETENTION_DAYS = 1
 const PLUGIN_PATHS = ['/updates', '/stats', '/plugin/updates', '/plugin/stats']
 
@@ -97,15 +98,45 @@ function wrangler(args: string[], dryRun: boolean, alreadyExists: RegExp) {
   }
 }
 
+class CloudflareApiError extends Error {
+  readonly status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.status = status
+  }
+}
+
 async function cloudflare<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
     ...init,
     headers: { 'Authorization': `Bearer ${requireEnv('CLOUDFLARE_API_TOKEN')}`, 'Content-Type': 'application/json', ...init.headers },
   })
-  const json = await response.json() as { success: boolean, result: T, errors?: unknown }
-  if (!json.success)
-    throw new Error(`${init.method ?? 'GET'} ${path}: ${JSON.stringify(json.errors)}`)
+  const json = await response.json().catch(() => null) as { success: boolean, result: T, errors?: unknown } | null
+  if (!json?.success)
+    throw new CloudflareApiError(`${init.method ?? 'GET'} ${path}: ${response.status} ${JSON.stringify(json?.errors ?? null)}`, response.status)
   return json.result
+}
+
+interface LogpushJob {
+  id: number
+  name: string
+  enabled?: boolean
+  filter?: string | null
+  max_upload_interval_seconds?: number
+  output_options?: { output_type?: string, timestamp_format?: string, field_names?: string[] } | null
+}
+
+/** True when the job lacks a setting of logpushJobBody (destination aside: the API hides its secrets). */
+export function logpushJobNeedsUpdate(job: LogpushJob) {
+  const wanted = logpushJobBody('')
+  const fields = job.output_options?.field_names ?? []
+  return job.enabled !== wanted.enabled
+    || job.filter !== wanted.filter
+    || job.max_upload_interval_seconds !== wanted.max_upload_interval_seconds
+    || job.output_options?.output_type !== wanted.output_options.output_type
+    || job.output_options?.timestamp_format !== wanted.output_options.timestamp_format
+    || wanted.output_options.field_names.some(field => !fields.includes(field))
 }
 
 async function main() {
@@ -136,8 +167,11 @@ async function main() {
   try {
     rules = (await cloudflare<{ rules?: CustomFieldsRule[] }>(`/zones/${zone.id}/rulesets/phases/http_log_custom_fields/entrypoint`)).rules ?? []
   }
-  catch {
-    // No custom fields configured yet.
+  catch (error) {
+    // Only a missing entrypoint means "no custom fields yet": on any other
+    // error the PUT below would replace the fields already configured.
+    if (!(error instanceof CloudflareApiError && error.status === 404))
+      throw error
   }
   const nextRules = withStatHeaderField(rules)
   if (nextRules !== rules) {
@@ -148,9 +182,16 @@ async function main() {
     console.log(`Added ${STAT_HEADER} to the ${zoneName} custom log fields`)
   }
 
-  const jobs = await cloudflare<{ id: number, name: string }[]>(`/zones/${zone.id}/logpush/jobs`)
-  if (jobs.some(job => job.name === LOGPUSH_JOB_NAME)) {
-    console.log(`Logpush job ${LOGPUSH_JOB_NAME} already exists`)
+  const jobs = await cloudflare<LogpushJob[]>(`/zones/${zone.id}/logpush/jobs`)
+  const existing = jobs.find(job => job.name === LOGPUSH_JOB_NAME)
+  if (existing) {
+    if (!logpushJobNeedsUpdate(existing)) {
+      console.log(`Logpush job ${LOGPUSH_JOB_NAME} already exists`)
+      return
+    }
+    const { name: _name, ...settings } = logpushJobBody(destination)
+    await cloudflare(`/zones/${zone.id}/logpush/jobs/${existing.id}`, { method: 'PUT', body: JSON.stringify(settings) })
+    console.log(`Updated Logpush job ${LOGPUSH_JOB_NAME} (${existing.id})`)
     return
   }
   const job = await cloudflare<{ id: number }>(`/zones/${zone.id}/logpush/jobs`, {

@@ -26,11 +26,11 @@ import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, 
 import { getAppOwnerWithEdgeCache } from './pluginEdgeCacheReads.ts'
 import { getClientIP } from './rate_limit.ts'
 import { s3 } from './s3.ts'
-import { setSnippetUpdatesFill } from './snippetEdgeAnswer.ts'
+import { getSnippetEdgeAnswerBps, setSnippetUpdatesFill } from './snippetEdgeAnswer.ts'
 import { shouldQueuePluginNotifications } from './supabase_write_guard.ts'
 import { isUpdateEnumerationLimited, recordUpdateEnumerationMiss, updateEnumerationLimitedResponse } from './updateOracleGuard.ts'
 import { canServeUpToDateFromCache, getUpdateReadCache, setUpdateReadCache } from './updateReadCache.ts'
-import { getCachedDefaultChannel, shouldUseUpdatesEdgeCache } from './updatesEdgeCache.ts'
+import { getCachedDefaultChannel, planValidUntilMs, shouldUseUpdatesEdgeCache } from './updatesEdgeCache.ts'
 import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName, isVersionDeleted } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
@@ -386,7 +386,8 @@ export async function updateWithPG(
   const edgeCache = shouldUseUpdatesEdgeCache(c, app_id, device_id)
   const ownerPromise = edgeCache
     ? getAppOwnerFromEdgeCache(c, app_id, drizzleClient, pathTiming)
-    : getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
+    // Snippet fills must not outlive a trial: they need its end date.
+    : getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT, { includeTrialAt: getSnippetEdgeAnswerBps(c) > 0 })
   const channelPrefetchPromise = cachedStatus === 'cloud' && coerce
     ? (async () => {
         try {
@@ -688,6 +689,7 @@ export async function updateWithPG(
         allowDeviceCustomId: Boolean(appOwner.allow_device_custom_id),
         versionName: version.name,
         keyId: version.key_id ?? null,
+        planValidUntil: planValidUntilMs(appOwner),
       }
     : null
   if (readCachePayload) {
@@ -1029,13 +1031,24 @@ async function upToDateFromReadCache(c: Context, body: AppInfos, appStatus: Awai
  * Stats of an up-to-date answer the Cloudflare Snippet served without a
  * worker (snippetEdgeAnswer.ts), replayed from Logpush. Writes what
  * upToDateFromReadCache writes for the same answer; the decision itself was
- * made by the snippet and is not recomputed.
+ * made by the snippet and is not recomputed. The owner comes from the owner
+ * cache, not from the snippet header (the device can read that header).
  */
-export async function recordSnippetUpToDate(c: Context, body: AppInfos, answer: { ownerOrg: string, allowDeviceCustomId: boolean, versionName: string }) {
-  const device = makeDevice(body, answer.allowDeviceCustomId)
-  await backgroundTask(c, createStatsMau(c, body.device_id, body.app_id, answer.ownerOrg, body.platform, body.version_build))
-  await sendStatsAndDevice(c, device, [{ action: 'noNew', versionName: answer.versionName }])
-  return c.json(BRES)
+export async function recordSnippetUpToDate(c: Context, body: AppInfos, answer: { versionName: string }) {
+  const lazyClient = createLazyPgClient(c, true)
+  try {
+    const owner = await getAppOwnerWithEdgeCache(c, body.app_id, getDrizzleClient(lazyClient.client, { logger: false }), PLAN_LIMIT)
+    // Deleted or no longer a cloud app: nothing to attribute the answer to.
+    if (!owner.value)
+      return c.json(BRES)
+    const device = makeDevice(body, owner.value.allow_device_custom_id)
+    await backgroundTask(c, createStatsMau(c, body.device_id, body.app_id, owner.value.owner_org, body.platform, body.version_build))
+    await sendStatsAndDevice(c, device, [{ action: 'noNew', versionName: answer.versionName }])
+    return c.json(BRES)
+  }
+  finally {
+    await lazyClient.close()
+  }
 }
 
 export async function update(c: Context, body: AppInfos) {

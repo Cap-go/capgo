@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { logpushJobBody, STAT_HEADER, withStatHeaderField } from '../scripts/setup-snippet-edge-stats.ts'
+import { logpushJobBody, logpushJobNeedsUpdate, STAT_HEADER, withStatHeaderField } from '../scripts/setup-snippet-edge-stats.ts'
 
 describe('snippet-edge-stats:setup', () => {
   it('adds the stat header to the custom log fields without dropping existing ones', () => {
@@ -17,5 +17,13 @@ describe('snippet-edge-stats:setup', () => {
     expect(job.dataset).toBe('http_requests')
     expect(job.output_options.field_names).toContain('ResponseHeaders')
     expect(JSON.parse(job.filter).where.or.map((condition: { value: string }) => condition.value)).toEqual(['/updates', '/stats', '/plugin/updates', '/plugin/stats'])
+  })
+
+  it('updates an existing Logpush job only when a setting differs', () => {
+    const { destination_conf: _destination, ...current } = logpushJobBody('r2://bucket/{DATE}')
+    expect(logpushJobNeedsUpdate({ id: 1, ...current })).toBe(false)
+    expect(logpushJobNeedsUpdate({ id: 1, ...current, filter: null })).toBe(true)
+    expect(logpushJobNeedsUpdate({ id: 1, ...current, output_options: { ...current.output_options, field_names: ['ResponseHeaders'] } })).toBe(true)
+    expect(logpushJobNeedsUpdate({ id: 1, ...current, enabled: false })).toBe(true)
   })
 })

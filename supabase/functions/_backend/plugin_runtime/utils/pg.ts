@@ -1336,9 +1336,10 @@ export async function getAppOwnerPostgres(
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: PlanAction[] = [],
+  options: { includeTrialAt?: boolean } = {},
 ): Promise<AppOwnerPostgresResult | null> {
   try {
-    return await queryAppOwnerPostgres(c, appId, drizzleClient, actions)
+    return await queryAppOwnerPostgres(c, appId, drizzleClient, actions, options)
   }
   catch (e: unknown) {
     logPgError(c, 'getAppOwnerPostgres', e, {
