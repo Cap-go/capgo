@@ -3311,7 +3311,7 @@ defineExpose({
                       type="button"
                       class="d-btn min-h-12"
                       :class="whiteCardPrimaryButtonClass()"
-                      :disabled="isAppDetailsNavigationPending"
+                      :disabled="isAppDetailsNavigationPending || (appDetailsStep === 'name' && !appName.trim())"
                       :data-test="appDetailsStep === 'app_id' && !hasProvidedAppId ? 'app-onboarding-skip-app-id' : 'app-onboarding-continue'"
                       @click="continueFromCurrentAppDetailsStep"
                     >

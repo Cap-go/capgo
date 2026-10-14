@@ -92,6 +92,26 @@ describe('/private/events durable acceptance', () => {
     expect(sendTracking.mock.calls[0][2]).toEqual({ posthog: false })
   })
 
+  it.each(['Org Created'])('reserves %s for committed database handlers', async (event) => {
+    expect((await request({ event })).status).toBe(400)
+    expect(queueSend).not.toHaveBeenCalled()
+    expect(sendTracking).not.toHaveBeenCalled()
+  })
+
+  it('preserves legacy invitation success submissions and their dashboard dimensions', async () => {
+    const response = await request({
+      event: 'organization_membership_invitation_accepted',
+      tags: { flow: 'new_user_magic_link', account_state: 'created', entry_path: '/invitation', pending_invitation_count: 1 },
+    })
+    expect(response.status).toBe(200)
+    expect(queueSend).toHaveBeenCalledWith(expect.objectContaining({
+      payload: expect.objectContaining({
+        event: 'organization_membership_invitation_accepted',
+        tags: expect.objectContaining({ flow: 'new_user_magic_link', account_state: 'created', entry_path: '/invitation', pending_invitation_count: 1 }),
+      }),
+    }), { contentType: 'json' })
+  })
+
   it('returns the same accepted event ID across retries, scoped to authenticated actor and authorized org', async () => {
     const payload = { client_event_id: clientEventId, org_id: 'org-a', user_id: 'spoofed-actor', timestamp: acceptedAt - 1000 }
     const first = await (await request(payload)).json() as { status: string, event_id: string } as { status: string, event_id: string }

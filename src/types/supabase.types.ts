@@ -2727,6 +2727,58 @@ export type Database = {
         }
         Relationships: []
       }
+      org_invitation_email_requests: {
+        Row: {
+          id: string
+          invited_by_user_id: string | null
+          message_id: string | null
+          org_user_id: number | null
+          requested_at: string
+          sent_at: string | null
+          tmp_user_id: number | null
+        }
+        Insert: {
+          id?: string
+          invited_by_user_id?: string | null
+          message_id?: string | null
+          org_user_id?: number | null
+          requested_at?: string
+          sent_at?: string | null
+          tmp_user_id?: number | null
+        }
+        Update: {
+          id?: string
+          invited_by_user_id?: string | null
+          message_id?: string | null
+          org_user_id?: number | null
+          requested_at?: string
+          sent_at?: string | null
+          tmp_user_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_invitation_email_requests_invited_by_user_id_fkey"
+            columns: ["invited_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_invitation_email_requests_org_user_id_fkey"
+            columns: ["org_user_id"]
+            isOneToOne: true
+            referencedRelation: "org_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_invitation_email_requests_tmp_user_id_fkey"
+            columns: ["tmp_user_id"]
+            isOneToOne: true
+            referencedRelation: "tmp_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_metrics_cache: {
         Row: {
           bandwidth: number
@@ -4902,6 +4954,10 @@ export type Database = {
             Args: { apikey: string; appid: string; name_version: string }
             Returns: boolean
           }
+      expire_r2_manifest_placeholders: {
+        Args: { p_bucket: string; p_limit: number }
+        Returns: number
+      }
       expire_usage_credits: { Args: never; Returns: number }
       find_apikey_by_value: {
         Args: { key_value: string }
@@ -5868,6 +5924,10 @@ export type Database = {
       queue_cron_stat_org_for_org: {
         Args: { customer_id: string; org_id: string }
         Returns: undefined
+      }
+      queue_org_invitation_email: {
+        Args: { p_invite_id: number; p_inviter_id?: string; p_kind: string }
+        Returns: string
       }
       rbac_check_permission: {
         Args: {

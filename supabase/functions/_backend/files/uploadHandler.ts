@@ -16,7 +16,7 @@ import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { quickError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { createManifestSizeReceipt, MANIFEST_SIZE_RECEIPT_HEADER } from '../utils/manifest_size_receipt.ts'
+import { createManifestSizeReceipt, getManifestReceiptBucket, MANIFEST_SIZE_RECEIPT_HEADER, manifestSizeReceiptEvidenceFromR2 } from '../utils/manifest_size_receipt.ts'
 import { onError } from '../utils/on_error.ts'
 import { noopDigester, sha256Digester } from './digest.ts'
 import { parseChecksum, parseUploadMetadata } from './parse.ts'
@@ -83,7 +83,13 @@ function optionsHandler(c: Context) {
   })
 }
 
+interface AppendBodyResult {
+  uploadOffset: number
+  object: R2Object | null
+}
+
 interface Env {
+  ENV_NAME?: string
   ATTACHMENT_BUCKET: R2Bucket
   MANIFEST_SIZE_RECEIPT_SECRET: string
 }
@@ -94,6 +100,7 @@ export class UploadHandler extends DurableObject {
   multipart: RetryMultipartUpload | undefined
   retryBucket: RetryBucket
   receiptSecret: string
+  receiptBucket: string
 
   // only allow a single request to operate at a time
   requestGate: AsyncLock
@@ -102,6 +109,7 @@ export class UploadHandler extends DurableObject {
     super(ctx, env)
     const bucket = env.ATTACHMENT_BUCKET
     this.receiptSecret = env.MANIFEST_SIZE_RECEIPT_SECRET
+    this.receiptBucket = getManifestReceiptBucket(env.ENV_NAME)
     this.parts = []
     this.requestGate = new AsyncLock()
     this.retryBucket = new RetryBucket(bucket, DEFAULT_RETRY_PARAMS)
@@ -370,16 +378,15 @@ export class UploadHandler extends DurableObject {
 
     const uploadLocation = new URL(encodeR2KeyForUploadLocation(r2Key), c.req.url.endsWith('/') ? c.req.url : `${c.req.url}/`)
 
-    const uploadOffset = hasContent
+    const result = hasContent
       ? await this.appendBody(c, r2Key, c.req.raw.body as ReadableStream<Uint8Array>, 0, uploadInfo)
-      : 0
+      : { uploadOffset: 0, object: null as R2Object | null }
+    const uploadOffset = result.uploadOffset
     if (!hasContent && uploadLength === 0) {
-      await this.r2Put(c, r2Key, new Uint8Array(), checksum, uploadInfo.contentType)
+      result.object = await this.r2Put(c, r2Key, new Uint8Array(), checksum, uploadInfo.contentType)
       await this.cleanup()
     }
-    const receipt = uploadInfo.uploadLength === uploadOffset && this.receiptSecret
-      ? await createManifestSizeReceipt(this.receiptSecret, r2Key, uploadOffset)
-      : null
+    const receipt = await this.completedUploadReceipt(c, r2Key, uploadOffset, uploadInfo, result.object)
     return new Response(null, {
       status: 201,
       headers: new Headers({
@@ -405,8 +412,11 @@ export class UploadHandler extends DurableObject {
 
     let offset: number | undefined = await this.ctx.storage.get(UPLOAD_OFFSET_KEY)
     let uploadLength: number | undefined
+    let object: R2Object | null = null
+    let readStartedAt = Date.now()
     if (offset == null) {
       const headResponse = await this.retryBucket.head(r2Key)
+      object = headResponse
       if (headResponse == null) {
         cloudlog({ requestId: c.get('requestId'), message: 'in DO files head headResponse is null' })
         return quickError(404, 'not_found', 'Not Found')
@@ -432,8 +442,21 @@ export class UploadHandler extends DurableObject {
     if (uploadLength != null) {
       headers.set('Upload-Length', uploadLength.toString())
     }
-    if (offset === uploadLength && this.receiptSecret && (await this.retryBucket.head(r2Key))?.size === offset)
-      headers.set(MANIFEST_SIZE_RECEIPT_HEADER, await createManifestSizeReceipt(this.receiptSecret, r2Key, offset))
+    if (offset === uploadLength && this.receiptSecret) {
+      if (!object) {
+        readStartedAt = Date.now()
+        object = await this.retryBucket.head(r2Key)
+      }
+      if (object?.size === offset && object.key === r2Key) {
+        try {
+          headers.set(MANIFEST_SIZE_RECEIPT_HEADER, await createManifestSizeReceipt(this.receiptSecret, this.receiptBucket, r2Key, manifestSizeReceiptEvidenceFromR2(object, 'r2_read', readStartedAt)))
+        }
+        catch (error) {
+          cloudlogErr({ requestId: c.get('requestId'), message: 'TUS HEAD receipt evidence unavailable', error })
+          throw quickError(503, 'upstream_unavailable', 'File storage evidence temporarily unavailable', undefined, error, { alert: false })
+        }
+      }
+    }
     return new Response(null, { headers })
   }
 
@@ -477,11 +500,10 @@ export class UploadHandler extends DurableObject {
       return c.text('Must provide request body', 400)
     }
 
-    uploadOffset = await this.appendBody(c, r2Key, c.req.raw.body, currentUploadOffset, uploadInfo)
+    const result = await this.appendBody(c, r2Key, c.req.raw.body, currentUploadOffset, uploadInfo)
+    uploadOffset = result.uploadOffset
 
-    const receipt = uploadInfo.uploadLength === uploadOffset && this.receiptSecret
-      ? await createManifestSizeReceipt(this.receiptSecret, r2Key, uploadOffset)
-      : null
+    const receipt = await this.completedUploadReceipt(c, r2Key, uploadOffset, uploadInfo, result.object)
     return new Response(null, {
       status: 204,
       headers: new Headers({
@@ -497,7 +519,31 @@ export class UploadHandler extends DurableObject {
     })
   }
 
-  async switchOnPartKind(c: Context, r2Key: string, uploadOffset: number, uploadInfo: StoredUploadInfo, part: Part, digester: Digester, checksum: Uint8Array | undefined) {
+  async completedUploadReceipt(c: Context, r2Key: string, uploadOffset: number, uploadInfo: StoredUploadInfo, object: R2Object | null): Promise<string | null> {
+    if (!this.receiptSecret || uploadInfo.uploadLength !== uploadOffset || object?.size !== uploadOffset || object.key !== r2Key)
+      return null
+    try {
+      return await createManifestSizeReceipt(this.receiptSecret, this.receiptBucket, r2Key, manifestSizeReceiptEvidenceFromR2(object, 'r2_upload'))
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'TUS upload receipt evidence unavailable, checking exact R2 metadata', error })
+      // Only exceptional write evidence (for example provider clock skew) uses a
+      // fresh exact-key read. Normal completions never add a per-file HEAD.
+      const readStartedAt = Date.now()
+      try {
+        const readObject = await this.retryBucket.head(r2Key)
+        if (!readObject || readObject.key !== r2Key || readObject.size !== uploadOffset)
+          throw new Error('Completed upload metadata is unavailable')
+        return await createManifestSizeReceipt(this.receiptSecret, this.receiptBucket, r2Key, manifestSizeReceiptEvidenceFromR2(readObject, 'r2_read', readStartedAt))
+      }
+      catch (readError) {
+        throw quickError(503, 'upstream_unavailable', 'Upload completed but storage evidence is temporarily unavailable', undefined, readError, { alert: false })
+      }
+    }
+  }
+
+  async switchOnPartKind(c: Context, r2Key: string, uploadOffset: number, uploadInfo: StoredUploadInfo, part: Part, digester: Digester, checksum: Uint8Array | undefined): Promise<AppendBodyResult> {
+    let object: R2Object | null = null
     switch (part.kind) {
       case 'intermediate': {
         this.multipart ??= await this.r2CreateMultipartUpload(r2Key, uploadInfo)
@@ -524,7 +570,7 @@ export class UploadHandler extends DurableObject {
         else if (!this.multipart) {
           // all the bytes fit into a single in memory buffer, so we can just upload
           // it directly without using multipart
-          await this.r2Put(c, r2Key, part.bytes, checksum, uploadInfo.contentType)
+          object = await this.r2Put(c, r2Key, part.bytes, checksum, uploadInfo.contentType)
           uploadOffset += part.bytes.byteLength
           await this.cleanup()
         }
@@ -532,17 +578,17 @@ export class UploadHandler extends DurableObject {
           // upload the last part (can be less than the 5mb min part size), then complete the upload
           const uploadedPart = await this.r2UploadPart(r2Key, this.parts.length + 1, part.bytes)
           this.parts.push({ part: uploadedPart, length: part.bytes.byteLength })
-          await this.r2CompleteMultipartUpload(c, r2Key, await digester.digest(), checksum)
+          object = await this.r2CompleteMultipartUpload(c, r2Key, await digester.digest(), checksum)
           uploadOffset += part.bytes.byteLength
           await this.cleanup()
         }
         break
       }
     }
-    return uploadOffset
+    return { uploadOffset, object }
   }
 
-  // Append body to the upload starting at uploadOffset. Returns the new uploadOffset
+  // Append body and retain the metadata of a successfully completed R2 write.
   //
   // The body is streamed into a fixed length buffer. If the object fits into a single
   // buffer, it's uploaded directly. Otherwise, each full buffer is uploaded to a
@@ -561,7 +607,8 @@ export class UploadHandler extends DurableObject {
   // adding custom metadata to the object when we create the multipart upload. For A, if the client manages to upload
   // the object in one-shot we calculate the digest as it comes in. Otherwise, after the multipart upload is
   // finished, we retrieve the object from R2 and recompute the digest.
-  async appendBody(c: Context, r2Key: string, body: ReadableStream<Uint8Array>, uploadOffset: number, uploadInfo: StoredUploadInfo): Promise<number> {
+  async appendBody(c: Context, r2Key: string, body: ReadableStream<Uint8Array>, uploadOffset: number, uploadInfo: StoredUploadInfo): Promise<AppendBodyResult> {
+    let object: R2Object | null = null
     if ((uploadInfo.uploadLength ?? 0) > MAX_UPLOAD_LENGTH_BYTES) {
       await this.cleanup(r2Key)
       cloudlog({ requestId: c.get('requestId'), message: 'files append body Upload-Length exceeds maximum upload size' })
@@ -592,9 +639,11 @@ export class UploadHandler extends DurableObject {
       }
 
       await digester.update(part.bytes)
-      uploadOffset = await this.switchOnPartKind(c, r2Key, uploadOffset, uploadInfo, part, digester, checksum)
+      const result = await this.switchOnPartKind(c, r2Key, uploadOffset, uploadInfo, part, digester, checksum)
+      uploadOffset = result.uploadOffset
+      object = result.object ?? object
     }
-    return uploadOffset
+    return { uploadOffset, object }
   }
 
   // Check a checksum, throwing a 415 if the checksum does not match
@@ -707,10 +756,10 @@ export class UploadHandler extends DurableObject {
     return this.retryBucket.resumeMultipartUpload(r2Key, multipartUploadId)
   }
 
-  async r2Put(c: Context, r2Key: string, bytes: Uint8Array, checksum?: Uint8Array, contentType?: string) {
+  async r2Put(c: Context, r2Key: string, bytes: Uint8Array, checksum?: Uint8Array, contentType?: string): Promise<R2Object | null> {
     try {
       const httpMetadata = buildFileHttpMetadata(contentType)
-      await this.retryBucket.put(r2Key, bytes, checksum as any, httpMetadata)
+      return await this.retryBucket.put(r2Key, bytes, checksum as any, httpMetadata)
     }
     catch (e) {
       if (isR2ChecksumError(e)) {
@@ -742,7 +791,7 @@ export class UploadHandler extends DurableObject {
     }
   }
 
-  async r2CompleteMultipartUpload(c: Context, r2Key: string, actualChecksum?: ArrayBuffer, expectedChecksum?: Uint8Array) {
+  async r2CompleteMultipartUpload(c: Context, r2Key: string, actualChecksum?: ArrayBuffer, expectedChecksum?: Uint8Array): Promise<R2Object> {
     if (this.multipart == null) {
       throw new UnrecoverableError('cannot call complete multipart with no multipart upload', r2Key)
     }
@@ -752,12 +801,13 @@ export class UploadHandler extends DurableObject {
       await this.checkChecksum(c, r2Key, expectedChecksum, actualChecksum)
     }
 
-    await this.multipart.complete(this.parts.map(storedPart => storedPart.part))
+    const object = await this.multipart.complete(this.parts.map(storedPart => storedPart.part))
 
     // Otherwise we have to compute the digest from the finished upload
     if (actualChecksum == null && expectedChecksum != null) {
       await this.checkChecksum(c, r2Key, expectedChecksum, await this.retrieveChecksum(r2Key))
     }
+    return object
   }
 
   tempkey(): string {
