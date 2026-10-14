@@ -18,6 +18,7 @@ import {
 } from './store_signing.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv } from './utils.ts'
+import { fetchPublicWebsite, isBlockedWebsiteHost } from './website_live_check.ts'
 import { generateWebsiteLiveIconSet } from './website_live_icons.ts'
 
 export type StorePlatform = 'ios' | 'android'
@@ -191,7 +192,7 @@ export function normalizeWebsiteLiveUrl(input: string): string | null {
   catch {
     return null
   }
-  if (url.protocol !== 'https:' || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/i.test(url.hostname) || url.username || url.password)
+  if (url.protocol !== 'https:' || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/i.test(url.hostname) || url.username || url.password || isBlockedWebsiteHost(url.hostname))
     return null
   if (url.pathname !== '/' && url.pathname !== '/index.html')
     return null
@@ -639,11 +640,11 @@ function sameOriginUrl(base: URL, href: string | null | undefined): URL | null {
 }
 
 async function fetchSameOrigin(base: URL, url: URL, maxBytes: number): Promise<Uint8Array | null> {
-  const response = await fetch(url, { redirect: 'manual', headers: { 'User-Agent': 'Capgo-Website-Live/1.0' } })
-  if (!response.ok)
+  const { response, finalUrl } = await fetchPublicWebsite(url.href, { accept: '*/*' })
+  if (!response.ok || new URL(finalUrl).origin !== base.origin) {
+    await response.body?.cancel()
     return null
-  if (new URL(response.url || url.href).origin !== base.origin)
-    return null
+  }
   return readLimited(response, maxBytes)
 }
 

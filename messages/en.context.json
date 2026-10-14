@@ -4261,5 +4261,18 @@
   "store-publish-android-first-release": "Used in Capgo web console areas: pages/app, constants. Role: UI text for publishing a Website Live app to the App Store and Google Play. Translate for UI; keep Capgo, App Store, Google Play, TestFlight, Play Console, App Store Connect, file extensions and placeholders unchanged.",
   "store-publish-publish-ios": "Used in Capgo web console areas: pages/app, constants. Role: UI text for publishing a Website Live app to the App Store and Google Play. Translate for UI; keep Capgo, App Store, Google Play, TestFlight, Play Console, App Store Connect, file extensions and placeholders unchanged.",
   "store-publish-publish-android": "Used in Capgo web console areas: pages/app, constants. Role: UI text for publishing a Website Live app to the App Store and Google Play. Translate for UI; keep Capgo, App Store, Google Play, TestFlight, Play Console, App Store Connect, file extensions and placeholders unchanged.",
-  "store-publish-started": "Used in Capgo web console areas: pages/app, constants. Role: UI text for publishing a Website Live app to the App Store and Google Play. Translate for UI; keep Capgo, App Store, Google Play, TestFlight, Play Console, App Store Connect, file extensions and placeholders unchanged."
+  "store-publish-started": "Used in Capgo web console areas: pages/app, constants. Role: UI text for publishing a Website Live app to the App Store and Google Play. Translate for UI; keep Capgo, App Store, Google Play, TestFlight, Play Console, App Store Connect, file extensions and placeholders unchanged.",
+  "store-publish-check-website": "Button on the Website Live store page that checks whether the website can run inside the app",
+  "store-publish-website-checked": "Toast after the website compatibility check finished",
+  "store-publish-website-compatible": "Result when the website passes the compatibility check; {rendering} is the detected framework type such as \"Static SPA\"",
+  "store-publish-website-not-compatible": "Result when the website fails a required compatibility check",
+  "store-publish-save-anyway": "Button to save the website even though the compatibility check failed",
+  "store-publish-check-public-html": "Check label: the website returns a public HTML page",
+  "store-publish-check-same-origin": "Check label: the website does not redirect to another address",
+  "store-publish-check-static-shell": "Check label: the website is a static build, not server-side rendered",
+  "store-publish-check-cacheable": "Check label: the page is identical for every user and can be cached",
+  "store-publish-check-cookies": "Check label: warning about cookies set by the page",
+  "store-publish-check-same-origin-assets": "Check label: scripts and styles are hosted on the website itself so they work offline",
+  "store-publish-check-service-worker": "Check label: warning about a service worker on the website",
+  "store-publish-check-mobile-viewport": "Check label: the page declares a mobile viewport"
 }

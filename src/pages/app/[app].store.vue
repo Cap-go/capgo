@@ -49,6 +49,21 @@ interface StoreState {
   builds: StoreBuild[]
 }
 
+interface WebsiteCheck {
+  url: string
+  final_url: string
+  compatible: boolean
+  rendering: string
+  checks: { id: string, status: 'pass' | 'warning' | 'fail', essential: boolean, detail: string }[]
+  details: { app_name: string | null, theme_color: string | null }
+}
+
+class StoreRequestError extends Error {
+  constructor(message: string, readonly code: string | null, readonly moreInfo: Record<string, any> | null) {
+    super(message)
+  }
+}
+
 interface GeneratedKeystore {
   keystore_base64: string
   key_alias: string
@@ -96,6 +111,7 @@ const storePassword = ref('')
 const playServiceAccountJson = ref('')
 const playServiceAccountFileName = ref('')
 const generatedKeystore = ref<GeneratedKeystore | null>(null)
+const websiteCheck = ref<WebsiteCheck | null>(null)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -123,7 +139,7 @@ async function storeFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const text = await response.text()
   const json = text ? JSON.parse(text) : null
   if (!response.ok)
-    throw new Error(json?.message || json?.error || response.statusText)
+    throw new StoreRequestError(json?.message || json?.error || response.statusText, json?.error ?? null, json?.moreInfo ?? null)
   return json as T
 }
 
@@ -188,20 +204,56 @@ async function run(action: string, task: () => Promise<void>, success: string) {
   }
 }
 
-function saveDetails() {
+function saveDetails(force = false) {
   return run('details', async () => {
-    applyState(await storeFetch<StoreState>('', {
-      method: 'PUT',
-      body: JSON.stringify({
-        app_id: appId.value,
-        website_url: websiteUrl.value.trim() || undefined,
-        app_name: appName.value.trim(),
-        version_name: versionName.value.trim(),
-        icon_background_color: iconBackgroundColor.value.toUpperCase(),
-        submit_for_review: submitForReview.value,
-      }),
-    }))
+    try {
+      const next = await storeFetch<StoreState & { website_check: WebsiteCheck | null }>('', {
+        method: 'PUT',
+        body: JSON.stringify({
+          app_id: appId.value,
+          website_url: websiteUrl.value.trim() || undefined,
+          app_name: appName.value.trim() || undefined,
+          version_name: versionName.value.trim(),
+          icon_background_color: iconBackgroundColor.value.toUpperCase(),
+          submit_for_review: submitForReview.value,
+          force: force || undefined,
+        }),
+      })
+      if (next.website_check)
+        websiteCheck.value = next.website_check
+      applyState(next)
+    }
+    catch (error) {
+      if (error instanceof StoreRequestError && error.code === 'website_not_compatible' && error.moreInfo?.website_check)
+        websiteCheck.value = error.moreInfo.website_check
+      throw error
+    }
   }, t('store-publish-saved'))
+}
+
+function checkWebsite() {
+  return run('check', async () => {
+    websiteCheck.value = await storeFetch<WebsiteCheck>('/check', {
+      method: 'POST',
+      body: JSON.stringify({ app_id: appId.value, website_url: websiteUrl.value.trim() || undefined }),
+    })
+  }, t('store-publish-website-checked'))
+}
+
+const WEBSITE_CHECK_LABELS: Record<string, string> = {
+  public_html: 'store-publish-check-public-html',
+  same_origin: 'store-publish-check-same-origin',
+  static_shell: 'store-publish-check-static-shell',
+  cacheable: 'store-publish-check-cacheable',
+  cookies: 'store-publish-check-cookies',
+  same_origin_assets: 'store-publish-check-same-origin-assets',
+  service_worker: 'store-publish-check-service-worker',
+  mobile_viewport: 'store-publish-check-mobile-viewport',
+}
+
+function websiteCheckLabel(id: string) {
+  const key = WEBSITE_CHECK_LABELS[id]
+  return key ? t(key) : id
 }
 
 function readFile(file: File, as: 'text' | 'base64'): Promise<string> {
@@ -491,6 +543,21 @@ onBeforeUnmount(() => {
             <p v-if="!isWebsiteLive" class="mt-1 text-xs text-amber-700 dark:text-amber-300">
               {{ t('store-publish-website-url-hint') }}
             </p>
+            <div v-if="websiteCheck" class="p-3 mt-3 text-sm border rounded-lg" :class="websiteCheck.compatible ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800' : 'border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800'" data-test="store-website-check">
+              <p class="font-medium" :class="websiteCheck.compatible ? 'text-emerald-800 dark:text-emerald-200' : 'text-red-800 dark:text-red-200'">
+                {{ websiteCheck.compatible ? t('store-publish-website-compatible', { rendering: websiteCheck.rendering }) : t('store-publish-website-not-compatible') }}
+              </p>
+              <ul class="mt-2 space-y-1">
+                <li v-for="check in websiteCheck.checks" :key="check.id" class="flex gap-2">
+                  <IconCheckCircle v-if="check.status === 'pass'" class="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" />
+                  <IconAlertCircle v-else class="w-4 h-4 mt-0.5 shrink-0" :class="check.status === 'fail' ? 'text-red-600' : 'text-amber-600'" />
+                  <span class="text-slate-700 dark:text-slate-200"><span class="font-medium">{{ websiteCheckLabel(check.id) }}:</span> {{ check.detail }}</span>
+                </li>
+              </ul>
+              <button v-if="!websiteCheck.compatible" type="button" class="mt-3 d-btn d-btn-outline d-btn-error d-btn-xs" :disabled="busy !== null" data-test="store-save-anyway" @click="saveDetails(true)">
+                {{ t('store-publish-save-anyway') }}
+              </button>
+            </div>
           </div>
           <div>
             <label for="store-app-name" class="block mb-1 text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('store-publish-app-name') }}</label>
@@ -505,8 +572,12 @@ onBeforeUnmount(() => {
             <span class="text-sm text-slate-700 dark:text-slate-200">{{ t('store-publish-submit-for-review') }}</span>
           </label>
         </div>
-        <div class="flex justify-end mt-4">
-          <button type="button" class="d-btn d-btn-primary d-btn-sm" :disabled="busy !== null" data-test="store-save-details" @click="saveDetails">
+        <div class="flex justify-end gap-2 mt-4">
+          <button type="button" class="d-btn d-btn-outline d-btn-sm" :disabled="busy !== null || !websiteUrl.trim()" data-test="store-check-website" @click="checkWebsite">
+            <span v-if="busy === 'check'" class="d-loading d-loading-spinner d-loading-xs" />
+            {{ t('store-publish-check-website') }}
+          </button>
+          <button type="button" class="d-btn d-btn-primary d-btn-sm" :disabled="busy !== null" data-test="store-save-details" @click="saveDetails()">
             <span v-if="busy === 'details'" class="d-loading d-loading-spinner d-loading-xs" />
             {{ t('store-publish-save') }}
           </button>

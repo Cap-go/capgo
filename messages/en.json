@@ -4262,5 +4262,18 @@
   "store-publish-android-first-release": "Google Play requires the first version of a new app to be uploaded by hand in Play Console. Capgo uploads every version after that.",
   "store-publish-publish-ios": "Build and publish to the App Store",
   "store-publish-publish-android": "Build and publish to Google Play",
-  "store-publish-started": "Build started. It usually takes 10 to 20 minutes."
+  "store-publish-started": "Build started. It usually takes 10 to 20 minutes.",
+  "store-publish-check-website": "Check website",
+  "store-publish-website-checked": "Website checked",
+  "store-publish-website-compatible": "This website can run as an app ({rendering}).",
+  "store-publish-website-not-compatible": "This website cannot run as an app yet. Fix the failed checks, then check again.",
+  "store-publish-save-anyway": "Save anyway",
+  "store-publish-check-public-html": "Public page",
+  "store-publish-check-same-origin": "Address",
+  "store-publish-check-static-shell": "Static build",
+  "store-publish-check-cacheable": "Same page for everyone",
+  "store-publish-check-cookies": "Cookies",
+  "store-publish-check-same-origin-assets": "Offline files",
+  "store-publish-check-service-worker": "Service worker",
+  "store-publish-check-mobile-viewport": "Mobile layout"
 }

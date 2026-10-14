@@ -10,6 +10,7 @@ import { checkPermission } from '../../utils/rbac.ts'
 import { safeParseSchema } from '../../utils/schema_validation.ts'
 import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
+import { checkWebsiteLive } from '../../utils/website_live_check.ts'
 import {
   androidBuilderCredentials,
   assertStoreBundleId,
@@ -25,6 +26,7 @@ import {
   iosBuilderCredentials,
   listStoreCredentialSummaries,
   loadIconSet,
+  normalizeWebsiteLiveUrl,
   saveAndroidCredentials,
   saveIosCredentials,
   setWebsiteLiveUrl,
@@ -58,6 +60,13 @@ const configBodySchema = z.object({
   version_name: z.string().trim().regex(/^\d{1,4}\.\d{1,4}\.\d{1,4}$/).optional(),
   icon_background_color: hexColorSchema.optional(),
   submit_for_review: z.boolean().optional(),
+  /** Save the website without the compatibility check. */
+  force: z.boolean().optional(),
+})
+
+const checkBodySchema = z.object({
+  app_id: appIdSchema,
+  website_url: z.string().trim().min(1).max(2048).optional(),
 })
 
 const iconBodySchema = z.object({
@@ -182,16 +191,44 @@ app.get('/', middlewareAuth(), async (c) => {
   return c.json(await loadStoreState(c, appId))
 })
 
+function websiteUrlOrThrow(input: string): string {
+  const websiteUrl = normalizeWebsiteLiveUrl(input)
+  if (!websiteUrl)
+    throw simpleError('invalid_website_url', 'Use the HTTPS address of the website root, such as https://app.example.com')
+  return websiteUrl
+}
+
+// POST /website_live_store/check — check that a website can run as a Website Live app
+app.post('/check', middlewareAuth(), async (c) => {
+  const body = parseWith(checkBodySchema, await parseBody(c))
+  await assertAppPermission(c, 'app.read', body.app_id)
+  const websiteApp = await getWebsiteLiveApp(c, body.app_id)
+  const input = body.website_url ?? websiteApp.website_url
+  if (!input)
+    throw simpleError('website_url_missing', 'Add the website address first')
+  return c.json(await checkWebsiteLive(websiteUrlOrThrow(input)))
+})
+
 // PUT /website_live_store — store listing settings
 app.put('/', middlewareAuth(), async (c) => {
   const body = parseWith(configBodySchema, await parseBody(c))
   await assertAppPermission(c, 'app.update_settings', body.app_id)
-  await getWebsiteLiveApp(c, body.app_id)
-  if (body.website_url)
-    await setWebsiteLiveUrl(c, body.app_id, body.website_url)
-  const { website_url: _websiteUrl, ...configPatch } = body
+  const websiteApp = await getWebsiteLiveApp(c, body.app_id)
+  const { website_url: websiteUrlInput, force, ...configPatch } = body
+  let websiteCheck: Awaited<ReturnType<typeof checkWebsiteLive>> | null = null
+  if (websiteUrlInput) {
+    const websiteUrl = websiteUrlOrThrow(websiteUrlInput)
+    if (!force && (websiteUrl !== websiteApp.website_url || websiteApp.update_mode !== 'website')) {
+      websiteCheck = await checkWebsiteLive(websiteUrl)
+      if (!websiteCheck.compatible)
+        throw simpleError('website_not_compatible', 'This website cannot run as a Website Live app yet', { website_check: websiteCheck })
+      if (!configPatch.app_name && websiteCheck.details.app_name && !hasControlCharacters(websiteCheck.details.app_name) && !(await getStoreConfig(c, body.app_id)).app_name)
+        configPatch.app_name = websiteCheck.details.app_name
+    }
+    await setWebsiteLiveUrl(c, body.app_id, websiteUrl)
+  }
   await upsertStoreConfig(c, body.app_id, currentUserId(c), configPatch)
-  return c.json(await loadStoreState(c, body.app_id))
+  return c.json({ ...(await loadStoreState(c, body.app_id)), website_check: websiteCheck })
 })
 
 // POST /website_live_store/icon — generate every store icon from one PNG

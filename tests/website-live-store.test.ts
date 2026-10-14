@@ -58,7 +58,7 @@ describe('website live store publishing', () => {
     const response = await fetchTestRequest(storeUrl(), {
       method: 'PUT',
       headers,
-      body: JSON.stringify({ app_id: APP_ID, website_url: 'app.example.com', app_name: 'Example & Co', version_name: '1.2.0', icon_background_color: '#119eff' }),
+      body: JSON.stringify({ app_id: APP_ID, website_url: 'app.example.com', app_name: 'Example & Co', version_name: '1.2.0', icon_background_color: '#119eff', force: true }),
     })
     expect(response.status).toBe(200)
     const state = await response.json() as any
@@ -68,6 +68,32 @@ describe('website live store publishing', () => {
 
     const { data } = await getSupabaseClient().from('apps').select('update_mode, website_url').eq('app_id', APP_ID).single()
     expect(data).toEqual({ update_mode: 'website', website_url: 'https://app.example.com/' })
+  })
+
+  it('never fetches private hosts', async () => {
+    for (const websiteUrl of ['https://metadata.internal/', 'https://printer.local/', 'https://localhost/']) {
+      const response = await fetchTestRequest(storeUrl('/check'), {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ app_id: CLASSIC_APP_ID, website_url: websiteUrl }),
+      })
+      expect(response.status).toBe(400)
+      expect((await response.json() as any).error).toBe('invalid_website_url')
+    }
+  })
+
+  it('does not save a website that fails the check', async () => {
+    const response = await fetchTestRequest(storeUrl(), {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ app_id: CLASSIC_APP_ID, website_url: 'https://capgo-website-live-check.invalid/' }),
+    })
+    expect(response.status).toBe(400)
+    const body = await response.json() as any
+    expect(body.error).toBe('website_not_compatible')
+    expect(body.moreInfo.website_check.checks[0]).toMatchObject({ id: 'public_html', status: 'fail', essential: true })
+    const { data } = await getSupabaseClient().from('apps').select('update_mode').eq('app_id', CLASSIC_APP_ID).single()
+    expect(data?.update_mode).not.toBe('website')
   })
 
   it('rejects websites served from a sub path', async () => {

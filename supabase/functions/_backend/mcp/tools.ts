@@ -674,9 +674,20 @@ const websiteLiveStoreTools: McpTool[] = [
     request: input => ({ method: 'GET', path: '/website_live_store', query: { app_id: input.appId } }),
   }),
   apiTool({
+    name: 'capgo_check_website_live',
+    title: 'Check a website for Website Live',
+    description: 'Check that a website can run as a Website Live app: public HTTPS HTML, no server-side rendering, same page for every user (no private/no-store cache, no session cookies), plus warnings for external scripts, service workers and a missing mobile viewport. Also suggests the app name and theme color found on the page. Defaults to the website already set on the app.',
+    input: {
+      appId,
+      website_url: z.string().optional().describe('HTTPS address of the website root to check instead of the current one'),
+    },
+    annotations: { ...READ, openWorldHint: true },
+    request: ({ appId: id, ...rest }) => ({ method: 'POST', path: '/website_live_store/check', body: compact({ app_id: id, ...rest }) }),
+  }),
+  apiTool({
     name: 'capgo_update_website_live_store',
     title: 'Update Website Live store settings',
-    description: 'Set the website the app loads (turns on Website Live), the store app name (max 30 characters), the marketing version, the icon background color and whether builds are submitted to store review.',
+    description: 'Set the website the app loads (turns on Website Live), the store app name (max 30 characters), the marketing version, the icon background color and whether builds are submitted to store review. A new website is checked first (see capgo_check_website_live); when the check fails nothing is saved unless force is true, which skips the check.',
     input: {
       appId,
       website_url: z.string().url().optional().describe('HTTPS address of the website root, e.g. https://app.example.com'),
@@ -684,6 +695,7 @@ const websiteLiveStoreTools: McpTool[] = [
       version_name: z.string().regex(/^\d+\.\d+\.\d+$/).optional().describe('Marketing version, e.g. 1.0.0. Capgo bumps it when that version is already released.'),
       icon_background_color: z.string().regex(/^#[0-9a-f]{6}$/i).optional(),
       submit_for_review: z.boolean().optional().describe('Submit each store build to App Store / Play review (default true)'),
+      force: z.boolean().optional().describe('Skip the compatibility check and save the website anyway'),
     },
     annotations: DESTRUCTIVE,
     request: ({ appId: id, ...rest }) => ({ method: 'PUT', path: '/website_live_store', body: compact({ app_id: id, ...rest }) }),
