@@ -30,6 +30,11 @@ describe('pg_errors', () => {
     expect(isTransientPgError(error)).toBe(true)
   })
 
+  it('treats deadlocks and dead pg clients as transient', () => {
+    expect(isTransientPgError(Object.assign(new Error('deadlock detected'), { code: '40P01' }))).toBe(true)
+    expect(isTransientPgError(new Error('Client has encountered a connection error and is not queryable'))).toBe(true)
+  })
+
   it('does not treat invalid UUID casts as transient', () => {
     const error = Object.assign(new Error('Failed query: SELECT 1'), {
       name: 'DrizzleQueryError',

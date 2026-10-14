@@ -23,6 +23,7 @@ const TRANSIENT_PG_SQLSTATES = new Set([
   '53300',
   '53400',
   '57014',
+  '40P01',
 ])
 
 const TRANSIENT_ERROR_MESSAGE_RE = /connection (?:terminated|ended|closed|refused|reset)|timeout exceeded when trying to connect|connect(?:ion)? timed? ?out|canceling statement due to (?:(?:statement|lock) timeout|conflict with recovery)|network(?: |_)?error|socket hang up|not queryable|hyperdrive|too many clients already|waiting for an open slot|timed out while waiting for a message from the origin database/i

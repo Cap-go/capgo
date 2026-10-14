@@ -14,8 +14,8 @@ import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { getDotfileDeltaStorageCandidateKeys } from '../utils/manifest_encoding.ts'
 import { createManifestSizeReceipt, getManifestReceiptBucket, MANIFEST_SIZE_RECEIPT_HEADER, manifestSizeReceiptEvidenceFromR2, verifyManifestSizeReceiptFacts } from '../utils/manifest_size_receipt.ts'
 import { MANIFEST_UPLOAD_CAPABILITY_HEADER, verifyManifestUploadCapability } from '../utils/manifest_upload_capability.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { throwDatabaseLookupError, throwDatabaseUnavailable } from '../utils/pg_auth_lookup.ts'
+import { closeClient, getPgClient } from '../utils/pg.ts'
+import { throwDatabaseLookupError } from '../utils/pg_auth_lookup.ts'
 import { getAppPlanStatePg, getUserIdFromApikey, withFreshPgRetry } from '../utils/pg_files.ts'
 import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
 import { buildRateLimitInfo, onPremiseAppResponse } from '../utils/rateLimitInfo.ts'
@@ -1184,13 +1184,12 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 
   // Use Postgres instead of Supabase SDK
   const pgClient = await getPgClient(c, false) // authz + plan gating must read primary
-  const drizzleClient = getDrizzleClient(pgClient)
 
   try {
     // Get user_id from apikey using Postgres
-    const userLookup = await getUserIdFromApikey(c, capgkey, drizzleClient)
+    const userLookup = await getUserIdFromApikey(c, capgkey, pgClient)
     if (userLookup.kind === 'db_error')
-      throwDatabaseUnavailable(c, 'checkWriteAppAccess.getUserIdFromApikey', userLookup.error, { app_id })
+      throwDatabaseLookupError(c, 'checkWriteAppAccess.getUserIdFromApikey', userLookup.error, { app_id })
 
     const userId = userLookup.kind === 'ok' ? userLookup.value : null
 

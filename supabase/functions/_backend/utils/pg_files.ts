@@ -4,7 +4,7 @@ import type { PgAuthLookupResult } from './pg_auth_lookup.ts'
 import { eq, sql } from 'drizzle-orm'
 import { cloudlog } from './logging.ts'
 import { buildPlanValidationExpression, closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
-import { waitAuthPgRetryJitter, withAuthPgRetry } from './pg_auth_retry.ts'
+import { waitAuthPgRetryJitter } from './pg_auth_retry.ts'
 import { isTransientPgError } from './pg_errors.ts'
 import * as schema from './postgres_schema.ts'
 
@@ -14,7 +14,7 @@ import * as schema from './postgres_schema.ts'
 export async function getUserIdFromApikey(
   c: Context,
   apikey: string,
-  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  pgClient: PgClient,
 ): Promise<PgAuthLookupResult<string>> {
   try {
     cloudlog({
@@ -23,7 +23,7 @@ export async function getUserIdFromApikey(
       apikeyPrefix: apikey?.substring(0, 15),
     })
 
-    const result = await withAuthPgRetry(() => drizzleClient.execute<{ get_user_id: string }>(
+    const result = await withFreshPgRetry(c, 'getUserIdFromApikey', pgClient, client => getDrizzleClient(client).execute<{ get_user_id: string }>(
       sql`SELECT get_user_id(${apikey})`,
     ))
 
@@ -41,7 +41,6 @@ export async function getUserIdFromApikey(
     return { kind: 'ok', value: userId }
   }
   catch (e: unknown) {
-    logPgError(c, 'getUserIdFromApikey', e)
     return { kind: 'db_error', error: e }
   }
 }
