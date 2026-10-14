@@ -178,6 +178,39 @@ describe('hosted MCP protocol', () => {
     expect(calls).toHaveLength(0)
     expect(JSON.stringify(response?.result)).toContain('MCP · Test')
   })
+
+  it.concurrent('returns a quoted CLI upload command using the caller key', async () => {
+    const { ctx, calls } = fakeContext({ app_id: 'com.example.app' })
+    ctx.apikey = 'key-123'
+    const response = await handleJsonRpcMessage({
+      jsonrpc: '2.0',
+      id: 9,
+      method: 'tools/call',
+      params: { name: 'capgo_get_upload_command', arguments: { appId: 'com.example.app', path: 'dist', channel: 'it\'s', delta: true } },
+    }, ctx)
+    expect(calls).toEqual([{ method: 'GET', path: '/app/com.example.app' }])
+    const result = response?.result as { content: Array<{ text: string }>, isError?: boolean }
+    expect(result.isError).toBeUndefined()
+    expect(JSON.parse(result.content[0].text).command).toBe(
+      `CAPGO_TOKEN='key-123' bunx @capgo/cli@latest bundle upload 'com.example.app' --path 'dist' --channel 'it'\\''s' --delta`,
+    )
+  })
+
+  it.concurrent('refuses the upload command when the key cannot read the app', async () => {
+    const ctx: McpToolContext = {
+      call: async () => ({ ok: false, status: 404, data: { error: 'app_not_found' } }),
+      caller: { userId: 'u', apikeyId: 1, apikeyName: 'k', apikeyExpiresAt: null },
+      apikey: 'key-123',
+    }
+    const response = await handleJsonRpcMessage({
+      jsonrpc: '2.0',
+      id: 10,
+      method: 'tools/call',
+      params: { name: 'capgo_get_upload_command', arguments: { appId: 'com.example.app' } },
+    }, ctx)
+    expect(response?.result).toMatchObject({ isError: true })
+    expect(JSON.stringify(response?.result)).not.toContain('key-123')
+  })
 })
 
 describe('hosted MCP OAuth helpers', () => {

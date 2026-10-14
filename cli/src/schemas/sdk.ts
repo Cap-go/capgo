@@ -106,6 +106,9 @@ export const uploadOptionsSchema = z.object({
   acceptIncompatible: z.boolean().optional(),
   disableCodeCheck: z.boolean().optional(),
   useZip: z.boolean().optional(),
+  delta: z.boolean().optional(),
+  deltaOnly: z.boolean().optional(),
+  encryptPartial: z.boolean().optional(),
   capacitorConfig: capacitorConfigOptionSchema.optional(),
 }).superRefine((value, ctx) => {
   rejectConflictingBooleanGroup(value, ctx, ['acceptIncompatible', 'ignoreCompatibilityCheck'])
