@@ -102,7 +102,9 @@ async function main() {
   catch (error: any) {
     // Keep the previous committed checkpoint; report the failed key range so
     // an operator can inspect it before resuming. Do not swallow failed work.
-    await writeFile(`${checkpointPath}.failed.json`, JSON.stringify({ cursor, versionIds: error.versionIds, code: error.code, message: error.message }), { mode: 0o600 })
+    const report = JSON.stringify({ cursor, versionIds: error.versionIds, code: error.code, message: error.message })
+    await writeFile(`${checkpointPath}.failed.json`, report, { mode: 0o600 })
+      .catch(writeError => console.error('Failed to write failure report', writeError, report))
     throw error
   }
   finally {

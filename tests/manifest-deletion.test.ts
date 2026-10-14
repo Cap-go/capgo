@@ -1,7 +1,11 @@
 import type { Context } from 'hono'
+import { spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { env } from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -240,6 +244,30 @@ describe('manifest deletion Postgres effects', () => {
       await blocker.query('ROLLBACK')
       blocker.release()
       client.release()
+    }
+  })
+
+  it('preserves the original database error and failed IDs when the failure report cannot be saved', async () => {
+    await seedVersion(1, 1, true, 0)
+    await pool.query('ALTER TABLE public.manifest RENAME TO manifest_report_error_fixture')
+    try {
+      const result = spawnSync('bun', [fileURLToPath(new URL('../scripts/reclaim_deleted_version_manifests.ts', import.meta.url))], {
+        encoding: 'utf8',
+        timeout: 10000,
+        env: {
+          ...env,
+          SUPABASE_DB_URL: dbUrl.toString(),
+          MANIFEST_REQUEUE_CHECKPOINT: join(tmpdir(), `manifest-report-missing-${randomUUID()}`, 'state.json'),
+        },
+      })
+      expect(result.error).toBeUndefined()
+      expect(result.status).toBe(1)
+      expect(result.stderr).toContain('Failed to write failure report')
+      expect(result.stderr).toContain('42P01')
+      expect(result.stderr).toContain('"versionIds":["1"]')
+    }
+    finally {
+      await pool.query('ALTER TABLE public.manifest_report_error_fixture RENAME TO manifest')
     }
   })
 
