@@ -259,6 +259,15 @@ describe('cleanup producer Postgres transactions', () => {
     await db.query(`UPDATE public.r2_objects SET manifest_lease_expires_at=now()+interval '1 hour' WHERE bucket_name=$1`, [bucket])
     expect(await discoverCleanupPage(db, bucket, '')).toHaveLength(10_000)
     const q = queue()
+    let pages = 0
+    const interrupted = { query: async (statement: string | QueryConfig, values?: unknown[]) => {
+      if (typeof statement === 'string' && statement.startsWith('WITH page AS MATERIALIZED') && ++pages === 2)
+        throw new Error('Synthetic interrupted zero-result scan')
+      return db.query(statement as string, values)
+    } }
+    await expect(runCleanupProducer(interrupted as unknown as ClientBase, bucket, q)).rejects.toThrow('interrupted zero-result scan')
+    // This is the last examined key of the first page, despite zero retirements.
+    expect((await checkpoint(db, bucket)).cursor).toBe(keys[9999])
     expect(await runCleanupProducer(db, bucket, q)).toBe(0)
     expect(q.sendBatch).not.toHaveBeenCalled()
     expect((await checkpoint(db, bucket)).cursor).toBe('')
