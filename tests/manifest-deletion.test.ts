@@ -75,7 +75,7 @@ beforeAll(async () => {
     INSERT INTO public.app_versions (id, app_id) VALUES (999, 'com.test.legacy.restore');
     INSERT INTO public.manifest_trash_restore_pending (app_version_id, s3_path) VALUES (999, 'delta/legacy');`)
   // Apply the actual migration to existing recovery state as well as fresh schemas.
-  await pool.query(await readFile(new URL('../supabase/migrations/20261013151417_retain_manifest_delta_objects.sql', import.meta.url), 'utf8'))
+  await pool.query(await readFile(new URL('../supabase/migrations/20261014101115_retain_manifest_delta_objects.sql', import.meta.url), 'utf8'))
   getPgClient.mockResolvedValue(pool)
 })
 
@@ -172,7 +172,7 @@ describe('manifest deletion Postgres effects', () => {
   })
 
   it('requires a concurrent index prebuild on large databases and accepts that prebuilt index', async () => {
-    const migration = await readFile(new URL('../supabase/migrations/20261013151417_retain_manifest_delta_objects.sql', import.meta.url), 'utf8')
+    const migration = await readFile(new URL('../supabase/migrations/20261014101115_retain_manifest_delta_objects.sql', import.meta.url), 'utf8')
     await pool.query('INSERT INTO public.app_versions (id, app_id) SELECT i, $1 FROM generate_series(1,10001) i', [appId])
     await pool.query('DROP INDEX public.idx_app_versions_deleted_manifest_retry')
     try {
