@@ -3,11 +3,13 @@
 OpenAI plugin package for the hosted Capgo MCP server (`https://api.capgo.app/mcp`, see `docs/hosted-mcp.md`).
 Submission guide: https://developers.openai.com/plugins/deploy/submission
 
+The plugin files live at the repo root so Open Plugins scanners (https://open-plugins.com) detect them:
+
 ```
 plugin.json          manifest + listing metadata (extensions.com.openai.interface)
 mcp.json             hosted MCP server (streamable-http)
 skills/              workflow skills bundled with the plugin
-assets/              logo and composer icon
+assets/plugin/       logo and composer icon
 ```
 
 The ZIP must not contain this README or `REVIEW.md`; the build script only packages the files above.
