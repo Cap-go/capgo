@@ -22,6 +22,37 @@ generated value for older clients) and frozen numeric `timestamp`; retry the
 same request with both values to preserve the primary and derived identities.
 Other direct PostHog callers keep the Hono wrapper and its legacy boolean contract.
 
+## Committed organization lifecycle events
+
+`Org Created` is produced only by `on_organization_create` from the existing
+transactional pgmq INSERT message. Its distinct ID is the queued `created_by`
+Supabase user UUID, its timestamp is the queued organization `created_at`, and
+`$insert_id` is `org-created:<org UUID>`. Existing `owner_org`, organization
+group, and signup-attribution properties remain; event-only properties add
+`org_id` and `capture_source: database_trigger`.
+
+Invitation events retain their existing browser/request producers and helper,
+including `flow`, `account_state`, `entry_path`, and
+`pending_invitation_count`. The standalone admin invitation dashboard filters
+even overall counts by `flow`, so removing that dimension would hide successful
+acceptances. Invitation tracking is outside this change.
+
+pgmq messages become visible only after the business transaction commits;
+rollback removes the queued message too. The organization-creation handler awaits
+PostHog with a one-second timeout and requires a confirmed `delivered` outcome
+(including retrying HTTP-200 quota limits, rejection, or ambiguous responses). Failures
+retry through the existing queue budget of at most five reads. Client
+`/private/events` submissions cannot use `Org Created`. This is
+positive evidence going forward, not a lossless audit: delivery can still
+exhaust retries, and missing events cannot establish historical absence.
+The `capture_source` property distinguishes this future organization-creation
+contract from older captures.
+Existing Bento work continues independently of PostHog failures.
+The existing `org:created` email uses its per-org permanent notification claim
+so analytics retries cannot resend it beyond the former cron throttle window.
+Transient notification failures also retry the queue; already-claimed notifications
+and other terminal outcomes do not trigger another attempt.
+
 ## Direct production cutover
 
 Merge deploys this cutover directly to production. There is no dual-send phase,
@@ -107,7 +138,11 @@ Recovery understands original V1 and explicit envelopes, and refuses invalid dat
 
 `posthog_queue_enqueue` logs persistence/failure status and canonical correlation
 IDs. `posthog_queue_delivery` logs action/outcome, HTTP status when available,
-attempt count, queue age, and duration. No new logs contain event names,
+attempt count, queue age, and duration. Provider retries retain `http_status`
+(including `null` before a response arrives); ambiguous deliveries also include
+`reason`: `timeout`, `network`, or `invalid_response`. A successful HTTP response
+with `{"status":"Ok"}` is acknowledged unless it reports a quota limitation.
+No new logs contain event names,
 user/org/app IDs, IPs, descriptions, tags, provider response bodies, errors with
 arbitrary provider details, or authentication material. No provider result is
 returned to the client; success remains `{ status: 'ok', event_id }`.

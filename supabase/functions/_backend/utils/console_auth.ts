@@ -11,15 +11,15 @@ import { TOTP } from 'otpauth'
 import type { JWTClaims } from './hono.ts'
 import { honoFactory } from './hono.ts'
 import { getPasswordUtf8ByteLength } from './password_policy.ts'
-import { getPgClient } from './pg.ts'
+import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from './pg.ts'
 import { getEnv } from './utils.ts'
 
 export const CONSOLE_SESSION_PREFIX = 'capgo_session_'
 export const IMPORTED_TOTP_PREFIX = 'capgo-base32:'
 
 /** Request-scoped pools must not retain another Worker's I/O context. */
-export function createConsoleAuth(c: Context, provisionUserId?: string) {
-  const database = getPgClient(c)
+export async function createConsoleAuth(c: Context, provisionUserId?: string) {
+  const database = await getPgClient(c)
   const baseURL = getEnv(c, 'CONSOLE_AUTH_URL')
   const secret = getEnv(c, 'BETTER_AUTH_SECRET')
   const webURL = getEnv(c, 'WEBAPP_URL')
@@ -44,12 +44,31 @@ export function createConsoleAuth(c: Context, provisionUserId?: string) {
     await c.env.AUTH_EMAIL.send({ from: 'noreply@capgo.app', to: email, subject, text })
   }
 
+  let connectionReleased = Promise.resolve()
   const auth = betterAuth({
     appName: 'Capgo',
     baseURL: `${baseURL.replace(/\/$/, '')}/auth`,
     basePath: '/auth',
     secret,
-    database,
+    // Kysely requires a pool interface; Hyperdrive provides an already-connected Client.
+    // Serialize adapter checkouts so transactions cannot share that Client concurrently.
+    database: {
+      connect: async () => {
+        const previous = connectionReleased
+        let releaseConnection!: () => void
+        connectionReleased = new Promise<void>((resolve) => { releaseConnection = resolve })
+        await previous
+        try {
+          const client = await checkoutPgClient(database)
+          return { query: client.query.bind(client), release: () => { releasePgClient(database, client); releaseConnection() } }
+        }
+        catch (error) {
+          releaseConnection()
+          throw error
+        }
+      },
+      end: async () => { await closeClient(c, database) },
+    },
     trustedOrigins: [webURL, 'capacitor://localhost', 'ionic://localhost',
       ...getEnv(c, 'CONSOLE_TRUSTED_ORIGINS').split(',').map(origin => origin.trim()).filter(Boolean),
       ...(getEnv(c, 'ENV_NAME').endsWith('-local') ? ['http://localhost:*', 'http://127.0.0.1:*'] : [])],
@@ -262,7 +281,7 @@ export function createConsoleAuth(c: Context, provisionUserId?: string) {
       },
     },
   })
-  return { auth, database, close: () => database.end() }
+  return { auth, database, close: () => closeClient(c, database) }
 }
 
 export function consoleAuthHeaders(headers: Headers): Headers {
@@ -275,7 +294,7 @@ export function consoleAuthHeaders(headers: Headers): Headers {
   return result
 }
 
-export async function getConsoleSession(instance: ReturnType<typeof createConsoleAuth>, headers: Headers) {
+export async function getConsoleSession(instance: Awaited<ReturnType<typeof createConsoleAuth>>, headers: Headers) {
   const result = await instance.auth.api.getSession({ headers: consoleAuthHeaders(headers) })
   if (!result || result.user.migrationBlocked)
     return null
@@ -296,7 +315,7 @@ export async function getConsoleSession(instance: ReturnType<typeof createConsol
 }
 
 export async function resolveConsoleSession(c: Context, authorization: string): Promise<JWTClaims | null> {
-  const instance = createConsoleAuth(c)
+  const instance = await createConsoleAuth(c)
   try {
     const headers = new Headers({ authorization })
     const result = await getConsoleSession(instance, headers)

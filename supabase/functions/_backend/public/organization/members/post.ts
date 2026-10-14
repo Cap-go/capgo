@@ -3,11 +3,11 @@ import type { MiddlewareKeyVariables } from '../../../utils/hono.ts'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
-import { safeParseSchema } from '../../../utils/schema_validation.ts'
 import { BRES, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
-import { closeClient, getPgClient } from '../../../utils/pg.ts'
+import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from '../../../utils/pg.ts'
 import { checkPermission } from '../../../utils/rbac.ts'
+import { safeParseSchema } from '../../../utils/schema_validation.ts'
 
 const rbacInviteRoles = ['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin'] as const
 
@@ -39,7 +39,6 @@ const inviteBodySchema = z.object({
 
 interface PgTransactionClient {
   query: <TRow = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rowCount?: number | null, rows: TRow[] }>
-  release: () => void
 }
 
 export function normalizeInviteRole(inviteType: string): RbacInviteRole | null {
@@ -78,11 +77,11 @@ export async function post(c: Context<MiddlewareKeyVariables>, bodyRaw: unknown,
   // invite_user_to_org_rbac via Postgres (not service-role Supabase SDK) after
   // revoking anon execute. Mirrors organization/post.ts: BEGIN before
   // set_config(..., true) so capgkey survives until the RPC runs.
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   let dbClient: PgTransactionClient | null = null
   let transactionStarted = false
   try {
-    dbClient = await pgPool.connect() as PgTransactionClient
+    dbClient = await checkoutPgClient(pgPool) as PgTransactionClient
     await dbClient.query('BEGIN')
     transactionStarted = true
     await dbClient.query(
@@ -109,7 +108,7 @@ export async function post(c: Context<MiddlewareKeyVariables>, bodyRaw: unknown,
     throw simpleError('error_inviting_user_to_organization', 'Error inviting user to organization', { error })
   }
   finally {
-    dbClient?.release()
+    releasePgClient(pgPool, dbClient)
     closeClient(c, pgPool)
   }
 

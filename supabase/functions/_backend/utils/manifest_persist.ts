@@ -88,7 +88,7 @@ export async function persistVersionManifestEntries(
     return { inserted: 0, alreadyPresent: false }
   }
 
-  const pgPool = getPgClient(c, false)
+  const pgPool = await getPgClient(c, false)
   let alreadyPresent = false
   try {
     alreadyPresent = await getDrizzleClient(pgPool).transaction(async (tx) => {
@@ -103,11 +103,12 @@ export async function persistVersionManifestEntries(
           SELECT ${record.id}::bigint, entry.file_name, entry.s3_path, entry.file_hash, entry.file_size FROM jsonb_to_recordset(${rowsJson}::jsonb)
           AS entry(file_name text, s3_path text, file_hash text, file_size bigint)`)
 
-        if (!options.trustFileSizes)
+        if (!options.trustFileSizes) {
           await tx.execute(sql`WITH queued AS MATERIALIZED (SELECT pgmq.send('on_manifest_create', pg_catalog.jsonb_build_object(
             'function_name', 'on_manifest_create', 'function_type', 'cloudflare', 'payload', pg_catalog.jsonb_build_object('old_record', NULL,
             'record', pg_catalog.to_jsonb(manifest), 'type', 'INSERT', 'table', 'manifest', 'schema', 'public'))) AS msg_id
             FROM public.manifest WHERE app_version_id = ${record.id}) SELECT count(*) FROM queued`)
+        }
 
         await tx.execute(sql`UPDATE public.app_versions SET manifest_count = ${validEntries.length}, updated_at = now()
           ${sql.raw(options.clearAppVersionsManifest ? ', manifest = NULL' : '')} WHERE id = ${record.id}`)

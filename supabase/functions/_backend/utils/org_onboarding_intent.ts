@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { isBentoConfigured, syncBentoSubscriberTags } from './bento.ts'
 import { cloudlog } from './logging.ts'
 import { getOrgAdminMemberEmailsForTags } from './org_email_notifications.ts'
-import { getDrizzleClient, getPgClient } from './pg.ts'
+import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { getEnv, trimTrailingSlashes } from './utils.ts'
 
@@ -130,7 +130,7 @@ export async function syncOrgOnboardingIntentForOrg(
   org: { id: string, management_email?: string | null, created_by?: string | null, onboarding?: unknown },
 ) {
   const intent = parseOrgOnboardingIntent(org.onboarding)
-  const pgClient = getPgClient(c, true)
+  const pgClient = await getPgClient(c, true)
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {
@@ -152,7 +152,7 @@ export async function syncOrgOnboardingIntentForOrg(
     await syncOrgOnboardingIntentBentoTags(c, intent, Array.from(emailSet))
   }
   finally {
-    await pgClient.end()
+    await closeClient(c, pgClient)
   }
 }
 

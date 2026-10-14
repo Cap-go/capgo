@@ -8,6 +8,7 @@ import { getLocalConfig, useConsole } from '~/services/console'
 import { hideLoader } from '~/services/loader'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { setUser } from '~/services/posthog'
+import { applySignupAttributionToPostHog } from '~/services/signupAttribution'
 import { isSsoUser, provisionSsoUser } from '~/services/ssoProvisioning'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { sendEvent } from '~/services/tracking'
@@ -80,8 +81,9 @@ async function updateUser(
       userRecord.image_url = immediateImageUrl || null
 
     const updatePosthogUser = (avatar?: string | null) => {
+      const authUser = main.auth
       setUser(
-        main.auth?.id ?? '',
+        authUser?.id ?? '',
         {
           email: userRecord.email,
           nickname: [userRecord.first_name, userRecord.last_name].filter(Boolean).join(' ') || undefined,
@@ -89,6 +91,7 @@ async function updateUser(
         },
         config.supaHost,
       )
+      applySignupAttributionToPostHog(authUser, config.supaHost)
     }
 
     main.user = userRecord
@@ -298,6 +301,7 @@ async function guard(
     if (!main.auth || main.auth.id !== sessionUser.id || authConfirmedAt !== sessionUser.email_confirmed_at) {
       main.auth = sessionUser
     }
+    applySignupAttributionToPostHog(sessionUser, getLocalConfig().supaHost)
   }
 
   const { data: mfaData, error: mfaError }

@@ -4,7 +4,7 @@ import { getRuntimeKey } from 'hono/adapter'
 import ipaddr from 'ipaddr.js'
 import { IdentityProvider } from 'samlify'
 import { simpleError } from './hono.ts'
-import { getPgClient } from './pg.ts'
+import { closeClient, getPgClient } from './pg.ts'
 import { getEnv } from './utils.ts'
 
 export function consoleSamlConfig(authURL: string, providerId: string, xml: string, mapping: Record<string, string> = {}): SAMLConfig {
@@ -87,14 +87,13 @@ export async function fetchConsoleSamlMetadata(source: { metadata_url?: string, 
   return new TextDecoder().decode(data)
 }
 
-export async function withConsoleSsoDatabase<T>(c: Context, operation: (pool: ReturnType<typeof getPgClient>) => Promise<T>) {
-  const pool = getPgClient(c)
+export async function withConsoleSsoDatabase<T>(c: Context, operation: (pool: Awaited<ReturnType<typeof getPgClient>>) => Promise<T>) {
+  const pool = await getPgClient(c)
   try {
     return await operation(pool)
   }
   finally {
-    if (getRuntimeKey() !== 'workerd')
-      await pool.end()
+    await closeClient(c, pool)
   }
 }
 

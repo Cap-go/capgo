@@ -22,9 +22,9 @@ async function userHasVerifiedMfaFactors(
   c: Context<MiddlewareKeyVariables>,
   userId: string,
 ): Promise<boolean> {
-  let pgClient: ReturnType<typeof getPgClient> | null = null
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | null = null
   try {
-    pgClient = getPgClient(c, true)
+    pgClient = await getPgClient(c, true)
     const result = await pgClient.query<{ has_verified_mfa: boolean }>(
       `
       SELECT EXISTS (
@@ -54,9 +54,9 @@ async function isActivePlatformImpersonation(
     return false
   }
 
-  let pgClient: ReturnType<typeof getPgClient> | null = null
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | null = null
   try {
-    pgClient = getPgClient(c, true)
+    pgClient = await getPgClient(c, true)
     const result = await pgClient.query<{ is_active: boolean }>(
       `
       SELECT EXISTS (

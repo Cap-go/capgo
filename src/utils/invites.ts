@@ -63,8 +63,5 @@ export function shouldAttemptExistingUserInviteNotification(
   if (output === 'ALREADY_INVITED')
     return hasPendingInvite
 
-  if (output !== 'OK')
-    return false
-
-  return true
+  return false
 }

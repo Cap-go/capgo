@@ -139,8 +139,7 @@ interface EligibleOrgMemberEmailsResult {
   resolutionFailed: boolean
 }
 
-
-type OrgRoleBindingRow = {
+interface OrgRoleBindingRow {
   principal_id: string | null
   expires_at: Date | null
 }
@@ -498,7 +497,7 @@ export async function sendEmailToOrgMembers(
   if (!isBentoConfigured(c))
     return 0
 
-  const client = drizzleClient ?? getDrizzleClient(getPgClient(c, true))
+  const client = drizzleClient ?? getDrizzleClient(await getPgClient(c, true))
   const { recipients } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, client)
   if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendEmailToOrgMembers: org not found', orgId })
@@ -663,7 +662,7 @@ export async function sendNotifToOrgMembersOnceWithResult(
   if (!isBentoConfigured(c))
     return 'failed'
 
-  const pgClient = getPgClient(c)
+  const pgClient = await getPgClient(c)
   const writeClient = getDrizzleClient(pgClient)
 
   try {

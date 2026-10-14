@@ -1,9 +1,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 // @ts-types="npm:@types/pg"
-import type { PoolClient } from 'pg'
 import type { BillingPlanBentoState } from './billing_bento_tags.ts'
 import type { AuthInfo } from './hono.ts'
+import type { PgQueryClient } from './pg.ts'
 import type { Database } from './supabase.types.ts'
 import type { ChannelDeviceOverrideIds, ChannelDevicePlatform, DeviceWithoutCreatedAt, NativeActiveDevicesByPlatformRow, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsInsightsParams, ReadStatsParams, StatsInsightsResult, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
@@ -12,7 +12,8 @@ import { buildBillingPlanBentoTags } from './billing_bento_tags.ts'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { quickError, simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { closeClient, getPgClient } from './pg.ts'
+import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from './pg.ts'
+import { getClientIP } from './rate_limit.ts'
 import { emptyStatsInsights, normalizeStatsInsightsResult } from './statsInsights.ts'
 import { Constants } from './supabase.types.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
@@ -158,7 +159,7 @@ async function readDevicesSBSql(c: Context, params: ReadDevicesParams, customIdM
     ? `updated_at ${devicesOrder.ascending ? 'ASC' : 'DESC'}, device_id ASC`
     : 'device_id ASC'
   values.push(limit + 1)
-  const pgClient = getPgClient(c, true)
+  const pgClient = await getPgClient(c, true)
   try {
     const result = await pgClient.query(
       `SELECT * FROM public.devices WHERE ${where} ORDER BY ${orderBy} LIMIT $${values.length}`,
@@ -202,7 +203,7 @@ async function countDevicesSBSql(
     os_version_compare: options?.osVersionCompare,
     version_name_compare: options?.versionNameCompare,
   }, customIdMode)
-  const pgClient = getPgClient(c, true)
+  const pgClient = await getPgClient(c, true)
   try {
     const result = await pgClient.query<{ total: string }>(
       `SELECT COUNT(*)::text AS total FROM public.devices WHERE ${where}`,
@@ -283,6 +284,22 @@ export function emptySupabase(c: Context) {
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_ANON_KEY'), options)
 }
 
+/** Anon GoTrue client that forwards the trusted client IP for auth rate limiting. */
+export function emptySupabaseWithClientIP(c: Context) {
+  const clientIp = getClientIP(c)
+  const options = {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+    ...(clientIp !== 'unknown'
+      ? { global: { headers: { 'X-Forwarded-For': clientIp } } }
+      : {}),
+  }
+  return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_ANON_KEY'), options)
+}
+
 // WARNING: The service role key has admin privileges and should only be used in secure server environments!
 export function supabaseAdmin(c: Context) {
   const serviceRoleKey = getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')
@@ -345,7 +362,7 @@ export async function getAppsFromSB(c: Context, referenceDate?: Date): Promise<s
   }
 
   if (createdBeforeIso) {
-    const pgClient = getPgClient(c, false)
+    const pgClient = await getPgClient(c, false)
 
     try {
       page = 0
@@ -474,7 +491,7 @@ export async function apikeyHasOrgRight(c: Context, key: Database['public']['Tab
   if (!key.rbac_id)
     return false
 
-  const pgClient = getPgClient(c)
+  const pgClient = await getPgClient(c)
   try {
     const result = await pgClient.query<{ allowed: boolean }>(
       `
@@ -964,11 +981,11 @@ export async function createApiKey(c: Context, userId: string) {
     return
   }
 
-  const pgPool = getPgClient(c)
-  let pgClient: PoolClient | undefined
+  const pgPool = await getPgClient(c)
+  let pgClient: PgQueryClient | undefined
   let inTransaction = false
   try {
-    pgClient = await pgPool.connect()
+    pgClient = await checkoutPgClient(pgPool)
     await pgClient.query('BEGIN')
     inTransaction = true
     await pgClient.query(`SET LOCAL lock_timeout = '5s'`)
@@ -1169,7 +1186,7 @@ export async function createApiKey(c: Context, userId: string) {
     // Workerd keeps request-scoped Pools open, so destroy the checked-out
     // socket explicitly after the transaction and then close the Pool where
     // the runtime supports it.
-    pgClient?.release(true)
+    releasePgClient(pgPool, pgClient, true)
     closeClient(c, pgPool)
   }
 }
@@ -1845,7 +1862,7 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
 }
 
 export async function readStatsInsightsSB(c: Context, params: ReadStatsInsightsParams): Promise<StatsInsightsResult> {
-  const pgClient = getPgClient(c)
+  const pgClient = await getPgClient(c)
   const actionValues = params.actions?.length ? params.actions : []
   const versionName = params.version_name?.trim()
   const values: unknown[] = [params.app_id, params.start_date, params.end_date]

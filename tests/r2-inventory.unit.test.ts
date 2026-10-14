@@ -4,10 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { consumeInventoryBatch } from '../cloudflare_workers/r2_inventory/index.ts'
 import { INVENTORY_CONFIG, inventoryTransaction, parseInventoryEvent, timestampUs } from '../supabase/functions/_backend/utils/r2_inventory.ts'
 
-const mocks = vi.hoisted(() => ({ apply: vi.fn(), end: vi.fn(), head: vi.fn(), publish: vi.fn(), eventDlq: vi.fn(), repairDlq: vi.fn(), snapshot: vi.fn(), observe: vi.fn() }))
+const mocks = vi.hoisted(() => ({ clients: vi.fn(), apply: vi.fn(), end: vi.fn(), head: vi.fn(), publish: vi.fn(), eventDlq: vi.fn(), repairDlq: vi.fn(), snapshot: vi.fn(), observe: vi.fn() }))
 vi.mock('pg', async importOriginal => ({
   ...await importOriginal<object>(),
-  Client: class { connect = vi.fn(); end = mocks.end },
+  Client: class {
+    constructor(options: unknown) { mocks.clients(options) }
+    connect = vi.fn()
+    end = mocks.end
+  },
 }))
 vi.mock('../supabase/functions/_backend/utils/r2_inventory.ts', async importOriginal => ({
   ...await importOriginal<object>(),
@@ -19,7 +23,7 @@ const body = { bucket: 'inventory-test', action: 'PutObject', eventTime: '2026-1
 function fixture(bodies: unknown[], repair = false) {
   const messages = bodies.map((body, index) => ({ id: `synthetic-message-${index}`, timestamp: new Date('2026-10-06T10:00:00Z'), attempts: 1, body, ack: vi.fn(), retry: vi.fn() }))
   const batch = { queue: `capgo-r2-inventory-test${repair ? '-repair' : ''}`, messages, retryAll: vi.fn() }
-  const env = { INVENTORY_BUCKET: 'inventory-test', HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'local' }, ATTACHMENT_BUCKET: { head: mocks.head }, REPAIR_QUEUE: { sendBatch: mocks.publish }, EVENT_DLQ: { sendBatch: mocks.eventDlq }, REPAIR_DLQ: { sendBatch: mocks.repairDlq } }
+  const env = { INVENTORY_BUCKET: 'inventory-test', HYPERDRIVE_R2_INVENTORY: { connectionString: 'local' }, ATTACHMENT_BUCKET: { head: mocks.head }, REPAIR_QUEUE: { sendBatch: mocks.publish }, EVENT_DLQ: { sendBatch: mocks.eventDlq }, REPAIR_DLQ: { sendBatch: mocks.repairDlq } }
   return { messages, batch: batch as unknown as MessageBatch<unknown>, env: env as unknown as Parameters<typeof consumeInventoryBatch>[1], retryAll: batch.retryAll }
 }
 beforeEach(() => {
@@ -68,15 +72,56 @@ describe('r2 inventory queue', () => {
     }
   })
 
-  it('caps the combined event and repair consumer concurrency at two in every environment', () => {
-    const wrangler = JSON.parse(readFileSync(new URL('../cloudflare_workers/r2_inventory/wrangler.jsonc', import.meta.url), 'utf8'))
-    for (const environment of Object.values(wrangler.env) as { queues: { consumers: { max_concurrency: number, dead_letter_queue: string }[], producers: { binding: string, queue: string }[] } }[]) {
-      expect(environment.queues.consumers).toHaveLength(2)
-      expect(environment.queues.consumers.map(consumer => consumer.max_concurrency)).toEqual([1, 1])
-      const bindings = Object.fromEntries(environment.queues.producers.map(producer => [producer.binding, producer.queue]))
-      expect(bindings.EVENT_DLQ).toBe(environment.queues.consumers[0].dead_letter_queue)
-      expect(bindings.REPAIR_DLQ).toBe(environment.queues.consumers[1].dead_letter_queue)
+  it.each([false, true])('uses only the dedicated inventory database binding (repair=%s)', async (repair) => {
+    const f = fixture([repair ? { bucket: 'inventory-test', key: 'legacy/file', kind: 'verify' } : body], repair)
+    const env = { ...f.env, HYPERDRIVE_R2_INVENTORY: { connectionString: 'postgres://dedicated-inventory' }, HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'postgres://primary-must-not-be-used' } }
+    await consumeInventoryBatch(f.batch, env as unknown as typeof f.env)
+    expect(mocks.clients).toHaveBeenCalledTimes(repair ? 2 : 1)
+    for (const [options] of mocks.clients.mock.calls)
+      expect(options).toMatchObject({ connectionString: 'postgres://dedicated-inventory' })
+    expect(f.messages[0].ack).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([false, true])('retries without connecting to the primary when the inventory binding is absent (repair=%s)', async (repair) => {
+    const f = fixture([repair ? { bucket: 'inventory-test', key: 'legacy/file', kind: 'verify' } : body], repair)
+    const { HYPERDRIVE_R2_INVENTORY: _, ...rest } = f.env
+    const env = { ...rest, HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'postgres://primary-must-not-be-used' } }
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await consumeInventoryBatch(f.batch, env as unknown as typeof f.env)
+      expect(mocks.clients).not.toHaveBeenCalled()
+      expect(mocks.apply).not.toHaveBeenCalled()
+      expect(mocks.snapshot).not.toHaveBeenCalled()
+      expect(f.messages[0].ack).not.toHaveBeenCalled()
+      expect(f.retryAll).toHaveBeenCalledWith({ delaySeconds: 30 })
     }
+    finally {
+      log.mockRestore()
+    }
+  })
+
+  it('configures only production inventory with its existing PlanetScale Hyperdrive and bucket', () => {
+    const wrangler = JSON.parse(readFileSync(new URL('../cloudflare_workers/r2_inventory/wrangler.jsonc', import.meta.url), 'utf8'))
+    expect(Object.keys(wrangler.env)).toEqual(['prod'])
+    expect(wrangler.queues).toBeUndefined()
+    expect(wrangler.hyperdrive).toBeUndefined()
+    expect(wrangler.env.prod.name).toBe('capgo-r2-inventory-prod')
+    expect(wrangler.env.prod.vars).toEqual({ INVENTORY_BUCKET: 'capgo' })
+    expect(wrangler.env.prod.r2_buckets).toEqual([{ binding: 'ATTACHMENT_BUCKET', bucket_name: 'capgo' }])
+    expect(wrangler.env.prod.hyperdrive).toEqual([{ binding: 'HYPERDRIVE_R2_INVENTORY', id: 'af73fa6a112b495f80e81718b153db76' }])
+  })
+
+  it('preserves production queue bindings, batching, concurrency and the five-delivery budget', () => {
+    const wrangler = JSON.parse(readFileSync(new URL('../cloudflare_workers/r2_inventory/wrangler.jsonc', import.meta.url), 'utf8'))
+    expect(wrangler.env.prod.queues.producers).toEqual([
+      { binding: 'REPAIR_QUEUE', queue: 'capgo-r2-inventory-prod-repair' },
+      { binding: 'EVENT_DLQ', queue: 'capgo-r2-inventory-prod-dlq' },
+      { binding: 'REPAIR_DLQ', queue: 'capgo-r2-inventory-prod-repair-dlq' },
+    ])
+    expect(wrangler.env.prod.queues.consumers).toEqual([
+      { queue: 'capgo-r2-inventory-prod', max_batch_size: 100, max_batch_timeout: 10, max_concurrency: 1, max_retries: 4, dead_letter_queue: 'capgo-r2-inventory-prod-dlq' },
+      { queue: 'capgo-r2-inventory-prod-repair', max_batch_size: 10, max_batch_timeout: 10, max_concurrency: 1, max_retries: 4, dead_letter_queue: 'capgo-r2-inventory-prod-repair-dlq' },
+    ])
   })
 
   it('normalizes creation metadata and preserves microsecond ordering', () => {

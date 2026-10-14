@@ -21,6 +21,7 @@ import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { shouldShowExpiredTrialPlansState, shouldShowPlanFailureBanner } from '~/services/paymentRequired'
 import { checkPermissions } from '~/services/permissions'
 import { createPlansVisitTracker } from '~/services/plansVisitTracking'
+import { getSignupAttributionEventTags } from '~/services/signupAttribution'
 import { getAffonsoReferral, getDatafastAttribution, openCheckout } from '~/services/stripe'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
@@ -258,6 +259,7 @@ function trackPlanCheckoutStarted(plan: Database['public']['Tables']['plans']['R
       plan_price: isYear ? plan.price_y : plan.price_m,
       plan_price_monthly: plan.price_m,
       plan_price_yearly: plan.price_y,
+      ...getSignupAttributionEventTags(mainStore.auth),
     },
   }).catch()
 }

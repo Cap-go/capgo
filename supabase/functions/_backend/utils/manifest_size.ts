@@ -260,7 +260,7 @@ export async function getManifestDownloadSize(
   if (!lookup)
     return buildManifestDownloadSizeResult(files, [])
 
-  const pgClient = getPgClient(c, true)
+  const pgClient = await getPgClient(c, true)
   try {
     const result = await pgClient.query<{ file_hash: string, version_id: number | null, file_size: number | string | null }>(
       lookup.text,

@@ -55,7 +55,7 @@ app.post('/console-accept-invitation', async (c) => {
   const policy = org?.password_policy_config as (Parameters<typeof getPasswordPolicyValidationErrors>[1] & { enabled?: boolean }) | null
   if (getPasswordPolicyValidationErrors(body.data.password, policy?.enabled ? policy : { min_length: 6, require_uppercase: true, require_number: true, require_special: true }).length)
     return quickError(400, 'invalid_password', 'Password does not meet organization requirements')
-  const instance = createConsoleAuth(c, invitation.future_uuid)
+  const instance = await createConsoleAuth(c, invitation.future_uuid)
   let createdUserId: string | undefined
   let membershipFinalized = false
   try {
@@ -129,7 +129,7 @@ app.post('/console-reauthenticate', async (c) => {
   const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
   if (captchaSecret)
     await verifyCaptchaToken(c, body.data.captchaToken ?? '', captchaSecret)
-  const instance = createConsoleAuth(c)
+  const instance = await createConsoleAuth(c)
   try {
     const session = await getConsoleSession(instance, c.req.raw.headers)
     if (!session || (session.user.twoFactorEnabled && !session.mfaVerified) || session.session.impersonatedBy)
@@ -153,7 +153,7 @@ app.post('/console-reauthenticate', async (c) => {
 })
 
 app.get('/console-session', async (c) => {
-  const instance = createConsoleAuth(c)
+  const instance = await createConsoleAuth(c)
   try {
     const result = await getConsoleSession(instance, c.req.raw.headers)
     if (!result || result.user.migrationBlocked)
@@ -184,7 +184,7 @@ app.get('/console-session', async (c) => {
 
 // A server-validated session is required; browser-provided user ids are never trusted.
 app.post('/console-verify-email', async (c) => {
-  const instance = createConsoleAuth(c)
+  const instance = await createConsoleAuth(c)
   try {
     const headers = consoleAuthHeaders(c.req.raw.headers)
     const session = await getConsoleSession(instance, headers)
@@ -209,7 +209,7 @@ app.post('/console-verify-email', async (c) => {
 })
 
 app.on(['GET', 'POST'], '*', async (c) => {
-  const instance = createConsoleAuth(c)
+  const instance = await createConsoleAuth(c)
   try {
     // Supabase's gateway strips /functions/v1 before invoking the function.
     // Better Auth still needs the externally configured path for routing and links.

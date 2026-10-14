@@ -181,7 +181,7 @@ app.post('/', async (c) => {
         return quickError(400, 'captcha_failed', 'CAPTCHA verification failed')
       }
     }
-    const instance = createConsoleAuth(c)
+    const instance = await createConsoleAuth(c)
     try {
       await instance.auth.api.verifyPassword({ headers: consoleAuthHeaders(c.req.raw.headers), body: { password: body.password } })
       signInData = { user: { id: auth.userId }, session: { access_token: c.get('authorization')!.slice(7) } }

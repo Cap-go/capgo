@@ -2610,6 +2610,51 @@ export type Database = {
         }
         Relationships: []
       }
+      sso_provider_org_links: {
+        Row: {
+          created_at: string
+          id: string
+          linked_by: string | null
+          org_id: string
+          role_mapping: Json | null
+          sso_provider_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          linked_by?: string | null
+          org_id: string
+          role_mapping?: Json | null
+          sso_provider_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          linked_by?: string | null
+          org_id?: string
+          role_mapping?: Json | null
+          sso_provider_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sso_provider_org_links_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sso_provider_org_links_sso_provider_id_fkey"
+            columns: ["sso_provider_id"]
+            isOneToOne: false
+            referencedRelation: "sso_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sso_providers: {
         Row: {
           attribute_mapping: Json | null
@@ -2866,6 +2911,7 @@ export type Database = {
           future_uuid: string
           id: number
           invite_magic_string: string
+          invited_by_user_id: string | null
           last_name: string
           org_id: string
           rbac_role_name: string
@@ -2879,6 +2925,7 @@ export type Database = {
           future_uuid?: string
           id?: number
           invite_magic_string?: string
+          invited_by_user_id?: string | null
           last_name: string
           org_id: string
           rbac_role_name?: string
@@ -2892,6 +2939,7 @@ export type Database = {
           future_uuid?: string
           id?: number
           invite_magic_string?: string
+          invited_by_user_id?: string | null
           last_name?: string
           org_id?: string
           rbac_role_name?: string
@@ -5025,6 +5073,7 @@ export type Database = {
         | "native_app_version_changed"
         | "app_nav"
         | "channelPaused"
+        | "update_check_error"
       stripe_status:
         | "created"
         | "succeeded"
@@ -5297,6 +5346,7 @@ export const Constants = {
         "native_app_version_changed",
         "app_nav",
         "channelPaused",
+        "update_check_error",
       ],
       stripe_status: [
         "created",

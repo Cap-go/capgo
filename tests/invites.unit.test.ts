@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { resolveInviteNewUserErrorMessage, shouldAttemptExistingUserInviteNotification } from '../src/utils/invites'
 
 describe('shouldAttemptExistingUserInviteNotification', () => {
-  it.concurrent('returns true for new invites and pending invite resends', () => {
-    expect(shouldAttemptExistingUserInviteNotification('OK')).toBe(true)
+  it.concurrent('requests email only for explicit pending invite resends', () => {
+    expect(shouldAttemptExistingUserInviteNotification('OK')).toBe(false)
     expect(shouldAttemptExistingUserInviteNotification('ALREADY_INVITED', true)).toBe(true)
   })
 
