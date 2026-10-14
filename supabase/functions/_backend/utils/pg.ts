@@ -1488,33 +1488,6 @@ export async function getChannelsPg(
   }
 }
 
-export async function getAppByIdPg(
-  c: Context,
-  appId: string,
-  drizzleClient: ReturnType<typeof getDrizzleClient>,
-  actions: PlanAction[] = [],
-): Promise<{ owner_org: string, plan_valid: boolean } | null> {
-  try {
-    if (actions.length === 0)
-      return null
-    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
-    const app = await drizzleClient
-      .select({
-        owner_org: schema.apps.owner_org,
-        plan_valid: planExpression,
-      })
-      .from(schema.apps)
-      .where(eq(schema.apps.app_id, appId))
-      .limit(1)
-      .then(data => data[0])
-    return app
-  }
-  catch (e: unknown) {
-    logPgError(c, 'getAppByIdPg', e)
-    return null
-  }
-}
-
 export async function getCompatibleChannelsPg(
   c: Context,
   appId: string,

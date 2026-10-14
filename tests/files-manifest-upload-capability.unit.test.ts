@@ -47,7 +47,6 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
 }))
 
 vi.mock('../supabase/functions/_backend/utils/pg_files.ts', () => ({
-  getAppByAppIdPg: vi.fn(),
   getAppPlanStatePg: vi.fn(),
   getUserIdFromApikey: vi.fn(),
 }))

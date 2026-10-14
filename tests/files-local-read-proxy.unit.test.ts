@@ -1,7 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const createSignedUrlMock = vi.fn()
-const getAppByAppIdPgMock = vi.fn()
+const getAppPlanStatePgMock = vi.fn()
 const getPgClientMock = vi.fn(() => ({}))
 const storageFromMock = vi.fn(() => ({
   createSignedUrl: createSignedUrlMock,
@@ -29,7 +29,7 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
 }))
 
 vi.mock('../supabase/functions/_backend/utils/pg_files.ts', () => ({
-  getAppByAppIdPg: getAppByAppIdPgMock,
+  getAppPlanStatePg: getAppPlanStatePgMock,
   getUserIdFromApikey: vi.fn(),
 }))
 
@@ -55,7 +55,7 @@ describe('files local read proxy', () => {
   })
 
   it.concurrent('proxies local storage reads without checking the app in the database', async () => {
-    getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: 'test-org' })
+    getAppPlanStatePgMock.mockResolvedValue({ kind: 'ok', value: { owner_org: 'test-org', plan_valid: true } })
     createSignedUrlMock.mockResolvedValue({
       data: { signedUrl: 'https://storage.example/object?token=test' },
       error: null,
@@ -93,7 +93,7 @@ describe('files local read proxy', () => {
     expect(response.headers.get('cache-control')).toBe('public, max-age=60, no-transform')
     expect(response.headers.get('content-disposition')).toBe('attachment; filename="orgs/test-org/apps/test-app/local.txt"')
     expect(getPgClientMock).not.toHaveBeenCalled()
-    expect(getAppByAppIdPgMock).not.toHaveBeenCalled()
+    expect(getAppPlanStatePgMock).not.toHaveBeenCalled()
     expect(storageFromMock).toHaveBeenCalledWith('capgo')
     expect(createSignedUrlMock).toHaveBeenCalledWith('orgs/test-org/apps/test-app/local.txt', 60)
   })
@@ -134,6 +134,6 @@ describe('files local read proxy', () => {
     expect(response.headers.get('cache-control')).toBe('public, max-age=60, no-transform')
     expect(response.headers.get('content-disposition')).toBe('attachment; filename="orgs/test-org/apps/test-app/local.txt"')
     expect(getPgClientMock).not.toHaveBeenCalled()
-    expect(getAppByAppIdPgMock).not.toHaveBeenCalled()
+    expect(getAppPlanStatePgMock).not.toHaveBeenCalled()
   })
 })

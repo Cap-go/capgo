@@ -290,6 +290,17 @@ describe('request_manifest_upload', () => {
     })
   })
 
+  it('keeps alerting upstream_unavailable when plan state lookup fails permanently', async () => {
+    mocks.getAppPlanStatePg.mockResolvedValue({
+      kind: 'db_error',
+      error: Object.assign(new Error('column "foo" does not exist'), { code: '42703' }),
+    })
+    const response = await postRequest(validRequestBody())
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({ error: 'upstream_unavailable' })
+  })
+
   it('encodes leading-dot manifest file names in delta storage suffixes', async () => {
     const body = validRequestBody()
     body.entries[0]!.file_name = '.htaccess'

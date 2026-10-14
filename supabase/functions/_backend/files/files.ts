@@ -15,8 +15,8 @@ import { getDotfileDeltaStorageCandidateKeys } from '../utils/manifest_encoding.
 import { createManifestSizeReceipt, MANIFEST_SIZE_RECEIPT_HEADER } from '../utils/manifest_size_receipt.ts'
 import { MANIFEST_UPLOAD_CAPABILITY_HEADER, verifyManifestUploadCapability } from '../utils/manifest_upload_capability.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { throwDatabaseUnavailable } from '../utils/pg_auth_lookup.ts'
-import { getAppByAppIdPg, getAppPlanStatePg, getUserIdFromApikey } from '../utils/pg_files.ts'
+import { throwDatabaseLookupError, throwDatabaseUnavailable } from '../utils/pg_auth_lookup.ts'
+import { getAppPlanStatePg, getUserIdFromApikey } from '../utils/pg_files.ts'
 import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
 import { buildRateLimitInfo, onPremiseAppResponse } from '../utils/rateLimitInfo.ts'
 import { checkPermissionPgFreshRetry } from '../utils/rbac.ts'
@@ -1239,10 +1239,10 @@ async function checkWriteAppAccess(c: Context, next: Next) {
       })
     }
 
-    // Get app using Postgres
-    const appLookup = await getAppByAppIdPg(c, app_id, drizzleClient)
+    // One primary read for ownership + plan gating
+    const appLookup = await getAppPlanStatePg(c, app_id, ATTACHMENT_PLAN_LIMIT)
     if (appLookup.kind === 'db_error')
-      throwDatabaseUnavailable(c, 'checkWriteAppAccess.getAppByAppIdPg', appLookup.error, { app_id })
+      throwDatabaseLookupError(c, 'checkWriteAppAccess.getAppPlanStatePg', appLookup.error, { app_id })
 
     const app = appLookup.kind === 'ok' ? appLookup.value : null
 
@@ -1283,13 +1283,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
       })
     }
 
-    const appPlan = await getAppPlanStatePg(c, app_id, drizzleClient, ATTACHMENT_PLAN_LIMIT)
-    if (appPlan.kind === 'db_error')
-      throwDatabaseUnavailable(c, 'checkWriteAppAccess.getAppPlanStatePg', appPlan.error, { app_id })
-    if (appPlan.kind === 'not_found')
-      throw quickError(404, 'app_not_found', 'App not found', { app_id })
-
-    if (!appPlan.value.plan_valid) {
+    if (!app.plan_valid) {
       // Keep the explicit on_premise_app 429 (with Retry-After / Cache-Control) —
       // the edge cache contract depends on that error code and headers.
       return onPremiseAppResponse(c)
