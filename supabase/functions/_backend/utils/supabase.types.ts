@@ -4860,6 +4860,10 @@ export type Database = {
             Args: { apikey: string; appid: string; name_version: string }
             Returns: boolean
           }
+      expire_r2_manifest_placeholders: {
+        Args: { p_bucket: string; p_limit: number }
+        Returns: number
+      }
       expire_usage_credits: { Args: never; Returns: number }
       find_apikey_by_value: {
         Args: { key_value: string }
