@@ -48,6 +48,7 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
 
 vi.mock('../supabase/functions/_backend/utils/pg_files.ts', () => ({
   getAppPlanStatePg: vi.fn(),
+  withFreshPgRetry: vi.fn(),
   getUserIdFromApikey: vi.fn(),
 }))
 
@@ -176,10 +177,11 @@ describe('files manifest upload capabilities', () => {
     const capability = await createManifestUploadCapability(input, issuedAt)
 
     expect(capability.tokenPrefix).toBe('v1.2026-10-a.1790957400.12345.0.')
-    expect(capability.uploadToken).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(capability.uploadToken).toMatch(/^[\w-]{43}$/)
     expect(capability.token).toBe(`${capability.tokenPrefix}${capability.uploadToken}`)
     await expect(createManifestUploadCapability({ ...input, expiresAt: issuedAt + 601 }, issuedAt))
-      .rejects.toThrow('Cannot sign invalid manifest upload capability')
+      .rejects
+      .toThrow('Cannot sign invalid manifest upload capability')
   })
 
   it.each(['POST', 'HEAD', 'PATCH'] as const)('authorizes %s without API-key or database authentication', async (method) => {

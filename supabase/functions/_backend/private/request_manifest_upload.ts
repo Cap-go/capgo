@@ -75,7 +75,7 @@ app.post('/', middlewareKey({ usePostgres: true, readOnly: false, rateLimitScope
     if (!version || !(await checkPermissionPg(c, 'app.upload_bundle', { appId: version.appId }, drizzleClient, auth.userId, apikey)))
       return quickError(404, 'error_version_not_found', 'Version not found')
 
-    const appPlanLookup = await getAppPlanStatePg(c, version.appId, drizzleClient, ATTACHMENT_PLAN_LIMIT)
+    const appPlanLookup = await getAppPlanStatePg(c, version.appId, pgClient, ATTACHMENT_PLAN_LIMIT)
     if (appPlanLookup.kind === 'db_error')
       throwDatabaseLookupError(c, 'request_manifest_upload.getAppPlanStatePg', appPlanLookup.error)
     if (appPlanLookup.kind === 'not_found')

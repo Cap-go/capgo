@@ -30,6 +30,7 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
 
 vi.mock('../supabase/functions/_backend/utils/pg_files.ts', () => ({
   getAppPlanStatePg: vi.fn(),
+  withFreshPgRetry: vi.fn(),
   getUserIdFromApikey: vi.fn(),
 }))
 

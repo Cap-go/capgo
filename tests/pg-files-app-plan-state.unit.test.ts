@@ -30,10 +30,10 @@ vi.mock('../supabase/functions/_backend/utils/pg_auth_retry.ts', async (importOr
   return { ...actual, waitAuthPgRetryJitter: vi.fn(async () => undefined) }
 })
 
-const { getAppPlanStatePg } = await import('../supabase/functions/_backend/utils/pg_files.ts')
+const { getAppPlanStatePg, withFreshPgRetry } = await import('../supabase/functions/_backend/utils/pg_files.ts')
 
 const c = {} as any
-const callerClient = (await import('../supabase/functions/_backend/utils/pg.ts')).getDrizzleClient({ id: 0 } as any)
+const callerClient = { id: 0 } as any
 const transientError = Object.assign(new Error('Connection terminated unexpectedly'), { code: 'ECONNRESET' })
 
 describe('getAppPlanStatePg', () => {
@@ -96,6 +96,32 @@ describe('getAppPlanStatePg', () => {
 
   it('fails closed without plan actions', async () => {
     await expect(getAppPlanStatePg(c, 'com.demo.app', callerClient, [])).rejects.toThrow('at least one plan action')
+    expect(mocks.getPgClient).not.toHaveBeenCalled()
+  })
+})
+
+describe('withFreshPgRetry', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.getPgClient.mockImplementation(async () => ({ id: 'fresh' }))
+  })
+
+  it('retries a dead-client error on a fresh client and closes only that client', async () => {
+    const run = vi.fn()
+      .mockRejectedValueOnce(new Error('Client has encountered a connection error and is not queryable'))
+      .mockResolvedValueOnce('ok')
+
+    await expect(withFreshPgRetry(c, 'test', callerClient, run)).resolves.toBe('ok')
+    expect(run.mock.calls.map(call => call[0])).toEqual([callerClient, { id: 'fresh' }])
+    expect(mocks.closeClient).toHaveBeenCalledWith(c, { id: 'fresh' })
+    expect(mocks.closeClient).toHaveBeenCalledTimes(1)
+  })
+
+  it('throws permanent errors without opening a fresh client', async () => {
+    const permanentError = Object.assign(new Error('relation "x" does not exist'), { code: '42P01' })
+    const run = vi.fn().mockRejectedValue(permanentError)
+
+    await expect(withFreshPgRetry(c, 'test', callerClient, run)).rejects.toBe(permanentError)
     expect(mocks.getPgClient).not.toHaveBeenCalled()
   })
 })
