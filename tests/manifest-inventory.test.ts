@@ -93,7 +93,7 @@ describe('manifest inventory transactions', () => {
     expect((await db.query(`SELECT has_function_privilege('anon','public.expire_r2_manifest_placeholders(text,integer)','EXECUTE') allowed`)).rows[0].allowed).toBe(false)
   }))
 
-  it.concurrent('serializes expiry behind consumer admission lock across its INSERT-then-SELECT gap', () => fixture(async (db, second, bucket) => {
+  it.concurrent('serializes expiry behind consumer admission lock across its INSERT-then-SELECT gap', ({ expect }) => fixture(async (db, second, bucket) => {
     await reserve(db, bucket)
     await db.query('UPDATE public.r2_objects SET manifest_lease_expires_at=now() WHERE bucket_name=$1', [bucket])
     await db.query('BEGIN')
@@ -166,7 +166,7 @@ describe('provider clock ambiguity', () => {
 })
 
 describe('parallel reservation retirement', () => {
-  it.concurrent('rechecks eight blocked reservations after retirement while an indexed control query remains responsive', () => fixture(async (db, second, bucket) => {
+  it.concurrent('rechecks eight blocked reservations after retirement while an indexed control query remains responsive', ({ expect }) => fixture(async (db, second, bucket) => {
     await reserve(db, bucket)
     const peers = [second, ...Array.from({ length: 7 }, () => new Client({ connectionString: POSTGRES_URL }))]
     const inspect = new Client({ connectionString: POSTGRES_URL })

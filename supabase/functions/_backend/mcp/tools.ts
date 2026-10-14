@@ -83,6 +83,7 @@ const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: fal
 // Deletes, cancellations and overwrites of existing settings. OpenAI plugin guidelines count
 // overwrites as destructive even when they can be undone, so clients ask before running them.
 const DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } satisfies McpToolAnnotations
+// Writes that reach a system outside Capgo: an email inbox, a third-party URL, devices or push providers.
 const EXTERNAL = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true } satisfies McpToolAnnotations
 
 const appId = z.string().min(1).describe('App ID in reverse-domain form, e.g. com.example.app')
@@ -275,13 +276,13 @@ const accountTools: McpTool[] = [
   apiTool({
     name: 'capgo_invite_organization_member',
     title: 'Invite organization member',
-    description: 'Invite a user to an organization by email.',
+    description: 'Invite a user to an organization by email. Capgo sends an invitation email to that address.',
     input: {
       orgId,
       email: z.string().email(),
       invite_type: z.enum(['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin']).describe('Role granted to the invited user'),
     },
-    annotations: WRITE,
+    annotations: EXTERNAL,
     request: input => ({ method: 'POST', path: '/organization/members', body: input }),
   }),
   apiTool({
@@ -436,16 +437,16 @@ const bundleTools: McpTool[] = [
   apiTool({
     name: 'capgo_create_bundle_from_url',
     title: 'Register external bundle',
-    description: 'Register a bundle hosted at an external https URL (zip). To upload local files use capgo_get_upload_command.',
+    description: 'Record a new bundle version for an app the user owns, pointing to a zip the user already hosts at an https URL. This only creates the version entry: no device receives it until a channel is set to this version with capgo_update_channel or capgo_set_bundle_channel. Only use a URL and checksum the user provided. To upload local files use capgo_get_upload_command.',
     input: {
       appId,
       version: z.string().min(1).describe('Semver version name, e.g. 1.2.3'),
-      external_url: z.string().url().describe('https URL of the bundle zip'),
+      external_url: z.string().url().startsWith('https://').describe('https URL of the bundle zip, provided by the user'),
       checksum: z.string().min(1).describe('Checksum of the zip as produced by the Capgo CLI'),
       session_key: z.string().optional().describe('Encryption session key when the bundle is encrypted'),
       key_id: z.string().optional(),
     },
-    annotations: WRITE,
+    annotations: EXTERNAL,
     request: ({ appId: id, ...rest }) => ({ method: 'POST', path: '/bundle', body: compact({ app_id: id, ...rest }) }),
   }),
   apiTool({

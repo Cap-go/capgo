@@ -12,6 +12,9 @@
   "env": {
     "prod": {
       "name": "capgo-r2-inventory-prod",
+      "triggers": {
+        "crons": ["* * * * *"]
+      },
       "vars": {
         "INVENTORY_BUCKET": "capgo"
       },

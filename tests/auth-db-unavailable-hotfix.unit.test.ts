@@ -2,9 +2,9 @@
 import { HTTPException } from 'hono/http-exception'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CapgoDrizzleQueryLogger } from '../supabase/functions/_backend/utils/drizzle_query_logger.ts'
-import { getUserIdFromApikey } from '../supabase/functions/_backend/utils/pg_files.ts'
-import { withAuthPgRetry } from '../supabase/functions/_backend/utils/pg_auth_retry.ts'
 import { onError } from '../supabase/functions/_backend/utils/on_error.ts'
+import { withAuthPgRetry } from '../supabase/functions/_backend/utils/pg_auth_retry.ts'
+import { getUserIdFromApikey } from '../supabase/functions/_backend/utils/pg_files.ts'
 
 const {
   executeMock,
@@ -22,13 +22,13 @@ const {
 
 getDrizzleClientMock.mockImplementation(() => ({ execute: executeMock }))
 
-vi.mock('../supabase/functions/_backend/utils/logging.ts', async (importOriginal) => ({
+vi.mock('../supabase/functions/_backend/utils/logging.ts', async importOriginal => ({
   ...await importOriginal<typeof import('../supabase/functions/_backend/utils/logging.ts')>(),
   cloudlog: cloudlogMock,
   cloudlogErr: vi.fn(),
 }))
 
-vi.mock('../supabase/functions/_backend/utils/pg.ts', async (importOriginal) => ({
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async importOriginal => ({
   ...await importOriginal<typeof import('../supabase/functions/_backend/utils/pg.ts')>(),
   closeClient: vi.fn(async () => undefined),
   getDrizzleClient: getDrizzleClientMock,
@@ -87,9 +87,25 @@ describe('auth database unavailable hotfix', () => {
   })
 
   it('getUserIdFromApikey returns db_error instead of null on Postgres failure', async () => {
-    const drizzle = { execute: vi.fn().mockRejectedValue(new Error('Connection terminated unexpectedly')) }
-    const result = await getUserIdFromApikey(makeContext(), 'capgo_test_key', drizzle as any)
-    expect(result).toEqual({ kind: 'db_error', error: expect.any(Error) })
+    const failure = new Error('Connection terminated unexpectedly')
+    executeMock.mockRejectedValue(failure)
+    const result = await getUserIdFromApikey(makeContext(), 'capgo_test_key', {} as any)
+    expect(result).toEqual({ kind: 'db_error', error: failure })
+  })
+
+  it('getUserIdFromApikey retries a dropped connection on a fresh primary client', async () => {
+    const callerClient = { id: 'caller' }
+    const freshClient = { id: 'fresh' }
+    getPgClientMock.mockImplementation(() => freshClient as any)
+    executeMock
+      .mockRejectedValueOnce(new Error('Client has encountered a connection error and is not queryable'))
+      .mockResolvedValueOnce({ rows: [{ get_user_id: 'user-1' }] })
+
+    const result = await getUserIdFromApikey(makeContext(), 'capgo_test_key', callerClient as any)
+
+    expect(result).toEqual({ kind: 'ok', value: 'user-1' })
+    expect(getDrizzleClientMock.mock.calls.map(call => (call as unknown[])[0])).toEqual([callerClient, freshClient])
+    expect(getPgClientMock).toHaveBeenCalledWith(expect.anything(), false)
   })
 
   it('middlewareKey returns 503 database_unavailable on checkKeyPg failure without recording failed auth', async () => {
