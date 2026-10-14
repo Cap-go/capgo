@@ -1,5 +1,6 @@
 import type { McpApiRequest, McpToolContext } from '../supabase/functions/_backend/mcp/tools.ts'
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import apiWorker from '../cloudflare_workers/api/index.ts'
 import {
@@ -118,6 +119,15 @@ describe('hosted MCP protocol', () => {
       expect(tool.inputSchema.type).toBe('object')
       expect(tool.inputSchema).not.toHaveProperty('$schema')
       expect(typeof tool.annotations.readOnlyHint).toBe('boolean')
+    }
+  })
+
+  it.concurrent('uses delta terms, never the deprecated partial ones, in hosted and local MCP tools', () => {
+    const deprecated = /partial/i
+    expect(JSON.stringify(listTools())).not.toMatch(deprecated)
+    for (const file of ['cli/src/mcp/tool-schemas.ts', 'cli/src/mcp/server.ts']) {
+      const source = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8').replaceAll(/\bPartial</g, '')
+      expect(source, file).not.toMatch(deprecated)
     }
   })
 
