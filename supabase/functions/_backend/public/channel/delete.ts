@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { HTTPException } from 'hono/http-exception'
 import { BRES, simpleError } from '../../utils/hono.ts'
-import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
+import { checkoutPgClient, closeClient, getPgClient, logPgError, releasePgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
@@ -27,7 +27,6 @@ export interface ChannelSet {
 
 interface PgQueryClient {
   query: <TRow = Record<string, unknown>>(text: string, params?: unknown[]) => Promise<{ rowCount?: number | null, rows: TRow[] }>
-  release: () => void
 }
 
 interface PreviewChannelRow {
@@ -169,12 +168,12 @@ async function deletePreviewChannelAndBundle(
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ) {
   const effectiveApikey = getEffectiveApikey(c, apikey)
-  const pgClient = getPgClient(c)
+  const pgClient = await getPgClient(c)
   let dbClient: PgQueryClient | null = null
   let transactionStarted = false
 
   try {
-    dbClient = await pgClient.connect()
+    dbClient = await checkoutPgClient(pgClient)
     await dbClient.query('BEGIN')
     transactionStarted = true
 
@@ -297,7 +296,7 @@ async function deletePreviewChannelAndBundle(
     throw simpleError('cannot_delete_preview_bundle', 'Cannot delete this preview channel and bundle')
   }
   finally {
-    dbClient?.release()
+    releasePgClient(pgClient, dbClient)
     await closeClient(c, pgClient)
   }
 }

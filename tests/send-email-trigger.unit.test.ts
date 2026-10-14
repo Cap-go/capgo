@@ -1,7 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { sendMock } = vi.hoisted(() => ({
+const { sendMock, queryMock, releaseMock, logMock, runtimeMock } = vi.hoisted(() => ({
   sendMock: vi.fn(async (_message: unknown) => ({ messageId: 'message-id' })),
+  queryMock: vi.fn(),
+  releaseMock: vi.fn(),
+  logMock: vi.fn(),
+  runtimeMock: vi.fn(() => 'node'),
+}))
+
+vi.mock('hono/adapter', async () => ({
+  ...await vi.importActual('hono/adapter'),
+  getRuntimeKey: runtimeMock,
+}))
+
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
+  ...await vi.importActual('../supabase/functions/_backend/utils/pg.ts'),
+  getPgClient: async () => ({ connect: async () => ({ query: queryMock, release: releaseMock }) }),
+  closeClient: vi.fn(),
+}))
+
+vi.mock('../supabase/functions/_backend/utils/logging.ts', async () => ({
+  ...await vi.importActual('../supabase/functions/_backend/utils/logging.ts'),
+  cloudlog: logMock,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/hono.ts', async () => {
@@ -41,6 +61,29 @@ const signupEvent = {
   },
 }
 
+const orgInvitationId = 'bacf009d-fbdc-40a0-9190-ec3e2dcf5e01'
+const orgId = '984c9e7d-797a-4c6e-a2ea-b78dbebf1d78'
+const invitation = {
+  id: orgInvitationId,
+  org_id: orgId,
+  org_user_id: null as number | null,
+  tmp_user_id: 42 as number | null,
+  sent_at: null as string | null,
+  is_pending: true,
+  email: 'invitee@example.com',
+  first_name: 'Alex',
+  last_name: '',
+  org_name: 'Example & Team',
+  org_admin_name: 'Pat Admin',
+  invite_magic_string: 'secret-invite-token',
+}
+
+function mockInvitation(overrides: Partial<typeof invitation> = {}) {
+  queryMock.mockImplementation(async (query: string) => ({
+    rows: query.includes('FROM public.org_invitation_email_requests') ? [{ ...invitation, ...overrides }] : [],
+  }))
+}
+
 function postSendEmail(body: unknown, withBinding = true) {
   return cloudflareApp.request('http://local/', {
     body: JSON.stringify(body),
@@ -52,7 +95,89 @@ function postSendEmail(body: unknown, withBinding = true) {
 describe('send_email queue handler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    sendMock.mockResolvedValue({ messageId: 'message-id' })
+    sendMock.mockReset().mockResolvedValue({ messageId: 'message-id' })
+    runtimeMock.mockReturnValue('node')
+    mockInvitation()
+  })
+
+  it('sends a new-account organization invite with the existing subject and invitation link', async () => {
+    const response = await postSendEmail({ org_invitation_id: orgInvitationId })
+    expect(response.status).toBe(200)
+    expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({
+      to: 'invitee@example.com',
+      from: 'noreply@capgo.app',
+      subject: '[Capgo]: Join Example & Team org & create account',
+    }))
+    const content = sendMock.mock.calls[0]![0] as { html: string, text: string }
+    expect(content.html).toContain('Example &amp; Team')
+    expect(content.html).toContain('/invitation?invite_magic_string=secret-invite-token')
+    expect(content.text).toContain('Pat Admin')
+    expect(content.text).toContain('valid for seven days')
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('UPDATE public.org_invitation_email_requests'), [orgInvitationId, 'message-id'])
+    expect(JSON.stringify(logMock.mock.calls)).toContain('message-id')
+    expect(JSON.stringify(logMock.mock.calls)).not.toContain('secret-invite-token')
+    expect(JSON.stringify(logMock.mock.calls)).not.toContain('invitee@example.com')
+    expect(releaseMock).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the invitation delivery alive in the Worker when the queue client disconnects', async () => {
+    runtimeMock.mockReturnValue('workerd')
+    const waitUntil = vi.fn()
+    const response = await cloudflareApp.request('http://local/', {
+      body: JSON.stringify({ org_invitation_id: orgInvitationId }),
+      headers: { 'content-type': 'application/json' },
+      method: 'POST',
+    }, { AUTH_EMAIL: { send: sendMock } } as never, { waitUntil, passThroughOnException: vi.fn(), props: {} })
+    expect(response.status).toBe(200)
+    expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise))
+    expect(queryMock).toHaveBeenCalledWith('SET LOCAL idle_in_transaction_session_timeout = 60000')
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('UPDATE public.org_invitation_email_requests'), [orgInvitationId, 'message-id'])
+  })
+
+  it('sends an existing-account organization invite with its existing subject and dashboard link', async () => {
+    mockInvitation({ org_user_id: 24, tmp_user_id: null })
+    const response = await postSendEmail({ org_invitation_id: orgInvitationId })
+    expect(response.status).toBe(200)
+    expect(sendMock).toHaveBeenCalledWith(expect.objectContaining({
+      subject: '[Capgo]: Join Example & Team with your account',
+    }))
+    const content = sendMock.mock.calls[0]![0] as { html: string, text: string }
+    expect(content.html).toContain(`/dashboard?invite_org=${orgId}`)
+    expect(content.text).toContain('with your existing account')
+    expect(content.text).not.toContain('secret-invite-token')
+  })
+
+  it.each([
+    { sent_at: '2026-10-01T10:00:00Z' },
+    { is_pending: false },
+  ])('acknowledges an already sent or obsolete organization invite without sending it', async (overrides) => {
+    mockInvitation(overrides)
+    const response = await postSendEmail({ org_invitation_id: orgInvitationId })
+    expect(response.status).toBe(200)
+    expect(sendMock).not.toHaveBeenCalled()
+  })
+
+  it('acknowledges a missing or superseded send generation without sending it', async () => {
+    queryMock.mockResolvedValue({ rows: [] })
+    const response = await postSendEmail({ org_invitation_id: orgInvitationId })
+    expect(response.status).toBe(200)
+    expect(sendMock).not.toHaveBeenCalled()
+  })
+
+  it('rolls back the organization email send marker when the provider fails so the queue can retry', async () => {
+    sendMock.mockRejectedValueOnce(new Error('provider unavailable'))
+    const response = await postSendEmail({ org_invitation_id: orgInvitationId })
+    expect(response.status).toBe(500)
+    expect(queryMock).toHaveBeenCalledWith('ROLLBACK')
+    expect(queryMock.mock.calls.some(([query]) => query.includes('UPDATE public.org_invitation_email_requests'))).toBe(false)
+    expect(releaseMock).toHaveBeenCalledOnce()
+  })
+
+  it('rejects a malformed organization send generation before using the database or sending', async () => {
+    const response = await postSendEmail({ org_invitation_id: 'not-a-uuid' })
+    expect(response.status).toBe(400)
+    expect(queryMock).not.toHaveBeenCalled()
+    expect(sendMock).not.toHaveBeenCalled()
   })
 
   it('sends the confirmation email through Cloudflare with a working link', async () => {

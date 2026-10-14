@@ -1,13 +1,13 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../../utils/hono.ts'
 import type { Database } from '../../../utils/supabase.types.ts'
-import { z } from 'zod'
 import { HTTPException } from 'hono/http-exception'
-import { safeParseSchema } from '../../../utils/schema_validation.ts'
+import { z } from 'zod'
 import { BRES, quickError, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../../../utils/pg.ts'
+import { checkoutPgClient, closeClient, getDrizzleClient, getPgClient, releasePgClient } from '../../../utils/pg.ts'
 import { checkPermission, checkPermissionPg } from '../../../utils/rbac.ts'
+import { safeParseSchema } from '../../../utils/schema_validation.ts'
 import { supabaseAdmin } from '../../../utils/supabase.ts'
 
 const deleteBodySchema = z.object({
@@ -25,7 +25,6 @@ interface PinnedPgClient {
     rowCount?: number | null
     rows: T[]
   }>
-  release: () => void
 }
 
 interface MemberRemovalRequest {
@@ -159,7 +158,7 @@ async function assertMemberRemovalAuthorizedAfterLock(
   targetUserId: string,
   dbClient: PinnedPgClient,
 ): Promise<void> {
-  const pinnedDrizzle = getDrizzleClient(dbClient as unknown as ReturnType<typeof getPgClient>) as DrizzleClient
+  const pinnedDrizzle = getDrizzleClient(dbClient as unknown as Awaited<ReturnType<typeof getPgClient>>) as DrizzleClient
   const apikeyString = auth.apikey?.key ?? c.get('capgkey') ?? null
   const canManageRoles = await checkPermissionPg(
     c,
@@ -219,13 +218,13 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
 
   // Pin the transaction to one connection: rank read, cleanup, and membership deletion
   // must share the organization lock with every RBAC mutation trigger.
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   let dbClient: PinnedPgClient | undefined
   let transactionOpen = false
   cloudlog({ requestId: c.get('requestId'), message: 'targetUserId', data: targetUserId })
   cloudlog({ requestId: c.get('requestId'), message: 'body.orgId', data: body.orgId })
   try {
-    dbClient = await pgPool.connect() as unknown as PinnedPgClient
+    dbClient = await checkoutPgClient(pgPool) as unknown as PinnedPgClient
     await dbClient.query('BEGIN')
     transactionOpen = true
     await dbClient.query('SELECT public.lock_rbac_orgs($1::uuid)', [body.orgId])
@@ -265,7 +264,7 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
     throw simpleError('error_deleting_user_from_organization', 'Error deleting user from organization', { error })
   }
   finally {
-    dbClient?.release()
+    releasePgClient(pgPool, dbClient)
     closeClient(c, pgPool)
   }
 

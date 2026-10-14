@@ -671,6 +671,7 @@ export type Database = {
           builder_job_id: string | null
           created_at: string
           id: string
+          ios_dependency_manager: string | null
           last_error: string | null
           owner_org: string
           platform: string
@@ -682,6 +683,7 @@ export type Database = {
           upload_path: string
           upload_session_key: string
           upload_url: string
+          xcode_version: string | null
         }
         Insert: {
           ai_analyzed?: boolean
@@ -691,6 +693,7 @@ export type Database = {
           builder_job_id?: string | null
           created_at?: string
           id?: string
+          ios_dependency_manager?: string | null
           last_error?: string | null
           owner_org: string
           platform: string
@@ -702,6 +705,7 @@ export type Database = {
           upload_path: string
           upload_session_key: string
           upload_url: string
+          xcode_version?: string | null
         }
         Update: {
           ai_analyzed?: boolean
@@ -711,6 +715,7 @@ export type Database = {
           builder_job_id?: string | null
           created_at?: string
           id?: string
+          ios_dependency_manager?: string | null
           last_error?: string | null
           owner_org?: string
           platform?: string
@@ -722,6 +727,7 @@ export type Database = {
           upload_path?: string
           upload_session_key?: string
           upload_url?: string
+          xcode_version?: string | null
         }
         Relationships: [
           {
@@ -1633,6 +1639,10 @@ export type Database = {
           build_avg_seconds_day_ios: number
           build_count_day_android: number
           build_count_day_ios: number
+          build_requests_day_ios_cocoapods: number
+          build_requests_day_ios_sdk: Json
+          build_requests_day_ios_spm: number
+          build_requests_day_ios_unknown: number
           build_total_seconds_day_android: number
           build_total_seconds_day_ios: number
           builder_active_paying_clients_60d: number
@@ -1738,6 +1748,10 @@ export type Database = {
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
           build_count_day_ios?: number
+          build_requests_day_ios_cocoapods?: number
+          build_requests_day_ios_sdk?: Json
+          build_requests_day_ios_spm?: number
+          build_requests_day_ios_unknown?: number
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
           builder_active_paying_clients_60d?: number
@@ -1843,6 +1857,10 @@ export type Database = {
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
           build_count_day_ios?: number
+          build_requests_day_ios_cocoapods?: number
+          build_requests_day_ios_sdk?: Json
+          build_requests_day_ios_spm?: number
+          build_requests_day_ios_unknown?: number
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
           builder_active_paying_clients_60d?: number
@@ -2870,6 +2888,51 @@ export type Database = {
           scope_type?: string
         }
         Relationships: []
+      }
+      sso_provider_org_links: {
+        Row: {
+          created_at: string
+          id: string
+          linked_by: string | null
+          org_id: string
+          role_mapping: Json | null
+          sso_provider_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          linked_by?: string | null
+          org_id: string
+          role_mapping?: Json | null
+          sso_provider_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          linked_by?: string | null
+          org_id?: string
+          role_mapping?: Json | null
+          sso_provider_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sso_provider_org_links_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sso_provider_org_links_sso_provider_id_fkey"
+            columns: ["sso_provider_id"]
+            isOneToOne: false
+            referencedRelation: "sso_providers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sso_providers: {
         Row: {

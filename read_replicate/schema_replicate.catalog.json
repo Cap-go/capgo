@@ -1571,6 +1571,16 @@
       "type": "numeric(18,6)"
     },
     {
+      "default": null,
+      "generated": "",
+      "identity": "",
+      "name": "signup_plugin",
+      "notNull": false,
+      "position": 30,
+      "table": "orgs",
+      "type": "text"
+    },
+    {
       "default": "now()",
       "generated": "",
       "identity": "",

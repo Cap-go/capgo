@@ -454,3 +454,37 @@ export const plistRequiredDeviceArm64: PrescanCheck = {
     }]
   },
 }
+
+// ── ios/plist-scene-lifecycle-xcode27 ─────────────────────────────────────────
+
+/** Major of the Xcode version the build asks for (`--xcode-version` / CAPGO_IOS_XCODE_VERSION), or null. */
+function requestedXcodeMajor(ctx: ScanContext): number | null {
+  const raw = ctx.credentials?.CAPGO_IOS_XCODE_VERSION?.trim().replace(/^xcode\s*/i, '')
+  const major = raw ? Number.parseInt(raw, 10) : Number.NaN
+  return Number.isFinite(major) ? major : null
+}
+
+/**
+ * Apps linked with the iOS 27 SDK (Xcode 27) must adopt the UIScene lifecycle: UIKit stops an
+ * app without a scene manifest at launch (EXC_BREAKPOINT in
+ * `_UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption`). Only judged when the build
+ * explicitly asks for Xcode 27+, since builds on older Xcode are not affected.
+ */
+export const plistSceneLifecycleXcode27: PrescanCheck = {
+  id: 'ios/plist-scene-lifecycle-xcode27',
+  platforms: ['ios'],
+  appliesTo: ctx => hasInfoPlist(ctx) && (requestedXcodeMajor(ctx) ?? 0) >= 27,
+  async run(ctx): Promise<Finding[]> {
+    const raw = readInfoPlist(ctx.projectDir)
+    if (raw === null || plistHasKey(raw, 'UIApplicationSceneManifest'))
+      return []
+    return [{
+      id: 'ios/plist-scene-lifecycle-xcode27',
+      severity: 'error',
+      title: 'App does not adopt the UIScene lifecycle, required when building with Xcode 27',
+      detail: 'Apps built with the iOS 27 SDK crash at launch on iOS 27 without a UIApplicationSceneManifest in Info.plist and a scene delegate.',
+      fix: 'Add a SceneDelegate and a UIApplicationSceneManifest to ios/App/App/Info.plist (Capacitor supports scenes), or build with --xcode-version 26.',
+      docsUrl: 'https://developer.apple.com/documentation/uikit/specifying-the-scenes-your-app-supports',
+    }]
+  },
+}

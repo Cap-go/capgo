@@ -267,7 +267,7 @@ export async function getVersionData(
     const message = `App version ${appid}@${bundle} doesn't exist`
     if (!silent)
       log.error(message)
-    throw new Error(message)
+    throw new CliUserError(message, { appId: appid, bundle })
   }
   return versionData
 }

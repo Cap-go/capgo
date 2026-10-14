@@ -204,7 +204,7 @@ export async function checkPermission(
 
   let pgClient
   try {
-    pgClient = getPgClient(c)
+    pgClient = await getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
 
     if (auth.authType === 'apikey' && apikey?.rbac_id) {
@@ -430,9 +430,9 @@ export async function checkPermissionPgFreshRetry(
   readOnly = false,
 ): Promise<boolean> {
   for (let attempt = 0; attempt < 2; attempt++) {
-    let pgClient: ReturnType<typeof getPgClient> | undefined
+    let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
     try {
-      pgClient = getPgClient(c, readOnly)
+      pgClient = await getPgClient(c, readOnly)
       const drizzleClient = getDrizzleClient(pgClient)
       return await checkPermissionPg(c, permission, scope, drizzleClient, userId, apikeyString)
     }

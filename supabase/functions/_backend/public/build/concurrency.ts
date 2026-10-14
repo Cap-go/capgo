@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../../utils/logging.ts'
-import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
+import { checkoutPgClient, closeClient, getPgClient, logPgError, releasePgClient } from '../../utils/pg.ts'
 import { sendEventToTracking } from '../../utils/tracking.ts'
 import { getEnv, trimTrailingSlashes } from '../../utils/utils.ts'
 
@@ -211,12 +211,12 @@ export async function assertNativeBuildConcurrencyAvailable(
   c: Context,
   input: { orgId: string, appId: string, userId?: string | null },
 ): Promise<NativeBuildConcurrencyState> {
-  let pgPool: ReturnType<typeof getPgClient> | null = null
+  let pgPool: Awaited<ReturnType<typeof getPgClient>> | null = null
   let client: PgClient | null = null
 
   try {
-    pgPool = getPgClient(c, true)
-    client = await pgPool.connect() as PgClient
+    pgPool = await getPgClient(c, true)
+    client = await checkoutPgClient(pgPool) as PgClient
     const { planName, limit } = await readPlanConcurrencyLimit(client, input.orgId)
     const activeBuilds = await countActiveNativeBuilds(client, input.orgId)
     const upgradeUrl = getPlansUpgradeUrl(c)
@@ -236,7 +236,7 @@ export async function assertNativeBuildConcurrencyAvailable(
     throw simpleError('internal_error', 'Unable to validate native build concurrency', { error: (error as Error)?.message })
   }
   finally {
-    client?.release()
+    releasePgClient(pgPool, client)
     if (pgPool)
       await closeClient(c, pgPool)
   }
@@ -248,12 +248,12 @@ export async function reserveNativeBuildSlot(
 ): Promise<NativeBuildSlotReservation> {
   let planName: string
   let limit: number
-  let pgPool: ReturnType<typeof getPgClient> | null = null
+  let pgPool: Awaited<ReturnType<typeof getPgClient>> | null = null
   let client: PgClient | null = null
 
   try {
-    pgPool = getPgClient(c)
-    client = await pgPool.connect() as PgClient
+    pgPool = await getPgClient(c)
+    client = await checkoutPgClient(pgPool) as PgClient
     await client.query('BEGIN')
 
     const orgLock = await client.query(
@@ -345,7 +345,7 @@ export async function reserveNativeBuildSlot(
     throw simpleError('internal_error', 'Unable to reserve native build slot', { error: (error as Error)?.message })
   }
   finally {
-    client?.release()
+    releasePgClient(pgPool, client)
     if (pgPool)
       await closeClient(c, pgPool)
   }

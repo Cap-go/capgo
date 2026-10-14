@@ -1,12 +1,12 @@
-import type { PoolClient } from 'pg'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { PgQueryClient } from '../utils/pg.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { captureOrganizationInvitationPosthogEvent, sanitizeOrganizationInvitationFailureReason } from '../utils/organization_invitation_posthog.ts'
 import { getEffectivePasswordMinLength, getPasswordPolicyValidationErrors } from '../utils/password_policy.ts'
-import { closeClient, getPgClient } from '../utils/pg.ts'
+import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from '../utils/pg.ts'
 import { safeParseSchema } from '../utils/schema_validation.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
@@ -155,11 +155,11 @@ async function ensureOrgMembership(
   userId: string,
   invitation: { invite_magic_string: string, org_id: string },
 ) {
-  const pgPool = getPgClient(c, false)
-  let pgClient: PoolClient | null = null
+  const pgPool = await getPgClient(c, false)
+  let pgClient: PgQueryClient | null = null
   let status: string | undefined
   try {
-    pgClient = await pgPool.connect()
+    pgClient = await checkoutPgClient(pgPool)
     const result = await pgClient.query<{ accept_tmp_user_invitation: string }>(
       `SELECT public.accept_tmp_user_invitation($1, $2::uuid) AS accept_tmp_user_invitation`,
       [invitation.invite_magic_string, userId],
@@ -181,7 +181,7 @@ async function ensureOrgMembership(
     return quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation', { error: message })
   }
   finally {
-    pgClient?.release()
+    releasePgClient(pgPool, pgClient)
     await closeClient(c, pgPool)
   }
 

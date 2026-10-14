@@ -1,6 +1,8 @@
 import type { InventoryConfig, RepairTask } from '../../supabase/functions/_backend/utils/r2_inventory.ts'
+import type { CleanupQueue } from './cleanup.ts'
 import { Client } from 'pg'
 import { applyInventoryEvents, applyObservations, INVENTORY_CONFIG, normalizeEtag, parseInventoryEvent, readObservationSnapshot } from '../../supabase/functions/_backend/utils/r2_inventory.ts'
+import { CLEANUP_ACTIVATED, runCleanupProducer } from './cleanup.ts'
 
 interface RejectedInventoryMessage {
   kind: 'invalid_inventory_message'
@@ -19,6 +21,7 @@ export interface InventoryEnv {
   REPAIR_QUEUE: Queue<RepairTask>
   EVENT_DLQ: Queue<RejectedInventoryMessage>
   REPAIR_DLQ: Queue<RejectedInventoryMessage>
+  CLEANUP_QUEUE?: CleanupQueue
 }
 
 async function withDatabase<T>(env: InventoryEnv, operation: (db: Client) => Promise<T>): Promise<T> {
@@ -182,4 +185,16 @@ export async function consumeInventoryBatch(batch: MessageBatch<unknown>, env: I
   }
 }
 
-export default { queue: consumeInventoryBatch }
+export async function scheduleInventoryCleanup(_controller: ScheduledController, env: InventoryEnv) {
+  if (!CLEANUP_ACTIVATED) {
+    console.log(JSON.stringify({ event: 'r2_cleanup_disabled', reason: 'Activation prerequisites require a separate reviewed change' }))
+    return
+  }
+  const queue = env.CLEANUP_QUEUE
+  if (env.INVENTORY_BUCKET !== 'capgo' || !queue)
+    throw new Error('Production cleanup bucket or queue binding missing')
+  const retired = await withDatabase(env, db => runCleanupProducer(db, env.INVENTORY_BUCKET, queue))
+  console.log(JSON.stringify({ event: 'r2_cleanup_run', retired }))
+}
+
+export default { queue: consumeInventoryBatch, scheduled: scheduleInventoryCleanup }
