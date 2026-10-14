@@ -2,6 +2,11 @@
 
 Merge the schema PR first, then the queue consumer, then the historical scanner. This inventory rollout does not enable physical object cleanup or change published CLI behavior.
 
+The production inventory Worker also contains an explicitly disabled minute
+cleanup producer. See [R2 cleanup producer](r2-cleanup-producer.md) for its
+transaction/queue contract and the separate activation prerequisites. Deploying
+the schedule does not enable retirement or provision a deletion queue.
+
 ## Queue consumer
 
 R2 inventory is production-only. Only the `prod` Worker environment and its four queues are configured; alpha and preproduction do not deploy inventory. The dedicated Worker uses one database connection per event batch, releases it before publication, and awaits all work before returning. Configure a Hyperdrive connection with query caching **disabled**; stale inventory reads are unsafe. The dedicated `HYPERDRIVE_R2_INVENTORY` binding selects the inventory database independently of the files Worker.
