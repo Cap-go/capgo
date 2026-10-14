@@ -25,7 +25,7 @@ const bodySchema = z.object({
   intent: z.enum(['ota', 'builder', 'both', 'exploring', 'publish', 'unknown']).optional(),
   startingOut: z.boolean().optional(),
   developmentEnvironment: z.enum(['hosted_builder', 'ai_assistant', 'hand_coded', 'other', 'local_project', 'exploring', 'skipped']).optional(),
-  // website: start the trial on the Website Live plan instead of a MAU-based plan.
+  // website: start the trial on the Web2App plan instead of a MAU-based plan.
   updateMode: z.enum(['capgo', 'website']).optional(),
 })
 
@@ -41,7 +41,7 @@ async function getInitialPlanForMau(c: Context<MiddlewareKeyVariables>, estimate
     .from('plans')
     .select('name, stripe_id, mau')
     .eq('kind', kind)
-    // Website Live has no MAU limit to match against.
+    // Web2App has no MAU limit to match against.
     .gte('mau', kind === 'website' ? 0 : estimatedMau)
     .order('mau', { ascending: true })
     .limit(1)
@@ -67,7 +67,7 @@ async function hasWebsiteLivePlan(c: Context<MiddlewareKeyVariables>) {
 }
 
 async function createPendingStripeInfo(c: Context<MiddlewareKeyVariables>, orgId: string, estimatedMau: number, requestedKind: InitialPlanKind) {
-  // Website Live stays hidden until its plan row exists; such requests start on the classic plan.
+  // Web2App stays hidden until its plan row exists; such requests start on the classic plan.
   const kind = requestedKind === 'website' && !(await hasWebsiteLivePlan(c)) ? 'full' : requestedKind
   const plan = await getInitialPlanForMau(c, estimatedMau, kind)
   const pendingCustomerId = `pending_${orgId}`

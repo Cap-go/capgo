@@ -52,12 +52,12 @@ const currentPlanName = computedAsync(async () => {
   return data
 }, null, isPlanLoading)
 const isPlanUnreadable = computed(() => !isPlanLoading.value && currentPlanName.value === null)
-// Both the current plan and the plan catalog (to know which plans are Website Live) must be loaded.
+// Both the current plan and the plan catalog (to know which plans are Web2App) must be loaded.
 const isPlanKnown = computed(() => !isPlanLoading.value && currentPlanName.value !== null && mainStore.plans.length > 0)
-// Website Live is identified by plan kind, not by its display name.
+// Web2App is identified by plan kind, not by its display name.
 const websitePlanNames = computed(() => new Set(mainStore.plans.filter(plan => plan.kind === 'website').map(plan => plan.name)))
 const needsFullPlan = computed(() => !!currentPlanName.value && websitePlanNames.value.has(currentPlanName.value))
-// Recovery path: a classic-mode app in a Website Live org (for example when
+// Recovery path: a classic-mode app in a Web2App org (for example when
 // onboarding could not save the website) can still be switched to the website.
 const showEnableWebsiteLive = computed(() => !!state.value && !isWebsiteMode.value && needsFullPlan.value)
 
@@ -107,7 +107,7 @@ async function saveWebsiteUrl() {
     toast.success(t('website-live-url-saved'))
   }
   catch (error) {
-    console.error('Cannot save Website Live URL', error)
+    console.error('Cannot save Web2App URL', error)
     toast.error(t('website-live-url-save-error'))
   }
   finally {

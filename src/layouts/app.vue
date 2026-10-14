@@ -69,9 +69,9 @@ watch(appId, (targetAppId) => {
     void appUpdateModeStore.load(targetAppId)
 }, { immediate: true })
 
-// Website Live apps update from their website: bundles, channels, builds,
+// Web2App apps update from their website: bundles, channels, builds,
 // devices, notifications and stats do not exist for them, so only the
-// overview (Website Live status) and settings stay visible.
+// overview (Web2App status) and settings stay visible.
 const isWebsiteMode = computed(() => !!appId.value && appUpdateModeStore.isWebsiteMode(appId.value))
 const WEBSITE_MODE_TAB_KEYS = new Set(['', '/settings'])
 const appTabs = computed<Tab[]>(() => isWebsiteMode.value

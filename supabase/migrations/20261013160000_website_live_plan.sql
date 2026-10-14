@@ -1,9 +1,9 @@
--- Website Live: a low-cost plan where the customer's deployed static website is
+-- Web2App: a low-cost plan where the customer's deployed static website is
 -- the update source. The updater plugin only asks GET /website_live whether
 -- the app may update and which website URL to download from; no channels,
 -- stats, bundle uploads or encryption are involved.
 
--- 1) Plan kind: keep Website Live out of every usage-based plan recommendation.
+-- 1) Plan kind: keep Web2App out of every usage-based plan recommendation.
 ALTER TABLE public.plans
   ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAULT 'full';
 
@@ -13,11 +13,11 @@ ALTER TABLE public.plans
   ADD CONSTRAINT plans_kind_check CHECK (kind IN ('full', 'website'));
 
 COMMENT ON COLUMN public.plans.kind IS
-  'full: classic Capgo plan (channels, stats, bundles). website: Website Live plan, updates come from the app website_url and usage-based limits are zero.';
+  'full: classic Capgo plan (channels, stats, bundles). website: Web2App plan, updates come from the app website_url and usage-based limits are zero.';
 
--- The Website Live plan row itself is not inserted here: it needs the live
+-- The Web2App plan row itself is not inserted here: it needs the live
 -- Stripe product/price ids and ships in a follow-up migration once they exist.
--- Until then the console hides Website Live (no plan with kind = 'website').
+-- Until then the console hides Web2App (no plan with kind = 'website').
 -- Its usage limits must be zero (mau, storage, bandwidth, build_time_unit), so
 -- any classic Capgo usage on this plan marks the org as exceeded, while
 -- /website_live only checks that the subscription is active.
@@ -103,7 +103,7 @@ ALTER TABLE public.apps
   ADD CONSTRAINT apps_website_mode_requires_url CHECK (update_mode <> 'website' OR website_url IS NOT NULL);
 
 COMMENT ON COLUMN public.apps.update_mode IS
-  'capgo: classic Capgo updates (bundles, channels, stats). website: Website Live, the updater downloads the static site at website_url after GET /website_live allows it.';
+  'capgo: classic Capgo updates (bundles, channels, stats). website: Web2App, the updater downloads the static site at website_url after GET /website_live allows it.';
 COMMENT ON COLUMN public.apps.website_url IS
   'HTTPS URL of the deployed static web build used as the update source in website update mode.';
 

@@ -264,17 +264,17 @@ const isImportingOrganizationWebsite = ref(false)
 const organizationWebsiteInput = ref('')
 const websitePreview = ref<OrganizationWebsitePreview | null>(null)
 const showOrganizationInvite = ref(false)
-// Website Live qualification: teams without a dedicated mobile developer who
+// Web2App qualification: teams without a dedicated mobile developer who
 // already deploy their app as a website can update straight from that website.
 type OnboardingUpdateMode = 'capgo' | 'website'
 const updateMode = ref<OnboardingUpdateMode>('capgo')
 const updateModeTouched = ref(false)
 const websiteLiveUrlInput = ref('')
-// Hidden until the Website Live plan exists (it is created once its Stripe prices exist).
+// Hidden until the Web2App plan exists (it is created once its Stripe prices exist).
 const hasWebsiteLivePlan = computed(() => main.plans.some(plan => plan.kind === 'website'))
 const showWebsiteLiveChoice = computed(() => props.preOrg && hasWebsiteLivePlan.value && selectedIntent.value !== 'builder')
 // The publish intent keeps its own WebNativeApp recommendation experiment, so
-// Website Live is only recommended to live-update intents built with AI tools.
+// Web2App is only recommended to live-update intents built with AI tools.
 const qualifiesForWebsiteLive = computed(() => showWebsiteLiveChoice.value
   && (selectedIntent.value === 'ota' || selectedIntent.value === 'both')
   && (selectedDevelopmentEnvironment.value === 'hosted_builder' || selectedDevelopmentEnvironment.value === 'ai_assistant'))
@@ -2097,7 +2097,7 @@ async function createOrganizationAndApp() {
     toast.error(t('website-live-invalid-url'))
     return
   }
-  // Website Live has no MAU tiers, so the user-count question is skipped.
+  // Web2App has no MAU tiers, so the user-count question is skipped.
   const selectedStop = websiteLive ? startingOutUserCountStop : selectedUserCountStop.value
   if (!selectedStop) {
     toast.error(t('organization-onboarding-user-scale-required'))
@@ -2180,7 +2180,7 @@ async function completePreOrgAppCreation(organizationId: string, shouldInvite: b
   trackOrganizationEvent('onboarding_organization_invite_viewed')
 }
 
-// Website Live has no CLI setup, channel or first upload: the app overview
+// Web2App has no CLI setup, channel or first upload: the app overview
 // shows the plugin config, so onboarding ends as soon as the app exists.
 async function finishWebsiteLiveOnboarding(completionProperties: OnboardingStepCompletionProperties) {
   const app = createdApp.value
@@ -2196,8 +2196,8 @@ async function finishWebsiteLiveOnboarding(completionProperties: OnboardingStepC
     organizationStore.updateAppNeedOnboarding(app.app_id, false)
   }
   catch (error) {
-    // The overview still works; the getting-started page redirects Website Live apps.
-    console.error('Cannot dismiss getting started for Website Live app', error)
+    // The overview still works; the getting-started page redirects Web2App apps.
+    console.error('Cannot dismiss getting started for Web2App app', error)
   }
   window.dispatchEvent(new Event(ONBOARDING_DASHBOARD_EXPLORED_EVENT))
   allowOnboardingDashboardExploration(onboardingUserId.value, app.app_id)
@@ -2411,13 +2411,13 @@ async function createAppRecord(options?: { nextStep?: 'organization' }): Promise
         await useAppUpdateModeStore().save(appId, websiteState)
       }
       catch (firstError) {
-        console.warn('Retrying Website Live save on onboarding app', firstError)
+        console.warn('Retrying Web2App save on onboarding app', firstError)
         try {
           await useAppUpdateModeStore().save(appId, websiteState)
         }
         catch (updateModeError) {
-          // The app exists; app settings offer the website again for Website Live orgs.
-          console.error('Cannot enable Website Live on onboarding app', updateModeError)
+          // The app exists; app settings offer the website again for Web2App orgs.
+          console.error('Cannot enable Web2App on onboarding app', updateModeError)
           toast.error(t('website-live-onboarding-save-error'))
         }
       }

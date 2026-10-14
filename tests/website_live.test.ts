@@ -28,7 +28,7 @@ afterAll(async () => {
 })
 
 describe('[GET] /website_live', () => {
-  it('allows a Website Live app and returns its website', async () => {
+  it('allows a Web2App app and returns its website', async () => {
     const response = await fetchWebsiteLive(WEBSITE_APP)
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toContain('s-maxage=')

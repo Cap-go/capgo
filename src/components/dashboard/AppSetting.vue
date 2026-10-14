@@ -308,7 +308,7 @@ async function submit(form: {
     toast.error(error as string)
   }
 
-  // Website Live apps do not render the classic options below.
+  // Web2App apps do not render the classic options below.
   if (isWebsiteMode.value) {
     isLoading.value = false
     return
@@ -1418,7 +1418,7 @@ async function transferAppOwnership() {
               <div v-else-if="!appRef?.icon_url" class="mb-3 rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
                 Add an App Store or Google Play link to auto-import the app icon if you do not want to upload one manually.
               </div>
-              <!-- Channels, retention and device options do not apply to Website Live apps. -->
+              <!-- Channels, retention and device options do not apply to Web2App apps. -->
               <template v-if="!isWebsiteMode">
                 <div
                   :key="forceBump"

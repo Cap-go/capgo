@@ -101,7 +101,7 @@ BEGIN
 
   -- raise notice '%', mau_count;
 
-  -- Website Live has no usage limits; these checks cover usage-based plans.
+  -- Web2App has no usage limits; these checks cover usage-based plans.
   FOR plan IN
     SELECT * FROM plans WHERE kind = 'full'
   LOOP

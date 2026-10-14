@@ -30,7 +30,7 @@ function getPlanUpgradeCacheKey(hostname, appId, endpoint, method) {
 // Endpoints that should be checked for on-prem caching
 const ONPREM_CACHEABLE_ENDPOINTS = ['/updates', '/stats', '/channel_self']
 
-// Website Live answers are the same for every device of an app, so the
+// Web2App answers are the same for every device of an app, so the
 // snippet serves them from cache before routing (keyed by app_id only).
 const WEBSITE_LIVE_PATH = '/website_live'
 

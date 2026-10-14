@@ -289,7 +289,7 @@ async function applyCreditsForMetric(
 
 function planToInt(plan: string) {
   switch (plan) {
-    case 'Website Live':
+    case 'Web2App':
       return 0
     case 'Solo':
       return 1
