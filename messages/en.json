@@ -4148,7 +4148,7 @@
   "website-live-setup-title": "Set up your app",
   "website-live-setup-install": "Install the Capgo updater plugin in your Capacitor project.",
   "website-live-setup-config": "Turn on website mode in your Capacitor config.",
-  "website-live-setup-ready": "Tell the updater your app started correctly.",
+  "website-live-setup-ready": "Rollback works on its own: no startup call is needed.",
   "website-live-setup-release": "Build your app and publish it to the App Store and Google Play once.",
   "website-live-setup-deploy": "From now on, deploy your website as usual. Apps update on their next launch.",
   "website-live-settings-title": "Web2App",
