@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * Pack the Capgo "Website Live" native app template into dist/website-live-template.zip.
+ * Pack the Capgo "Web2App" native app template into dist/website-live-template.zip.
  *
  * The zip mirrors what `capgo build request` uploads (cli/src/build/request.ts zipDirectory):
  * package.json, capacitor.config.* (plus a resolved capacitor.config.json), the native ios/ and
@@ -24,7 +24,7 @@ const outPath = resolve(repoRoot, outArgIndex !== -1 ? process.argv[outArgIndex 
 
 const PLACEHOLDERS = {
   bundleId: 'app.capgo.websitelive.template',
-  appName: 'Website Live Template',
+  appName: 'Web2App Template',
   websiteUrl: 'https://example.com',
 } as const
 

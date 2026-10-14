@@ -86,7 +86,7 @@ const planFeatureLabelKeysByPlan: Record<string, string[]> = {
 }
 
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
-  // Website Live has no usage limits: list what it does instead of zero quotas.
+  // Web2App has no usage limits: list what it does instead of zero quotas.
   if (plan.kind === 'website') {
     return [
       planFeature(t('plan-feature-website-live-unlimited')),

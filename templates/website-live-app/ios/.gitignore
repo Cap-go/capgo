@@ -7,8 +7,8 @@ DerivedData
 xcuserdata
 
 # Cordova plugins for Capacitor
-# capacitor-cordova-ios-plugins  (committed: Website Live template is built without cap sync)
+# capacitor-cordova-ios-plugins  (committed: Web2App template is built without cap sync)
 
 # Generated Config files
-# App/App/capacitor.config.json  (committed: Website Live template is built without cap sync)
-# App/App/config.xml  (committed: Website Live template is built without cap sync)
+# App/App/capacitor.config.json  (committed: Web2App template is built without cap sync)
+# App/App/config.xml  (committed: Web2App template is built without cap sync)

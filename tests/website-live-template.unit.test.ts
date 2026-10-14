@@ -9,7 +9,7 @@ import { generateWebsiteLiveIconSet } from '../supabase/functions/_backend/utils
 import { patchWebsiteLiveTemplate } from '../supabase/functions/_backend/utils/website_live_template.ts'
 
 const BUNDLE = 'app.capgo.websitelive.template'
-const NAME = 'Website Live Template'
+const NAME = 'Web2App Template'
 const URL_PLACEHOLDER = 'https://example.com'
 const NAMESPACE = 'app.capgo.websitelive'
 

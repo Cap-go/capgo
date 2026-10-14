@@ -199,7 +199,7 @@ export function normalizeWebsiteLiveUrl(input: string): string | null {
   return `${url.origin}/`
 }
 
-/** Turn on Website Live for the app with this website. */
+/** Turn on Web2App for the app with this website. */
 export async function setWebsiteLiveUrl(c: Context, appId: string, input: string): Promise<string> {
   const websiteUrl = normalizeWebsiteLiveUrl(input)
   if (!websiteUrl)
@@ -439,7 +439,7 @@ export async function saveIosCredentials(c: Context, input: {
     const profile = await createAppStoreProfile(ascCreds, {
       bundleIdResourceId,
       certificateId,
-      name: `Capgo Website Live ${bundleId}`,
+      name: `Capgo Web2App ${bundleId}`,
     })
     const parsedProfile = parseMobileProvision(profile.profileContentBase64)
     profileExpiresAt = parsedProfile.expirationDate
@@ -581,7 +581,7 @@ function iconPrefix(app: WebsiteLiveApp): string {
 async function putStorageObject(c: Context, key: string, bytes: Uint8Array, contentType: string) {
   const { error } = await supabaseAdmin(c).storage.from(ICON_BUCKET).upload(key, new Uint8Array(bytes), { contentType, upsert: true })
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Website Live icon upload failed', key, error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Web2App icon upload failed', key, error })
     throw simpleError('icon_upload_failed', 'Could not store the generated icon')
   }
 }
@@ -611,7 +611,7 @@ export async function getIconPreviewUrl(c: Context, prefix: string | null): Prom
     return null
   const { data, error } = await supabaseAdmin(c).storage.from(ICON_BUCKET).createSignedUrl(`${prefix}/${ICON_FILES.preview256}`, 3600)
   if (error || !data) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot sign Website Live icon preview', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot sign Web2App icon preview', error })
     return null
   }
   return data.signedUrl
@@ -718,7 +718,7 @@ export async function fetchTemplateZip(c: Context): Promise<Uint8Array> {
   const url = getTemplateUrl(c)
   const response = await fetch(url)
   if (!response.ok) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Website Live template download failed', url, status: response.status })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Web2App template download failed', url, status: response.status })
     throw quickError(503, 'website_live_template_unavailable', 'The app template is not available right now. Try again in a few minutes.')
   }
   return new Uint8Array(await response.arrayBuffer())
@@ -762,7 +762,7 @@ export async function uploadToBuilder(c: Context, input: { builderUploadUrl: str
       throw quickError(503, 'builder_upload_failed', 'Could not upload the app project to the builder')
     }
   }
-  cloudlog({ requestId: c.get('requestId'), message: 'Website Live project uploaded to builder', bytes: input.bytes.byteLength })
+  cloudlog({ requestId: c.get('requestId'), message: 'Web2App project uploaded to builder', bytes: input.bytes.byteLength })
 }
 
 export async function getPublishSecrets(c: Context, appId: string, platform: StorePlatform) {

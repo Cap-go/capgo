@@ -198,7 +198,7 @@ function websiteUrlOrThrow(input: string): string {
   return websiteUrl
 }
 
-// POST /website_live_store/check — check that a website can run as a Website Live app
+// POST /website_live_store/check — check that a website can run as a Web2App app
 app.post('/check', middlewareAuth(), async (c) => {
   const body = parseWith(checkBodySchema, await parseBody(c))
   await assertAppPermission(c, 'app.read', body.app_id)
@@ -221,7 +221,7 @@ app.put('/', middlewareAuth(), async (c) => {
     if (!force && (websiteUrl !== websiteApp.website_url || websiteApp.update_mode !== 'website')) {
       websiteCheck = await checkWebsiteLive(websiteUrl)
       if (!websiteCheck.compatible)
-        throw simpleError('website_not_compatible', 'This website cannot run as a Website Live app yet', { website_check: websiteCheck })
+        throw simpleError('website_not_compatible', 'This website cannot run as a Web2App app yet', { website_check: websiteCheck })
       if (!configPatch.app_name && websiteCheck.details.app_name && !hasControlCharacters(websiteCheck.details.app_name) && !(await getStoreConfig(c, body.app_id)).app_name)
         configPatch.app_name = websiteCheck.details.app_name
     }
@@ -304,7 +304,7 @@ app.delete('/credentials', middlewareAuth(), async (c) => {
 app.post('/credentials/android/export', middlewareAuth(), async (c) => {
   const body = parseWith(z.object({ app_id: appIdSchema }), await parseBody(c))
   await assertAppPermission(c, 'app.build_native', body.app_id)
-  cloudlog({ requestId: c.get('requestId'), message: 'Website Live Android keystore exported', app_id: body.app_id, user_id: currentUserId(c) })
+  cloudlog({ requestId: c.get('requestId'), message: 'Web2App Android keystore exported', app_id: body.app_id, user_id: currentUserId(c) })
   return c.json(await exportAndroidKeystore(c, body.app_id))
 })
 
@@ -362,7 +362,7 @@ app.post('/publish', middlewareAuth(), async (c) => {
     buildRequest: created.buildRequestRow,
     userId,
   })
-  cloudlog({ requestId: c.get('requestId'), message: 'Website Live store build started', app_id: body.app_id, platform: body.platform, job_id: created.builderJob.jobId })
+  cloudlog({ requestId: c.get('requestId'), message: 'Web2App store build started', app_id: body.app_id, platform: body.platform, job_id: created.builderJob.jobId })
   return c.json({
     build_request_id: created.buildRequestRow.id,
     job_id: created.builderJob.jobId,

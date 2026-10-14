@@ -98,6 +98,6 @@ capacitor-cordova-android-plugins
 app/src/main/assets/public
 
 # Generated Config files
-# app/src/main/assets/capacitor.config.json  (committed: Website Live template is built without cap sync)
-# app/src/main/assets/capacitor.plugins.json  (committed: Website Live template is built without cap sync)
-# app/src/main/res/xml/config.xml  (committed: Website Live template is built without cap sync)
+# app/src/main/assets/capacitor.config.json  (committed: Web2App template is built without cap sync)
+# app/src/main/assets/capacitor.plugins.json  (committed: Web2App template is built without cap sync)
+# app/src/main/res/xml/config.xml  (committed: Web2App template is built without cap sync)

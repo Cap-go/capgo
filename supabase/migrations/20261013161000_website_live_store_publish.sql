@@ -1,4 +1,4 @@
--- Website Live store publishing: Capgo builds the store app from its template,
+-- Web2App store publishing: Capgo builds the store app from its template,
 -- signs it with keys the customer uploads, and submits it to store review.
 
 CREATE TABLE IF NOT EXISTS public.website_live_store_configs (
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.website_live_store_configs (
   )
 );
 
-COMMENT ON TABLE public.website_live_store_configs IS 'Store listing settings Capgo uses to build Website Live apps from the hosted template. One row per app.';
+COMMENT ON TABLE public.website_live_store_configs IS 'Store listing settings Capgo uses to build Web2App apps from the hosted template. One row per app.';
 COMMENT ON COLUMN public.website_live_store_configs.icon_storage_prefix IS 'Path prefix in the images storage bucket holding the generated icon set (ios-1024.png, android-*.png, play-512.png, preview-256.png).';
 
 CREATE TABLE IF NOT EXISTS public.website_live_store_credentials (
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS public.website_live_store_credentials (
   CONSTRAINT website_live_store_credentials_app_platform_key UNIQUE (app_id, platform)
 );
 
-COMMENT ON TABLE public.website_live_store_credentials IS 'Encrypted store signing and upload keys for Website Live builds. secret_ciphertext is AES-GCM encrypted by the API; metadata only holds non-secret summaries shown in the console.';
+COMMENT ON TABLE public.website_live_store_credentials IS 'Encrypted store signing and upload keys for Web2App builds. secret_ciphertext is AES-GCM encrypted by the API; metadata only holds non-secret summaries shown in the console.';
 
 ALTER TABLE public.website_live_store_configs OWNER TO postgres;
 ALTER TABLE public.website_live_store_credentials OWNER TO postgres;

@@ -10,7 +10,7 @@ export interface AppUpdateModeState {
 }
 
 /**
- * Website Live apps hide every classic Capgo feature (bundles, channels,
+ * Web2App apps hide every classic Capgo feature (bundles, channels,
  * devices, stats, builds). The layout and settings read the mode from here so
  * one fetch per app drives the whole app section.
  */

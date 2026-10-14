@@ -22,5 +22,5 @@ export const appTabs: Tab[] = [
   { label: 'settings', icon: IconCog, key: '/settings', group: 'configure', description: 'app-settings-description' },
 ]
 
-/** Website Live apps get their store app built by Capgo from this tab. */
+/** Web2App apps get their store app built by Capgo from this tab. */
 export const websiteLiveStoreTab: Tab = { label: 'store-app', icon: IconStore, key: '/store', group: 'ship', description: 'store-app-tab-description' }

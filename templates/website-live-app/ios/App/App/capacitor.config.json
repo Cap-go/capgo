@@ -1,6 +1,6 @@
 {
 	"appId": "app.capgo.websitelive.template",
-	"appName": "Website Live Template",
+	"appName": "Web2App Template",
 	"webDir": "www",
 	"plugins": {
 		"CapacitorUpdater": {

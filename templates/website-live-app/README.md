@@ -1,6 +1,6 @@
-# Website Live app template
+# Web2App app template
 
-Native iOS and Android shell used by the Capgo **Website Live** plan, which turns a customer's static website into a store app.
+Native iOS and Android shell used by the Capgo **Web2App** plan, which turns a customer's static website into a store app.
 
 The app is a Capacitor 8 project with `@capgo/capacitor-updater` in **website mode**:
 
@@ -46,7 +46,7 @@ The native `.gitignore` files were edited so these paths stay tracked.
 | placeholder | value | where |
 | --- | --- | --- |
 | bundle id | `app.capgo.websitelive.template` | `applicationId`, `PRODUCT_BUNDLE_IDENTIFIER`, `strings.xml` (`package_name`, `custom_url_scheme`), every `capacitor.config.*` (`appId` and `plugins.CapacitorUpdater.appId`) |
-| app name | `Website Live Template` | `CFBundleDisplayName`, `strings.xml` (`app_name`, `title_activity_main`), `capacitor.config.*` `appName`, fallback page `<title>` |
+| app name | `Web2App Template` | `CFBundleDisplayName`, `strings.xml` (`app_name`, `title_activity_main`), `capacitor.config.*` `appName`, fallback page `<title>` |
 | website URL | `https://example.com` | fallback page `<meta name="capgo-website-url">` (informational only; the runtime URL comes from `/website_live`) |
 
 The server reads `manifest.json` at the zip root and then:

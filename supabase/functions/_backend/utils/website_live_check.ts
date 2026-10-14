@@ -1,5 +1,5 @@
 /**
- * Website Live compatibility check. The app downloads the website root and its
+ * Web2App compatibility check. The app downloads the website root and its
  * same-origin assets and runs them offline, so the root must be the same static
  * app shell for every user. Rules come from the capacitor-website-updater CLI
  * check and the WebNativeApp domain checker.
@@ -201,7 +201,7 @@ function result(url: string, finalUrl: string, rendering: string, checks: Websit
   }
 }
 
-/** Check that the website root can be cached and run as a Website Live app shell. */
+/** Check that the website root can be cached and run as a Web2App app shell. */
 export async function checkWebsiteLive(websiteUrl: string, fetchImpl: FetchLike = fetch): Promise<WebsiteCheckResult> {
   const root = new URL(websiteUrl)
   let response: Response

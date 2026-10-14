@@ -54,7 +54,7 @@ describe('website live store publishing', () => {
     expect(response.status).toBe(403)
   })
 
-  it('turns on Website Live and saves the listing settings', async () => {
+  it('turns on Web2App and saves the listing settings', async () => {
     const response = await fetchTestRequest(storeUrl(), {
       method: 'PUT',
       headers,

@@ -3,7 +3,7 @@ import { decode, encode } from 'fast-png'
 import { simpleError } from './hono.ts'
 
 /**
- * Website Live icon pipeline: one uploaded PNG -> every icon the native template needs.
+ * Web2App icon pipeline: one uploaded PNG -> every icon the native template needs.
  *
  * Pure JS (fast-png only) so it runs the same on Cloudflare Workers and Supabase Deno.
  * Resampling works on premultiplied alpha with a separable area-average (box) filter for

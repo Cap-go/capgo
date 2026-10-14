@@ -2,7 +2,7 @@
   "name": "capgo-website-live-template",
   "version": "1.0.0",
   "private": true,
-  "description": "Capgo Website Live native app template (Capacitor + @capgo/capacitor-updater website mode)",
+  "description": "Capgo Web2App native app template (Capacitor + @capgo/capacitor-updater website mode)",
   "scripts": {
     "sync": "cap sync",
     "pack": "bun ../../scripts/pack-website-live-template.ts"

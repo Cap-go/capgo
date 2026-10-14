@@ -3,7 +3,7 @@ import { deflateSync, inflateSync } from 'fflate'
 import { simpleError } from './hono.ts'
 
 /**
- * Patch the packed Website Live native template (scripts/pack-website-live-template.ts) for one app.
+ * Patch the packed Web2App native template (scripts/pack-website-live-template.ts) for one app.
  *
  * The zip is rewritten entry by entry: untouched entries are copied as raw compressed bytes
  * (byte-identical data, original method, CRC, timestamps and unix modes such as gradlew's 0755),

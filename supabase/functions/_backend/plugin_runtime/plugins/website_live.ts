@@ -10,7 +10,7 @@ import * as schema from '../utils/postgres_schema.ts'
 import { updatesAppCacheTag } from '../utils/updatesCacheTag.ts'
 import { isStripeConfigured, isValidAppId } from '../utils/utils.ts'
 
-// Website Live plugin endpoint. Devices in website mode only ask whether the
+// Web2App plugin endpoint. Devices in website mode only ask whether the
 // app may update from its website and which URL to download from. The answer
 // does not depend on the device, so it is cached per app id: in the Cloudflare
 // snippet before routing, here in the Cache API, and by the device itself.
@@ -60,7 +60,7 @@ async function queryWebsiteLiveApp(c: Context, appId: string): Promise<WebsiteLi
   const pgClient = await getPgClient(c, true)
   try {
     const drizzleClient = getDrizzleClient(pgClient, { logger: false })
-    // No usage action: Website Live is unlimited, only the subscription
+    // No usage action: Web2App is unlimited, only the subscription
     // (trial, paid, or credits) must be active.
     const planValid = buildPlanValidationExpression([], schema.apps.owner_org)
     // Release CI adds the columns to the replica subscriber before the
@@ -110,7 +110,7 @@ app.get('/', async (c) => {
   catch (error) {
     logPgError(c, 'website_live', error, { appId })
     // Fail closed without caching: the device keeps its current bundle.
-    return quickError(503, 'website_live_unavailable', 'Cannot check Website Live status')
+    return quickError(503, 'website_live_unavailable', 'Cannot check Web2App status')
   }
 
   const response = buildWebsiteLiveResponse(row, isStripeConfigured(c))

@@ -1363,8 +1363,8 @@ describe('[POST] /organization', () => {
     }
   }
 
-  it('starts Website Live requests on the Website Live plan', async () => {
-    await expectCreatedOrganizationPlan(0, 'Website Live', { updateMode: 'website' })
+  it('starts Web2App requests on the Web2App plan', async () => {
+    await expectCreatedOrganizationPlan(0, 'Web2App', { updateMode: 'website' })
   })
 
   it('create organization', async () => {

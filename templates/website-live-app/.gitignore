@@ -1,4 +1,4 @@
-# Website Live template: native ios/ and android/ sources (including cap sync output
+# Web2App template: native ios/ and android/ sources (including cap sync output
 # such as public/, capacitor.config.json and capacitor-cordova-*-plugins) ARE committed.
 node_modules/
 dist/

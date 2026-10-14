@@ -637,7 +637,7 @@ const buildTools: McpTool[] = [
   apiTool({
     name: 'capgo_get_build_status',
     title: 'Build status',
-    description: 'Get the status of a native cloud build. Start builds with the Capgo CLI (npx @capgo/cli@latest build request), or capgo_publish_website_live_app for Website Live apps.',
+    description: 'Get the status of a native cloud build. Start builds with the Capgo CLI (npx @capgo/cli@latest build request), or capgo_publish_website_live_app for Web2App apps.',
     input: { appId, job_id: z.string().min(1) },
     annotations: READ,
     request: input => ({ method: 'GET', path: '/build/status', query: { app_id: input.appId, job_id: input.job_id } }),
@@ -661,22 +661,22 @@ const buildTools: McpTool[] = [
 ]
 
 // ---------------------------------------------------------------------------
-// Website Live store publishing
+// Web2App store publishing
 // ---------------------------------------------------------------------------
 const storePlatform = z.enum(['ios', 'android']).describe('Store platform')
 const websiteLiveStoreTools: McpTool[] = [
   apiTool({
     name: 'capgo_get_website_live_store',
-    title: 'Website Live store setup',
-    description: 'Show what Capgo needs to build and publish the store app of a Website Live app: website, app name, icon, stored store keys (never the secrets), what is still missing per platform, and recent store builds.',
+    title: 'Web2App store setup',
+    description: 'Show what Capgo needs to build and publish the store app of a Web2App app: website, app name, icon, stored store keys (never the secrets), what is still missing per platform, and recent store builds.',
     input: { appId },
     annotations: READ,
     request: input => ({ method: 'GET', path: '/website_live_store', query: { app_id: input.appId } }),
   }),
   apiTool({
     name: 'capgo_check_website_live',
-    title: 'Check a website for Website Live',
-    description: 'Check that a website can run as a Website Live app: public HTTPS HTML, no server-side rendering, same page for every user (no private/no-store cache, no session cookies), plus warnings for external scripts, service workers and a missing mobile viewport. Also suggests the app name and theme color found on the page. Defaults to the website already set on the app.',
+    title: 'Check a website for Web2App',
+    description: 'Check that a website can run as a Web2App app: public HTTPS HTML, no server-side rendering, same page for every user (no private/no-store cache, no session cookies), plus warnings for external scripts, service workers and a missing mobile viewport. Also suggests the app name and theme color found on the page. Defaults to the website already set on the app.',
     input: {
       appId,
       website_url: z.string().optional().describe('HTTPS address of the website root to check instead of the current one'),
@@ -686,8 +686,8 @@ const websiteLiveStoreTools: McpTool[] = [
   }),
   apiTool({
     name: 'capgo_update_website_live_store',
-    title: 'Update Website Live store settings',
-    description: 'Set the website the app loads (turns on Website Live), the store app name (max 30 characters), the marketing version, the icon background color and whether builds are submitted to store review. A new website is checked first (see capgo_check_website_live); when the check fails nothing is saved unless force is true, which skips the check.',
+    title: 'Update Web2App store settings',
+    description: 'Set the website the app loads (turns on Web2App), the store app name (max 30 characters), the marketing version, the icon background color and whether builds are submitted to store review. A new website is checked first (see capgo_check_website_live); when the check fails nothing is saved unless force is true, which skips the check.',
     input: {
       appId,
       website_url: z.string().url().optional().describe('HTTPS address of the website root, e.g. https://app.example.com'),
@@ -702,7 +702,7 @@ const websiteLiveStoreTools: McpTool[] = [
   }),
   apiTool({
     name: 'capgo_set_website_live_icon',
-    title: 'Set Website Live app icon',
+    title: 'Set Web2App app icon',
     description: 'Generate every iOS, Android and Play Store icon from one square PNG (at least 512x512, ideally 1024x1024), or from the biggest PNG icon the website publishes.',
     input: {
       appId,
@@ -757,7 +757,7 @@ const websiteLiveStoreTools: McpTool[] = [
   apiTool({
     name: 'capgo_publish_website_live_app',
     title: 'Build and publish store app',
-    description: 'Build the store app from the Capgo Website Live template with the app name, icon and keys, upload it to App Store Connect or Google Play and submit it for review when enabled. Follow progress with capgo_get_build_status and capgo_get_build_logs.',
+    description: 'Build the store app from the Capgo Web2App template with the app name, icon and keys, upload it to App Store Connect or Google Play and submit it for review when enabled. Follow progress with capgo_get_build_status and capgo_get_build_logs.',
     input: { appId, platform: storePlatform },
     annotations: EXTERNAL,
     request: input => ({ method: 'POST', path: '/website_live_store/publish', body: { app_id: input.appId, platform: input.platform } }),

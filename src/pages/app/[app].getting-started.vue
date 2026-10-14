@@ -49,7 +49,7 @@ watch(() => id.value, async (appId) => {
 async function selectSetupFlow(appId: string | undefined) {
   if (!appId || setupFlowAppId.value === appId)
     return
-  // Website Live apps never install a bundle pipeline, so the full Capgo
+  // Web2App apps never install a bundle pipeline, so the full Capgo
   // checklist does not apply: their overview is the setup page.
   const mode = await appUpdateModeStore.load(appId)
   if (app.value?.app_id !== appId)
