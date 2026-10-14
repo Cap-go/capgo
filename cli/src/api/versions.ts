@@ -1,5 +1,5 @@
-import type { CapgoClient } from '../utils'
 import type { Database } from '../types/supabase.types'
+import type { CapgoClient } from '../utils'
 import { log } from '@clack/prompts'
 import { Table } from '@sauber/table'
 import { CliUserError } from '../shared/cli-user-error'
@@ -196,14 +196,22 @@ export async function deleteAppVersion(
   // Soft-delete through the CLI data endpoint when a client is provided. HTTP DELETE /bundle
   // rejects bundles still linked to a channel; admin channel cleanup needs this path.
   if (client) {
+    let updated: string[]
     try {
-      await setBundlesDeleted(client, appid, [bundle], true)
+      updated = await setBundlesDeleted(client, appid, [bundle], true)
     }
     catch (error) {
       const message = `App version ${appid}@${bundle} not found in database`
       if (!silent)
         log.error(message)
       throw new Error(`${message}: ${formatError(error)}`)
+    }
+    // Zero rows updated: already deleted, renamed or not visible to this key.
+    if (!updated.includes(bundle)) {
+      const message = `App version ${appid}@${bundle} not found in database`
+      if (!silent)
+        log.error(message)
+      throw new Error(message)
     }
     return
   }

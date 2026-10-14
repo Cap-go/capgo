@@ -3,6 +3,8 @@ import type { CapacitorConfig } from '../config'
 import type { UploadBundleResult } from '../schemas/bundle'
 import type { Database } from '../types/supabase.types'
 import type { Compatibility, manifestType } from '../utils'
+import type { AutoBumpLevel } from '../versionHelpers'
+import type { ResolvedManifestUpload } from './manifest-upload'
 import type { UploadReporter, UploadSpinner } from './reporter'
 import type { OptionsUpload } from './upload_interface'
 import { randomUUID } from 'node:crypto'
@@ -14,39 +16,37 @@ import { greaterOrEqual, parse } from '@std/semver'
 // Native fetch is available in Node.js >= 18
 import pack from '../../package.json'
 import { trackEvent } from '../analytics/track'
-import { runCliPreflight } from '../api/preflight'
 import { fetchChannelCompatibilityContext } from '../api/channels'
 import { fetchCliChannels, fetchLatestBundle } from '../api/cli-data'
-import { fetchBundleVersionRow, upsertAppVersion } from '../api/versions'
 import { calcKeyId, encryptChecksum, encryptChecksumV3, encryptSource, generateSessionKey } from '../api/crypto'
+import { runCliPreflight } from '../api/preflight'
 import { checkAlerts } from '../api/update'
+import { fetchBundleVersionRow, upsertAppVersion } from '../api/versions'
 import { loadSavedCredentials } from '../build/credentials'
 import { getChecksum } from '../checksum'
+import { CORDOVA_DEFAULT_WEB_DIR } from '../cordova/project'
+import { isCordovaMode } from '../framework/mode'
 import { getRepoStarStatus, isRepoStarredInSession, starRepository } from '../github'
 import { confirmWithRememberedChoice } from '../promptPreferences'
+import { parsePackageJsonOptionPaths, resolveAppIdWithRecovery } from '../recovery/app-id'
+import { ensureNotifyAppReadyInBuildFolder } from '../recovery/notify-app-ready'
 import { showReplicationProgress } from '../replicationProgress'
 import { CliUserError } from '../shared/cli-user-error'
 import { formatTable } from '../terminal-table'
 import { usesAlwaysDirectUpdate } from '../updaterConfig'
 import { baseKeyV2, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, canPromptInteractively, channelUpdatePackageCliError, checkCompatibilityCloud, createCapgoClient, deletedFailedVersion, deltaManifestTooLargeMessage, findRoot, findSavedKey, formatError, formatVerboseError, getBundleVersion, getCompatibilityDetails, getInstalledVersion, getLocalConfig, getLocalDependencies, getOrganizationId, getPMAndCommand, getRemoteChecksums, getRemoteFileConfig, hasCliPermission, invokeCapgoCliApi, isCompatible, isDeprecatedPluginVersion, MAX_MANIFEST_ENTRIES, regexSemver, resolveUserIdFromApiKey, sendEvent, setVersionManifest, updateConfigUpdater, UPLOAD_TIMEOUT, UPLOAD_TIMEOUT_ERROR_NAME, uploadTimeoutMessage, uploadTUS, uploadUrl, zipFile } from '../utils'
-import type { AutoBumpLevel } from '../versionHelpers'
 import { autoBumpVersionBy, getVersionSuggestions, interactiveVersionBump, normalizeAutoBumpInput } from '../versionHelpers'
 import { resolveAutoBumpLevelFromAi } from './auto-bump-ai'
 import { maybePromptBuilderCta, shouldBlockIncompatibleUpload } from './builder-cta'
 import { checkIndexPosition, searchInDirectory } from './check'
 import { summarizeUploadCompatibility } from './compatibility'
-import { CORDOVA_DEFAULT_WEB_DIR } from '../cordova/project'
-import { isCordovaMode } from '../framework/mode'
-import { ensureNotifyAppReadyInBuildFolder } from '../recovery/notify-app-ready'
-import { parsePackageJsonOptionPaths, resolveAppIdWithRecovery } from '../recovery/app-id'
 import { finalizeUploadedBundle } from './finalize-upload'
-import { loadUploadProjectConfig } from './upload-config'
 import { isManifestUploadAutoEnabled, MANIFEST_UPLOAD_PROTOCOL_VERSION, manifestUploadFileHashFormat, requestManifestUpload } from './manifest-upload'
-import type { ResolvedManifestUpload } from './manifest-upload'
 import { PartialUploadValidationError, prepareBundlePartialFiles, prepareManifestUploadEntries, uploadPartial } from './partial'
 import { clackUploadReporter, getUploadReporter, runWithUploadReporter } from './reporter'
 import { ManifestUploadAbandonError, resolveManifestUploadAbandonScope } from './upload-abandon-error'
 import { formatUploadChannels, getChannelsToAssignByChecksum, parseUploadChannels } from './upload-channels'
+import { loadUploadProjectConfig } from './upload-config'
 
 type SupabaseType = Awaited<ReturnType<typeof createCapgoClient>>
 type pmType = ReturnType<typeof getPMAndCommand>
@@ -532,7 +532,7 @@ const CORDOVA_UPDATER_PACKAGES = [
   'cordova-plugin-capgo',
 ] as const
 
-type ResolvedUpdaterForUpload = {
+interface ResolvedUpdaterForUpload {
   packageName: string
   version: string
 }
@@ -938,7 +938,6 @@ async function getVersionIdForChannelUpdate(
 
   return version.id
 }
-
 
 async function versionExistsOnRemote(
   apikey: string,
@@ -1521,7 +1520,7 @@ async function uploadBundleInternalWithReporter(preAppid: string, options: Optio
     }
   }
 
-  const fileConfig = await getRemoteFileConfig()
+  const fileConfig = await getRemoteFileConfig(apikey)
   if (options.verbose) {
     log.info(`[Verbose] Remote file config retrieved:`)
     log.info(`  - Max upload length: ${Math.floor(fileConfig.maxUploadLength / 1024 / 1024)} MB`)
@@ -1554,7 +1553,7 @@ async function uploadBundleInternalWithReporter(preAppid: string, options: Optio
   if (options.verbose)
     log.info(`[Verbose] Local config loaded: host=${localConfig.hostWeb}`)
 
-  const client = await createCapgoClient(apikey, options.apiHost)
+  const client = await createCapgoClient(apikey, options.apiHost, false, undefined, options.filesHost)
   if (options.verbose)
     log.info(`[Verbose] Supabase client created successfully`)
 

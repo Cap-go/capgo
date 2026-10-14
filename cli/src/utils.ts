@@ -8,6 +8,7 @@ import type { UploadSpinner } from './bundle/reporter'
 import type { CapacitorConfig, ExtConfigPairs } from './config'
 import type { Compatibility, CompatibilityDetails, IncompatibilityReason, NativePackage } from './schemas/common'
 import type { Database } from './types/supabase.types'
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { spawn } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { homedir, platform as osPlatform } from 'node:os'
@@ -23,9 +24,9 @@ import prettyjson from 'prettyjson'
 import * as tus from 'tus-js-client'
 import { buildCliRequestHeaders, validateCliRequestHeaderValue } from './analytics/cli-headers'
 import { getGlobalAnalyticsProps } from './analytics/global-props'
+import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
 import { CapgoApiHttpError } from './api/http-error'
 import { assertMinCliVersion } from './api/min-cli-version'
-import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
 import { sendCliEvent } from './app/debug'
 import { getActiveUploadReporter } from './bundle/reporter'
 import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from './capacitor-cli'
@@ -193,7 +194,7 @@ export function formatError(error: any): string {
 const MAX_VERBOSE_ERROR_NODES = 12
 const MAX_VERBOSE_ERROR_MESSAGE_LENGTH = 2_000
 
-type VerboseErrorLike = {
+interface VerboseErrorLike {
   name?: unknown
   message?: unknown
   code?: unknown
@@ -775,31 +776,22 @@ export async function updateConfigUpdater(newConfig: any): Promise<ExtConfigPair
   return updateConfigbyKey('CapacitorUpdater', newConfig)
 }
 
-export async function getLocalConfig(silent = false) {
+/** `localApi` / `localApiFiles` carry the API key: same rules as --api-host. */
+function configApiHost(name: 'localApi' | 'localApiFiles', value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value.trim())
+    return undefined
   try {
-    const extConfig = await getConfig(silent)
-    const capConfig: CapgoConfig = {
-      host: (extConfig?.config?.plugins?.CapacitorUpdater?.localHost || defaultHost) as string,
-      hostWeb: (extConfig?.config?.plugins?.CapacitorUpdater?.localWebHost || defaultHostWeb) as string,
-      hostFilesApi: (extConfig?.config?.plugins?.CapacitorUpdater?.localApiFiles || defaultFileHost) as string,
-      hostApi: (extConfig?.config?.plugins?.CapacitorUpdater?.localApi || defaultApiHost) as string,
-    }
+    return normalizeCapgoApiHost(value)
+  }
+  catch (error) {
+    throw new CliUserError(`Invalid ${name} in capacitor config: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
 
-    // Legacy self-host config: `localSupa` without `localApi` serves every Capgo function
-    // from <localSupa>/functions/v1. `localSupaAnon` is no longer needed.
-    const legacyApiHost = extConfig?.config?.plugins?.CapacitorUpdater?.localApi
-      ? undefined
-      : legacySupabaseFunctionsHost(extConfig?.config?.plugins?.CapacitorUpdater?.localSupa)
-    if (legacyApiHost) {
-      if (!silent)
-        log.info('Using custom Capgo backend from capacitor.config.json')
-      if (!silent)
-        warnLegacySupabaseHost('`localSupa` in capacitor.config', legacyApiHost)
-      capConfig.hostApi = legacyApiHost
-      if (!extConfig?.config?.plugins?.CapacitorUpdater?.localApiFiles)
-        capConfig.hostFilesApi = legacyApiHost
-    }
-    return applyCapgoHostOverride(capConfig)
+export async function getLocalConfig(silent = false) {
+  let extConfig: Awaited<ReturnType<typeof getConfig>> | undefined
+  try {
+    extConfig = await getConfig(silent)
   }
   catch {
     return applyCapgoHostOverride({
@@ -809,6 +801,31 @@ export async function getLocalConfig(silent = false) {
       hostApi: defaultApiHost,
     })
   }
+  const localApi = configApiHost('localApi', extConfig?.config?.plugins?.CapacitorUpdater?.localApi)
+  const localApiFiles = configApiHost('localApiFiles', extConfig?.config?.plugins?.CapacitorUpdater?.localApiFiles)
+  const capConfig: CapgoConfig = {
+    host: (extConfig?.config?.plugins?.CapacitorUpdater?.localHost || defaultHost) as string,
+    hostWeb: (extConfig?.config?.plugins?.CapacitorUpdater?.localWebHost || defaultHostWeb) as string,
+    // A self-hosted API serves files on the same origin unless localApiFiles says otherwise.
+    hostFilesApi: localApiFiles ?? localApi ?? defaultFileHost,
+    hostApi: localApi ?? defaultApiHost,
+  }
+
+  // Legacy self-host config: `localSupa` without `localApi` serves every Capgo function
+  // from <localSupa>/functions/v1. `localSupaAnon` is no longer needed.
+  const legacyApiHost = extConfig?.config?.plugins?.CapacitorUpdater?.localApi
+    ? undefined
+    : legacySupabaseFunctionsHost(extConfig?.config?.plugins?.CapacitorUpdater?.localSupa)
+  if (legacyApiHost) {
+    if (!silent)
+      log.info('Using custom Capgo backend from capacitor.config.json')
+    if (!silent)
+      warnLegacySupabaseHost('`localSupa` in capacitor.config', legacyApiHost)
+    capConfig.hostApi = legacyApiHost
+    if (!localApiFiles)
+      capConfig.hostFilesApi = legacyApiHost
+  }
+  return applyCapgoHostOverride(capConfig)
 }
 
 interface CapgoHostOverride {
@@ -817,22 +834,36 @@ interface CapgoHostOverride {
 }
 
 let capgoHostOverride: CapgoHostOverride = {}
+const capgoHostScope = new AsyncLocalStorage<CapgoHostOverride>()
 
-/**
- * Pin the Capgo API for this process (--api-host / --files-host, or an SDK client).
- * Every host lookup (HTTP calls, remote config, files config, TUS uploads) then
- * uses it, so tests and self-hosted backends never leak traffic to Capgo cloud.
- */
-export function setCapgoHostOverride(hosts: CapgoHostOverride) {
-  const next: CapgoHostOverride = {
+function normalizeHostOverride(hosts: CapgoHostOverride): CapgoHostOverride {
+  return {
     apiHost: hosts.apiHost ? normalizeCapgoApiHost(hosts.apiHost) : undefined,
     filesHost: hosts.filesHost ? normalizeCapgoApiHost(hosts.filesHost) : undefined,
   }
-  if (next.apiHost === capgoHostOverride.apiHost && next.filesHost === capgoHostOverride.filesHost)
-    return
-  capgoHostOverride = next
-  // Remote config is per host.
-  cachedRemoteConfig = null
+}
+
+/** Hosts pinned for the current call: an SDK/client scope, else the CLI process pin. */
+function currentHostOverride(): CapgoHostOverride {
+  return capgoHostScope.getStore() ?? capgoHostOverride
+}
+
+/**
+ * Pin the Capgo API for this CLI process (--api-host / --files-host). Every host
+ * lookup (HTTP calls, remote config, files config, TUS uploads) then uses it, so
+ * tests and self-hosted backends never leak traffic to Capgo cloud. Library code
+ * uses withCapgoHosts instead so concurrent clients never share a host.
+ */
+export function setCapgoHostOverride(hosts: CapgoHostOverride) {
+  capgoHostOverride = normalizeHostOverride(hosts)
+}
+
+/**
+ * Run `action` with its own Capgo hosts. Empty hosts mean Capgo defaults (env,
+ * capacitor config, cloud): a scope never inherits the CLI process pin.
+ */
+export function withCapgoHosts<T>(hosts: CapgoHostOverride, action: () => T): T {
+  return capgoHostScope.run(normalizeHostOverride(hosts), action)
 }
 
 function envHost(name: 'CAPGO_API_HOST' | 'CAPGO_FILES_HOST'): string | undefined {
@@ -847,8 +878,10 @@ function envHost(name: 'CAPGO_API_HOST' | 'CAPGO_FILES_HOST'): string | undefine
  * Functions, a single worker, a test server) expose both on one origin.
  */
 function applyCapgoHostOverride<T extends { hostApi: string, hostFilesApi: string }>(config: T): T {
-  const apiHost = capgoHostOverride.apiHost ?? envHost('CAPGO_API_HOST')
-  const filesHost = capgoHostOverride.filesHost ?? envHost('CAPGO_FILES_HOST')
+  const pinned = currentHostOverride()
+  const apiHost = pinned.apiHost ?? envHost('CAPGO_API_HOST')
+  // An explicit API host owns its files too: CAPGO_FILES_HOST must not send that key elsewhere.
+  const filesHost = pinned.filesHost ?? (pinned.apiHost ? undefined : envHost('CAPGO_FILES_HOST'))
   if (apiHost) {
     config.hostApi = apiHost
     config.hostFilesApi = apiHost
@@ -899,10 +932,22 @@ interface CapgoConfig {
   minCliVersion?: string
   minCliVersionReason?: string
 }
-let cachedRemoteConfig: CapgoConfig | null = null
-let remoteConfigInFlight: Promise<CapgoConfig> | null = null
+// Remote config is per API host: concurrent clients on different backends never share it.
+const cachedRemoteConfig = new Map<string, CapgoConfig>()
+const remoteConfigInFlight = new Map<string, Promise<CapgoConfig>>()
 
-export async function getRemoteConfig(silent = false, signal?: AbortSignal) {
+/**
+ * `/private/config` and `/files/config` only use the key for usage attribution.
+ * Send the caller's key, or the saved key only to Capgo cloud: a saved key must
+ * never reach a self-hosted or test backend it was not issued for.
+ */
+function configProbeKey(host: string, apikey?: string): string | undefined {
+  if (apikey)
+    return apikey
+  return host === defaultApiHost || host === defaultFileHost ? findSavedKeySilent() : undefined
+}
+
+export async function getRemoteConfig(silent = false, signal?: AbortSignal, apikey?: string) {
   // call host + /api/get_config and parse the result as json using fetch
   // Always return a shallow copy so callers cannot mutate the process-wide cache.
   /**
@@ -913,25 +958,29 @@ export async function getRemoteConfig(silent = false, signal?: AbortSignal) {
     assertMinCliVersion(copy, undefined, silent)
     return copy
   }
-  if (!signal && cachedRemoteConfig)
-    return finish(cachedRemoteConfig)
-  if (!signal && remoteConfigInFlight)
-    return remoteConfigInFlight.then(finish)
+  const localConfig = await getLocalConfig(silent)
+  const host = localConfig.hostApi
+  const cached = cachedRemoteConfig.get(host)
+  if (!signal && cached)
+    return finish(cached)
+  const inFlight = remoteConfigInFlight.get(host)
+  if (!signal && inFlight)
+    return inFlight.then(finish)
 
   const run = (async () => {
-    const localConfig = await getLocalConfig(silent)
     try {
-      const silentKey = findSavedKeySilent()
-      const response = await fetch(`${localConfig.hostApi}/private/config`, {
+      const key = configProbeKey(host, apikey)
+      const response = await fetch(`${host}/private/config`, {
         ...(signal ? { signal } : {}),
-        headers: buildCliRequestHeaders(silentKey ? { capgkey: silentKey } : undefined),
+        redirect: 'error',
+        headers: buildCliRequestHeaders(key ? { capgkey: key } : undefined),
       })
       if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`)
       const data = await response.json() as CapgoConfig
       const merged = { ...data, ...localConfig } as CapgoConfig
       if (!signal)
-        cachedRemoteConfig = merged
+        cachedRemoteConfig.set(host, merged)
       return { ...merged }
     }
     catch {
@@ -942,12 +991,12 @@ export async function getRemoteConfig(silent = false, signal?: AbortSignal) {
     }
     finally {
       if (!signal)
-        remoteConfigInFlight = null
+        remoteConfigInFlight.delete(host)
     }
   })()
 
   if (!signal)
-    remoteConfigInFlight = run
+    remoteConfigInFlight.set(host, run)
   return run.then(finish)
 }
 
@@ -961,13 +1010,13 @@ export interface CapgoFilesConfig {
   alertUploadSize: number
 }
 
-export async function getRemoteFileConfig() {
+export async function getRemoteFileConfig(apikey?: string) {
   const localConfig = await getLocalConfig()
-  // call host + /api/get_config and parse the result as json using fetch
   try {
-    const silentKey = findSavedKeySilent()
+    const key = configProbeKey(localConfig.hostFilesApi, apikey)
     const response = await fetch(`${localConfig.hostFilesApi}/files/config`, {
-      headers: buildCliRequestHeaders(silentKey ? { capgkey: silentKey } : undefined),
+      redirect: 'error',
+      headers: buildCliRequestHeaders(key ? { capgkey: key } : undefined),
     })
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
@@ -1038,9 +1087,9 @@ export function isCapgoManagedSupabaseHost(supaHost?: string): boolean {
   try {
     const hostname = new URL(normalizeSupabaseHost(supaHost)).hostname.toLowerCase()
     return hostname === 'sb.capgo.app'
-      || hostname === 'xvwzpoazmxkqosrdewyv.client.co'
-      || hostname === 'ibwjdnhknbkcqfbabwei.client.co'
-      || hostname === 'aucsybvnhavogdmzwtcw.client.co'
+      || hostname === 'xvwzpoazmxkqosrdewyv.supabase.co'
+      || hostname === 'ibwjdnhknbkcqfbabwei.supabase.co'
+      || hostname === 'aucsybvnhavogdmzwtcw.supabase.co'
   }
   catch {
     return false
@@ -1244,27 +1293,32 @@ export interface CapgoClient extends CapgoApiHosts {
 }
 
 export async function createCapgoClient(apikey: string, apiHost?: string, silent = false, signal?: AbortSignal, filesHost?: string): Promise<CapgoClient> {
-  // A client pinned to a custom backend pins the whole process: remote config,
-  // files config and uploads must not fall back to Capgo cloud.
-  if (apiHost || filesHost)
-    setCapgoHostOverride({ apiHost: apiHost ?? capgoHostOverride.apiHost, filesHost: filesHost ?? capgoHostOverride.filesHost })
-  // Enforces the API-published minimum CLI version before any command runs.
-  await getRemoteConfig(silent, signal)
-  const hosts = await resolveCapgoApiHosts(undefined, silent)
-  if (apiHost && !silent)
-    log.info(`Using custom Capgo API ${hosts.apiHost}`)
-  return {
-    apikey: validateCliRequestHeaderValue('capgkey', apikey),
-    ...hosts,
+  const key = validateCliRequestHeaderValue('capgkey', apikey)
+  const connect = async (): Promise<CapgoClient> => {
+    // Enforces the API-published minimum CLI version before any command runs.
+    await getRemoteConfig(silent, signal, key)
+    const hosts = await resolveCapgoApiHosts(undefined, silent)
+    if (apiHost && !silent)
+      log.info(`Using custom Capgo API ${hosts.apiHost}`)
+    return { apikey: key, ...hosts }
   }
+  if (!apiHost && !filesHost)
+    return connect()
+  // The client keeps its own hosts; nothing process-wide changes.
+  const current = currentHostOverride()
+  const api = apiHost ? normalizeCapgoApiHost(apiHost) : current.apiHost
+  return withCapgoHosts({
+    apiHost: api,
+    filesHost: filesHost ?? (api === current.apiHost ? current.filesHost : undefined),
+  }, connect)
 }
 
 export async function fetchCliMembers2faStatus(
   apikey: string,
   orgId: string,
   httpOptions: CliHttpOptions = {},
-): Promise<Array<{ user_id: string, '2fa_enabled': boolean }>> {
-  const { data, error } = await invokeCapgoCliApi<Array<{ user_id: string, '2fa_enabled': boolean }>>(
+): Promise<Array<{ 'user_id': string, '2fa_enabled': boolean }>> {
+  const { data, error } = await invokeCapgoCliApi<Array<{ 'user_id': string, '2fa_enabled': boolean }>>(
     `private/cli/members/2fa-status?org_id=${encodeURIComponent(orgId)}`,
     {
       apikey,
@@ -2071,6 +2125,7 @@ export interface CliHttpOptions {
 export interface CapgoApiTarget {
   apikey: string
   apiHost?: string
+  filesHost?: string
 }
 
 /** Call the Capgo API with a client's key and host. */
@@ -2088,8 +2143,8 @@ export async function invokeCliHttpFromClient<T>(
   const method = (options.method ?? 'GET').toUpperCase()
   const query = options.query
     ? new URLSearchParams(
-      Object.entries(options.query).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length > 0),
-    ).toString()
+        Object.entries(options.query).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].length > 0),
+      ).toString()
     : ''
   const resolvedPath = query ? `${path}?${query}` : path
 
@@ -2097,8 +2152,8 @@ export async function invokeCliHttpFromClient<T>(
     apikey: client.apikey,
     method,
     body: method === 'GET' || method === 'HEAD' ? undefined : options.body,
-    apiHost: client.apiHost,
-    useFilesHost: options.useFilesHost,
+    apiHost: options.useFilesHost ? (client.filesHost ?? client.apiHost) : client.apiHost,
+    useFilesHost: options.useFilesHost && !client.filesHost,
     signal: options.signal,
   })
 }

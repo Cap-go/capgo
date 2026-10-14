@@ -196,6 +196,12 @@ describe('pOST /preflight', () => {
     expect(mocks.checkPermission).toHaveBeenCalledWith(expect.anything(), 'channel.promote_bundle', { appId: 'com.example.app', channelId: 3 })
   })
 
+  it('keeps a 2FA-only check independent of app visibility', async () => {
+    mocks.app = null
+    const response = await post('/preflight', { app_id: 'com.example.app' })
+    expect(response.status).toBe(200)
+  })
+
   it('fails with permission_denied when RBAC denies', async () => {
     mocks.checkPermission.mockResolvedValue(false)
     const response = await post('/preflight', { app_id: 'com.example.app', permission: 'app.delete' })

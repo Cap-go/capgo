@@ -81,7 +81,7 @@ import { setOrganizationInternal } from './organization/set'
 import { promoteChannelOptionsSchema, requestBuildOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from './schemas/sdk'
 import { CliUserError } from './shared/cli-user-error'
 import { getUserIdInternal } from './user/account'
-import { createCapgoClient, findSavedKey, getConfig, getLocalConfig, normalizeCapgoHostOptions, setCapgoHostOverride } from './utils'
+import { createCapgoClient, findSavedKey, getConfig, getLocalConfig, normalizeCapgoHostOptions, withCapgoHosts } from './utils'
 import { parseSecurityPolicyError } from './utils/security_policy_errors'
 import { normalizeAutoBumpInput } from './versionHelpers'
 
@@ -156,6 +156,7 @@ async function withCapacitorConfigTarget<T>(capacitorConfig: string | undefined,
 export class CapgoSDK {
   private readonly apikey?: string
   private readonly apiHost?: string
+  private readonly filesHost?: string
 
   constructor(options?: {
     apikey?: string
@@ -169,10 +170,23 @@ export class CapgoSDK {
     supaAnon?: string
   }) {
     this.apikey = options?.apikey
-    this.apiHost = normalizeCapgoHostOptions(options ?? {}, true).apiHost
-    // Uploads, files config and remote config read the process-wide host.
-    if (this.apiHost || options?.filesHost)
-      setCapgoHostOverride({ apiHost: this.apiHost, filesHost: options?.filesHost })
+    const hosts = normalizeCapgoHostOptions(options ?? {}, true)
+    this.apiHost = hosts.apiHost
+    this.filesHost = hosts.filesHost
+  }
+
+  /**
+   * Hosts for one SDK call: per-call apiHost / filesHost (or deprecated supaHost),
+   * else the constructor's. Each call runs in its own host scope, so SDK instances
+   * on different backends can run concurrently without sharing hosts or keys.
+   */
+  callHosts(args: unknown[]): { apiHost?: string, filesHost?: string } {
+    const callOptions = args.find((arg): arg is CapgoHostOptions => typeof arg === 'object' && arg !== null
+      && ('apiHost' in arg || 'filesHost' in arg || 'supaHost' in arg))
+    const call = callOptions ? normalizeCapgoHostOptions(callOptions, true) : {}
+    if (call.apiHost)
+      return { apiHost: call.apiHost, filesHost: call.filesHost }
+    return { apiHost: this.apiHost, filesHost: call.filesHost ?? this.filesHost }
   }
 
   /** Per-call apiHost (or deprecated supaHost) overrides the SDK-wide one. */
@@ -555,7 +569,7 @@ export class CapgoSDK {
         // Convert SDK options to internal format
         const internalOptions: OptionsUpload = {
           apikey: parsed.apikey || this.apikey || findSavedKey(true),
-          apiHost: this.resolveApiHost(parsed),
+          ...this.callHosts([parsed]),
           path: parsed.path,
           mode: parsed.mode,
           bundle: parsed.bundle,
@@ -1346,6 +1360,22 @@ export class CapgoSDK {
   }
 }
 
+// Every public SDK method runs in its own Capgo host scope (see callHosts).
+for (const name of Object.getOwnPropertyNames(CapgoSDK.prototype)) {
+  if (name === 'constructor' || name === 'callHosts' || name === 'resolveApiHost')
+    continue
+  const method = (CapgoSDK.prototype as unknown as Record<string, unknown>)[name]
+  if (typeof method !== 'function')
+    continue
+  Object.defineProperty(CapgoSDK.prototype, name, {
+    configurable: true,
+    writable: true,
+    value(this: CapgoSDK, ...args: unknown[]) {
+      return withCapgoHosts(this.callHosts(args), () => method.apply(this, args))
+    },
+  })
+}
+
 // ============================================================================
 // Functional API - Convenience Wrappers
 // ============================================================================
@@ -1725,7 +1755,7 @@ export type {
   ZipBundleOptions,
 } from './schemas/sdk'
 export type { Database } from './types/supabase.types'
-export { createCapgoClient, setCapgoHostOverride } from './utils'
+export { createCapgoClient, withCapgoHosts } from './utils'
 export {
   formatApiErrorForCli,
   getSecurityPolicyMessage,

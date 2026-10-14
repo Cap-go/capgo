@@ -84,25 +84,36 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
     // App-admin cleanup: soft-delete linked bundles that are not shared, then DELETE the channel.
     // Do not send delete_bundle=true here — that path is preview-key only.
     const softDeletedBundleNames: string[] = []
+    // Restore every bundle already soft-deleted when a later step fails.
+    const restoreSoftDeletedBundles = async () => {
+      if (softDeletedBundleNames.length)
+        await setBundlesDeleted(client, appId, softDeletedBundleNames, false).catch(() => [])
+    }
     if (options.deleteBundle) {
-      const linked = await findVersionsLinkedToChannel(client, appId, channelId)
-      const candidates = [linked.stable, linked.rollout].filter((row): row is NonNullable<typeof row> => !!row?.name)
-      const uniqueByName = new Map(candidates.map(row => [row.name, row]))
-      for (const bundle of uniqueByName.values()) {
-        const shared = await isVersionLinkedToOtherChannel(client, appId, bundle.id, channelId)
-        if (shared) {
+      try {
+        const linked = await findVersionsLinkedToChannel(client, appId, channelId)
+        const candidates = [linked.stable, linked.rollout].filter((row): row is NonNullable<typeof row> => !!row?.name)
+        const uniqueByName = new Map(candidates.map(row => [row.name, row]))
+        for (const bundle of uniqueByName.values()) {
+          const shared = await isVersionLinkedToOtherChannel(client, appId, bundle.id, channelId)
+          if (shared) {
+            if (!silent)
+              log.info(`Keeping bundle ${bundle.name}; it is still linked to another channel`)
+            continue
+          }
           if (!silent)
-            log.info(`Keeping bundle ${bundle.name}; it is still linked to another channel`)
-          continue
+            log.info(`Deleting bundle ${bundle.name} from Capgo`)
+          await deleteAppVersion(client, appId, bundle.name, {
+            silent,
+            apikey: options.apikey,
+            apiHost: options.apiHost,
+          })
+          softDeletedBundleNames.push(bundle.name)
         }
-        if (!silent)
-          log.info(`Deleting bundle ${bundle.name} from Capgo`)
-        await deleteAppVersion(client, appId, bundle.name, {
-          silent,
-          apikey: options.apikey,
-          apiHost: options.apiHost,
-        })
-        softDeletedBundleNames.push(bundle.name)
+      }
+      catch (error) {
+        await restoreSoftDeletedBundles()
+        throw error
       }
     }
 
@@ -111,9 +122,7 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
 
     const deleteStatus = await delChannel(httpOptions, channelId, appId, false)
     if (deleteStatus.error) {
-      if (softDeletedBundleNames.length) {
-        await setBundlesDeleted(client, appId, softDeletedBundleNames, false).catch(() => [])
-      }
+      await restoreSoftDeletedBundles()
       if (!silent)
         log.error(`Cannot delete Channel 🙀 ${formatError(deleteStatus.error)}`)
       throw new Error(`Cannot delete channel: ${formatError(deleteStatus.error)}`)

@@ -308,10 +308,13 @@ app.post('/preflight', middlewareKey(), versionedRoute<CliContext>({
       })
     }
 
-    // Channel-scoped keys may not see the app row; their channel permission decides.
+    // Only app-scoped permission and plan checks need the app row. Channel-scoped keys
+    // may not see it (their channel permission decides), and a 2FA-only check must
+    // not turn into an app visibility check.
     const channelScoped = body.channel_id !== undefined && body.permission?.startsWith('channel.') === true
+    const needsApp = !channelScoped && (body.permission !== undefined || body.plan !== undefined)
     const appRow = body.app_id ? await visibleApp(supabase, body.app_id) : null
-    if (body.app_id && !appRow && !channelScoped)
+    if (body.app_id && !appRow && needsApp)
       return quickError(404, 'app_not_found', 'App not found', { app_id: body.app_id })
     const orgId = body.org_id ?? appRow?.owner_org ?? null
 
