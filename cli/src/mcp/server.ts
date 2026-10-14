@@ -218,7 +218,7 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
       acceptIncompatible,
       delta,
       deltaOnly,
-      encryptPartial,
+      encryptDelta,
       apikey,
       capacitorConfig,
     }) => {
@@ -240,7 +240,7 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
         acceptIncompatible,
         delta,
         deltaOnly,
-        encryptPartial,
+        encryptDelta,
         apikey,
         capacitorConfig,
       })

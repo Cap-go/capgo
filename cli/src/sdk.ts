@@ -577,7 +577,7 @@ export class CapgoSDK {
           zip: parsed.useZip, // use legacy zip upload if requested
           delta: parsed.delta,
           deltaOnly: parsed.deltaOnly,
-          encryptPartial: parsed.encryptPartial,
+          encryptDelta: parsed.encryptDelta,
         }
 
         // Call internal upload function but suppress CLI behaviors

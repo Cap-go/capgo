@@ -38,7 +38,7 @@ export const mcpUploadBundleInputSchema = z.object({
   acceptIncompatible: z.boolean().optional().describe('Accept native-package incompatibility as handled (still checks and warns, continues, skips the crash-warning email)'),
   delta: z.boolean().optional().describe('Also upload the per-file manifest for delta (differential) updates'),
   deltaOnly: z.boolean().optional().describe('Upload only the delta manifest files, without the full zip'),
-  encryptPartial: z.boolean().optional().describe('Encrypt delta manifest files'),
+  encryptDelta: z.boolean().optional().describe('Encrypt delta manifest files (auto-enabled for updater >= 6.14.4)'),
   apikey: z.string().optional().describe('API key to use instead of the saved one, e.g. from the hosted Capgo MCP tool capgo_get_upload_command'),
   capacitorConfig: capacitorConfigOptionSchema.optional(),
 })
