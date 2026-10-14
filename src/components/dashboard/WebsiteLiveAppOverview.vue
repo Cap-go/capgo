@@ -24,11 +24,10 @@ plugins: {
     autoUpdate: true,
   },
 },`)
-const readySnippet = `import { CapacitorUpdater } from '@capgo/capacitor-updater'
-
-// Call this as soon as your app has started correctly.
-// If it is not called, the update is rolled back automatically.
-CapacitorUpdater.notifyAppReady()`
+const readySnippet = `// Nothing to add: in website mode the updater confirms the new version
+// once the page shows content, and rolls back a version that never does.
+// To confirm from your own code instead, set websiteAutoNotifyReady: false
+// in the config above and call CapacitorUpdater.notifyAppReady() yourself.`
 
 const setupSteps = computed(() => [
   { key: 'install', title: t('website-live-setup-install'), code: installCommand },
