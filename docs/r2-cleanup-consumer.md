@@ -86,8 +86,9 @@ retry acknowledged messages. Existing notifications are fallback recovery.
 Four workflows progress concurrently, at most one storage request each. There
 is no DB connection during storage and no per-file DB connection. Cleanup adds
 at most one active application DB connection to the existing notification and
-repair consumers' combined two; Hyperdrive pools and API traffic add their own
-connections. Transactions use two-second statements, 500ms locks and five-second
+repair consumers' combined two. The independently scheduled upstream producer/health
+invocation can add one inventory and one source-database connection; Hyperdrive
+pools and API traffic have additional budgets. Transactions use two-second statements, 500ms locks and five-second
 idle limits. Connection establishment is limited to three seconds.
 
 Each storage workflow has a 20-second deadline. A batch has ten minutes and
