@@ -86,11 +86,12 @@ Once PR #974 is merged, you can use these exact URLs to access the banners direc
 - Logo (1024x1024): `https://capgo.app/affiliate/logo-1024x1024.png`
 
 **Other Capgo Examples:**
-- `https://capgo.app/affiliate/capgo-example-og.png`
-- `https://capgo.app/affiliate/capgo-example-rectangle.png`
-- `https://capgo.app/affiliate/capgo-example-square.png`
-- `https://capgo.app/affiliate/capgo-example-story.png`
-- `https://capgo.app/affiliate/official-capgo-social-2400x1260.png`
+- `https://capgo.app/affiliate/capgo-example-og.png` (1200x628)
+- `https://capgo.app/affiliate/capgo-example-rectangle.png` (800x600)
+- `https://capgo.app/affiliate/capgo-example-square.png` (1080x1080)
+- `https://capgo.app/affiliate/capgo-example-story.png` (1080x1920)
+- `https://capgo.app/affiliate/official-capgo-social-2400x1260.png` (2400x1260)
+
 
 ## Example Banner HTML embed
 
