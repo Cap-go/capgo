@@ -25,7 +25,7 @@ bunx wrangler deploy --config cloudflare_workers/r2_inventory/wrangler.jsonc --e
 bunx wrangler r2 bucket notification create capgo --event-types object-create object-delete --queue capgo-r2-inventory-prod --description capgo-r2-inventory
 ```
 
-The release workflow does not create the bucket notification rule. For a reviewed production activation, inspect existing rules before running the manual notification command. Queue creation is idempotent, but notification-rule creation is not. All four queues retain messages for four days; the provisioning script repairs retention drift and verifies the final settings while preserving other queue settings.
+The release workflow does not create the bucket notification rule. For a reviewed production activation, inspect existing rules before running the manual notification command. Queue creation is idempotent, but notification-rule creation is not. All five queues retain messages for four days; the provisioning script repairs retention drift and verifies the final settings while preserving other queue settings.
 
 The event consumer has batch size 100, timeout 10 seconds, concurrency one, and four retries (at most five deliveries). The repair queue has batches of ten and concurrency one. Each invocation opens at most one database connection at a time, so both queues together use at most two active inventory database connections in production. Repairs release the database connection before issuing up to two concurrent HEAD requests; ordinary uploads never perform HEAD. Consumer handlers return as soon as their work finishes, with no artificial pacing delay. The ten-second timeout coalesces small batches; it is not a minimum batch size or a rate limiter. Measure actual throughput, database WAL/latency and backlog.
 
@@ -39,7 +39,7 @@ Production notifications and repairs both write to the standalone PlanetScale Po
 
 The standalone database needs `r2_objects`, its lifecycle trigger and enum, and `r2_inventory_checkpoints`. Its `manifest` table is reserved for a separate replication setup; the notification consumer does not access it. The checkpoint schema is recorded in `cloudflare_workers/r2_inventory/sql/20261009_checkpoints.sql` and was prepared on the target before this binding change. This is a standalone database setup, not a Supabase migration. Run it only once against an empty checkpoint schema, with a separately created runtime role; rerunning it fails atomically rather than silently accepting a different schema.
 
-The Hyperdrive origin uses the `r2_inventory_consumer` role. It can select, insert and update the two inventory tables and use the object-state enum. It has no inherited database-wide or administrative roles, column SELECT on `manifest.s3_path` for cleanup reference checks, and no delete or schema-creation permission. Runtime credentials are stored in Hyperdrive, never in repository files. These explicit grants were verified on the target, and Cloudflare accepted the restricted origin connection.
+The Hyperdrive origin uses the `r2_inventory_consumer` role. It can select, insert and update the two inventory tables, use the object-state enum, and select only the `manifest.s3_path` column for cleanup reference checks. It has no inherited database-wide or administrative roles and no delete or schema-creation permission. Runtime credentials are stored in Hyperdrive, never in repository files. These explicit grants were verified on the target, and Cloudflare accepted the restricted origin connection.
 
 ### Manifest reservation lease schema preparation
 
@@ -97,7 +97,7 @@ Each queue retains concurrency one, so at most two inventory application connect
 
 ### Release and rollback
 
-The normal Capgo release workflow deploys the changed inventory binding. The bucket's existing notification rule and four queues are reused, so no bucket reconfiguration or new application secret is needed. After deployment, verify the deployed Hyperdrive binding, both queue backlogs and DLQs, successful batch logs, and new inventory rows in PlanetScale. Source ingestion in Supabase stops when the old consumer is replaced.
+The normal Capgo release workflow deploys the changed inventory binding. The bucket's existing notification rule and four existing queues are reused; the producer-only cleanup queue is provisioned separately, so no bucket reconfiguration or new application secret is needed. After deployment, verify the deployed Hyperdrive binding, both queue backlogs and DLQs, successful batch logs, and new inventory rows in PlanetScale. Source ingestion in Supabase stops when the old consumer is replaced.
 
 If a cutover fails, pause delivery of both inventory queues before exhausting their five-delivery budget, inspect the failure and repair the target. Do not simply point back to Supabase after successful PlanetScale acknowledgements: Supabase then lacks the acknowledged interval. A rollback needs a resumable reconciliation of that interval (including deletions) before the old inventory can be trusted again. No data is automatically deleted by this PR.
 
