@@ -1,9 +1,10 @@
 import type { Client, ClientBase } from 'pg'
+import type { CleanupHealth } from './health.ts'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
+import { requireCleanupHealth } from './health.ts'
 
-// Change only in a reviewed activation PR after the prerequisites in the runbook.
-export const CLEANUP_ACTIVATED = false
+export const CLEANUP_ACTIVATED = true
 export const CLEANUP_CONFIG = Object.freeze({
   pageRows: 10_000,
   transactionRows: 100,
@@ -11,7 +12,6 @@ export const CLEANUP_CONFIG = Object.freeze({
   reserveMs: 5_000,
   publicationMs: 2_000,
   leaseSeconds: 45,
-  healthMaxAgeSeconds: 120,
   maxDeletionBacklog: 10_000,
   batchBytes: 256_000,
   messageBytes: 128_000,
@@ -75,25 +75,6 @@ export async function discoverCleanupPage(db: ClientBase, bucket: string, cursor
   return result.rows
 }
 
-// Evidence, not configuration. No traffic timestamp or empty queue is assumed healthy.
-// A separate reviewed monitor must attest processing/replication and backlog, even at idle.
-export async function requireCleanupHealth(db: ClientBase, bucket: string): Promise<void> {
-  const result = await db.query<{ checkpoint: Record<string, unknown>, age: number }>(`SELECT checkpoint,
-    extract(epoch FROM clock_timestamp() - (checkpoint->>'observedAt')::timestamptz)::float8 AS age
-    FROM public.r2_inventory_checkpoints WHERE bucket_name = $1
-      AND job_name = 'cleanup_health' AND partition_key = ''`, [bucket])
-  const row = result.rows[0]
-  const health = row?.checkpoint
-  if (!row || !health || health.schemaVersion !== 1 || !Number.isFinite(row.age)
-    || row.age < 0 || row.age > CLEANUP_CONFIG.healthMaxAgeSeconds
-    || health.notificationsHealthy !== true || health.repairsHealthy !== true
-    || health.manifestReplicationHealthy !== true || health.deletionConsumerHealthy !== true
-    || !Number.isSafeInteger(health.deletionBacklog) || Number(health.deletionBacklog) < 0
-    || Number(health.deletionBacklog) > CLEANUP_CONFIG.maxDeletionBacklog) {
-    throw new Error('Cleanup health evidence missing, stale, unhealthy or backpressured')
-  }
-}
-
 export function cleanupMessageBatches(messages: CleanupMessage[]): MessageSendRequest<CleanupMessage>[][] {
   const batches: MessageSendRequest<CleanupMessage>[][] = []
   let current: MessageSendRequest<CleanupMessage>[] = []
@@ -132,7 +113,7 @@ export async function publicationDeadline(operation: () => Promise<unknown>, mil
   }
 }
 
-export async function retireCleanupRange(db: ClientBase, bucket: string, lease: CleanupLease, keys: string[], cursor: string, queue: CleanupQueue, deadline: number): Promise<number> {
+export async function retireCleanupRange(db: ClientBase, bucket: string, lease: CleanupLease, keys: string[], cursor: string, queue: CleanupQueue, deadline: number, health: CleanupHealth): Promise<number> {
   if (keys.length > CLEANUP_CONFIG.transactionRows || new Set(keys).size !== keys.length)
     throw new Error('Cleanup retirement exceeds bound or contains duplicate keys')
   return drizzle({ client: db as Client }).transaction(async (tx) => {
@@ -148,7 +129,7 @@ export async function retireCleanupRange(db: ClientBase, bucket: string, lease: 
         AND (checkpoint->>'leaseUntil')::timestamptz > clock_timestamp() FOR UPDATE`, [bucket, job, lease.owner, lease.fence])
     if (!fenced.rows.length)
       throw new Error('Cleanup lease lost')
-    await requireCleanupHealth(db, bucket)
+    requireCleanupHealth(health)
     // Lock first, then use a fresh READ COMMITTED statement snapshot for the recheck.
     // Reservations serialize on the very same rows; a reservation that won is preserved.
     await db.query(`SELECT r2_key FROM public.r2_objects WHERE bucket_name = $1
@@ -208,12 +189,12 @@ export function cleanupRanges(page: CleanupRow[]) {
   return ranges
 }
 
-export async function runCleanupProducer(db: ClientBase, bucket: string, queue: CleanupQueue): Promise<number> {
+export async function runCleanupProducer(db: ClientBase, bucket: string, queue: CleanupQueue, health: CleanupHealth): Promise<number> {
   const deadline = Date.now() + CLEANUP_CONFIG.runMs
   await db.query(`SET statement_timeout = '5s'`)
   await db.query(`SET lock_timeout = '500ms'`)
   await db.query(`SET row_security = off`)
-  await requireCleanupHealth(db, bucket)
+  requireCleanupHealth(health)
   const lease = await acquireCleanupLease(db, bucket, crypto.randomUUID())
   if (!lease)
     return 0
@@ -222,13 +203,15 @@ export async function runCleanupProducer(db: ClientBase, bucket: string, queue: 
     while (Date.now() + CLEANUP_CONFIG.reserveMs < deadline) {
       const page = await discoverCleanupPage(db, bucket, lease.cursor)
       if (!page.length) {
-        await retireCleanupRange(db, bucket, lease, [], '', queue, deadline)
+        await retireCleanupRange(db, bucket, lease, [], '', queue, deadline, health)
         break // Persist wrap and revisit behind-cursor inserts on the next run.
       }
       for (const range of cleanupRanges(page)) {
         if (Date.now() + CLEANUP_CONFIG.reserveMs >= deadline)
           return retired
-        retired += await retireCleanupRange(db, bucket, lease, range.keys, range.cursor, queue, deadline)
+        if (Number(health.deletionBacklog) + retired + range.keys.length > CLEANUP_CONFIG.maxDeletionBacklog)
+          return retired
+        retired += await retireCleanupRange(db, bucket, lease, range.keys, range.cursor, queue, deadline, health)
         // Advance only after an unambiguously successful DB commit. On any error,
         // terminate this invocation; the next run reloads the durable checkpoint.
         lease.cursor = range.cursor

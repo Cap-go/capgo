@@ -77,7 +77,7 @@ describe('cleanup consumer committed Postgres safety', () => {
   it.concurrent.each([
     { observedAt: 'invalid' },
     { observedAt: '2026-02-30T00:00:00Z' },
-    { schemaVersion: 2 },
+    { schemaVersion: 3 },
     { manifestReplicationHealthy: false },
   ])('fails closed on invalid replication evidence %j', patch => fixture(async (db, _peer, bucket, key) => {
     const job = await seed(db, bucket, key)
@@ -95,6 +95,14 @@ describe('cleanup consumer committed Postgres safety', () => {
     }
     await db.query(`DELETE FROM public.r2_inventory_checkpoints WHERE bucket_name=$1`, [bucket])
     await expect(inspectCleanupGroup(db, bucket, [job])).rejects.toThrow('replication evidence')
+  }))
+
+  it.concurrent('accepts the upstream v2 health checkpoint without adopting producer-only flags or its freshness limit', () => fixture(async (db, _peer, bucket, key) => {
+    const job = await seed(db, bucket, key)
+    await db.query(`UPDATE public.r2_inventory_checkpoints SET checkpoint=checkpoint||jsonb_build_object(
+      'schemaVersion',2,'healthy',false,'producerReady',false,'maxAgeSeconds',120,
+      'observedAt',clock_timestamp()-interval '240 seconds') WHERE bucket_name=$1`, [bucket])
+    expect(await decision(db, bucket, job)).toBe('remove')
   }))
 
   it.concurrent('refuses RLS-hidden manifest reads rather than interpreting them as absence', () => fixture(async (db, peer, bucket, key) => {

@@ -1,10 +1,14 @@
 # R2 cleanup consumer
 
 This adds deletion delivery to the existing production inventory Worker. The
-producer implementation and its `CLEANUP_ACTIVATED=false`, minute schedule,
-120-second health bound and activation requirements are unchanged. Deploying
-this consumer does not start retirement. See [producer contract](r2-cleanup-producer.md).
-There is no consumer cron, new Worker, jobs table or health writer.
+producer implementation, constants, minute schedule and health code are unchanged
+relative to current main. Producer activation and live health checks were merged
+separately in PR #3702 while this consumer was being prepared; current main has
+`CLEANUP_ACTIVATED=true`. This PR preserves that upstream implementation verbatim.
+See [producer contract](r2-cleanup-producer.md). This PR adds no consumer cron,
+Worker, jobs table or health writer. Deploying it can begin draining existing
+committed retirement jobs once storage configuration and replication evidence
+permit; it must not be treated as a disabled deletion rollout.
 
 ## Delivery and safety
 
@@ -35,13 +39,14 @@ An unexpected reference/lease preserves both R2 and permanent retirement, logs a
 generic reason, acknowledges that message and contributes to the alert summary.
 There is no automatic redispatch of skipped or exhausted jobs.
 
-The consumer reads only `cleanup_health` schema version, valid `observedAt` and
+The consumer accepts the original v1 and upstream v2 `cleanup_health` schemas,
+and reads only a valid `observedAt` and
 `manifestReplicationHealthy=true`. Evidence must not be future-dated and must be
-at most 300 seconds old. It is read again for each group and its remaining life
+at most 300 seconds old, independently of producer-only `maxAgeSeconds`. It is read again for each group and its remaining life
 bounds storage work within that group. Notification/repair/backlog and consumer
 health flags do not gate draining. Missing/stale evidence stops R2 work; this PR
-neither invents evidence nor reinstates admin monitoring. The producer's separate,
-stricter health contract is unchanged.
+neither invents evidence nor reinstates admin monitoring. The producer's separate live
+health contract is unchanged relative to main.
 
 ## Storage and acknowledgement
 
@@ -134,11 +139,15 @@ using its token, so an old invocation cannot overwrite a later claim.
 
 ## Deployment and activation prerequisites
 
-Before enabling retirement in a **separate reviewed producer activation**, verify:
+Before deploying the consumer, verify:
 
-1. Every prerequisite in the unchanged producer runbook, including authoritative
-   manifest replication evidence and the legacy late-write safety decision.
-   This consumer PR does not supply a monitor or health attestation writer.
+1. The upstream producer activation from PR #3702 is intentional for the rollout.
+   Current main already enables retirement, so consumer deployment can start
+   physical deletion of committed jobs. Preserve the producer runbook's replication
+   and legacy late-write safety requirements. This consumer PR supplies no health
+   attestation writer and changes none of the existing producer health code.
+   If deletion must remain paused, pause cleanup delivery before deployment;
+   never use missing credentials as the pause mechanism or burn delivery retries.
 2. Correct standalone PlanetScale inventory/replicated manifest schema, retirement
    triggers, uncached `HYPERDRIVE_R2_INVENTORY` and the existing restricted role.
    Read-only inspection on 2026-10-15 found about 20M inventory / 11.4M manifest
