@@ -21,7 +21,7 @@ import { shouldShowExpiredTrialPlansState, shouldShowPlanFailureBanner } from '~
 import { checkPermissions } from '~/services/permissions'
 import { createPlansVisitTracker } from '~/services/plansVisitTracking'
 import { getSignupAttributionEventTags } from '~/services/signupAttribution'
-import { getAffonsoReferral, getDatafastAttribution, openCheckout } from '~/services/stripe'
+import { getAffonsoReferral, getDatafastAttribution, openCheckout, openPortal } from '~/services/stripe'
 import { getCreditPricingSteps, getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
@@ -300,6 +300,17 @@ async function openWebStripeCheckout(plan: Database['public']['Tables']['plans']
 
   const dismissedByCancel = await dialogStore.onDialogDismiss()
   return !dismissedByCancel
+}
+
+const canCancelPlan = computed(() => !!currentOrganization.value?.paying && !isCreditsOnly.value)
+
+async function openCancelPlan() {
+  const orgId = currentOrganization.value?.gid
+  if (!orgId || !(await checkPermissions('org.update_billing', { orgId }))) {
+    showAdminModal.value = true
+    return
+  }
+  await openPortal(orgId, t, 'cancel_subscription')
 }
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
@@ -787,6 +798,17 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       <div v-if="!isMobile" class="mt-4 text-xs text-center text-gray-500 dark:text-gray-400 shrink-0">
         {{ t('plan-page-warn').replace('%ORG_NAME%', currentOrganization?.name ?? '') }}
         <a class="text-blue-600 hover:underline dark:text-blue-300" href="https://capgo.app/docs/docs/webapp/payment/">{{ t('plan-page-warn-2') }}</a>
+      </div>
+
+      <div v-if="!isMobile && canCancelPlan" class="mt-2 text-xs text-center shrink-0">
+        <button
+          type="button"
+          data-test="cancel-plan-button"
+          class="font-medium text-gray-500 underline hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+          @click="openCancelPlan"
+        >
+          {{ t('cancel-plan') }}
+        </button>
       </div>
 
       <!-- Credits CTA: under prices so plan cards stay visible without scrolling -->
