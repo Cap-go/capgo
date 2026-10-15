@@ -277,25 +277,33 @@ jobs:
           fetch-depth: 2
       - name: Setup bun
         run: bash scripts/setup-bun.sh
-      - name: Validate migration timestamps
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-        run: bash scripts/check-supabase-migration-order.sh
-      - name: Check for typos
-        uses: crate-ci/typos@v1 # v1.45.1
-      - name: Check for console statements
-        run: |
-          if grep -r --exclude="logging.ts" --exclude=".env" --exclude=".env.*" "console\." supabase/functions/; then
-            echo "Found console statements in supabase/functions directory, use cloudlog instead"
-            exit 1
-          else
-            echo "No console statements found in supabase/functions directory"
-          fi
-      - name: Install dependencies
-        run: bun install
-      - name: Lint
-        run: bun lint && bun lint:backend
-      - name: Typecheck
-        run: bun typecheck
+      - parallel:
+          - name: Validate migration timestamps
+            if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+            run: bash scripts/check-supabase-migration-order.sh
+          - name: Check for typos
+            uses: crate-ci/typos@v1 # v1.45.1
+          - name: Check for console statements
+            run: |
+              if grep -r --exclude="logging.ts" --exclude=".env" --exclude=".env.*" "console\." supabase/functions/; then
+                echo "Found console statements in supabase/functions directory, use cloudlog instead"
+                exit 1
+              else
+                echo "No console statements found in supabase/functions directory"
+              fi
+          - name: Install dependencies
+            run: bun install
+      - parallel:
+          - name: Lint frontend
+            run: bun lint
+          - name: Lint backend
+            run: bun lint:backend
+          - name: Typecheck CLI
+            run: bun run cli:typecheck
+          - name: Typecheck backend
+            run: bun run typecheck:backend
+          - name: Typecheck frontend
+            run: bun run typecheck:frontend
 
   test_unit:
     needs: changes
@@ -410,10 +418,13 @@ jobs:
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - name: Install dependencies
-        run: bun install
-      - name: Run Supabase Start
-        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      - parallel:
+          - name: Install dependencies
+            run: bun install
+          - name: Run Supabase Start
+            env:
+              SUPABASE_CLI_BIN: supabase
+            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated Supabase endpoints
         run: |
           bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)' >> "$GITHUB_ENV"
@@ -552,10 +563,13 @@ jobs:
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - name: Install dependencies
-        run: bun install
-      - name: Run Supabase Start
-        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      - parallel:
+          - name: Install dependencies
+            run: bun install
+          - name: Run Supabase Start
+            env:
+              SUPABASE_CLI_BIN: supabase
+            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated Supabase endpoints
         run: |
           bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)' >> "$GITHUB_ENV"
@@ -733,10 +747,13 @@ jobs:
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - name: Install dependencies
-        run: bun install
-      - name: Run Supabase Start
-        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      - parallel:
+          - name: Install dependencies
+            run: bun install
+          - name: Run Supabase Start
+            env:
+              SUPABASE_CLI_BIN: supabase
+            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated Supabase endpoints
         run: |
           bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)' >> "$GITHUB_ENV"
@@ -841,10 +858,13 @@ jobs:
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - name: Install dependencies
-        run: bun install
-      - name: Run Supabase Start
-        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      - parallel:
+          - name: Install dependencies
+            run: bun install
+          - name: Run Supabase Start
+            env:
+              SUPABASE_CLI_BIN: supabase
+            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated test endpoints
         run: |
           {
@@ -950,10 +970,13 @@ jobs:
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - name: Install dependencies
-        run: bun install
-      - name: Run Supabase Start
-        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      - parallel:
+          - name: Install dependencies
+            run: bun install
+          - name: Run Supabase Start
+            env:
+              SUPABASE_CLI_BIN: supabase
+            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated test endpoints
         run: |
           {
@@ -1538,12 +1561,15 @@ jobs:
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - name: Install dependencies and build CLI
-        run: |
-          bun install
-          bun run cli:build
-      - name: Run Supabase Start
-        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      - parallel:
+          - name: Install dependencies and build CLI
+            run: |
+              bun install
+              bun run cli:build
+          - name: Run Supabase Start
+            env:
+              SUPABASE_CLI_BIN: supabase
+            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated Supabase endpoints
         run: |
           bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)' >> "$GITHUB_ENV"
