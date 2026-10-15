@@ -122,10 +122,12 @@ describe('r2 inventory queue', () => {
       { binding: 'REPAIR_QUEUE', queue: 'capgo-r2-inventory-prod-repair' },
       { binding: 'EVENT_DLQ', queue: 'capgo-r2-inventory-prod-dlq' },
       { binding: 'REPAIR_DLQ', queue: 'capgo-r2-inventory-prod-repair-dlq' },
+      { binding: 'CLEANUP_DLQ', queue: 'capgo-r2-inventory-prod-cleanup-dlq' },
     ])
     expect(wrangler.env.prod.queues.consumers).toEqual([
       { queue: 'capgo-r2-inventory-prod', max_batch_size: 100, max_batch_timeout: 10, max_concurrency: 1, max_retries: 4, dead_letter_queue: 'capgo-r2-inventory-prod-dlq' },
       { queue: 'capgo-r2-inventory-prod-repair', max_batch_size: 10, max_batch_timeout: 10, max_concurrency: 1, max_retries: 4, dead_letter_queue: 'capgo-r2-inventory-prod-repair-dlq' },
+      { queue: 'capgo-r2-inventory-prod-cleanup', max_batch_size: 100, max_batch_timeout: 10, max_concurrency: 1, max_retries: 2, retry_delay: 30, dead_letter_queue: 'capgo-r2-inventory-prod-cleanup-dlq' },
     ])
   })
 
