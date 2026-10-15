@@ -18,9 +18,11 @@ import IconScanQrCode from '~icons/lucide/scan-qr-code'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
-import { captureAppleOAuthCallback, completeAppleOAuth, consumeAppleOAuthLandingError, hasPendingAppleOAuth, startAppleOAuth } from '~/services/appleOAuth'
+import { appleOAuth } from '~/services/appleOAuth'
+import { googleOAuth } from '~/services/googleOAuth'
 import { hideLoader } from '~/services/loader'
 import { isNativeAppleLoginAvailable, signInWithApple } from '~/services/nativeAppleLogin'
+import { isNativeGoogleLoginAvailable, loadNativeGoogleConfiguration, signInWithGoogle } from '~/services/nativeGoogleLogin'
 import { autoAuth, defaultApiHost, hashEmail, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { isCapgoDomainReferrer, isDirectLoginLanding } from '~/utils/capgoReferrer'
@@ -28,11 +30,14 @@ import { getLoginActionVisibility } from '~/utils/loginActions'
 import { validateRedirectPath } from '~/utils/safeRedirect'
 import { safeResetTurnstile } from '~/utils/turnstile'
 
+const oauthFlows = [appleOAuth, googleOAuth]
 const route = useRoute('/login')
 const supabase = useSupabase()
 const isLoading = ref(false)
 const isAppleLoading = ref(false)
 const appleLoginAvailable = computed(() => isNativeAppleLoginAvailable())
+const googleLoginAvailable = computed(() => isNativeGoogleLoginAvailable())
+const isGoogleLoading = ref(false)
 const isMobile = ref(Capacitor.isNativePlatform())
 const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
@@ -389,6 +394,35 @@ async function handleAppleLogin() {
   }
   finally {
     isAppleLoading.value = false
+    isLoading.value = false
+  }
+}
+
+async function handleGoogleLogin() {
+  if (isLoading.value || !isNativeGoogleLoginAvailable())
+    return
+  isLoading.value = true
+  isGoogleLoading.value = true
+  let hasGoogleSession = false
+  try {
+    const result = await signInWithGoogle(supabase, turnstileToken.value || undefined)
+    if (!result)
+      return
+    hasGoogleSession = true
+    if (!await checkMfa())
+      throw new Error('Google login could not complete MFA setup')
+  }
+  catch (error) {
+    if (hasGoogleSession)
+      await supabase.auth.signOut({ scope: 'local' })
+    const code = error instanceof Error ? error.message : ''
+    const message = code === 'sso_required' ? 'sso-required' : code === 'account_deleted' ? 'used-to-create' : 'google-login-failed'
+    turnstileToken.value = ''
+    safeResetTurnstile(captchaComponent.value)
+    toast.error(t(message))
+  }
+  finally {
+    isGoogleLoading.value = false
     isLoading.value = false
   }
 }
@@ -760,24 +794,24 @@ async function handleQuerySessionHandoff(accessToken: string, refreshToken: stri
   hideLoader()
 }
 
-async function handleAppleOAuthLanding(parsedUrl: URL) {
-  if (consumeAppleOAuthLandingError())
-    throw new Error('Apple authorization failed')
-  if (parsedUrl.searchParams.get('apple_oauth') === '1' && !Capacitor.isNativePlatform()) {
-    // Console owns the verifier and resulting session across the Apple round trip.
-    const entry = new URL(parsedUrl)
-    parsedUrl.searchParams.delete('apple_oauth')
-    parsedUrl.searchParams.delete('apple_website_state')
+async function handleSocialOAuthLanding(parsedUrl: URL) {
+  if (oauthFlows.map(flow => flow.consumeLandingError()).some(Boolean))
+    throw new Error('Social authorization failed')
+  const entry = oauthFlows.find(flow => parsedUrl.searchParams.get(`${flow.provider}_oauth`) === '1')
+  if (entry && !Capacitor.isNativePlatform()) {
+    const url = new URL(parsedUrl)
+    parsedUrl.searchParams.delete(`${entry.provider}_oauth`)
+    parsedUrl.searchParams.delete(`${entry.provider}_website_state`)
     globalThis.history.replaceState({}, '', parsedUrl)
-    await startAppleOAuth(entry)
+    await entry.start(url)
     return true
   }
-  captureAppleOAuthCallback(parsedUrl)
-  if (hasPendingAppleOAuth()) {
+  oauthFlows.forEach(flow => flow.capture(parsedUrl))
+  if (oauthFlows.some(flow => flow.hasPending())) {
     isLoading.value = false
     hideLoader()
     if (!captchaKey.value || turnstileToken.value)
-      await finishAppleOAuth()
+      await finishSocialOAuth()
     return true
   }
   return false
@@ -786,7 +820,7 @@ async function handleAppleOAuthLanding(parsedUrl: URL) {
 async function checkLogin() {
   try {
     const parsedUrl = new URL(route.fullPath, globalThis.location.origin)
-    if (await handleAppleOAuthLanding(parsedUrl))
+    if (await handleSocialOAuthLanding(parsedUrl))
       return
     const params = new URLSearchParams(parsedUrl.search)
 
@@ -840,34 +874,36 @@ async function checkLogin() {
   }
 }
 
-async function finishAppleOAuth() {
-  if (isAppleLoading.value || !hasPendingAppleOAuth())
+async function finishSocialOAuth() {
+  const flow = oauthFlows.find(item => item.hasPending())
+  if (!flow || isAppleLoading.value || isGoogleLoading.value)
     return
-  isAppleLoading.value = true
+  const loading = flow.provider === 'apple' ? isAppleLoading : isGoogleLoading
+  loading.value = true
   isLoading.value = true
-  let hasAppleSession = false
+  let hasSession = false
   try {
-    await completeAppleOAuth(supabase, turnstileToken.value || undefined)
-    hasAppleSession = true
+    await flow.complete(supabase, turnstileToken.value || undefined)
+    hasSession = true
     if (!await checkMfa())
-      throw new Error('Apple login could not complete MFA setup')
+      throw new Error('Social login could not complete MFA setup')
   }
   catch {
-    if (hasAppleSession)
+    if (hasSession)
       await supabase.auth.signOut({ scope: 'local' })
     turnstileToken.value = ''
     safeResetTurnstile(captchaComponent.value)
-    toast.error(t('apple-login-failed'))
+    toast.error(t(`${flow.provider}-login-failed`))
   }
   finally {
-    isAppleLoading.value = false
+    loading.value = false
     isLoading.value = false
   }
 }
 
 watch(turnstileToken, (token) => {
-  if (token && hasPendingAppleOAuth())
-    void finishAppleOAuth()
+  if (token && oauthFlows.some(flow => flow.hasPending()))
+    void finishSocialOAuth()
 })
 
 function declineQuerySession() {
@@ -899,6 +935,9 @@ async function goback() {
   focusLoginEmailInput()
 }
 onMounted(checkLogin)
+onMounted(() => {
+  void loadNativeGoogleConfiguration()
+})
 </script>
 
 <template>
@@ -1159,16 +1198,23 @@ onMounted(checkLogin)
                       </div>
                     </div>
 
-                    <div v-if="appleLoginAvailable" v-show="isLoginStep" class="space-y-5">
+                    <div v-if="appleLoginAvailable || googleLoginAvailable" v-show="isLoginStep" class="space-y-5">
                       <div class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                         <span class="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
                         <span>{{ t('login-or-separator') }}</span>
                         <span class="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
                       </div>
                       <AppleSignInButton
+                        v-if="appleLoginAvailable"
                         :disabled="isLoading || shouldBlockForCaptcha || isCheckingSavedSession"
                         :loading="isAppleLoading"
                         @click="handleAppleLogin"
+                      />
+                      <GoogleSignInButton
+                        v-if="googleLoginAvailable"
+                        :disabled="isLoading || shouldBlockForCaptcha || isCheckingSavedSession"
+                        :loading="isGoogleLoading"
+                        @click="handleGoogleLogin"
                       />
                     </div>
 

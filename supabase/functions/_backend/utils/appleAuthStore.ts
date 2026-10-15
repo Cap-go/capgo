@@ -1,46 +1,15 @@
 import type { Context } from 'hono'
-import { base64url, compactDecrypt, CompactEncrypt } from 'jose'
-import { closeClient, getPgClient } from './pg.ts'
+import { authQuery as appleQuery, openAuthCredential, sanitizeAuthName as sanitizeAppleName, sealAuthCredential } from './socialAuthStore.ts'
 import { getEnv } from './utils.ts'
 
-export function appleRandom() {
-  return base64url.encode(crypto.getRandomValues(new Uint8Array(32)))
+export { authHash as appleHash, authQuery as appleQuery, authRandom as appleRandom, sanitizeAuthName as sanitizeAppleName } from './socialAuthStore.ts'
+
+export function sealAppleCredential(c: Context, value: unknown) {
+  return sealAuthCredential(value, getEnv(c, 'APPLE_SIGN_IN_PRIVATE_KEY'), 'capgo-apple-oauth-v1')
 }
 
-export async function appleHash(value: string) {
-  return base64url.encode(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))))
-}
-
-// Stored credentials are short-lived and encrypted with server-only key material.
-async function encryptionKey(c: Context) {
-  return new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`capgo-apple-oauth-v1:${getEnv(c, 'APPLE_SIGN_IN_PRIVATE_KEY')}`)))
-}
-
-export async function sealAppleCredential(c: Context, value: unknown) {
-  return new CompactEncrypt(new TextEncoder().encode(JSON.stringify(value)))
-    .setProtectedHeader({ alg: 'dir', enc: 'A256GCM' })
-    .encrypt(await encryptionKey(c))
-}
-
-export async function openAppleCredential<T>(c: Context, value: string): Promise<T> {
-  const { plaintext } = await compactDecrypt(value, await encryptionKey(c), { keyManagementAlgorithms: ['dir'], contentEncryptionAlgorithms: ['A256GCM'] })
-  return JSON.parse(new TextDecoder().decode(plaintext)) as T
-}
-
-export async function appleQuery<T extends Record<string, any>>(c: Context, query: string, params: unknown[]) {
-  const client = await getPgClient(c)
-  try {
-    return (await client.query<T>(query, params)).rows
-  }
-  finally {
-    await closeClient(c, client)
-  }
-}
-
-export function sanitizeAppleName(value: unknown) {
-  return typeof value === 'string' && !/[<>]/.test(value)
-    ? value.normalize('NFC').replace(/[\p{Cc}\p{Cf}]/gu, '').trim().slice(0, 100)
-    : ''
+export function openAppleCredential<T>(c: Context, value: string) {
+  return openAuthCredential<T>(value, getEnv(c, 'APPLE_SIGN_IN_PRIVATE_KEY'), 'capgo-apple-oauth-v1')
 }
 
 export async function rememberAppleName(c: Context, subject: string, first: unknown, last: unknown) {
@@ -56,13 +25,4 @@ export async function rememberAppleName(c: Context, subject: string, first: unkn
   return rows[0]
 }
 
-export interface AppleAttempt extends Record<string, unknown> {
-  state_hash: string
-  nonce: string
-  redirect_uri: string
-  code_challenge: string
-  client_state: string
-  expected_user_id: string | null
-  expected_subject: string | null
-  credential: string | null
-}
+export type { SocialAuthAttempt as AppleAttempt } from './socialAuthStore.ts'

@@ -4126,5 +4126,9 @@
   "your-api-key": "Used in Capgo web console areas: services. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "your-role-in-org": "Used in Capgo web console areas: pages. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "your-usage": "Used in Capgo web console areas: pages/settings/organization. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
-  "zip-bundle": "Used in Capgo web console areas: pages/app. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged."
+  "zip-bundle": "Used in Capgo web console areas: pages/app. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "sign-in-with-google": "Used in Capgo web console authentication and account deletion. Button label for Google sign-in using the official Google branding. Keep the Google product name unchanged.",
+  "google-login-failed": "Used in Capgo web console authentication and account deletion. Toast after Google sign-in fails. Keep the Google product name unchanged.",
+  "google-delete-account-hint": "Used in Capgo web console authentication and account deletion. Explanation before fresh Google reauthentication for account deletion. Email verification and enrolled MFA still apply.",
+  "google-delete-reauth-required": "Used in Capgo web console authentication and account deletion. Account deletion error requiring the user to repeat Google sign-in because recent authentication expired."
 }

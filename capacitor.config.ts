@@ -11,7 +11,7 @@ const config: CapacitorConfig = {
       logLevel: 0,
       providers: {
         apple: true,
-        google: false,
+        google: true,
         facebook: false,
         twitter: false,
         telegram: false,

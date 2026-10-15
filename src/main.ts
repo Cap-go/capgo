@@ -8,6 +8,7 @@ import { routes } from 'vue-router/auto-routes'
 import { prepareAppleOAuthLanding } from '~/services/appleOAuth'
 import { installDeepLinkHandler } from '~/services/deepLinks'
 import { isDocumentNavigationPending, replaceDocument } from '~/services/documentNavigation'
+import { prepareGoogleOAuthLanding } from '~/services/googleOAuth'
 import { getNativeExternalPurchaseRedirect, isNativeAppStoreContext, isNativeExternalPurchaseRestrictedPath } from '~/services/nativeCompliance'
 import { posthogLoader } from '~/services/posthog'
 import { captureConsoleAttributionFromLocation } from '~/services/signupAttribution'
@@ -20,6 +21,7 @@ import { getRemoteConfig } from './services/supabase'
 import './styles/style.css'
 
 prepareAppleOAuthLanding()
+prepareGoogleOAuthLanding()
 
 // Handle chunk load errors (stale chunks after deployment)
 // When a new version is deployed, old chunk URLs return 404/HTML instead of JS
