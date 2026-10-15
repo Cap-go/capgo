@@ -24,6 +24,7 @@ const sensitiveRequestBodyKeys = new Set([
   'access_token',
   'refresh_token',
   'authorization_code',
+  'code',
   'nonce',
   'code_verifier',
   'first_name',
