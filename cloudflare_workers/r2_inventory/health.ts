@@ -1,4 +1,6 @@
 import type { Client } from 'pg'
+import { sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/node-postgres'
 
 export const CLEANUP_HEALTH = Object.freeze({ timeoutMs: 5000, producerAgeMs: 30_000, consumerAgeMs: 120_000, feedbackSeconds: 60, replaySeconds: 30, walBytes: 64 * 1024 * 1024, deletionBacklog: 10_000 })
 export const REPLICATION = Object.freeze({ subscription: 'capgo_planetscale_r2_sub', slot: 'capgo_planetscale_r2_slot', publication: 'capgo_planetscale_r2_pub' })
@@ -81,12 +83,19 @@ export async function checkCleanupHealth(source: Client, inventory: Client, buck
   const read = async (client: Client, text: string, values: string[]) => {
     await client.connect()
     remaining()
-    // Arm on the checked-out connection before the parameterized SELECT.
-    await client.query('BEGIN READ ONLY; SET LOCAL statement_timeout = \'3s\'; SET LOCAL idle_in_transaction_session_timeout = \'4s\'')
-    const result = await client.query(text, values)
-    await client.query('COMMIT')
+    const row = await drizzle({ client }).transaction(async (tx) => {
+      remaining()
+      // Arm on the checked-out connection before the parameterized SELECT.
+      await tx.execute(sql`SET LOCAL statement_timeout = '3s'`)
+      remaining()
+      await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '4s'`)
+      remaining()
+      const result = await client.query(text, values)
+      remaining()
+      return result.rows.length === 1 ? result.rows[0] : undefined
+    }, { accessMode: 'read only' })
     remaining()
-    return result.rows.length === 1 ? result.rows[0] : undefined
+    return row
   }
   try {
     await Promise.race([
@@ -121,20 +130,21 @@ export async function checkCleanupHealth(source: Client, inventory: Client, buck
         // Publication is part of the five-second operation. Never read this row
         // in the producer; the future consumer checks schema, flags and freshness.
         remaining()
-        await inventory.query('BEGIN')
-        remaining()
-        const writeMs = Math.max(1, deadline - Date.now() - 100)
-        await inventory.query(`SET LOCAL statement_timeout = '${writeMs}ms'; SET LOCAL lock_timeout = '500ms'; SET LOCAL idle_in_transaction_session_timeout = '${writeMs}ms'`)
-        remaining()
-        const publication = await inventory.query(`INSERT INTO public.r2_inventory_checkpoints AS c (bucket_name, job_name, checkpoint)
-          VALUES ($1, 'cleanup_health', $2::jsonb) ON CONFLICT (bucket_name, job_name, partition_key)
-          DO UPDATE SET checkpoint = EXCLUDED.checkpoint
-          WHERE (c.checkpoint->>'observedAt')::timestamptz <= ($2::jsonb->>'observedAt')::timestamptz
-          RETURNING 1`, [bucket, JSON.stringify(health)])
-        if (publication.rows.length !== 1)
-          throw new Error('Newer cleanup health already published')
-        remaining()
-        await inventory.query('COMMIT')
+        await drizzle({ client: inventory }).transaction(async (tx) => {
+          remaining()
+          const writeMs = Math.max(1, deadline - Date.now() - 100)
+          await tx.execute(sql`SELECT set_config('statement_timeout', ${`${writeMs}ms`}, true),
+            set_config('lock_timeout', '500ms', true), set_config('idle_in_transaction_session_timeout', ${`${writeMs}ms`}, true)`)
+          remaining()
+          const publication = await inventory.query(`INSERT INTO public.r2_inventory_checkpoints AS c (bucket_name, job_name, checkpoint)
+            VALUES ($1, 'cleanup_health', $2::jsonb) ON CONFLICT (bucket_name, job_name, partition_key)
+            DO UPDATE SET checkpoint = EXCLUDED.checkpoint
+            WHERE (c.checkpoint->>'observedAt')::timestamptz <= ($2::jsonb->>'observedAt')::timestamptz
+            RETURNING 1`, [bucket, JSON.stringify(health)])
+          if (publication.rows.length !== 1)
+            throw new Error('Newer cleanup health already published')
+          remaining()
+        })
         remaining()
       })(),
       new Promise<never>((_, reject) => {

@@ -1,3 +1,5 @@
+import { sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/node-postgres'
 import { Client } from 'pg'
 import { describe, expect, it, vi } from 'vitest'
 import { checkCleanupHealth, DESTINATION_HEALTH_SQL, REPLICATION, SOURCE_HEALTH_SQL } from '../cloudflare_workers/r2_inventory/health.ts'
@@ -22,7 +24,6 @@ async function fixture(run: (inventory: Client, peer: Client, bucket: string, ch
     await run(inventory, peer, bucket, () => checkCleanupHealth(source, inventory, bucket, queues))
   }
   finally {
-    await peer.query('ROLLBACK')
     await Promise.all([source.end(), inventory.end()])
     await peer.query('DELETE FROM public.r2_inventory_checkpoints WHERE bucket_name=$1', [bucket])
     await peer.end()
@@ -47,11 +48,11 @@ describe('cleanup health checkpoint transactions', () => {
 
   it.concurrent('cancels a locked publication without allowing a later healthy commit', () => fixture(async (_inventory, peer, bucket, check) => {
     await peer.query(`INSERT INTO public.r2_inventory_checkpoints(bucket_name,job_name,checkpoint) VALUES ($1,'cleanup_health',jsonb_build_object('observedAt',clock_timestamp()-interval '1 hour','healthy',false))`, [bucket])
-    await peer.query('BEGIN')
-    await peer.query('SELECT 1 FROM public.r2_inventory_checkpoints WHERE bucket_name=$1 FOR UPDATE', [bucket])
-    const result = await check()
-    expect(result.producerReady).toBe(false)
-    await peer.query('COMMIT')
+    await drizzle({ client: peer }).transaction(async (tx) => {
+      await tx.execute(sql`SELECT 1 FROM public.r2_inventory_checkpoints WHERE bucket_name=${bucket} FOR UPDATE`)
+      const result = await check()
+      expect(result.producerReady).toBe(false)
+    })
     const stored = await peer.query(`SELECT checkpoint FROM public.r2_inventory_checkpoints WHERE bucket_name=$1 AND job_name='cleanup_health'`, [bucket])
     expect(stored.rows[0].checkpoint.healthy).toBe(false)
   }))

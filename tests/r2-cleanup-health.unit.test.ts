@@ -3,10 +3,12 @@ import { checkCleanupHealth, CLEANUP_HEALTH, DESTINATION_HEALTH_SQL, REPLICATION
 
 const sourceRow = () => ({ active: true, wal_status: 'reserved', state: 'streaming', feedback_age: 1, replay_seconds: null, wal_bytes: '0', publication_ok: true })
 const destinationRow = () => ({ subenabled: true, subslotname: REPLICATION.slot, subpublications: [REPLICATION.publication], pid: 42, srsubstate: 'r', receipt_age: 1, observed_at: new Date().toISOString(), apply_error_count: '2', sync_error_count: '1' })
+type Query = string | { text: string }
+const queryText = (input: Query) => typeof input === 'string' ? input : input.text
 function fixture() {
   const client = (row: object) => ({
     connect: vi.fn().mockResolvedValue(undefined),
-    query: vi.fn(async (text: string) => ({ rows: text.startsWith('SELECT') ? [row] : text.startsWith('INSERT') ? [{ published: true }] : [] })),
+    query: vi.fn(async (input: Query) => ({ rows: queryText(input).startsWith('SELECT') ? [row] : queryText(input).startsWith('INSERT') ? [{ published: true }] : [] })),
     end: vi.fn().mockResolvedValue(undefined),
   })
   const source = client(sourceRow())
@@ -25,21 +27,23 @@ describe('direct cleanup health', () => {
       connect = resolve
     }))
     const checking = f.run()
-    await vi.waitFor(() => expect(f.inventory.query).toHaveBeenCalledWith('COMMIT'))
+    await vi.waitFor(() => expect(f.inventory.query).toHaveBeenCalledWith(expect.objectContaining({ text: 'commit' }), []))
     expect(f.source.connect).toHaveBeenCalledOnce()
     expect(f.inventory.connect).toHaveBeenCalledOnce()
     expect(f.queues.every(queue => queue.metrics.mock.calls.length === 1)).toBe(true)
-    expect(f.inventory.query.mock.calls.some(([sql]) => sql.startsWith('INSERT'))).toBe(false)
+    expect(f.inventory.query.mock.calls.some(([sql]) => queryText(sql).startsWith('INSERT'))).toBe(false)
     connect()
     const result = await checking
     expect(result.healthy).toBe(true)
     requireCleanupHealth(result)
-    const publish = f.inventory.query.mock.calls.find(([sql]) => sql.startsWith('INSERT')) as unknown as [string, string[]]
+    const publish = f.inventory.query.mock.calls.find(([sql]) => queryText(sql).startsWith('INSERT')) as unknown as [string, string[]]
     expect(publish[0]).toContain('\'cleanup_health\'')
     expect(JSON.parse(publish[1][1])).toEqual(result)
+    expect(f.source.query).toHaveBeenCalledWith(expect.objectContaining({ text: 'begin read only' }), [])
+    expect(f.inventory.query).toHaveBeenCalledWith(expect.objectContaining({ text: 'begin read only' }), [])
     expect(f.source.query).toHaveBeenCalledWith(SOURCE_HEALTH_SQL, [REPLICATION.slot, REPLICATION.publication])
     expect(f.inventory.query).toHaveBeenCalledWith(DESTINATION_HEALTH_SQL, [REPLICATION.subscription])
-    expect(f.inventory.query.mock.calls.some(([sql]) => sql.startsWith('SELECT checkpoint'))).toBe(false)
+    expect(f.inventory.query.mock.calls.some(([sql]) => queryText(sql).startsWith('SELECT checkpoint'))).toBe(false)
   })
 
   it.each([
@@ -91,39 +95,42 @@ describe('direct cleanup health', () => {
     expect(result.healthy).toBe(index === 4)
     expect(result.producerReady).toBe(false)
     expect(result.reasons.length).toBeGreaterThan(0)
-    expect(f.inventory.query.mock.calls.some(([sql]) => sql.startsWith('INSERT'))).toBe(true)
+    expect(f.inventory.query.mock.calls.some(([sql]) => queryText(sql).startsWith('INSERT'))).toBe(true)
   })
 
   it('fails closed for permission failures and writes negative evidence when inventory is available', async () => {
     const f = fixture()
-    f.source.query.mockRejectedValue(new Error('permission denied'))
+    const normal = f.source.query.getMockImplementation()!
+    f.source.query.mockImplementation(input => queryText(input) === SOURCE_HEALTH_SQL ? Promise.reject(new Error('permission denied')) : normal(input))
     const result = await f.run()
     expect(result.healthy).toBe(false)
     expect(result.manifestReplicationHealthy).toBe(false)
-    expect(f.inventory.query.mock.calls.some(([sql]) => sql.startsWith('INSERT'))).toBe(true)
+    expect(f.source.query).toHaveBeenCalledWith(expect.objectContaining({ text: 'rollback' }), [])
+    expect(f.inventory.query.mock.calls.some(([sql]) => queryText(sql).startsWith('INSERT'))).toBe(true)
   })
 
   it('does not authorize the producer if publication fails', async () => {
     const f = fixture()
     const normal = f.inventory.query.getMockImplementation()!
-    f.inventory.query.mockImplementation(async text => text.startsWith('INSERT') ? Promise.reject(new Error('write failed')) : normal(text))
+    f.inventory.query.mockImplementation(async text => queryText(text).startsWith('INSERT') ? Promise.reject(new Error('write failed')) : normal(text))
     const result = await f.run()
     expect(result.healthy).toBe(false)
     expect(result.reasons).toContain('health_query_or_write_failed')
     expect(f.source.end).toHaveBeenCalled()
     expect(f.inventory.end).toHaveBeenCalled()
+    expect(f.inventory.query).toHaveBeenCalledWith(expect.objectContaining({ text: 'rollback' }), [])
   })
 
   it('does not overwrite a newer observation or authorize unpublished evidence', async () => {
     const f = fixture()
     const normal = f.inventory.query.getMockImplementation()!
-    f.inventory.query.mockImplementation(async text => text.startsWith('INSERT') ? { rows: [] } : normal(text))
+    f.inventory.query.mockImplementation(async text => queryText(text).startsWith('INSERT') ? { rows: [] } : normal(text))
     const result = await f.run()
     expect(result.healthy).toBe(false)
     expect(result.reasons).toContain('health_query_or_write_failed')
   })
 
-  it.each(['connection', 'query', 'write', 'queue'])('bounds the entire %s operation to five seconds and prevents late continuation', async (phase) => {
+  it.each(['connection', 'read_setup', 'query', 'read_commit', 'write', 'write_commit', 'queue'])('bounds the entire %s operation to five seconds and prevents late continuation', async (phase) => {
     vi.useFakeTimers()
     const f = fixture()
     let finish: (value: any) => void = () => {}
@@ -132,13 +139,21 @@ describe('direct cleanup health', () => {
     })
     if (phase === 'connection')
       f.source.connect.mockImplementation(() => stalled)
-    if (phase === 'query')
-      f.source.query.mockImplementation(() => stalled)
+    if (phase === 'read_setup' || phase === 'query' || phase === 'read_commit') {
+      const normal = f.source.query.getMockImplementation()!
+      const target = phase === 'query' ? SOURCE_HEALTH_SQL : phase === 'read_commit' ? 'commit' : 'SET LOCAL statement_timeout = \'3s\''
+      f.source.query.mockImplementation(input => queryText(input) === target ? stalled : normal(input))
+    }
     if (phase === 'queue')
       f.queues[0].metrics.mockImplementation(() => stalled)
     if (phase === 'write') {
       const normal = f.inventory.query.getMockImplementation()!
-      f.inventory.query.mockImplementation(text => text.startsWith('INSERT') ? stalled : normal(text))
+      f.inventory.query.mockImplementation(text => queryText(text).startsWith('INSERT') ? stalled : normal(text))
+    }
+    if (phase === 'write_commit') {
+      const normal = f.inventory.query.getMockImplementation()!
+      let commits = 0
+      f.inventory.query.mockImplementation(input => queryText(input) === 'commit' && ++commits === 2 ? stalled : normal(input))
     }
     const checking = f.run()
     await vi.advanceTimersByTimeAsync(4999)
@@ -152,9 +167,13 @@ describe('direct cleanup health', () => {
     expect(f.source.end).toHaveBeenCalled()
     expect(f.inventory.end).toHaveBeenCalled()
     const calls = f.inventory.query.mock.calls.length
+    const sourceCalls = f.source.query.mock.calls.length
     finish({ rows: [sourceRow()] })
     await vi.advanceTimersByTimeAsync(0)
-    expect(f.inventory.query.mock.calls).toHaveLength(calls)
+    // Drizzle may attempt rollback after a stalled statement settles; no late
+    // SELECT, publication or commit may follow the deadline.
+    expect(f.inventory.query.mock.calls.slice(calls).every(([input]) => queryText(input) === 'rollback')).toBe(true)
+    expect(f.source.query.mock.calls.slice(sourceCalls).every(([input]) => queryText(input) === 'rollback')).toBe(true)
     expect(result.healthy).toBe(false)
   })
 
