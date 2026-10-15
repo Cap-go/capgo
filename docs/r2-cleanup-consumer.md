@@ -39,6 +39,15 @@ An unexpected reference/lease preserves both R2 and permanent retirement, logs a
 generic reason, acknowledges that message and contributes to the alert summary.
 There is no automatic redispatch of skipped or exhausted jobs.
 
+V2 manifest finalization requires an existing, unexpired reservation and renews it
+under the inventory row lock; a receipt cannot recreate a missing reservation.
+Upload notifications preserve the existing expiry exactly. Once cleanup retires a
+key, a late upload cannot attach that key through a new successful finalization.
+The separate possibility of a previously admitted save committing after its renewed
+lease expires is accepted and documented beside the consumer reference check;
+shared transactional coordination is deferred to the planned inventory move into
+Supabase. Older v1/receiptless finalization retains its existing retirement checks.
+
 The consumer accepts the original v1 and upstream v2 `cleanup_health` schemas,
 and reads only a valid `observedAt` and
 `manifestReplicationHealthy=true`. Evidence must not be future-dated and must be
