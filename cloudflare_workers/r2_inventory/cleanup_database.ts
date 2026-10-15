@@ -64,6 +64,12 @@ export async function inspectCleanupGroup(db: ClientBase, bucket: string, messag
     const snapshot = await readObservationSnapshot(db, bucket, keys)
     // All reference probes start from the delivered PKs. row_security=off makes
     // a policy-filtered probe fail instead of authorizing deletion on hidden rows.
+    // Accepted limitation while inventory and manifest writes use separate databases:
+    // set_manifest renews the inventory lease before committing manifest rows in
+    // Supabase. A save that outlives that lease could commit a reference after this
+    // check and deletion. Visible references and active leases remain protected.
+    // Defer shared transactional coordination of finalization and retirement to
+    // the planned inventory move into Supabase.
     const safety = await db.query<{ r2_key: string, retired_at: string | null, revision: string, r2_state: string, referenced: boolean, leased: boolean }>(`SELECT r2_key, revision::text, r2_state,
       to_char(cleanup_requested_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS retired_at,
       EXISTS (SELECT 1 FROM public.manifest m WHERE m.s3_path=o.r2_key) AS referenced,
