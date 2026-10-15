@@ -1,6 +1,6 @@
 # Shared Apple authentication contract (implementation in progress)
 
-Authoritative tracked copy: `docs/apple-auth-api.md` in the backend/iOS PR. Base: remote main `78633b1ca6a377e3c69b2900bd2c4449233f2031`. Branch: `wolny/shared-apple-auth`. PR: pending.
+Authoritative tracked copy: `docs/apple-auth-api.md` in the backend/iOS PR. Initial verified base: remote main `78633b1ca6a377e3c69b2900bd2c4449233f2031`; refreshed to `4caff87863e6e0aafdde4574dd725a97cf3bf397` before implementation commit. Branch: `wolny/shared-apple-auth`. PR: https://github.com/Cap-go/capgo.app/pull/3715.
 
 All paths are relative to the existing API host (including `/functions/v1` when required by that host). JSON POST requests and responses use `Cache-Control: no-store`. No direct client Supabase Apple exchange or fallback is permitted. Supabase remains the session engine; clients install returned tokens with `supabase.auth.setSession(session)` and run their normal MFA/onboarding flow.
 
