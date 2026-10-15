@@ -282,6 +282,7 @@ export type Database = {
           created_by_apikey_rbac_id: string | null
           deleted: boolean
           deleted_at: string | null
+          delta_manifest_uploaded: boolean
           external_url: string | null
           id: number
           key_id: string | null
@@ -309,6 +310,7 @@ export type Database = {
           created_by_apikey_rbac_id?: string | null
           deleted?: boolean
           deleted_at?: string | null
+          delta_manifest_uploaded?: boolean
           external_url?: string | null
           id?: number
           key_id?: string | null
@@ -336,6 +338,7 @@ export type Database = {
           created_by_apikey_rbac_id?: string | null
           deleted?: boolean
           deleted_at?: string | null
+          delta_manifest_uploaded?: boolean
           external_url?: string | null
           id?: number
           key_id?: string | null
@@ -1746,6 +1749,9 @@ export type Database = {
           builds_success_total: number | null
           builds_total: number | null
           bundle_storage_gb: number
+          bundles_day_both: number | null
+          bundles_day_delta_only: number | null
+          bundles_day_zip_only: number | null
           canceled_orgs: number
           churn_revenue: number
           churn_revenue_enterprise: number
@@ -1865,6 +1871,9 @@ export type Database = {
           builds_success_total?: number | null
           builds_total?: number | null
           bundle_storage_gb?: number
+          bundles_day_both?: number | null
+          bundles_day_delta_only?: number | null
+          bundles_day_zip_only?: number | null
           canceled_orgs?: number
           churn_revenue?: number
           churn_revenue_enterprise?: number
@@ -1984,6 +1993,9 @@ export type Database = {
           builds_success_total?: number | null
           builds_total?: number | null
           bundle_storage_gb?: number
+          bundles_day_both?: number | null
+          bundles_day_delta_only?: number | null
+          bundles_day_zip_only?: number | null
           canceled_orgs?: number
           churn_revenue?: number
           churn_revenue_enterprise?: number

@@ -231,6 +231,16 @@
       "type": "uuid"
     },
     {
+      "default": "false",
+      "generated": "",
+      "identity": "",
+      "name": "delta_manifest_uploaded",
+      "notNull": true,
+      "position": 24,
+      "table": "app_versions",
+      "type": "boolean"
+    },
+    {
       "default": "now()",
       "generated": "",
       "identity": "",

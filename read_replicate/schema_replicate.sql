@@ -149,7 +149,8 @@ CREATE TABLE public.app_versions (
     key_id character varying(20),
     cli_version character varying,
     deleted_at timestamp with time zone,
-    created_by_apikey_rbac_id uuid
+    created_by_apikey_rbac_id uuid,
+    delta_manifest_uploaded boolean DEFAULT false NOT NULL
 )
 WITH (autovacuum_vacuum_scale_factor='0.05', autovacuum_analyze_scale_factor='0.02');
 

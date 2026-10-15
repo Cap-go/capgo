@@ -29,6 +29,7 @@ export function createBuiltinChannelVersion(channel: {
     created_by_apikey_rbac_id: null,
     deleted: false,
     deleted_at: null,
+    delta_manifest_uploaded: false,
     external_url: null,
     id: 0,
     key_id: null,

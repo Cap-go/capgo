@@ -1533,6 +1533,48 @@ async function getDailyIosBuildRequestBreakdown(c: Context, start: Date, end: Da
   }
 }
 
+interface BundleFormatDayCounts {
+  zipOnly: number
+  deltaOnly: number
+  both: number
+}
+
+function summarizeBundleFormatRow(row: { zip_only: number | string | null, delta_only: number | string | null, both: number | string | null } | undefined): BundleFormatDayCounts {
+  return {
+    zipOnly: Number(row?.zip_only) || 0,
+    deltaOnly: Number(row?.delta_only) || 0,
+    both: Number(row?.both) || 0,
+  }
+}
+
+/**
+ * Bundle upload formats for versions created in [start, end), deleted ones included.
+ * delta_manifest_uploaded is sticky, so deletion cleanup does not hide delta uploads.
+ * External/link bundles (no ZIP, no delta manifest) are not counted.
+ */
+async function countDailyBundleFormats(c: Context, start: Date, end: Date): Promise<BundleFormatDayCounts> {
+  // Read from primary so the daily rollup is not permanently undercounted by replica lag.
+  const pgClient = await getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+
+  try {
+    // Bounded by idx_app_versions_created_at.
+    const result = await drizzleClient.execute<{ zip_only: number | string | null, delta_only: number | string | null, both: number | string | null }>(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE r2_path IS NOT NULL AND NOT delta_manifest_uploaded)::int AS zip_only,
+        COUNT(*) FILTER (WHERE r2_path IS NULL AND delta_manifest_uploaded)::int AS delta_only,
+        COUNT(*) FILTER (WHERE r2_path IS NOT NULL AND delta_manifest_uploaded)::int AS both
+      FROM public.app_versions
+      WHERE created_at >= ${start}
+        AND created_at < ${end}
+    `)
+    return summarizeBundleFormatRow(result.rows?.[0])
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 function getCompletedAppBuildOnboardingWindow(window: DailyWindow): DailyWindow {
   const prevDayStart = new Date(window.prevDayStart.getTime() - DAY_IN_MS)
   const prevDayEnd = new Date(window.prevDayStart)
@@ -2896,6 +2938,7 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
     coreSnapshot,
     actives,
     finalizedAppBuildOnboardingMetrics,
+    bundleFormats,
   ] = await Promise.all([
     countAllApps(c, window.prevDayEnd),
     countAppsWithPreview(c, window.prevDayEnd),
@@ -2917,6 +2960,7 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
       users: await countActiveUsersForSnapshot(c, appIds, window),
     })),
     getAppBuildOnboardingMetrics(c, finalizedAppBuildOnboardingWindow),
+    countDailyBundleFormats(c, window.prevDayStart, window.prevDayEnd),
   ])
 
   const { customers, payingOrgsForConversion, plans } = billingSnapshot
@@ -2945,6 +2989,9 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
     users_with_2fa,
     apps_with_store_url,
     above_plan_with_credits,
+    bundles_day_zip_only: bundleFormats.zipOnly,
+    bundles_day_delta_only: bundleFormats.deltaOnly,
+    bundles_day_both: bundleFormats.both,
     above_plan_without_credits,
     need_upgrade,
     not_paying,
@@ -2972,7 +3019,7 @@ async function runCoreGlobalStatsShard(c: Context, window: DailyWindow): Promise
     users_active: actives.users,
   })
 
-  cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats core shard', dateId: window.prevDayDateId, finalizedAppBuildOnboardingDateId: finalizedAppBuildOnboardingWindow.prevDayDateId, apps, apps_with_preview, users_with_2fa, apps_with_store_url, updates, users, orgs })
+  cloudlog({ requestId: c.get('requestId'), message: 'Updated global stats core shard', dateId: window.prevDayDateId, finalizedAppBuildOnboardingDateId: finalizedAppBuildOnboardingWindow.prevDayDateId, bundleFormats, apps, apps_with_preview, users_with_2fa, apps_with_store_url, updates, users, orgs })
 }
 
 async function getRegistersToday(c: Context, createdAfterIso: string, createdBeforeIso: string): Promise<number> {
@@ -3704,6 +3751,7 @@ function scheduleGlobalStatsUpdate(
 export const globalStatsTestUtils = {
   buildGlobalStatsRetryMessage,
   summarizeIosBuildRequestRows,
+  summarizeBundleFormatRow,
   buildGlobalStatsShardMessage,
   readGlobalStatsPayload,
   REVENUE_ACTIVE_STRIPE_STATUSES,
