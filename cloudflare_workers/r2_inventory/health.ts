@@ -6,7 +6,7 @@ export const REPLICATION = Object.freeze({ subscription: 'capgo_planetscale_r2_s
 // NOW() makes this query uncacheable even on the existing cached source binding.
 // Catalog/statistics reads are bounded by replication configuration, never manifest size.
 export const SOURCE_HEALTH_SQL = `SELECT sl.active, sl.wal_status, sr.state,
-  extract(epoch FROM now() - sr.reply_time)::float8 AS feedback_age,
+  extract(epoch FROM greatest(now(), clock_timestamp()) - sr.reply_time)::float8 AS feedback_age,
   extract(epoch FROM sr.replay_lag)::float8 AS replay_seconds,
   pg_wal_lsn_diff(pg_current_wal_lsn(), sr.replay_lsn)::text AS wal_bytes,
   EXISTS (SELECT 1 FROM pg_catalog.pg_publication p JOIN pg_catalog.pg_publication_tables t
@@ -18,7 +18,7 @@ export const SOURCE_HEALTH_SQL = `SELECT sl.active, sl.wal_status, sr.state,
 
 export const DESTINATION_HEALTH_SQL = `SELECT s.subenabled, s.subslotname, s.subpublications,
   st.pid, r.srsubstate, clock_timestamp()::text AS observed_at,
-  extract(epoch FROM now() - st.last_msg_receipt_time)::float8 AS receipt_age,
+  extract(epoch FROM clock_timestamp() - st.last_msg_receipt_time)::float8 AS receipt_age,
   es.apply_error_count::text, es.sync_error_count::text
   FROM pg_catalog.pg_subscription s
   LEFT JOIN pg_catalog.pg_stat_subscription st ON st.subid = s.oid AND st.worker_type = 'apply'
@@ -124,7 +124,7 @@ export async function checkCleanupHealth(source: Client, inventory: Client, buck
         await inventory.query('BEGIN')
         remaining()
         const writeMs = Math.max(1, deadline - Date.now() - 100)
-        await inventory.query(`SET LOCAL statement_timeout = '${writeMs}ms'; SET LOCAL lock_timeout = '500ms'; SET LOCAL idle_in_transaction_session_timeout = '1s'`)
+        await inventory.query(`SET LOCAL statement_timeout = '${writeMs}ms'; SET LOCAL lock_timeout = '500ms'; SET LOCAL idle_in_transaction_session_timeout = '${writeMs}ms'`)
         remaining()
         const publication = await inventory.query(`INSERT INTO public.r2_inventory_checkpoints AS c (bucket_name, job_name, checkpoint)
           VALUES ($1, 'cleanup_health', $2::jsonb) ON CONFLICT (bucket_name, job_name, partition_key)

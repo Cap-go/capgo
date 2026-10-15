@@ -160,7 +160,7 @@ zero-result progress/wrap and no redispatch. Health checkpoint tests cover real
 commits, rejection of stale observations and cancellation of locked publication.
 
 The exact source health query was validated with production
-`EXPLAIN (ANALYZE, BUFFERS)` on 2026-10-15: execution took 1.944ms, inspecting
+`EXPLAIN (ANALYZE, BUFFERS)` on 2026-10-15: execution took 1.458ms, inspecting
 replication/publication catalogs without reading manifest rows. The exact
 destination query returned the expected ready subscription and fresh messages.
 
