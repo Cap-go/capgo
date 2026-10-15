@@ -5,6 +5,7 @@
     "": {
       "name": "capgo-app",
       "dependencies": {
+        "@aws-sdk/xml-builder": "3.972.36",
         "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6",
         "@capacitor/action-sheet": "^8.1.1",
         "@capacitor/android": "^8.5.2",
