@@ -1,10 +1,10 @@
 import type { Context } from 'hono'
 import type { AppleAttempt } from '../utils/appleAuthStore.ts'
 import { z } from 'zod'
-import { SocialAuthError as AppleAuthError, checkSocialEmail, getCaptchaSecret, isAuthRateLimitError, isCaptchaFailedError, socialRegistrationMetadataSchema as registrationMetadataSchema, saveSocialProfile } from '../utils/accountProvisioning.ts'
+import { SocialAuthError as AppleAuthError, checkSocialEmail, finishSocialSignIn, getCaptchaSecret, isAuthRateLimitError, isCaptchaFailedError, socialRegistrationMetadataSchema as registrationMetadataSchema } from '../utils/accountProvisioning.ts'
 import { appleHash, appleQuery, appleRandom, openAppleCredential, rememberAppleName, sealAppleCredential } from '../utils/appleAuthStore.ts'
 import { isAppleRolloutEnabled, isAppleSignInConfigured, isNativeAppleLoginConfigured, verifyAppleIdentity } from '../utils/appleSignIn.ts'
-import { createSocialAuthApp, socialExpectedUser as expectedUser, socialJsonBody as jsonBody } from '../utils/socialAuthHttp.ts'
+import { createSocialAuthApp, socialOAuthExchangeSchema as exchangeSchema, socialExpectedUser as expectedUser, socialJsonBody as jsonBody, socialOAuthConfig, socialOAuthStartSchema as startSchema } from '../utils/socialAuthHttp.ts'
 import { emptySupabaseWithClientIP } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
@@ -17,19 +17,6 @@ const credentialSchema = z.object({
   reauthenticate: z.boolean().optional(),
   registration_metadata: registrationMetadataSchema.optional(),
 })
-const startSchema = z.object({
-  redirect_uri: z.string().max(2048),
-  code_challenge: z.string().regex(/^[\w-]{43}$/),
-  client_state: z.string().regex(/^[\w-]{32,128}$/),
-  reauthenticate: z.boolean().optional(),
-  registration_metadata: registrationMetadataSchema.optional(),
-})
-const exchangeSchema = z.object({
-  code: z.string().regex(/^[\w-]{43}$/),
-  code_verifier: z.string().regex(/^[\w-]{43,128}$/),
-  captcha_token: z.string().min(1).max(4096).optional(),
-})
-
 export const app = createSocialAuthApp('apple', isAppleSignInConfigured)
 
 type AppleCredential = z.infer<typeof credentialSchema>
@@ -91,29 +78,7 @@ async function complete(c: Context, body: AppleCredential, web = false, expected
     if (!user.identities?.some(item => item.provider === 'apple' && item.identity_data?.sub === identity.subject))
       throw new AppleAuthError(400, 'invalid_apple_credential')
     await appleQuery(c, 'UPDATE public.apple_auth_names SET user_id = $2 WHERE subject = $1 AND (user_id IS NULL OR user_id = $2)', [identity.subject, user.id])
-    // Linked accounts can have a different primary email; enforce both identities.
-    await checkSocialEmail(c, user.email, 'apple')
-    const disabled = await client.rpc('is_account_disabled', { user_id: user.id })
-    if (disabled.error)
-      throw new AppleAuthError(500, 'apple_login_failed')
-    if (disabled.data) {
-      // Scheduled deletion remains restorable: issue the normal session but skip
-      // provisioning and let the existing auth guard send it to accountDisabled.
-      return {
-        user,
-        is_new_user: false,
-        name_status: 'unavailable',
-        account_status: 'disabled',
-        session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token },
-      }
-    }
-    const profile = await saveSocialProfile(c, client, { ...user, email: user.email }, name, body.registration_metadata, 'apple')
-    return {
-      user,
-      account_status: 'active',
-      ...profile,
-      session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token },
-    }
+    return await finishSocialSignIn(c, client, { ...user, email: user.email }, data.session, name, body.registration_metadata, 'apple')
   }
   catch (error_) {
     // Only revoke the just-created session. Never delete existing/linked auth users.
@@ -130,18 +95,7 @@ app.post('/', async (c) => {
 })
 
 function oauthConfig(c: Context) {
-  const clientId = getEnv(c, 'APPLE_SIGN_IN_WEB_CLIENT_ID').trim()
-  const callback = getEnv(c, 'APPLE_SIGN_IN_OAUTH_CALLBACK_URL').trim()
-  let redirects: string[] = []
-  try {
-    const values = JSON.parse(getEnv(c, 'APPLE_SIGN_IN_REDIRECT_URLS'))
-    if (Array.isArray(values) && values.every(value => typeof value === 'string'))
-      redirects = values
-  }
-  catch {}
-  if (!clientId || !callback.startsWith('https://') || !redirects.length)
-    throw new AppleAuthError(503, 'apple_login_unavailable')
-  return { clientId, callback, redirects }
+  return socialOAuthConfig(c, 'apple')
 }
 
 app.post('/start', async (c) => {

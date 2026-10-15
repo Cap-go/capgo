@@ -85,7 +85,7 @@ export async function checkSocialEmail(c: Context, email: string, provider: 'app
     throw new SocialAuthError(403, 'sso_required')
 }
 
-async function updateRegistrationMetadata(c: Context, client: AuthClient, user: User, rawMetadata: SocialRegistrationMetadata = {}, provider: 'apple' | 'google') {
+async function updateRegistrationMetadata(c: Context, client: AuthClient, user: User, provider: 'apple' | 'google', rawMetadata: SocialRegistrationMetadata = {}) {
   const existing = await supabaseAdmin(c).from('users').select('id').eq('id', user.id).maybeSingle()
   if (existing.error)
     throw new SocialAuthError(500, `${provider}_login_failed`)
@@ -103,7 +103,7 @@ async function updateRegistrationMetadata(c: Context, client: AuthClient, user: 
 }
 
 export async function saveSocialProfile(c: Context, client: AuthClient, user: User & { email: string }, name: { first_name: string, last_name: string }, metadata: SocialRegistrationMetadata | undefined, provider: 'apple' | 'google') {
-  await updateRegistrationMetadata(c, client, user, metadata, provider)
+  await updateRegistrationMetadata(c, client, user, provider, metadata)
   const profile = await provisionUserProfile(c, {
     id: user.id,
     email: user.email,
@@ -128,5 +128,23 @@ export async function saveSocialProfile(c: Context, client: AuthClient, user: Us
   return {
     is_new_user: (profile.data?.length ?? 0) > 0,
     name_status: saved.data.first_name || saved.data.last_name ? 'saved' : 'unavailable',
+  }
+}
+
+export async function finishSocialSignIn(c: Context, client: AuthClient, user: User & { email: string }, session: { access_token: string, refresh_token: string }, name: { first_name: string, last_name: string }, metadata: SocialRegistrationMetadata | undefined, provider: 'apple' | 'google') {
+  // Linked accounts can have a different primary email; enforce both identities.
+  await checkSocialEmail(c, user.email, provider)
+  const disabled = await client.rpc('is_account_disabled', { user_id: user.id })
+  if (disabled.error)
+    throw new SocialAuthError(500, `${provider}_login_failed`)
+  // Scheduled deletion stays restorable without provisioning a new profile.
+  const profile = disabled.data
+    ? { is_new_user: false, name_status: 'unavailable' }
+    : await saveSocialProfile(c, client, user, name, metadata, provider)
+  return {
+    user,
+    account_status: disabled.data ? 'disabled' : 'active',
+    ...profile,
+    session: { access_token: session.access_token, refresh_token: session.refresh_token },
   }
 }

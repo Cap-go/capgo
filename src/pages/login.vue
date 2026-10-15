@@ -416,7 +416,11 @@ async function handleGoogleLogin() {
     if (hasGoogleSession)
       await supabase.auth.signOut({ scope: 'local' })
     const code = error instanceof Error ? error.message : ''
-    const message = code === 'sso_required' ? 'sso-required' : code === 'account_deleted' ? 'used-to-create' : 'google-login-failed'
+    let message = 'google-login-failed'
+    if (code === 'sso_required')
+      message = 'sso-required'
+    else if (code === 'account_deleted')
+      message = 'used-to-create'
     turnstileToken.value = ''
     safeResetTurnstile(captchaComponent.value)
     toast.error(t(message))

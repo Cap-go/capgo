@@ -1,11 +1,11 @@
 import type { Context } from 'hono'
 import type { GoogleAttempt } from '../utils/googleAuthStore.ts'
 import { z } from 'zod'
-import { checkSocialEmail, getCaptchaSecret, SocialAuthError as GoogleAuthError, isAuthRateLimitError, isCaptchaFailedError, socialRegistrationMetadataSchema as registrationMetadataSchema, saveSocialProfile } from '../utils/accountProvisioning.ts'
+import { checkSocialEmail, finishSocialSignIn, getCaptchaSecret, SocialAuthError as GoogleAuthError, isAuthRateLimitError, isCaptchaFailedError, socialRegistrationMetadataSchema as registrationMetadataSchema } from '../utils/accountProvisioning.ts'
 import { googleHash, googleQuery, googleRandom, openGoogleCredential, sealGoogleCredential } from '../utils/googleAuthStore.ts'
 import { googleClientIds, isGoogleRolloutEnabled, isGoogleSignInConfigured, isNativeGoogleLoginConfigured, verifyGoogleIdentity } from '../utils/googleSignIn.ts'
 import { getSocialAuthSetting } from '../utils/socialAuthConfig.ts'
-import { createSocialAuthApp, socialExpectedUser as expectedUser, socialJsonBody as jsonBody } from '../utils/socialAuthHttp.ts'
+import { createSocialAuthApp, socialOAuthExchangeSchema as exchangeSchema, socialExpectedUser as expectedUser, socialJsonBody as jsonBody, socialOAuthConfig, socialOAuthStartSchema as startSchema } from '../utils/socialAuthHttp.ts'
 import { emptySupabaseWithClientIP } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
@@ -17,19 +17,6 @@ const credentialSchema = z.object({
   reauthenticate: z.boolean().optional(),
   registration_metadata: registrationMetadataSchema.optional(),
 })
-const startSchema = z.object({
-  redirect_uri: z.string().max(2048),
-  code_challenge: z.string().regex(/^[\w-]{43}$/),
-  client_state: z.string().regex(/^[\w-]{32,128}$/),
-  reauthenticate: z.boolean().optional(),
-  registration_metadata: registrationMetadataSchema.optional(),
-})
-const exchangeSchema = z.object({
-  code: z.string().regex(/^[\w-]{43}$/),
-  code_verifier: z.string().regex(/^[\w-]{43,128}$/),
-  captcha_token: z.string().min(1).max(4096).optional(),
-})
-
 export const app = createSocialAuthApp('google', isGoogleSignInConfigured)
 
 type GoogleCredential = z.infer<typeof credentialSchema>
@@ -90,29 +77,7 @@ async function complete(c: Context, body: GoogleCredential, web = false, expecte
       throw new GoogleAuthError(403, 'reauth_user_mismatch')
     if (!user.identities?.some(item => item.provider === 'google' && item.identity_data?.sub === identity.subject))
       throw new GoogleAuthError(400, 'invalid_google_credential')
-    // Linked accounts can have a different primary email; enforce both identities.
-    await checkSocialEmail(c, user.email, 'google')
-    const disabled = await client.rpc('is_account_disabled', { user_id: user.id })
-    if (disabled.error)
-      throw new GoogleAuthError(500, 'google_login_failed')
-    if (disabled.data) {
-      // Scheduled deletion remains restorable: issue the normal session but skip
-      // provisioning and let the existing auth guard send it to accountDisabled.
-      return {
-        user,
-        is_new_user: false,
-        name_status: 'unavailable',
-        account_status: 'disabled',
-        session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token },
-      }
-    }
-    const profile = await saveSocialProfile(c, client, { ...user, email: user.email }, name, body.registration_metadata, 'google')
-    return {
-      user,
-      account_status: 'active',
-      ...profile,
-      session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token },
-    }
+    return await finishSocialSignIn(c, client, { ...user, email: user.email }, data.session, name, body.registration_metadata, 'google')
   }
   catch (error_) {
     // Only revoke the just-created session. Never delete existing/linked auth users.
@@ -129,21 +94,11 @@ app.post('/', async (c) => {
 })
 
 function oauthConfig(c: Context) {
-  const clientId = getEnv(c, 'GOOGLE_SIGN_IN_WEB_CLIENT_ID').trim()
-  const callback = getEnv(c, 'GOOGLE_SIGN_IN_OAUTH_CALLBACK_URL').trim()
-  let redirects: string[] = []
-  try {
-    const values = JSON.parse(getEnv(c, 'GOOGLE_SIGN_IN_REDIRECT_URLS'))
-    if (Array.isArray(values) && values.every(value => typeof value === 'string'))
-      redirects = values
-  }
-  catch {}
-  if (!clientId || !callback.startsWith('https://') || !redirects.length)
-    throw new GoogleAuthError(503, 'google_login_unavailable')
+  const config = socialOAuthConfig(c, 'google')
   const secret = getEnv(c, 'GOOGLE_SIGN_IN_WEB_CLIENT_SECRET').trim()
   if (!secret)
     throw new GoogleAuthError(503, 'google_login_unavailable')
-  return { clientId, callback, redirects, secret }
+  return { ...config, secret }
 }
 
 app.post('/start', async (c) => {
