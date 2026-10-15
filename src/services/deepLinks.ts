@@ -2,6 +2,7 @@ import type { Router } from 'vue-router'
 import { App as CapacitorApp } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
 import { InstallReferrer } from '@capgo/capacitor-install-referrer'
+import { isAppleAuthRedirect } from '~/services/appleAuthRedirect'
 import { parsePreviewDeepLink, previewLinkFromInstallReferrer } from '~/services/previewLinks'
 import { routePreviewScan } from '~/services/previewNavigation'
 
@@ -143,12 +144,17 @@ export async function installDeepLinkHandler(router: Router) {
     return
 
   await CapacitorApp.addListener('appUrlOpen', (event) => {
+    // SocialLogin owns these callbacks. Never persist their one-use fragment.
+    if (isAppleAuthRedirect(event.url))
+      return
     // A warm open also becomes the process launch URL replayed after reloads.
     markLaunchUrlHandled(event.url)
     handleDeepLink(router, event.url)
   })
 
   const launchUrl = (await CapacitorApp.getLaunchUrl())?.url
+  if (launchUrl && isAppleAuthRedirect(launchUrl))
+    return
   if (launchUrl && readHandledLaunchUrl() === launchUrl)
     return
   if (launchUrl)

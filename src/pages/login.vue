@@ -374,7 +374,7 @@ async function handleAppleLogin() {
       return
     }
 
-    if (result.profileSaveFailed)
+    if (result.profileSaveFailed || result.nameUnavailable)
       toast.warning(t('apple-login-name-save-failed'))
     if (!await checkMfa())
       throw new Error('Apple login could not complete MFA setup')

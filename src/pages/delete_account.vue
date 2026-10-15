@@ -33,6 +33,7 @@ const router = useRouter()
 const isLoadingSession = ref(true)
 const isAppleAccount = ref(false)
 const pendingAppleCode = ref('')
+const pendingAppleClient = ref<'web' | undefined>()
 const pendingAppleUserId = ref('')
 const appleMfaFactorId = ref('')
 const appleMfaChallengeId = ref('')
@@ -151,7 +152,7 @@ async function deleteAccount() {
             if (isAppleAccount.value) {
               const { error: revokeError } = await invokeCapgoApi('private/revoke_apple_authorization', {
                 client: supabase,
-                body: { code: pendingAppleCode.value },
+                body: { code: pendingAppleCode.value, ...(pendingAppleClient.value ? { client: pendingAppleClient.value } : {}) },
               })
               if (revokeError) {
                 const errorCode = await getCapgoApiErrorCode(revokeError)
@@ -190,6 +191,7 @@ async function deleteAccount() {
           finally {
             isLoading.value = false
             pendingAppleCode.value = ''
+            pendingAppleClient.value = undefined
             pendingAppleUserId.value = ''
             pendingEmail.value = ''
             pendingPassword.value = ''
@@ -210,6 +212,7 @@ async function deleteAccount() {
   const dismissed = await dialogStore.onDialogDismiss()
   if (dismissed) {
     pendingAppleCode.value = ''
+    pendingAppleClient.value = undefined
     pendingAppleUserId.value = ''
     pendingEmail.value = ''
     pendingPassword.value = ''
@@ -249,6 +252,7 @@ async function startAppleDeletion() {
   }
   isLoading.value = true
   pendingAppleCode.value = ''
+  pendingAppleClient.value = undefined
   try {
     const { data: claims, error: claimsError } = await supabase.auth.getClaims()
     const userId = claims?.claims?.sub
@@ -267,6 +271,7 @@ async function startAppleDeletion() {
     if (!result.authorizationCode)
       throw new Error('Missing Apple authorization code')
     pendingAppleCode.value = result.authorizationCode
+    pendingAppleClient.value = result.authorizationClient
     pendingAppleUserId.value = userId
     if (await prepareAppleDeletionMfa())
       return
@@ -275,6 +280,7 @@ async function startAppleDeletion() {
   }
   catch {
     pendingAppleCode.value = ''
+    pendingAppleClient.value = undefined
     toast.error(t('apple-login-failed'))
   }
   finally {
@@ -288,6 +294,7 @@ function resetAppleDeletionAuthorization() {
   appleMfaFactorId.value = ''
   appleMfaChallengeId.value = ''
   pendingAppleCode.value = ''
+  pendingAppleClient.value = undefined
   pendingAppleUserId.value = ''
 }
 

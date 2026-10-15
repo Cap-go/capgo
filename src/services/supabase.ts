@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import subset from 'semver/ranges/subset'
 import { ref } from 'vue'
 import { invokeCapgoApi } from '~/services/capgoApi'
+import { loadAndroidAppleAvailability } from './appleAuthRedirect'
 import { sortCreditPricingSteps } from './creditPricing'
 
 let supaClient: SupabaseClient<Database> = null as any
@@ -44,6 +45,7 @@ export function getLocalConfig() {
 let config: CapgoConfig = getLocalConfig()
 export const stripeEnabled = ref<boolean>(config.stripeEnabled ?? true)
 export const nativeAppleLoginEnabled = ref(false)
+export const androidAppleLoginReady = ref(false)
 
 interface SpoofedAdminSession {
   jwt: string
@@ -141,6 +143,7 @@ export function mergeRemoteConfig(localConfig: CapgoConfig, remoteConfig: Partia
 export async function getRemoteConfig() {
   const localConfig = getLocalConfig()
   nativeAppleLoginEnabled.value = false
+  androidAppleLoginReady.value = false
   if (import.meta.env.MODE === 'development')
     return localConfig
 
@@ -155,6 +158,8 @@ export async function getRemoteConfig() {
     const merged = mergeRemoteConfig(localConfig, data)
     config = merged
     nativeAppleLoginEnabled.value = merged.nativeAppleLoginEnabled === true
+    if (import.meta.env.VITE_ANDROID_APPLE_LOGIN_ENABLED === 'true')
+      androidAppleLoginReady.value = await loadAndroidAppleAvailability(defaultApiHost)
     stripeEnabled.value = merged.stripeEnabled ?? stripeEnabled.value
     return merged
   }

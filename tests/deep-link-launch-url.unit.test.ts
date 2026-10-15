@@ -23,8 +23,24 @@ function createStorage() {
 
 describe('installDeepLinkHandler launch URL', () => {
   beforeEach(() => {
+    launchUrl.url = 'capgo://preview/channel?appId=com.example.app&channel=pr-1&channelId=7&nativeConfirmedPreview=1'
     vi.stubGlobal('sessionStorage', createStorage())
     vi.stubGlobal('localStorage', createStorage())
+  })
+
+  it('leaves Apple callbacks to SocialLogin without routing or storing the exchange fragment', async () => {
+    const { App } = await import('@capacitor/app')
+    const { installDeepLinkHandler } = await import('../src/services/deepLinks.ts')
+    launchUrl.url = 'capgo://apple-auth/callback#apple_code=opaque-code&state=attempt'
+    const push = vi.fn()
+    await installDeepLinkHandler({ push } as any)
+    expect(sessionStorage.getItem('capgo.handled_launch_url')).toBeNull()
+    expect(push).not.toHaveBeenCalled()
+    const calls = vi.mocked(App.addListener).mock.calls as unknown as [string, (event: { url: string }) => void][]
+    const listener = calls.findLast(([event]) => event === 'appUrlOpen')![1]
+    listener({ url: launchUrl.url })
+    expect(sessionStorage.getItem('capgo.handled_launch_url')).toBeNull()
+    expect(push).not.toHaveBeenCalled()
   })
 
   it('routes the launch URL once even when the handler is installed again after a bundle reload', async () => {
