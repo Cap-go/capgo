@@ -89,7 +89,7 @@ describe('android Apple OAuth transport', () => {
     const digest = await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(exchange.body.code_verifier))
     expect(start.body.code_challenge).toBe(Buffer.from(digest).toString('base64url'))
     expect(JSON.stringify(start)).not.toContain(exchange.body.code_verifier)
-    expect(mocks.open).toHaveBeenCalledWith({ authEndpoint: expect.stringMatching(/^https:\/\/appleid.apple.com\/auth\/authorize\?/), redirectUri: ANDROID_APPLE_REDIRECT_URI })
+    expect(mocks.open).toHaveBeenCalledWith({ authEndpoint: expect.stringMatching(/^https:\/\/appleid\.apple\.com\/auth\/authorize\?/), redirectUri: ANDROID_APPLE_REDIRECT_URI })
     expect(exchange.body).toMatchObject({ code: 'opaque-one-use-code', captcha_token: 'captcha-token' })
     expect(supabase.auth.setSession).toHaveBeenCalledWith({ access_token: 'access-token', refresh_token: 'refresh-token' })
     expect(result).toMatchObject({ user: { id: 'apple-user' }, authorizationClient: 'web', authorizationCode: 'apple-revocation-code', profileSaveFailed: false })
