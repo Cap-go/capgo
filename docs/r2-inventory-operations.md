@@ -2,7 +2,7 @@
 
 Merge the schema PR first, then the queue consumer, then the historical scanner. This inventory rollout does not enable physical object cleanup or change published CLI behavior.
 
-The production inventory Worker's minute cleanup producer checks live health,
+The production inventory Worker's minute cleanup producer checks manifest replication health,
 persists consumer evidence, and retires/enqueues eligible objects. Stable release
 deployment provisions its producer-only cleanup queue. See [R2 cleanup producer](r2-cleanup-producer.md)
 for the transaction/queue contract and separate physical deletion consumer rollout.

@@ -1,6 +1,5 @@
 import type { InventoryConfig, RepairTask } from '../../supabase/functions/_backend/utils/r2_inventory.ts'
 import type { CleanupQueue } from './cleanup.ts'
-import type { HealthQueue } from './health.ts'
 import { Client } from 'pg'
 import { applyInventoryEvents, applyObservations, INVENTORY_CONFIG, normalizeEtag, parseInventoryEvent, readObservationSnapshot } from '../../supabase/functions/_backend/utils/r2_inventory.ts'
 import { CLEANUP_ACTIVATED, runCleanupProducer } from './cleanup.ts'
@@ -24,8 +23,7 @@ export interface InventoryEnv {
   REPAIR_QUEUE: Queue<RepairTask>
   EVENT_DLQ: Queue<RejectedInventoryMessage>
   REPAIR_DLQ: Queue<RejectedInventoryMessage>
-  EVENT_QUEUE: Queue
-  CLEANUP_QUEUE?: CleanupQueue & HealthQueue
+  CLEANUP_QUEUE?: CleanupQueue
 }
 
 async function withDatabase<T>(env: InventoryEnv, operation: (db: Client) => Promise<T>): Promise<T> {
@@ -204,9 +202,9 @@ export async function scheduleInventoryCleanup(_controller: ScheduledController,
   source.on('error', () => {})
   inventory.on('error', () => {})
   try {
-    const health = await checkCleanupHealth(source, inventory, env.INVENTORY_BUCKET, [env.EVENT_QUEUE, env.REPAIR_QUEUE, env.EVENT_DLQ, env.REPAIR_DLQ, queue])
+    const health = await checkCleanupHealth(source, inventory, env.INVENTORY_BUCKET)
     console.log(JSON.stringify({ event: 'r2_cleanup_health', ...health }))
-    if (!health.producerReady)
+    if (!health.healthy)
       return
     const retired = await runCleanupProducer(inventory, env.INVENTORY_BUCKET, queue, health)
     console.log(JSON.stringify({ event: 'r2_cleanup_run', retired }))
