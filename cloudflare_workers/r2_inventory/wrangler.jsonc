@@ -43,6 +43,14 @@
           {
             "binding": "REPAIR_DLQ",
             "queue": "capgo-r2-inventory-prod-repair-dlq"
+          },
+          {
+            "binding": "CLEANUP_QUEUE",
+            "queue": "capgo-r2-inventory-prod-cleanup"
+          },
+          {
+            "binding": "CLEANUP_DLQ",
+            "queue": "capgo-r2-inventory-prod-cleanup-dlq"
           }
         ],
         "consumers": [
@@ -61,8 +69,20 @@
             "max_concurrency": 1,
             "max_retries": 4,
             "dead_letter_queue": "capgo-r2-inventory-prod-repair-dlq"
+          },
+          {
+            "queue": "capgo-r2-inventory-prod-cleanup",
+            "max_batch_size": 100,
+            "max_batch_timeout": 10,
+            "max_concurrency": 1,
+            "max_retries": 2,
+            "retry_delay": 30,
+            "dead_letter_queue": "capgo-r2-inventory-prod-cleanup-dlq"
           }
         ]
+      },
+      "limits": {
+        "cpu_ms": 300000
       }
     }
   }

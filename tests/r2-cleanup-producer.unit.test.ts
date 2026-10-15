@@ -20,7 +20,7 @@ describe('cleanup producer boundaries', () => {
     expect(Object.keys(config.env)).toEqual(['prod'])
     expect(config.env.prod.triggers.crons).toEqual(['* * * * *'])
     expect(config.triggers).toBeUndefined()
-    expect(config.env.prod.queues.producers.some((p: { binding: string }) => p.binding === 'CLEANUP_QUEUE')).toBe(false)
+    expect(config.env.prod.queues.producers.some((p: { binding: string }) => p.binding === 'CLEANUP_QUEUE')).toBe(true)
   })
 
   it('splits by count and encoded bytes including escaped/multibyte keys, preserving exact retirement identity', () => {
