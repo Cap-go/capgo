@@ -349,6 +349,21 @@ async function login(form: { email: string, password: string }) {
   await checkMfa()
 }
 
+async function checkNativeLoginEligibility(email: string) {
+  const [deleted, domain] = await Promise.all([
+    hashEmail(email).then(email => supabase.rpc('is_not_deleted', { email_check: email })),
+    checkDomain(email),
+  ])
+  if (deleted.error)
+    throw deleted.error
+  if (!deleted.data || (domain.has_sso && domain.enforce_sso)) {
+    await supabase.auth.signOut({ scope: 'local' })
+    toast.error(t(!deleted.data ? 'used-to-create' : 'sso-required'))
+    return false
+  }
+  return true
+}
+
 async function handleAppleLogin() {
   if (isLoading.value || !isNativeAppleLoginAvailable())
     return
@@ -364,18 +379,8 @@ async function handleAppleLogin() {
     if (!result.user.email)
       throw new Error('Apple login did not return an email')
 
-    // Keep the same deleted-account and enforced-SSO rules as password login.
-    const [deleted, domain] = await Promise.all([
-      hashEmail(result.user.email).then(email => supabase.rpc('is_not_deleted', { email_check: email })),
-      checkDomain(result.user.email),
-    ])
-    if (deleted.error)
-      throw deleted.error
-    if (!deleted.data || (domain.has_sso && domain.enforce_sso)) {
-      await supabase.auth.signOut({ scope: 'local' })
-      toast.error(t(!deleted.data ? 'used-to-create' : 'sso-required'))
+    if (!await checkNativeLoginEligibility(result.user.email))
       return
-    }
 
     if (result.profileSaveFailed)
       toast.warning(t('apple-login-name-save-failed'))
@@ -410,17 +415,8 @@ async function handleGoogleLogin() {
     if (!result.user.email)
       throw new Error('Google login did not return an email')
 
-    const [deleted, domain] = await Promise.all([
-      hashEmail(result.user.email).then(email => supabase.rpc('is_not_deleted', { email_check: email })),
-      checkDomain(result.user.email),
-    ])
-    if (deleted.error)
-      throw deleted.error
-    if (!deleted.data || (domain.has_sso && domain.enforce_sso)) {
-      await supabase.auth.signOut({ scope: 'local' })
-      toast.error(t(!deleted.data ? 'used-to-create' : 'sso-required'))
+    if (!await checkNativeLoginEligibility(result.user.email))
       return
-    }
     if (result.nameUnavailable)
       toast.warning(t('google-login-name-unavailable'))
     // The backend owns signup analytics and returns actual profile newness.
