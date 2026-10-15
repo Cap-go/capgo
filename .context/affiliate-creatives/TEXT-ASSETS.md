@@ -100,3 +100,32 @@ Once PR #974 is merged, you can use these exact URLs to access the banners direc
   <img src="https://capgo.app/affiliate/banner-300x250-medium-rectangle.png" width="300" height="250" alt="Capgo — live updates for Capacitor apps">
 </a>
 ```
+
+---
+
+## Affiliate Hub Update Post
+
+**Title:** New Marketing Assets & Brand Refresh! 🚀
+
+**Content:**
+Hi everyone! 
+
+We’ve just rolled out a major update to our brand identity, and we want to make sure you have everything you need to succeed.
+
+We've completely overhauled our marketing creatives. In your dashboard, you will now find:
+* A brand new, ultra-crisp logo in our updated dark-mode aesthetic.
+* 15+ newly designed, high-resolution (retina) banners in all standard sizes (from skyscrapers to mobile rectangles).
+* Ready-to-use social media graphics (Stories, Squares, and Open Graph) perfect for LinkedIn, X (Twitter), and Instagram.
+* Fresh text snippets, email blurbs, and social media copy that you can copy and paste directly into your campaigns.
+
+We highly recommend updating any old Capgo assets you are currently using to these new versions, as they convert much better! 
+
+All the new image assets are already uploaded here in your hub under the "Assets" tab. If you prefer to embed them directly via HTML, you can find the direct-hosted URLs and example embed codes in our official program guide.
+
+Thank you for being a Capgo partner! Let us know if there are any specific banner sizes or assets you'd like to see next.
+
+Happy building (and earning)!
+- The Capgo Team
+
+**Categories:**
+Marketing Assets, Product Update
