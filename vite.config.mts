@@ -162,6 +162,7 @@ const frontendEnvironmentVariables: Record<string, string> = {
   VITE_APP_URL: getUrl(),
   VITE_API_HOST: getUrl('api_domain'),
   VITE_CAPTCHA_KEY: getFrontendKey('captcha_key'),
+  VITE_ANDROID_APPLE_LOGIN_ENABLED: process.env.VITE_ANDROID_APPLE_LOGIN_ENABLED === 'true' ? 'true' : 'false',
   VITE_BRANCH: branch,
   package_dependencies: JSON.stringify(pack.dependencies),
   domain: getUrl(),

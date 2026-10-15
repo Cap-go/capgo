@@ -93,6 +93,13 @@ afterEach(() => {
 })
 
 describe('apple account deletion', () => {
+  it('revokes Android Apple authorization with the Services ID client before deletion', async () => {
+    mocks.signIn.mockResolvedValue({ user: { id: 'apple-user' }, authorizationCode: 'android-code', authorizationClient: 'web' })
+    await start(await mount())
+    await mocks.openDialog.mock.calls[0][0].buttons[0].handler()
+    expect(mocks.invoke).toHaveBeenCalledWith('private/revoke_apple_authorization', expect.objectContaining({ body: { code: 'android-code', client: 'web' } }))
+    expect(mocks.rpc).toHaveBeenCalledWith('delete_user')
+  })
   it('reauthenticates and revokes Apple access before scheduling deletion without a password', async () => {
     const root = await mount()
     expect(root.querySelector('input[type="password"]')).toBeNull()
@@ -186,5 +193,4 @@ describe('apple account deletion', () => {
     expect(root.textContent).toContain(messages['apple-delete-reauth-required'])
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
-
 })

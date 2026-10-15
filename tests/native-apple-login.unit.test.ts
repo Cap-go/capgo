@@ -1,12 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { Buffer } from 'node:buffer'
 import { webcrypto } from 'node:crypto'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isNativeAppleLoginAvailable, signInWithApple } from '../src/services/nativeAppleLogin'
 
 const native = vi.hoisted(() => ({ platform: 'ios', available: true, isNative: true }))
 const enabled = vi.hoisted(() => ({ value: true }))
-vi.mock('~/services/supabase', () => ({ nativeAppleLoginEnabled: enabled }))
+const androidReady = vi.hoisted(() => ({ value: true }))
+vi.mock('~/services/supabase', () => ({ nativeAppleLoginEnabled: enabled, androidAppleLoginReady: androidReady, defaultApiHost: 'https://api.example.test' }))
 const plugin = vi.hoisted(() => ({ initialize: vi.fn(), login: vi.fn() }))
 vi.mock('@capacitor/core', () => ({
   Capacitor: {
@@ -21,27 +22,60 @@ function client() {
   const user = { id: 'apple-user', email: 'apple-user@example.com', user_metadata: {} }
   return {
     auth: {
-      signInWithIdToken: vi.fn().mockResolvedValue({ data: { user, session: { user } }, error: null }),
-      updateUser: vi.fn().mockResolvedValue({ data: { user }, error: null }),
+      getSession: vi.fn().mockResolvedValue({ data: { session: { user, access_token: 'existing-session' } }, error: null }),
+      setSession: vi.fn().mockResolvedValue({ data: { user, session: { user } }, error: null }),
+      signInWithIdToken: vi.fn(),
+      updateUser: vi.fn(),
     },
   }
+}
+
+function response(overrides: Record<string, unknown> = {}, ok = true) {
+  return {
+    ok,
+    json: async () => ({ user: { id: 'apple-user' }, session: { access_token: 'backend-access', refresh_token: 'backend-refresh' }, name_status: 'saved', ...overrides }),
+  } as Response
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   enabled.value = true
+  androidReady.value = true
   native.platform = 'ios'
   native.available = true
   native.isNative = true
   plugin.initialize.mockResolvedValue(undefined)
   plugin.login.mockResolvedValue({
     provider: 'apple',
-    result: { idToken: 'verified-by-supabase', profile: { givenName: 'Example', familyName: 'Person' } },
+    result: { idToken: 'verified-by-backend', authorizationCode: 'native-revocation-code', profile: { givenName: 'Example', familyName: 'Person' } },
   })
+  vi.stubGlobal('fetch', vi.fn(async () => response()))
+})
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
 })
 
 describe('native Apple login', () => {
-  it('never offers Apple login on web, Android, or an older iOS binary without the plugin', async () => {
+  it('offers Android only in an explicitly enabled native build with the plugin', () => {
+    native.platform = 'android'
+    vi.stubEnv('VITE_ANDROID_APPLE_LOGIN_ENABLED', 'true')
+    expect(isNativeAppleLoginAvailable()).toBe(true)
+    androidReady.value = false
+    expect(isNativeAppleLoginAvailable()).toBe(false)
+    expect(isNativeAppleLoginAvailable(true)).toBe(true)
+    androidReady.value = true
+    enabled.value = false
+    expect(isNativeAppleLoginAvailable()).toBe(false)
+    expect(isNativeAppleLoginAvailable(true)).toBe(true)
+    native.available = false
+    expect(isNativeAppleLoginAvailable(true)).toBe(false)
+    native.available = true
+    native.isNative = false
+    expect(isNativeAppleLoginAvailable(true)).toBe(false)
+  })
+
+  it('never offers Apple login on web, unconfigured Android, or an older binary without the plugin', async () => {
     const supabase = client()
     for (const state of [
       { platform: 'web', available: true, isNative: false },
@@ -53,72 +87,74 @@ describe('native Apple login', () => {
       await expect(signInWithApple(supabase as unknown as SupabaseClient)).rejects.toThrow()
     }
     expect(plugin.initialize).not.toHaveBeenCalled()
+    expect(fetch).not.toHaveBeenCalled()
     expect(supabase.auth.signInWithIdToken).not.toHaveBeenCalled()
   })
 
-  it('exchanges the Apple token with Supabase using a fresh nonce and preserves the first-login name', async () => {
+  it('keeps native iOS authorization but exchanges every credential through the shared backend', async () => {
     const supabase = client()
     expect(isNativeAppleLoginAvailable()).toBe(true)
     await signInWithApple(supabase as unknown as SupabaseClient, 'captcha-token')
-    const credential = supabase.auth.signInWithIdToken.mock.calls[0][0]
-    const digest = await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(credential.nonce))
-    const expectedHash = Buffer.from(digest).toString('hex')
+    const [url, request] = vi.mocked(fetch).mock.calls[0]
+    const body = JSON.parse(request!.body as string)
+    const digest = await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(body.nonce))
     expect(plugin.initialize).toHaveBeenCalledWith({ apple: { useProperTokenExchange: true } })
-    expect(plugin.login).toHaveBeenCalledWith({ provider: 'apple', options: { scopes: ['email', 'name'], nonce: expectedHash } })
-    expect(credential).toMatchObject({ provider: 'apple', token: 'verified-by-supabase', options: { captchaToken: 'captcha-token' } })
-    expect(credential.nonce).toMatch(/^[a-f0-9]{64}$/)
-    expect(supabase.auth.updateUser).toHaveBeenCalledWith({ data: { first_name: 'Example', last_name: 'Person', full_name: 'Example Person' } })
+    expect(plugin.login).toHaveBeenCalledWith({ provider: 'apple', options: { scopes: ['email', 'name'], nonce: Buffer.from(digest).toString('hex') } })
+    expect(url).toBe('https://api.example.test/auth/apple')
+    expect(body).toMatchObject({ id_token: 'verified-by-backend', first_name: 'Example', last_name: 'Person', captcha_token: 'captcha-token' })
+    expect(body.nonce).toMatch(/^[a-f0-9]{64}$/)
+    expect(supabase.auth.setSession).toHaveBeenCalledWith({ access_token: 'backend-access', refresh_token: 'backend-refresh' })
+    expect(supabase.auth.signInWithIdToken).not.toHaveBeenCalled()
+    expect(supabase.auth.updateUser).not.toHaveBeenCalled()
     await signInWithApple(supabase as unknown as SupabaseClient)
-    expect(supabase.auth.signInWithIdToken.mock.calls[1][0].nonce).not.toBe(credential.nonce)
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[1][1]!.body as string).nonce).not.toBe(body.nonce)
   })
 
-  it('does not erase names on returning Apple sign-ins', async () => {
+  it('leaves profile persistence to the shared backend and preserves the native name cache', async () => {
     const supabase = client()
-    plugin.login.mockResolvedValue({ provider: 'apple', result: { idToken: 'verified-by-supabase', profile: { givenName: null, familyName: null } } })
+    plugin.login.mockResolvedValue({ provider: 'apple', result: { idToken: 'token', profile: { givenName: null, familyName: null } } })
     await signInWithApple(supabase as unknown as SupabaseClient)
+    const body = JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string)
+    expect(body).not.toHaveProperty('first_name')
+    expect(body).not.toHaveProperty('last_name')
     expect(supabase.auth.updateUser).not.toHaveBeenCalled()
   })
 
-  it('preserves an existing account name when Apple supplies a different name', async () => {
-    const supabase = client()
-    supabase.auth.signInWithIdToken.mockResolvedValue({ data: { user: { id: 'apple-user', user_metadata: { first_name: 'Chosen', last_name: 'Name', full_name: 'Chosen Name' } }, session: {} }, error: null })
-    await signInWithApple(supabase as unknown as SupabaseClient)
-    expect(supabase.auth.updateUser).not.toHaveBeenCalled()
-  })
-
-  it('honors the server kill switch even on a supported iOS binary', async () => {
+  it('honors the server switch and permits existing iOS users to reauthenticate when rollout is off', async () => {
     enabled.value = false
+    const supabase = client()
     expect(isNativeAppleLoginAvailable()).toBe(false)
-    await expect(signInWithApple(client() as unknown as SupabaseClient)).rejects.toThrow()
+    await expect(signInWithApple(supabase as unknown as SupabaseClient)).rejects.toThrow()
     expect(plugin.initialize).not.toHaveBeenCalled()
+    await signInWithApple(supabase as unknown as SupabaseClient, undefined, { reauthenticate: true })
+    expect(JSON.parse(vi.mocked(fetch).mock.calls[0][1]!.body as string).reauthenticate).toBe(true)
+    expect(vi.mocked(fetch).mock.calls[0][1]!.headers).toMatchObject({ Authorization: 'Bearer existing-session' })
   })
 
   it('treats cancelling the Apple sheet as a normal exit', async () => {
-    const supabase = client()
     plugin.login.mockRejectedValue({ code: 'USER_CANCELLED' })
-    await expect(signInWithApple(supabase as unknown as SupabaseClient)).resolves.toBeNull()
-    expect(supabase.auth.signInWithIdToken).not.toHaveBeenCalled()
+    await expect(signInWithApple(client() as unknown as SupabaseClient)).resolves.toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
   })
 
   it('rejects a missing identity token without attempting authentication', async () => {
-    const supabase = client()
     plugin.login.mockResolvedValue({ provider: 'apple', result: { idToken: null, profile: {} } })
+    await expect(signInWithApple(client() as unknown as SupabaseClient)).rejects.toThrow()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it.each([response({ error: 'invalid_apple_credential' }, false), response({ session: null }), response({ user: null })])('never falls back to direct Supabase Apple exchange on backend failure', async (reply) => {
+    vi.mocked(fetch).mockResolvedValue(reply)
+    const supabase = client()
     await expect(signInWithApple(supabase as unknown as SupabaseClient)).rejects.toThrow()
     expect(supabase.auth.signInWithIdToken).not.toHaveBeenCalled()
+    expect(supabase.auth.setSession).not.toHaveBeenCalled()
   })
 
-  it('propagates rejected credentials and requires a real Supabase session', async () => {
+  it('rejects a different reauthentication identity before installing a session', async () => {
+    vi.mocked(fetch).mockResolvedValue(response({ user: { id: 'other-user' } }))
     const supabase = client()
-    supabase.auth.signInWithIdToken.mockResolvedValueOnce({ data: { user: null, session: null }, error: new Error('Invalid nonce') })
-    await expect(signInWithApple(supabase as unknown as SupabaseClient)).rejects.toThrow('Invalid nonce')
-    supabase.auth.signInWithIdToken.mockResolvedValueOnce({ data: { user: null, session: null }, error: null })
-    await expect(signInWithApple(supabase as unknown as SupabaseClient)).rejects.toThrow()
-    expect(supabase.auth.updateUser).not.toHaveBeenCalled()
-  })
-
-  it('keeps a successful login if optional name persistence fails', async () => {
-    const supabase = client()
-    supabase.auth.updateUser.mockResolvedValue({ data: { user: null }, error: new Error('Profile unavailable') })
-    await expect(signInWithApple(supabase as unknown as SupabaseClient)).resolves.toMatchObject({ user: { id: 'apple-user' }, profileSaveFailed: true })
+    await expect(signInWithApple(supabase as unknown as SupabaseClient, undefined, { reauthenticate: true })).rejects.toThrow('does not match')
+    expect(supabase.auth.setSession).not.toHaveBeenCalled()
   })
 })
