@@ -81,6 +81,19 @@ followed by a crash before acknowledgement recovers through definitive absence.
 Permanent retirement plus the separately reviewed legacy-write/replication
 activation requirements remain essential; this is not a new restore workflow.
 
+The inventory Worker aliases `@aws-sdk/xml-builder` to its pure JavaScript
+parser. The SDK's browser parser requires `DOMParser`, which Workers do not
+provide: R2 can complete COPY with HTTP 200 while SDK deserialization fails.
+Keep the alias and explicit dependency together. The browser-build regression
+test verifies successful COPY parsing, embedded errors, incomplete responses,
+and existing-backup recovery without DOM APIs.
+
+Storage failures emit up to three distinct, sanitized diagnostic events per
+batch, immediately when observed. They report the storage stage, allowlisted
+error type, HTTP status, timings and copy-response field presence. They never
+include object keys, raw provider errors or credentials, and do not change
+acknowledgement, retries or deletion decisions.
+
 After confirmed DELETE/absence, acknowledge each corresponding source message
 **immediately, before any completion database connection/query**. Then perform
 one best-effort completion UPDATE per group. The update uses the snapshot taken
