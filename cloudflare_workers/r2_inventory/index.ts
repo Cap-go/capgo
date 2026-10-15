@@ -1,8 +1,10 @@
 import type { InventoryConfig, RepairTask } from '../../supabase/functions/_backend/utils/r2_inventory.ts'
 import type { CleanupQueue } from './cleanup.ts'
+import type { HealthQueue } from './health.ts'
 import { Client } from 'pg'
 import { applyInventoryEvents, applyObservations, INVENTORY_CONFIG, normalizeEtag, parseInventoryEvent, readObservationSnapshot } from '../../supabase/functions/_backend/utils/r2_inventory.ts'
 import { CLEANUP_ACTIVATED, runCleanupProducer } from './cleanup.ts'
+import { checkCleanupHealth } from './health.ts'
 
 interface RejectedInventoryMessage {
   kind: 'invalid_inventory_message'
@@ -17,11 +19,13 @@ interface RejectedInventoryMessage {
 export interface InventoryEnv {
   INVENTORY_BUCKET: string
   HYPERDRIVE_R2_INVENTORY: Hyperdrive
+  HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive
   ATTACHMENT_BUCKET: R2Bucket
   REPAIR_QUEUE: Queue<RepairTask>
   EVENT_DLQ: Queue<RejectedInventoryMessage>
   REPAIR_DLQ: Queue<RejectedInventoryMessage>
-  CLEANUP_QUEUE?: CleanupQueue
+  EVENT_QUEUE: Queue
+  CLEANUP_QUEUE?: CleanupQueue & HealthQueue
 }
 
 async function withDatabase<T>(env: InventoryEnv, operation: (db: Client) => Promise<T>): Promise<T> {
@@ -193,8 +197,24 @@ export async function scheduleInventoryCleanup(_controller: ScheduledController,
   const queue = env.CLEANUP_QUEUE
   if (env.INVENTORY_BUCKET !== 'capgo' || !queue)
     throw new Error('Production cleanup bucket or queue binding missing')
-  const retired = await withDatabase(env, db => runCleanupProducer(db, env.INVENTORY_BUCKET, queue))
-  console.log(JSON.stringify({ event: 'r2_cleanup_run', retired }))
+  const client = (connectionString: string) => new Client({ connectionString, connectionTimeoutMillis: 4000, query_timeout: 4000 })
+  const source = client(env.HYPERDRIVE_CAPGO_DIRECT_EU?.connectionString)
+  const inventory = client(env.HYPERDRIVE_R2_INVENTORY?.connectionString)
+  // Query/connection failures are reported by the health helper, without connection strings.
+  source.on('error', () => {})
+  inventory.on('error', () => {})
+  try {
+    const health = await checkCleanupHealth(source, inventory, env.INVENTORY_BUCKET, [env.EVENT_QUEUE, env.REPAIR_QUEUE, env.EVENT_DLQ, env.REPAIR_DLQ, queue])
+    console.log(JSON.stringify({ event: 'r2_cleanup_health', ...health }))
+    if (!health.producerReady)
+      return
+    const retired = await runCleanupProducer(inventory, env.INVENTORY_BUCKET, queue, health)
+    console.log(JSON.stringify({ event: 'r2_cleanup_run', retired }))
+  }
+  finally {
+    void source.end().catch(() => {})
+    void inventory.end().catch(() => {})
+  }
 }
 
 export default { queue: consumeInventoryBatch, scheduled: scheduleInventoryCleanup }

@@ -9,7 +9,7 @@ the schedule does not enable retirement or provision a deletion queue.
 
 ## Queue consumer
 
-R2 inventory is production-only. Only the `prod` Worker environment and its four queues are configured; alpha and preproduction do not deploy inventory. The dedicated Worker uses one database connection per event batch, releases it before publication, and awaits all work before returning. Configure a Hyperdrive connection with query caching **disabled**; stale inventory reads are unsafe. The dedicated `HYPERDRIVE_R2_INVENTORY` binding selects the inventory database independently of the files Worker.
+R2 inventory is production-only. Only the `prod` Worker environment and its five queues are configured (including the producer-only cleanup queue); alpha and preproduction do not deploy inventory. The dedicated Worker uses one database connection per event batch, releases it before publication, and awaits all work before returning. Configure a Hyperdrive connection with query caching **disabled**; stale inventory reads are unsafe. The dedicated `HYPERDRIVE_R2_INVENTORY` binding selects the inventory database independently of the files Worker.
 
 Inventory configuration is the `INVENTORY_CONFIG` constant in `supabase/functions/_backend/utils/r2_inventory.ts`; tombstones are retained for seven days. No Vault secret or runtime enablement switch is required. To pause a deployed consumer for maintenance, pause delivery in Cloudflare so messages do not burn their five-delivery budget.
 
@@ -39,7 +39,7 @@ Production notifications and repairs both write to the standalone PlanetScale Po
 
 The standalone database needs `r2_objects`, its lifecycle trigger and enum, and `r2_inventory_checkpoints`. Its `manifest` table is reserved for a separate replication setup; the notification consumer does not access it. The checkpoint schema is recorded in `cloudflare_workers/r2_inventory/sql/20261009_checkpoints.sql` and was prepared on the target before this binding change. This is a standalone database setup, not a Supabase migration. Run it only once against an empty checkpoint schema, with a separately created runtime role; rerunning it fails atomically rather than silently accepting a different schema.
 
-The Hyperdrive origin uses the `r2_inventory_consumer` role. It can select, insert and update the two inventory tables and use the object-state enum. It has no inherited database-wide or administrative roles, no access to `manifest`, and no delete or schema-creation permission. Runtime credentials are stored in Hyperdrive, never in repository files. These explicit grants were verified on the target, and Cloudflare accepted the restricted origin connection.
+The Hyperdrive origin uses the `r2_inventory_consumer` role. It can select, insert and update the two inventory tables and use the object-state enum. It has no inherited database-wide or administrative roles, column SELECT on `manifest.s3_path` for cleanup reference checks, and no delete or schema-creation permission. Runtime credentials are stored in Hyperdrive, never in repository files. These explicit grants were verified on the target, and Cloudflare accepted the restricted origin connection.
 
 ### Manifest reservation lease schema preparation
 
