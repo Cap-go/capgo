@@ -18,6 +18,7 @@ import IconScanQrCode from '~icons/lucide/scan-qr-code'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
+import { isAndroidGoogleLoginAvailable, signInWithGoogle } from '~/services/androidGoogleLogin'
 import { hideLoader } from '~/services/loader'
 import { isNativeAppleLoginAvailable, signInWithApple } from '~/services/nativeAppleLogin'
 import { autoAuth, defaultApiHost, hashEmail, useSupabase } from '~/services/supabase'
@@ -32,6 +33,8 @@ const supabase = useSupabase()
 const isLoading = ref(false)
 const isAppleLoading = ref(false)
 const appleLoginAvailable = computed(() => isNativeAppleLoginAvailable())
+const isGoogleLoading = ref(false)
+const googleLoginAvailable = computed(() => isAndroidGoogleLoginAvailable())
 const isMobile = ref(Capacitor.isNativePlatform())
 const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
@@ -388,6 +391,52 @@ async function handleAppleLogin() {
   }
   finally {
     isAppleLoading.value = false
+    isLoading.value = false
+  }
+}
+
+async function handleGoogleLogin() {
+  if (isLoading.value || !isAndroidGoogleLoginAvailable())
+    return
+
+  isLoading.value = true
+  isGoogleLoading.value = true
+  let hasGoogleSession = false
+  try {
+    const result = await signInWithGoogle(supabase, turnstileToken.value || undefined)
+    if (!result)
+      return
+    hasGoogleSession = true
+    if (!result.user.email)
+      throw new Error('Google login did not return an email')
+
+    const [deleted, domain] = await Promise.all([
+      hashEmail(result.user.email).then(email => supabase.rpc('is_not_deleted', { email_check: email })),
+      checkDomain(result.user.email),
+    ])
+    if (deleted.error)
+      throw deleted.error
+    if (!deleted.data || (domain.has_sso && domain.enforce_sso)) {
+      await supabase.auth.signOut({ scope: 'local' })
+      toast.error(t(!deleted.data ? 'used-to-create' : 'sso-required'))
+      return
+    }
+    if (result.nameUnavailable)
+      toast.warning(t('google-login-name-unavailable'))
+    // The backend owns signup analytics and returns actual profile newness.
+    // Continue through the existing account-status, onboarding and MFA guards.
+    if (!await checkMfa())
+      throw new Error('Google login could not complete MFA setup')
+  }
+  catch {
+    if (hasGoogleSession)
+      await supabase.auth.signOut({ scope: 'local' })
+    turnstileToken.value = ''
+    safeResetTurnstile(captchaComponent.value)
+    toast.error(t('google-login-failed'))
+  }
+  finally {
+    isGoogleLoading.value = false
     isLoading.value = false
   }
 }
@@ -1113,6 +1162,19 @@ onMounted(checkLogin)
                         :disabled="isLoading || shouldBlockForCaptcha || isCheckingSavedSession"
                         :loading="isAppleLoading"
                         @click="handleAppleLogin"
+                      />
+                    </div>
+
+                    <div v-if="googleLoginAvailable" v-show="isLoginStep" class="space-y-5">
+                      <div v-if="!appleLoginAvailable" class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                        <span class="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                        <span>{{ t('login-or-separator') }}</span>
+                        <span class="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                      </div>
+                      <AndroidGoogleSignInButton
+                        :disabled="isLoading || shouldBlockForCaptcha || isCheckingSavedSession"
+                        :loading="isGoogleLoading"
+                        @click="handleGoogleLogin"
                       />
                     </div>
 
