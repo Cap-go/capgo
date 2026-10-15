@@ -4121,5 +4121,11 @@
   "past-due-banner-message": "Your last payment failed.",
   "past-due-banner-message-amount": "Your last payment of {amount} failed.",
   "past-due-banner-pay-now": "Pay now",
-  "past-due-banner-update-card": "Update card"
+  "past-due-banner-update-card": "Update card",
+  "sign-in-with-apple": "Sign in with Apple",
+  "apple-login-or-email": "or continue with email",
+  "apple-login-failed": "Could not sign in with Apple. Please try again or use email.",
+  "apple-login-name-save-failed": "You are signed in. You can add your name in account settings.",
+  "apple-delete-account-hint": "Verify your email, then confirm with the same Apple account to delete your Capgo account.",
+  "apple-revoke-failed": "Could not disconnect your Apple account. Please sign in with Apple again and retry."
 }

@@ -34,6 +34,7 @@ import { app as publicStats } from '../../supabase/functions/_backend/private/pu
 import { app as release_live } from '../../supabase/functions/_backend/private/release_live.ts'
 import { app as replay } from '../../supabase/functions/_backend/private/replay.ts'
 import { app as request_manifest_upload } from '../../supabase/functions/_backend/private/request_manifest_upload.ts'
+import { app as revoke_apple_authorization } from '../../supabase/functions/_backend/private/revoke_apple_authorization.ts'
 import { app as role_bindings } from '../../supabase/functions/_backend/private/role_bindings.ts'
 // Manifest finalization validates size receipts issued by the files worker.
 import { app as set_manifest } from '../../supabase/functions/_backend/private/set_manifest.ts'
@@ -185,6 +186,7 @@ appPrivate.route('/stripe_checkout', stripe_checkout)
 appPrivate.route('/stripe_portal', stripe_portal)
 appPrivate.route('/stripe_past_due', stripe_past_due)
 appPrivate.route('/verify_email_otp', verify_email_otp)
+appPrivate.route('/revoke_apple_authorization', revoke_apple_authorization)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/request_manifest_upload', request_manifest_upload)
 appPrivate.route('/set_manifest', set_manifest)
