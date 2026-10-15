@@ -1,6 +1,9 @@
 {
   "name": "capgo-r2-inventory",
   "main": "index.ts",
+  "alias": {
+    "@aws-sdk/xml-builder": "@aws-sdk/xml-builder/dist-cjs/index.js"
+  },
   "compatibility_date": "2026-04-21",
   "compatibility_flags": [
     "nodejs_compat"

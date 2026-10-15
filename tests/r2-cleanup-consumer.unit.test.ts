@@ -72,6 +72,30 @@ describe('cleanup delivery isolation', () => {
     }
   })
 
+  it('logs at most three distinct storage diagnostics per batch while retrying every failed message', async () => {
+    const f = fixture(Array.from({ length: 100 }, (_, i) => value(String(i))))
+    const types = ['AccessDenied', 'TypeError', 'Error', 'AbortError', 'TimeoutError']
+    let index = 0
+    f.deps.storage = report => ({ remove: async () => {
+      report?.({ stage: 'copy', errorType: types[index++ % types.length], httpStatus: 403 })
+      throw new Error('synthetic private detail')
+    } })
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await consumeCleanupBatch(f.batch, f.env, f.deps)
+      const entries = log.mock.calls.map(([entry]) => JSON.parse(entry))
+      expect(entries).toEqual([
+        ...types.slice(0, 3).map(errorType => ({ event: 'r2_cleanup_storage_failure', stage: 'copy', errorType, httpStatus: 403 })),
+        { event: 'r2_cleanup_batch', received: 100, counts: { storage: 100 } },
+      ])
+      expect(JSON.stringify(entries)).not.toContain('synthetic private detail')
+      expect(f.batch.messages.every(m => vi.mocked(m.retry).mock.calls.length === 1)).toBe(true)
+    }
+    finally {
+      log.mockRestore()
+    }
+  })
+
   it('preserves references/leases, drops ordinary old/completed jobs quietly, and retries invisible retirement', async () => {
     const f = fixture(Array.from({ length: 6 }, (_, i) => value(String(i))))
     vi.mocked(inspectCleanupGroup).mockImplementationOnce(async (_db, _bucket, jobs) => ({

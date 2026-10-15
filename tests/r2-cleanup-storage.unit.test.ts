@@ -44,6 +44,60 @@ describe('cleanup real S3 transport', () => {
     await expect(createCleanupStorage(env).remove('capgo', key, 'etag', new AbortController().signal)).rejects.toThrow('unconfirmed')
     expect(fetcher).toHaveBeenCalledTimes(1)
   })
+
+  it('reports copy response field presence without logging object or credential values', async () => {
+    const report = vi.fn()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<CopyObjectResult><ETag>"etag"</ETag></CopyObjectResult>')))
+    await expect(createCleanupStorage(env, report).remove('capgo', key, 'etag', new AbortController().signal)).rejects.toThrow('unconfirmed')
+    expect(report).toHaveBeenCalledExactlyOnceWith({
+      stage: 'copy_response',
+      errorType: 'Error',
+      httpStatus: 200,
+      hasCopyResult: true,
+      hasCopyEtag: true,
+      hasCopyLastModified: false,
+      elapsedMs: expect.any(Number),
+      operationMs: { copy: expect.any(Number) },
+    })
+    for (const privateValue of [key, env.S3_ENDPOINT, env.S3_ACCESS_KEY_ID, env.S3_SECRET_ACCESS_KEY])
+      expect(JSON.stringify(report.mock.calls)).not.toContain(privateValue)
+  })
+
+  it('reports a delete failure separately from a successful copy and hides unrecognized error names', async () => {
+    const report = vi.fn()
+    const failure = Object.assign(new Error('synthetic private detail'), { name: 'synthetic-private-name', $metadata: { httpStatusCode: 403 } })
+    const send = vi.fn().mockResolvedValueOnce({ CopyObjectResult: { ETag: '"etag"', LastModified: new Date() }, $metadata: { httpStatusCode: 200 } }).mockRejectedValueOnce(failure)
+    await expect(cleanupStorage({ send } as unknown as S3Client, report).remove('capgo', key, 'etag', new AbortController().signal)).rejects.toBe(failure)
+    expect(report).toHaveBeenCalledExactlyOnceWith({
+      stage: 'delete',
+      errorType: 'OtherError',
+      httpStatus: 403,
+      hasCopyResult: true,
+      hasCopyEtag: true,
+      hasCopyLastModified: true,
+      elapsedMs: expect.any(Number),
+      operationMs: { copy: expect.any(Number), delete: expect.any(Number) },
+    })
+  })
+
+  it('does not reuse a copy status for a later network failure or replace the original error', async () => {
+    const failure = new TypeError('synthetic private network detail')
+    const report = vi.fn(() => {
+      throw new Error('Synthetic diagnostic outage')
+    })
+    const send = vi.fn().mockResolvedValueOnce({ CopyObjectResult: { ETag: '"etag"', LastModified: new Date() }, $metadata: { httpStatusCode: 200 } }).mockRejectedValueOnce(failure)
+    await expect(cleanupStorage({ send } as unknown as S3Client, report).remove('capgo', key, 'etag', new AbortController().signal)).rejects.toBe(failure)
+    expect(report).toHaveBeenCalledExactlyOnceWith({
+      stage: 'delete',
+      errorType: 'TypeError',
+      httpStatus: undefined,
+      hasCopyResult: true,
+      hasCopyEtag: true,
+      hasCopyLastModified: true,
+      elapsedMs: expect.any(Number),
+      operationMs: { copy: expect.any(Number), delete: expect.any(Number) },
+    })
+  })
 })
 
 describe('cleanup retry recovery and deadlines', () => {
@@ -74,6 +128,40 @@ describe('cleanup retry recovery and deadlines', () => {
     await client(send).remove('capgo', key, 'etag', new AbortController().signal)
     expect(send).toHaveBeenCalledTimes(2)
     expect(send.mock.calls[1][0].constructor.name).toBe('HeadObjectCommand')
+  })
+
+  it('reports the original copy failure when a recovery HEAD succeeds', async () => {
+    const failure = missing()
+    const report = vi.fn()
+    const send = vi.fn().mockRejectedValueOnce(failure).mockResolvedValueOnce(head)
+    await expect(cleanupStorage({ send } as unknown as S3Client, report).remove('capgo', key, 'etag', new AbortController().signal)).rejects.toBe(failure)
+    expect(report).toHaveBeenCalledExactlyOnceWith({
+      stage: 'copy',
+      errorType: 'NoSuchKey',
+      httpStatus: 404,
+      elapsedMs: expect.any(Number),
+      operationMs: { copy: expect.any(Number), head_source: expect.any(Number) },
+    })
+  })
+
+  it('separates time spent copying from time spent in a failed recovery HEAD', async () => {
+    vi.useFakeTimers()
+    const report = vi.fn()
+    const send = vi.fn().mockImplementationOnce(async () => {
+      vi.advanceTimersByTime(15000)
+      throw condition()
+    }).mockImplementationOnce(async () => {
+      vi.advanceTimersByTime(5000)
+      throw Object.assign(new Error('Synthetic abort'), { name: 'AbortError' })
+    })
+    await expect(cleanupStorage({ send } as unknown as S3Client, report).remove('capgo', key, 'etag', new AbortController().signal)).rejects.toThrow('Synthetic abort')
+    expect(report).toHaveBeenCalledExactlyOnceWith({
+      stage: 'head_source',
+      errorType: 'AbortError',
+      httpStatus: undefined,
+      elapsedMs: 20000,
+      operationMs: { copy: 15000, head_source: 5000 },
+    })
   })
 
   it('obtains missing inventory ETag with HEAD and fails closed on unknown absence or missing bucket', async () => {

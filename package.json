@@ -217,6 +217,7 @@
     "plugin:schemas:compile": "bunx zod-compiler generate supabase/functions/_backend/plugin_runtime/utils/plugin_schemas/update_request.zod.ts -o scripts/bench/validation/update_request.zod.compiled.ts --emit bag && bunx zod-compiler generate scripts/bench/validation/plugin_schemas.zod.ts -o scripts/bench/validation/plugin_schemas.zod.compiled.ts --emit bag"
   },
   "dependencies": {
+    "@aws-sdk/xml-builder": "3.972.36",
     "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6",
     "@capacitor/action-sheet": "^8.1.1",
     "@capacitor/android": "^8.5.2",
