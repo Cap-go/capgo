@@ -976,18 +976,6 @@ onMounted(checkLogin)
                 <FormKit id="login-account" type="form" :actions="false" autocapitalize="off" data-test="login-form" @submit="handleLoginSubmit">
                   <div class="space-y-5">
                     <div v-show="isLoginStep" class="space-y-5">
-                      <template v-if="appleLoginAvailable">
-                        <AppleSignInButton
-                          :disabled="isLoading || shouldBlockForCaptcha || isCheckingSavedSession"
-                          :loading="isAppleLoading"
-                          @click="handleAppleLogin"
-                        />
-                        <div class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                          <span class="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-                          <span>{{ t('apple-login-or-email') }}</span>
-                          <span class="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
-                        </div>
-                      </template>
                       <FormKit
                         id="login-email"
                         v-model="emailForLogin"
@@ -1113,6 +1101,19 @@ onMounted(checkLogin)
                           {{ t('log-in') }}
                         </button>
                       </div>
+                    </div>
+
+                    <div v-if="appleLoginAvailable" v-show="isLoginStep" class="space-y-5">
+                      <div class="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                        <span class="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                        <span>{{ t('login-or-separator') }}</span>
+                        <span class="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+                      </div>
+                      <AppleSignInButton
+                        :disabled="isLoading || shouldBlockForCaptcha || isCheckingSavedSession"
+                        :loading="isAppleLoading"
+                        @click="handleAppleLogin"
+                      />
                     </div>
 
                     <div v-show="loginActionVisibility.verify">
