@@ -6,7 +6,7 @@ import type { StatsLogDimensions, VersionAction } from './plugin_stats.ts'
 import type { Database } from './supabase.types.ts'
 import type { ChannelDeviceOverrideIds, DeviceRes, DeviceWithoutCreatedAt, NativeActiveDevicesByPlatformRow, NativeVersionUsage, ReadDevicesParams, ReadDevicesResponse, ReadStatsInsightsParams, ReadStatsParams, StatsActions, StatsInsightAction, StatsInsightDaily, StatsInsightDevice, StatsInsightsResult, StatsInsightVersion, StatsMetadata, VersionCompareFilter, VersionUsage, VersionUsageChannel } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
-import { countDevicesCF, countInstallSourcesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeActiveDevicesSummaryCF, readNativeDailyPlatformActiveCF, readNativeVersionUsageCF, readStatsCF, readStatsInsightsCF, readStatsVersionCF, trackDevicesCF } from './cloudflare.ts'
+import { countDevicesCF, countInstallSourcesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, getAppsFromCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeActiveDevicesSummaryCF, readNativeDailyPlatformActiveCF, readNativeVersionUsageCF, readStatsCF, readStatsInsightsCF, readStatsVersionCF, trackDevicesCF } from './cloudflare.ts'
 import { isDemoApp } from './demo.ts'
 import { normalizeDeviceCountryCode } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
@@ -22,7 +22,7 @@ import {
   onPremStats,
 } from './plugin_stats.ts'
 import { normalizeStatsInsightDate, normalizeStatsInsightNumber, sortStatsInsightTotals } from './statsInsights.ts'
-import { countDevicesSB, countInstallSourcesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readChannelDefaultPlatformsSB, readChannelDeviceOverrideIdsSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeActiveDevicesSummarySB, readNativeDailyPlatformActiveSB, readNativeVersionUsageSB, readStatsInsightsSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesSB, countInstallSourcesSB, getAppsFromSB, readBandwidthUsageSB, readChannelDefaultPlatformsSB, readChannelDeviceOverrideIdsSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeActiveDevicesSummarySB, readNativeDailyPlatformActiveSB, readNativeVersionUsageSB, readStatsInsightsSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { logSkippedSupabaseWrite, shouldSkipSupabaseStatsFallback } from './supabase_write_guard.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
@@ -593,11 +593,4 @@ export async function countAllUpdates(c: Context, referenceDate?: Date): Promise
 export async function countAllUpdatesExternal(c: Context, referenceDate?: Date): Promise<number> {
   const externalCount = await countUpdatesFromLogsExternalCF(c, referenceDate)
   return externalCount
-}
-
-export function getUpdateStats(c: Context) {
-  if (c.env.VERSION_USAGE)
-    return getUpdateStatsCF(c)
-  else
-    return getUpdateStatsSB(c)
 }

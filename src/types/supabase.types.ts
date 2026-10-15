@@ -5756,7 +5756,6 @@ export type Database = {
         }
         Returns: number
       }
-      process_admin_stats: { Args: never; Returns: undefined }
       process_all_cron_tasks: { Args: never; Returns: undefined }
       process_billing_period_stats_email: { Args: never; Returns: undefined }
       process_channel_device_counts_queue: {
@@ -5782,10 +5781,6 @@ export type Database = {
             Args: { batch_size?: number; queue_names: string[] }
             Returns: undefined
           }
-      process_global_stats_creates_queue: {
-        Args: { batch_size?: number }
-        Returns: number
-      }
       process_stats_email_monthly: { Args: never; Returns: undefined }
       process_stats_email_weekly: { Args: never; Returns: undefined }
       process_subscribed_orgs: { Args: never; Returns: undefined }

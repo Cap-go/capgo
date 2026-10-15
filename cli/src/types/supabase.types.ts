@@ -4519,14 +4519,9 @@ export type Database = {
       }
       parse_step_pattern: { Args: { pattern: string }; Returns: number }
       pg_log: { Args: { decision: string; input?: Json }; Returns: undefined }
-      process_admin_stats: { Args: never; Returns: undefined }
       process_all_cron_tasks: { Args: never; Returns: undefined }
       process_billing_period_stats_email: { Args: never; Returns: undefined }
       process_channel_device_counts_queue: {
-        Args: { batch_size?: number }
-        Returns: number
-      }
-      process_global_stats_creates_queue: {
         Args: { batch_size?: number }
         Returns: number
       }
