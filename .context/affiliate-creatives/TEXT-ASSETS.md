@@ -8,12 +8,13 @@ Replace YOUR_AFFILIATE_LINK with the partner's Rewardful link.
 Capgo is the ultimate live-update and delivery platform for Ionic and Capacitor mobile apps. We help mobile development teams bypass lengthy App Store and Google Play review times by allowing them to push web-layer updates instantly Over-The-Air (OTA). 
 
 **The Problem We Solve**
-When a bug hits production, waiting 24-48 hours for App Store approval is unacceptable. Capgo empowers developers to ship fixes, run cloud native builds, and manage release channels (staging, beta, production) in minutes, complete with one-click rollbacks.
+When a bug hits production, waiting days for App Store approval is unacceptable. Capgo empowers developers and their AI agents to ship fixes, run cloud native builds, and manage release channels (staging, beta, production) in minutes, complete with one-click rollbacks. It is also the #1 migration path for teams moving off Ionic Appflow (shutting down in 2027).
 
 **Ideal Audience & Target Market**
 *   **Mobile App Developers:** Engineers building hybrid apps using Capacitor or Ionic with frameworks like Vue, React, Svelte, or Angular.
+*   **AI-Assisted Developers:** Developers using Cursor, Windsurf, or Claude Code who want their AI agents to handle the mobile release pipeline natively via MCP.
 *   **Development Agencies:** Agencies building and maintaining mobile apps for multiple clients who need a reliable, fast deployment pipeline.
-*   **SaaS Startups & Product Teams:** Mobile product managers and CTOs looking to iterate faster and reduce deployment friction.
+*   **Ionic Appflow Customers:** Teams actively looking for a maintained, modern alternative to Appflow.
 
 **Positioning Guidance & Key Selling Points**
 When promoting Capgo to your audience, focus on speed and developer experience:
@@ -21,6 +22,8 @@ When promoting Capgo to your audience, focus on speed and developer experience:
 *   **Safety:** "Total release control with environments and instant 1-click rollbacks if something breaks."
 *   **Completeness:** "The all-in-one Capacitor toolchain: OTA updates, cloud native builds, and essential plugins."
 *   **Developer-Friendly:** Easy to drop into any existing Capacitor project with our CLI.
+*   **AI-Ready:** Full support for AI coding agents (Cursor, Claude Code, Windsurf) via our official MCP server and Agent Skills.
+*   **Appflow Alternative:** The clear, maintained upgrade path for teams migrating off Ionic Appflow and Microsoft CodePush.
 
 By partnering with Capgo, you are promoting a tool that genuinely saves developers time, eliminates deployment headaches, and directly improves their workflow.
 
@@ -30,7 +33,7 @@ By partnering with Capgo, you are promoting a tool that genuinely saves develope
 
 Ship Capacitor apps without waiting on App Store review.
 
-Capgo lets you push live updates, roll back instantly, and control rollouts with channels.
+Capgo is the ultimate all-in-one toolchain for OTA live updates, native cloud builds, and release automation. Oh, and it's fully AI-ready with an official MCP server for Cursor and Claude!
 
 Try it free: YOUR_AFFILIATE_LINK
 
@@ -48,7 +51,7 @@ Need to ship a Capacitor fix today instead of waiting on App Store or Play revie
 
 ## Newsletter blurb
 
-Capgo — live updates for Capacitor. Push OTA updates, run native builds, and roll back in one click. Skip store review for web-layer releases. Free trial: YOUR_AFFILIATE_LINK
+Capgo — the AI-ready live update platform for Capacitor. Push OTA updates, run native builds, and roll back in one click natively from your CLI or through your AI agent (Cursor/Claude via MCP). The perfect alternative to Ionic Appflow! Free trial: YOUR_AFFILIATE_LINK
 
 ## YouTube / video description
 
