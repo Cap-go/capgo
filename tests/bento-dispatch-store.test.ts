@@ -1,4 +1,5 @@
 import type { ReminderSender } from '../cloudflare_workers/bento_dispatch/consumer.ts'
+import type { DispatchJob } from '../cloudflare_workers/bento_dispatch/operations.ts'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -42,7 +43,7 @@ async function fixture(kind: 'new' | 'existing' = 'new', tokenAgeDays = 0) {
     tag,
     contexts,
     store: new DispatchStore(client),
-    claimConcurrently: async (partitions = Array.from({ length: 8 }).fill(partition)) => Promise.all(partitions.map(async (claimPartition) => {
+    claimConcurrently: async (partitions: number[] = Array.from<number>({ length: 8 }).fill(partition)) => Promise.all(partitions.map(async (claimPartition) => {
       const claimer = await pool.connect()
       try {
         return await new DispatchStore(claimer).claim(tag, claimPartition, 5)
@@ -230,7 +231,7 @@ describe('bento dispatch PostgreSQL store', () => {
     try {
       expect(await f.acceptInitial()).toHaveLength(2)
       const operation = kind === 'new' ? 'org:invite_new_user_reminder_1' : 'org:invite_existing_user_reminder_1'
-      const job = { version: 1 as const, operation, partition: f.partition, runId: randomUUID() }
+      const job: DispatchJob = { version: 1, operation, partition: f.partition, runId: randomUUID() }
       await executeSQL('UPDATE public.bento_event_dispatches SET due_at = CURRENT_TIMESTAMP WHERE tag = $1 AND context_key = $2', [operation, f.requestId])
       expect(await processDispatchJob(job, f.store, send)).toEqual({ accepted: 1, cancelled: 0, failed: 0 })
       expect(sent).toHaveLength(1)
