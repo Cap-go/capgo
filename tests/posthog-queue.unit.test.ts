@@ -89,7 +89,7 @@ describe('postHog queue consumer', () => {
     }))
     const timed = entry()
     const processing = processPostHogQueueBatch(batch([timed]), env)
-    await vi.advanceTimersByTimeAsync(5000)
+    await vi.advanceTimersByTimeAsync(10000)
     await processing
     expect(timed.retry).toHaveBeenCalledOnce()
     expect(timed.ack).not.toHaveBeenCalled()
@@ -188,7 +188,7 @@ describe('postHog queue consumer', () => {
     const messages = Array.from({ length: 10 }, () => entry())
     const processing = processPostHogQueueBatch(batch(messages), env)
     expect(fetchMock).toHaveBeenCalledTimes(10)
-    await vi.advanceTimersByTimeAsync(5000)
+    await vi.advanceTimersByTimeAsync(10000)
     await processing
     expect(messages.every(message => message.retry.mock.calls.length === 1)).toBe(true)
   })

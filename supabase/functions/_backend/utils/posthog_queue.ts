@@ -126,7 +126,7 @@ export function replayablePostHogMessage(body: unknown) {
 }
 
 export async function processPostHogQueueBatch(batch: MessageBatch<unknown>, env: PostHogQueueEnv) {
-  // Ten concurrent captures per invocation, each bounded to 5s fetch + 1s response inspection.
+  // Ten concurrent captures per invocation, each bounded to 10s fetch + 1s response inspection.
   // With max_concurrency=2, at most twenty provider requests are in flight.
   await Promise.all(batch.messages.map(async (entry) => {
     const startedAt = Date.now()
@@ -151,7 +151,7 @@ export async function processPostHogQueueBatch(batch: MessageBatch<unknown>, env
         ? await deliverPosthogCapture({ apiKey: env.POSTHOG_API_KEY, host: env.POSTHOG_API_HOST }, {
             ...message.payload,
             event_id: message.event_id,
-            timeoutMs: 5000,
+            timeoutMs: 10000,
           })
         : undefined
       if (delivery?.outcome === 'delivered') {
