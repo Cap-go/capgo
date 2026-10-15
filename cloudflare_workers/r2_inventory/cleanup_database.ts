@@ -52,7 +52,7 @@ export async function inspectCleanupGroup(db: ClientBase, bucket: string, messag
     const observedAt = row?.checkpoint?.observedAt
     const age = row?.age
     // Consumer evidence deliberately excludes producer backlog/notification gates.
-    if ((row?.checkpoint.schemaVersion !== 1 && row?.checkpoint.schemaVersion !== 2) || row.checkpoint.manifestReplicationHealthy !== true
+    if ((row?.checkpoint.schemaVersion !== 1 && row?.checkpoint.schemaVersion !== 2 && row?.checkpoint.schemaVersion !== 3) || row.checkpoint.manifestReplicationHealthy !== true
       || typeof observedAt !== 'string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,6})?(?:Z|[+-]\d\d:\d\d)$/.test(observedAt)
       || !Number.isFinite(age) || age < 0 || age > CLEANUP_CONSUMER.replicationMaxAgeSeconds) {
       throw new Error('Manifest replication evidence unavailable')

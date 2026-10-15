@@ -48,7 +48,7 @@ lease expires is accepted and documented beside the consumer reference check;
 shared transactional coordination is deferred to the planned inventory move into
 Supabase. Older v1/receiptless finalization retains its existing retirement checks.
 
-The consumer accepts the original v1 and upstream v2 `cleanup_health` schemas,
+The consumer accepts the original v1, upstream v2 and replication-only v3 `cleanup_health` schemas,
 and reads only a valid `observedAt` and
 `manifestReplicationHealthy=true`. Evidence must not be future-dated and must be
 at most 300 seconds old, independently of producer-only `maxAgeSeconds`. It is read again for each group and its remaining life

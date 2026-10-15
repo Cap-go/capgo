@@ -37,10 +37,6 @@
       "queues": {
         "producers": [
           {
-            "binding": "EVENT_QUEUE",
-            "queue": "capgo-r2-inventory-prod"
-          },
-          {
             "binding": "CLEANUP_QUEUE",
             "queue": "capgo-r2-inventory-prod-cleanup"
           },
