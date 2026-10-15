@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ replace: mocks.replace, push: mocks.push }) }))
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
+vi.mock('~/services/androidGoogleLogin', () => ({ isAndroidGoogleLoginAvailable: () => false }))
 vi.mock('~/services/nativeAppleLogin', () => ({ isNativeAppleLoginAvailable: () => true, signInWithApple: mocks.signIn }))
 vi.mock('~/services/capgoApi', () => ({ invokeCapgoApi: mocks.invoke, getCapgoApiErrorCode: mocks.errorCode }))
 vi.mock('~/services/emailOtp', () => ({ getRecentEmailOtpVerification: async () => ({ isVerified: true }) }))

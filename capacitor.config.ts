@@ -1,4 +1,5 @@
 import type { CapacitorConfig } from '@capacitor/cli'
+import process from 'node:process'
 import pkg from './package.json'
 
 // Capgo mobile app: native plugin set for plugin doc QR previews.
@@ -11,7 +12,7 @@ const config: CapacitorConfig = {
       logLevel: 0,
       providers: {
         apple: true,
-        google: false,
+        google: true,
         facebook: false,
         twitter: false,
         telegram: false,
@@ -39,6 +40,8 @@ const config: CapacitorConfig = {
       version: pkg.version,
     },
     Env: {
+      CAPGO_NATIVE_GOOGLE_LOGIN: 'true',
+      CAPGO_GOOGLE_WEB_CLIENT_ID: process.env.CAPGO_GOOGLE_WEB_CLIENT_ID ?? '',
       DEMO_API_URL: 'https://api.example.com',
       DEMO_TENANT_ID: 'capgo-plugin-preview',
     },

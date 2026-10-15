@@ -6,6 +6,7 @@ import { createClient } from '@supabase/supabase-js'
 import subset from 'semver/ranges/subset'
 import { ref } from 'vue'
 import { invokeCapgoApi } from '~/services/capgoApi'
+import { prepareAndroidGoogleLogin } from './androidGoogleLogin'
 import { sortCreditPricingSteps } from './creditPricing'
 
 let supaClient: SupabaseClient<Database> = null as any
@@ -141,6 +142,7 @@ export function mergeRemoteConfig(localConfig: CapgoConfig, remoteConfig: Partia
 export async function getRemoteConfig() {
   const localConfig = getLocalConfig()
   nativeAppleLoginEnabled.value = false
+  await prepareAndroidGoogleLogin(defaultApiHost)
   if (import.meta.env.MODE === 'development')
     return localConfig
 

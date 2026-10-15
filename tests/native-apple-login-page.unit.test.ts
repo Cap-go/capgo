@@ -25,6 +25,7 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: mocks.replace }),
 }))
 vi.mock('vue-sonner', () => ({ toast: { error: mocks.error, warning: vi.fn(), success: vi.fn() } }))
+vi.mock('~/services/androidGoogleLogin', () => ({ isAndroidGoogleLoginAvailable: () => false }))
 vi.mock('~/services/nativeAppleLogin', () => ({ isNativeAppleLoginAvailable: () => mocks.available, signInWithApple: mocks.signIn }))
 vi.mock('~/services/supabase', () => ({
   defaultApiHost: 'https://api.example.test',
