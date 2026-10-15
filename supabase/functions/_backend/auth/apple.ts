@@ -1,44 +1,13 @@
-import type { User } from '@supabase/supabase-js'
 import type { Context } from 'hono'
-import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { AppleAttempt } from '../utils/appleAuthStore.ts'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { Hono } from 'hono/tiny'
 import { z } from 'zod'
-import { parseSignupAttributionRecord } from '../../shared/signup-attribution.ts'
-import { checkRegistrationEmail, getCaptchaSecret, isAuthRateLimitError, isCaptchaFailedError, provisionUserProfile } from '../utils/accountProvisioning.ts'
+import { SocialAuthError as AppleAuthError, checkSocialEmail, finishSocialSignIn, getCaptchaSecret, isAuthRateLimitError, isCaptchaFailedError, socialRegistrationMetadataSchema as registrationMetadataSchema } from '../utils/accountProvisioning.ts'
 import { appleHash, appleQuery, appleRandom, openAppleCredential, rememberAppleName, sealAppleCredential } from '../utils/appleAuthStore.ts'
 import { isAppleRolloutEnabled, isAppleSignInConfigured, isNativeAppleLoginConfigured, verifyAppleIdentity } from '../utils/appleSignIn.ts'
-import { CacheHelper } from '../utils/cache.ts'
-import { simpleErrorWithStatus, useCors } from '../utils/hono.ts'
-import { getClientIP } from '../utils/rate_limit.ts'
-import { emptySupabaseWithClientIP, supabaseAdmin } from '../utils/supabase.ts'
+import { createSocialAuthApp, socialOAuthExchangeSchema as exchangeSchema, socialExpectedUser as expectedUser, socialJsonBody as jsonBody, socialOAuthConfig, socialOAuthStartSchema as startSchema } from '../utils/socialAuthHttp.ts'
+import { emptySupabaseWithClientIP } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
-class AppleAuthError extends Error {
-  constructor(readonly status: ContentfulStatusCode, readonly code: string) {
-    super(code)
-  }
-}
-
-const registrationMetadataSchema = z.object({
-  registration_device_type: z.string().trim().max(100).optional(),
-  registration_os: z.string().trim().max(100).optional(),
-  registration_browser: z.string().trim().max(100).optional(),
-  registration_variant: z.string().trim().max(100).optional(),
-  registration_experiment: z.string().trim().max(100).optional(),
-  registration_experiment_variant: z.string().trim().max(100).optional(),
-  signup_ref: z.string().max(512).optional(),
-  signup_plugin: z.string().max(512).optional(),
-  signup_source: z.string().max(512).optional(),
-  first_touch_type: z.string().max(100).optional(),
-  first_touch_path: z.string().max(1024).optional(),
-  first_utm_source: z.string().max(512).optional(),
-  first_utm_medium: z.string().max(512).optional(),
-  first_utm_campaign: z.string().max(512).optional(),
-  first_utm_content: z.string().max(512).optional(),
-  first_utm_term: z.string().max(512).optional(),
-})
 const credentialSchema = z.object({
   id_token: z.string().min(1).max(16384),
   nonce: z.string().min(32).max(128),
@@ -48,96 +17,9 @@ const credentialSchema = z.object({
   reauthenticate: z.boolean().optional(),
   registration_metadata: registrationMetadataSchema.optional(),
 })
-const startSchema = z.object({
-  redirect_uri: z.string().max(2048),
-  code_challenge: z.string().regex(/^[\w-]{43}$/),
-  client_state: z.string().regex(/^[\w-]{32,128}$/),
-  reauthenticate: z.boolean().optional(),
-  registration_metadata: registrationMetadataSchema.optional(),
-})
-const exchangeSchema = z.object({
-  code: z.string().regex(/^[\w-]{43}$/),
-  code_verifier: z.string().regex(/^[\w-]{43,128}$/),
-  captcha_token: z.string().min(1).max(4096).optional(),
-})
-
-export const app = new Hono<MiddlewareKeyVariables>()
-app.onError((error, c) => {
-  const failure = error instanceof AppleAuthError ? error : new AppleAuthError(500, 'apple_login_failed')
-  return simpleErrorWithStatus(c, failure.status, failure.code, 'Apple authentication could not complete')
-})
-app.use('*', useCors)
-app.use('*', async (c, next) => {
-  c.header('Cache-Control', 'no-store')
-  c.header('Referrer-Policy', 'no-referrer')
-  try {
-    if (c.req.path.endsWith('/capabilities')) {
-      await next()
-      return
-    }
-    if (!isAppleSignInConfigured(c))
-      throw new AppleAuthError(503, 'apple_login_unavailable')
-    // Bound database writes and Apple verification before GoTrue's own IP/CAPTCHA gates.
-    const cache = new CacheHelper(c)
-    const key = cache.buildRequest('/.apple-auth-rate', { ip: getClientIP(c) })
-    const counter = await cache.matchJson<{ count: number }>(key)
-    if ((counter?.count ?? 0) >= 30)
-      throw new AppleAuthError(429, 'too_many_requests')
-    await cache.putJson(key, { count: (counter?.count ?? 0) + 1 }, 60)
-    await next()
-  }
-  catch (error) {
-    // Never forward credentials, provider errors or request bodies to error reporters.
-    const failure = error instanceof AppleAuthError ? error : new AppleAuthError(500, 'apple_login_failed')
-    return simpleErrorWithStatus(c, failure.status, failure.code, 'Apple authentication could not complete')
-  }
-})
-
-async function jsonBody(c: Context) {
-  if (Number(c.req.header('content-length')) > 24000)
-    throw new AppleAuthError(400, 'invalid_request')
-  // Consume the original body so global error reporting cannot log credentials.
-  try {
-    const text = await c.req.text()
-    if (text.length > 24000)
-      throw new Error('Too large')
-    return JSON.parse(text)
-  }
-  catch {
-    throw new AppleAuthError(400, 'invalid_request')
-  }
-}
-
-async function expectedUser(c: Context, reauthenticate?: boolean) {
-  if (!reauthenticate)
-    return null
-  const token = c.req.header('Authorization')?.match(/^Bearer (.+)$/i)?.[1]
-  if (!token)
-    throw new AppleAuthError(401, 'not_authenticated')
-  const { data, error } = await emptySupabaseWithClientIP(c).auth.getUser(token)
-  if (error || !data.user)
-    throw new AppleAuthError(401, 'not_authenticated')
-  return data.user
-}
-
-async function checkEmail(c: Context, email: string) {
-  const admin = supabaseAdmin(c)
-  const [deleted, sso] = await Promise.all([
-    checkRegistrationEmail(c, email),
-    admin.rpc('get_sso_enforcement_by_domain', { p_domain: email.split('@')[1] }),
-  ])
-  if (deleted.error || sso.error)
-    throw new AppleAuthError(500, 'apple_login_failed')
-  if (!deleted.data)
-    throw new AppleAuthError(403, 'account_deleted')
-  const enforcement = Array.isArray(sso.data) ? sso.data[0] : sso.data
-  if (enforcement?.enforce_sso)
-    throw new AppleAuthError(403, 'sso_required')
-}
+export const app = createSocialAuthApp('apple', isAppleSignInConfigured)
 
 type AppleCredential = z.infer<typeof credentialSchema>
-type AppleName = Awaited<ReturnType<typeof rememberAppleName>>
-type AuthClient = ReturnType<typeof emptySupabaseWithClientIP>
 
 async function verifyCredential(c: Context, body: AppleCredential, web: boolean, expectedSubject: string | null) {
   if (!web && !body.reauthenticate && !await isNativeAppleLoginConfigured(c))
@@ -161,56 +43,10 @@ async function verifyCredential(c: Context, body: AppleCredential, web: boolean,
   return { identity, caller }
 }
 
-async function updateRegistrationMetadata(c: Context, client: AuthClient, user: User, rawMetadata: AppleCredential['registration_metadata'] = {}) {
-  const existing = await supabaseAdmin(c).from('users').select('id').eq('id', user.id).maybeSingle()
-  if (existing.error)
-    throw new AppleAuthError(500, 'apple_login_failed')
-  if (existing.data)
-    return
-  const metadata: Record<string, string> = { ...parseSignupAttributionRecord(rawMetadata) }
-  for (const [key, value] of Object.entries(rawMetadata)) {
-    if (key.startsWith('registration_') && value)
-      metadata[key] = value
-  }
-  // Hooks read auth metadata when the public profile insert queues on_user_create.
-  const updated = await client.auth.updateUser({ data: Object.fromEntries(Object.entries(metadata).filter(([key]) => !user.user_metadata[key])) })
-  if (updated.error)
-    throw new AppleAuthError(500, 'apple_login_failed')
-}
-
-async function saveProfile(c: Context, client: AuthClient, user: User & { email: string }, name: AppleName, metadata: AppleCredential['registration_metadata']) {
-  await updateRegistrationMetadata(c, client, user, metadata)
-  const profile = await provisionUserProfile(c, {
-    id: user.id,
-    email: user.email,
-    first_name: name.first_name || '',
-    last_name: name.last_name || '',
-  }, true).select('id')
-  if (profile.error)
-    throw new AppleAuthError(500, 'apple_login_failed')
-  const admin = supabaseAdmin(c)
-  // Conditional updates are atomic: parallel sign-ins cannot erase a chosen name.
-  await Promise.all((['first_name', 'last_name'] as const).map(async (field) => {
-    if (!name[field])
-      return
-    const patch = field === 'first_name' ? { first_name: name.first_name } : { last_name: name.last_name }
-    const update = await admin.from('users').update(patch).eq('id', user.id).or(`${field}.is.null,${field}.eq.`)
-    if (update.error)
-      throw new AppleAuthError(500, 'apple_login_failed')
-  }))
-  const saved = await admin.from('users').select('first_name,last_name').eq('id', user.id).single()
-  if (saved.error)
-    throw new AppleAuthError(500, 'apple_login_failed')
-  return {
-    is_new_user: (profile.data?.length ?? 0) > 0,
-    name_status: saved.data.first_name || saved.data.last_name ? 'saved' : 'unavailable',
-  }
-}
-
 async function complete(c: Context, body: AppleCredential, web = false, expectedId: string | null = null, expectedSubject: string | null = null) {
   const { identity, caller } = await verifyCredential(c, body, web, expectedSubject)
   expectedId = caller?.id ?? expectedId
-  await checkEmail(c, identity.email)
+  await checkSocialEmail(c, identity.email, 'apple')
   // Save before any network exchange/profile write that could fail or be interrupted.
   const name = await rememberAppleName(c, identity.subject, body.first_name, body.last_name)
   await appleQuery(c, `DELETE FROM public.apple_auth_token_uses WHERE token_hash IN
@@ -242,29 +78,7 @@ async function complete(c: Context, body: AppleCredential, web = false, expected
     if (!user.identities?.some(item => item.provider === 'apple' && item.identity_data?.sub === identity.subject))
       throw new AppleAuthError(400, 'invalid_apple_credential')
     await appleQuery(c, 'UPDATE public.apple_auth_names SET user_id = $2 WHERE subject = $1 AND (user_id IS NULL OR user_id = $2)', [identity.subject, user.id])
-    // Linked accounts can have a different primary email; enforce both identities.
-    await checkEmail(c, user.email)
-    const disabled = await client.rpc('is_account_disabled', { user_id: user.id })
-    if (disabled.error)
-      throw new AppleAuthError(500, 'apple_login_failed')
-    if (disabled.data) {
-      // Scheduled deletion remains restorable: issue the normal session but skip
-      // provisioning and let the existing auth guard send it to accountDisabled.
-      return {
-        user,
-        is_new_user: false,
-        name_status: 'unavailable',
-        account_status: 'disabled',
-        session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token },
-      }
-    }
-    const profile = await saveProfile(c, client, { ...user, email: user.email }, name, body.registration_metadata)
-    return {
-      user,
-      account_status: 'active',
-      ...profile,
-      session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token },
-    }
+    return await finishSocialSignIn(c, client, { ...user, email: user.email }, data.session, name, body.registration_metadata, 'apple')
   }
   catch (error_) {
     // Only revoke the just-created session. Never delete existing/linked auth users.
@@ -281,18 +95,7 @@ app.post('/', async (c) => {
 })
 
 function oauthConfig(c: Context) {
-  const clientId = getEnv(c, 'APPLE_SIGN_IN_WEB_CLIENT_ID').trim()
-  const callback = getEnv(c, 'APPLE_SIGN_IN_OAUTH_CALLBACK_URL').trim()
-  let redirects: string[] = []
-  try {
-    const values = JSON.parse(getEnv(c, 'APPLE_SIGN_IN_REDIRECT_URLS'))
-    if (Array.isArray(values) && values.every(value => typeof value === 'string'))
-      redirects = values
-  }
-  catch {}
-  if (!clientId || !callback.startsWith('https://') || !redirects.length)
-    throw new AppleAuthError(503, 'apple_login_unavailable')
-  return { clientId, callback, redirects }
+  return socialOAuthConfig(c, 'apple')
 }
 
 app.post('/start', async (c) => {

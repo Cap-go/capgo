@@ -7,10 +7,14 @@ import { createApp, defineComponent, h, nextTick } from 'vue'
 import { createI18n } from 'vue-i18n'
 import messages from '../messages/en.json'
 import AppleSignInButton from '../src/components/auth/AppleSignInButton.vue'
+import GoogleSignInButton from '../src/components/auth/GoogleSignInButton.vue'
 import DeleteAccountPage from '../src/pages/delete_account.vue'
 
 const mocks = vi.hoisted(() => ({
   signIn: vi.fn(),
+  googleSignIn: vi.fn(),
+  googleAvailable: false,
+  provider: 'apple',
   getClaims: vi.fn(),
   signOut: vi.fn(),
   invoke: vi.fn(),
@@ -28,6 +32,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('vue-router', () => ({ useRouter: () => ({ replace: mocks.replace, push: mocks.push }) }))
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 vi.mock('~/services/nativeAppleLogin', () => ({ isNativeAppleLoginAvailable: () => true, signInWithApple: mocks.signIn }))
+vi.mock('~/services/nativeGoogleLogin', () => ({ loadNativeGoogleConfiguration: async () => mocks.googleAvailable, isNativeGoogleLoginAvailable: () => mocks.googleAvailable, signInWithGoogle: mocks.googleSignIn }))
 vi.mock('~/services/capgoApi', () => ({ invokeCapgoApi: mocks.invoke, getCapgoApiErrorCode: mocks.errorCode }))
 vi.mock('~/services/emailOtp', () => ({ getRecentEmailOtpVerification: async () => ({ isVerified: true }) }))
 vi.mock('~/services/loader', () => ({ hideLoader: vi.fn() }))
@@ -39,7 +44,7 @@ vi.mock('~/services/supabase', () => ({ useSupabase: () => ({
   rpc: mocks.rpc,
   auth: {
     getClaims: mocks.getClaims,
-    getSession: async () => ({ data: { session: { user: { id: 'apple-user', email_confirmed_at: '2026-01-01', identities: [{ provider: 'apple' }] } } } }),
+    getSession: async () => ({ data: { session: { user: { id: 'apple-user', email_confirmed_at: '2026-01-01', identities: [{ provider: mocks.provider }] } } } }),
     signOut: mocks.signOut,
     mfa: { getAuthenticatorAssuranceLevel: mocks.assurance, listFactors: mocks.listFactors, challenge: mocks.challenge, verify: mocks.verify },
   },
@@ -63,6 +68,7 @@ async function mount() {
     },
   }))
   app.component('AppleSignInButton', AppleSignInButton)
+  app.component('GoogleSignInButton', GoogleSignInButton)
   for (const name of ['Spinner', 'CapgoLoader', 'RouterLink', 'LangSelector'])
     app.component(name, { render: () => h('span') })
   app.mount(root)
@@ -75,6 +81,9 @@ async function start(root: HTMLElement) {
 }
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.provider = 'apple'
+  mocks.googleAvailable = false
+  mocks.googleSignIn.mockResolvedValue({ user: { id: 'apple-user' } })
   mocks.getClaims.mockResolvedValue({ data: { claims: { sub: 'apple-user' } }, error: null })
   mocks.signIn.mockResolvedValue({ user: { id: 'apple-user' }, authorizationCode: 'fresh-code' })
   mocks.signOut.mockResolvedValue({ error: null })
@@ -186,5 +195,56 @@ describe('apple account deletion', () => {
     expect(root.textContent).toContain(messages['apple-delete-reauth-required'])
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
+})
 
+describe('google account deletion', () => {
+  beforeEach(() => {
+    mocks.provider = 'google'
+    mocks.googleAvailable = true
+  })
+  async function googleStart(root: HTMLElement) {
+    ;(root.querySelector('[data-test="google-sign-in"]') as HTMLButtonElement).click()
+    await settle()
+  }
+  it('uses fresh Google reauthentication and the existing deletion RPC without a password', async () => {
+    const root = await mount()
+    expect(root.querySelector('input[type="password"]')).toBeNull()
+    await googleStart(root)
+    expect(mocks.googleSignIn).toHaveBeenCalledWith(expect.anything(), undefined, { reauthenticate: true })
+    await mocks.openDialog.mock.calls[0][0].buttons[0].handler()
+    expect(mocks.rpc).toHaveBeenCalledWith('delete_user')
+    expect(mocks.invoke).not.toHaveBeenCalled()
+  })
+  it('requires enrolled MFA before confirmation', async () => {
+    mocks.assurance.mockResolvedValue({ data: { currentLevel: 'aal1', nextLevel: 'aal2' }, error: null })
+    const root = await mount()
+    await googleStart(root)
+    expect(mocks.openDialog).not.toHaveBeenCalled()
+    await getNode('delete-account')!.input({ code: '123456' })
+    getNode('delete-account')!.submit()
+    await vi.waitFor(() => expect(mocks.openDialog).toHaveBeenCalledOnce())
+    expect(mocks.verify).toHaveBeenCalledWith({ factorId: 'factor', challengeId: 'challenge', code: '123456' })
+  })
+  it('denies a different Google account and clears the installed session', async () => {
+    mocks.googleSignIn.mockResolvedValue({ user: { id: 'different-user' } })
+    await googleStart(await mount())
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
+    expect(mocks.openDialog).not.toHaveBeenCalled()
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+  it('checks the user again at confirmation', async () => {
+    await googleStart(await mount())
+    mocks.getClaims.mockResolvedValue({ data: { claims: { sub: 'different-user' } }, error: null })
+    await mocks.openDialog.mock.calls[0][0].buttons[0].handler()
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+  it('keeps the account intact when the server requires fresh authentication', async () => {
+    mocks.rpc.mockResolvedValue({ error: { message: 'reauth_required' } })
+    const root = await mount()
+    await googleStart(root)
+    await mocks.openDialog.mock.calls[0][0].buttons[0].handler()
+    await settle()
+    expect(root.textContent).toContain(messages['google-delete-reauth-required'])
+    expect(mocks.signOut).not.toHaveBeenCalled()
+  })
 })

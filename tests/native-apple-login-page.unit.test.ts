@@ -6,6 +6,7 @@ import { createApp, h, nextTick } from 'vue'
 import { createI18n } from 'vue-i18n'
 import messages from '../messages/en.json'
 import AppleSignInButton from '../src/components/auth/AppleSignInButton.vue'
+import GoogleSignInButton from '../src/components/auth/GoogleSignInButton.vue'
 import LoginPage from '../src/pages/login.vue'
 
 const mocks = vi.hoisted(() => ({
@@ -20,6 +21,8 @@ const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
   setSession: vi.fn(),
   fullPath: '/login',
+  googleAvailable: false,
+  googleSignIn: vi.fn(),
 }))
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => mocks.available } }))
 vi.mock('vue-router', () => ({
@@ -28,6 +31,7 @@ vi.mock('vue-router', () => ({
 }))
 vi.mock('vue-sonner', () => ({ toast: { error: mocks.error, warning: vi.fn(), success: vi.fn() } }))
 vi.mock('~/services/nativeAppleLogin', () => ({ isNativeAppleLoginAvailable: () => mocks.available, signInWithApple: mocks.signIn }))
+vi.mock('~/services/nativeGoogleLogin', () => ({ isNativeGoogleLoginAvailable: () => mocks.googleAvailable, loadNativeGoogleConfiguration: async () => mocks.googleAvailable, signInWithGoogle: mocks.googleSignIn }))
 vi.mock('~/services/supabase', () => ({
   defaultApiHost: 'https://api.example.test',
   hashEmail: async () => 'hashed-email',
@@ -60,6 +64,7 @@ async function mount() {
   app.use(plugin, defaultConfig())
   app.use(createI18n({ legacy: false, locale: 'en', messages: { en: messages } }))
   app.component('AppleSignInButton', AppleSignInButton)
+  app.component('GoogleSignInButton', GoogleSignInButton)
   for (const name of ['LangSelector', 'CapgoWordtype', 'Spinner'])
     app.component(name, { render: () => h('span') })
   app.component('RouterLink', { render: () => h('a') })
@@ -72,6 +77,8 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.available = true
   mocks.fullPath = '/login'
+  mocks.googleAvailable = false
+  mocks.googleSignIn.mockResolvedValue({ user: { id: 'google-user', email: 'google-user@example.com' } })
   sessionStorage.clear()
   mocks.signIn.mockResolvedValue({ user: { id: 'apple-user', email: 'apple@example.com' } })
   mocks.rpc.mockResolvedValue({ data: true, error: null })
@@ -90,6 +97,35 @@ afterEach(() => {
 })
 
 describe('native Apple login page', () => {
+  it('keeps email first and offers configured Google alongside Apple on iOS', async () => {
+    mocks.googleAvailable = true
+    const root = await mount()
+    const apple = root.querySelector('[data-test="apple-sign-in"]')!
+    const google = root.querySelector('[data-test="google-sign-in"]')!
+    expect(google).not.toBeNull()
+    expect(root.querySelector('[data-test="submit"]')!.compareDocumentPosition(apple) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(apple.compareDocumentPosition(google) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    ;(google as HTMLButtonElement).click()
+    await settle()
+    expect(mocks.googleSignIn).toHaveBeenCalledOnce()
+    expect(mocks.replace).toHaveBeenCalledWith('/apps')
+  })
+  it.each(['factors', 'challenge'])('signs out a fresh Google session when MFA %s setup fails', async (stage) => {
+    mocks.googleAvailable = true
+    if (stage === 'factors') {
+      mocks.listFactors.mockResolvedValue({ data: null, error: new Error('Unavailable') })
+    }
+    else {
+      mocks.listFactors.mockResolvedValue({ data: { all: [{ id: 'factor', status: 'verified' }] }, error: null })
+      mocks.challenge.mockResolvedValue({ data: null, error: new Error('Unavailable') })
+    }
+    const root = await mount()
+    ;(root.querySelector('[data-test="google-sign-in"]') as HTMLButtonElement).click()
+    await settle()
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
+    expect(mocks.replace).not.toHaveBeenCalled()
+    expect(mocks.error).toHaveBeenCalledWith(messages['google-login-failed'])
+  })
   async function mountOAuthCallback() {
     mocks.available = false
     const state = 's'.repeat(43)

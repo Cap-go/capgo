@@ -4127,5 +4127,9 @@
   "apple-login-name-save-failed": "You are signed in. You can add your name in account settings.",
   "apple-delete-reauth-required": "Your Apple authorization expired. Please sign in with Apple again to delete your account.",
   "apple-delete-account-hint": "Verify your email, then confirm with the same Apple account to delete your Capgo account.",
-  "apple-revoke-failed": "Could not disconnect your Apple account. Please sign in with Apple again and retry."
+  "apple-revoke-failed": "Could not disconnect your Apple account. Please sign in with Apple again and retry.",
+  "sign-in-with-google": "Sign in with Google",
+  "google-login-failed": "Google sign-in could not complete. Please try again.",
+  "google-delete-account-hint": "Confirm your Google account to delete your account. Your existing email verification and two-factor authentication requirements still apply.",
+  "google-delete-reauth-required": "Sign in with the same Google account again to confirm deletion."
 }

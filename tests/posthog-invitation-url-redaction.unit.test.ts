@@ -11,22 +11,22 @@ vi.mock('~/services/supabase', () => ({
 const { sanitizePostHogInvitationEvent } = await import('../src/services/posthog.ts')
 
 describe('postHog invitation URL redaction', () => {
-  it.concurrent('removes Apple callback credentials from page URLs and initial person properties', () => {
-    const callback = 'https://console.capgo.app/login#apple_code=private-exchange-code&state=private-state'
+  it.each(['apple', 'google'])('removes %s callback credentials from page URLs and initial person properties', (provider) => {
+    const callback = `https://console.capgo.app/login#${provider}_code=private-exchange-code&state=private-state`
     const sanitized = sanitizePostHogInvitationEvent({
       event: '$pageview',
       properties: {
         $current_url: callback,
         $set: { $current_url: callback },
         $set_once: { $initial_current_url: callback },
-        $referrer: 'https://console.capgo.app/login#apple_error=cancelled&state=private-state',
+        $referrer: `https://console.capgo.app/login#${provider}_error=cancelled&state=private-state`,
       },
     }) as any
     expect(sanitized.properties.$current_url).toBe('https://console.capgo.app/login')
     expect(sanitized.properties.$set.$current_url).toBe('https://console.capgo.app/login')
     expect(sanitized.properties.$set_once.$initial_current_url).toBe('https://console.capgo.app/login')
     expect(sanitized.properties.$referrer).toBe('https://console.capgo.app/login')
-    expect(JSON.stringify(sanitized)).not.toMatch(/private-exchange-code|private-state|apple_code|apple_error/)
+    expect(JSON.stringify(sanitized)).not.toMatch(/private-exchange-code|private-state|apple_code|apple_error|google_code|google_error/)
   })
 
   it.concurrent('removes magic-link bearer tokens from automatic URL properties', () => {

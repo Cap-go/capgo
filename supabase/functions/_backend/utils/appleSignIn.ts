@@ -1,8 +1,9 @@
 import type { Context } from 'hono'
 import { base64url, createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from 'jose'
-import { CacheHelper } from './cache.ts'
-import { closeClient, getPgClient } from './pg.ts'
+import { isSocialRolloutEnabled as isAppleRolloutEnabled } from './socialAuthConfig.ts'
 import { getEnv } from './utils.ts'
+
+export { isSocialRolloutEnabled as isAppleRolloutEnabled } from './socialAuthConfig.ts'
 
 const appleKeys = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'))
 const requiredSettings = ['APPLE_SIGN_IN_CLIENT_ID', 'APPLE_SIGN_IN_TEAM_ID', 'APPLE_SIGN_IN_KEY_ID', 'APPLE_SIGN_IN_PRIVATE_KEY'] as const
@@ -40,34 +41,6 @@ export async function isNativeAppleLoginConfigured(c: Context) {
   if (!isAppleSignInConfigured(c))
     return false
   return isAppleRolloutEnabled(c, 'NATIVE_APPLE_LOGIN_ENABLED')
-}
-
-export async function isAppleRolloutEnabled(c: Context, setting: 'NATIVE_APPLE_LOGIN_ENABLED' | 'WEB_APPLE_LOGIN_ENABLED') {
-  // Environment values are deployment-time overrides; Vault owns runtime rollout.
-  const override = getEnv(c, setting)
-  if (override)
-    return override === 'true'
-  try {
-    const cache = new CacheHelper(c)
-    const request = cache.buildRequest(`/.${setting.toLowerCase().replaceAll('_', '-')}`)
-    const cached = await cache.matchJson<{ enabled: boolean }>(request)
-    if (cached)
-      return cached.enabled === true
-    const client = await getPgClient(c)
-    let enabled = false
-    try {
-      const result = await client.query<{ decrypted_secret: string }>('SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = $1 LIMIT 1', [setting])
-      enabled = result.rows[0]?.decrypted_secret?.trim() === 'true'
-    }
-    finally {
-      await closeClient(c, client)
-    }
-    await cache.putJson(request, { enabled }, 60)
-    return enabled
-  }
-  catch {
-    return false
-  }
 }
 
 export async function revokeAppleAuthorization(c: Context, code: string, expectedSubject: string, web = false) {

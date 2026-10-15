@@ -13,6 +13,7 @@ import { getCapgoApiErrorCode, invokeCapgoApi } from '~/services/capgoApi'
 import { getRecentEmailOtpVerification } from '~/services/emailOtp'
 import { hideLoader } from '~/services/loader'
 import { isNativeAppleLoginAvailable, signInWithApple } from '~/services/nativeAppleLogin'
+import { isNativeGoogleLoginAvailable, loadNativeGoogleConfiguration, signInWithGoogle } from '~/services/nativeGoogleLogin'
 import { useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -32,10 +33,13 @@ const { t } = useI18n()
 const router = useRouter()
 const isLoadingSession = ref(true)
 const isAppleAccount = ref(false)
+const isGoogleAccount = ref(false)
+const isSocialAccount = computed(() => isAppleAccount.value || isGoogleAccount.value)
+const socialLoginError = computed(() => isAppleAccount.value ? 'apple-login-failed' : 'google-login-failed')
 const pendingAppleCode = ref('')
-const pendingAppleUserId = ref('')
-const appleMfaFactorId = ref('')
-const appleMfaChallengeId = ref('')
+const pendingSocialUserId = ref('')
+const socialMfaFactorId = ref('')
+const socialMfaChallengeId = ref('')
 const isEmailVerified = ref(true)
 const isDeleteBlocked = computed(() => !isEmailVerified.value)
 
@@ -59,6 +63,10 @@ async function checkEmailVerification() {
   }
   isAppleAccount.value = isNativeAppleLoginAvailable(true)
     && sessionResult.session.user.identities?.some(identity => identity.provider === 'apple') === true
+  const hasGoogleIdentity = sessionResult.session.user.identities?.some(identity => identity.provider === 'google') === true
+  if (!isAppleAccount.value && hasGoogleIdentity)
+    await loadNativeGoogleConfiguration(true)
+  isGoogleAccount.value = !isAppleAccount.value && hasGoogleIdentity && isNativeGoogleLoginAvailable(true)
   isEmailVerified.value = !!sessionResult.session.user.email_confirmed_at
   isLoadingSession.value = false
 }
@@ -92,8 +100,8 @@ async function deleteAccount() {
           isLoading.value = true
 
           try {
-            if (isAppleAccount.value) {
-              if (!pendingAppleCode.value || !pendingAppleUserId.value)
+            if (isSocialAccount.value) {
+              if (!pendingSocialUserId.value || (isAppleAccount.value && !pendingAppleCode.value))
                 return setErrors('delete-account', [t('invalid-auth')], {})
             }
             else {
@@ -129,7 +137,7 @@ async function deleteAccount() {
               return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
             }
 
-            if (isAppleAccount.value && userId !== pendingAppleUserId.value)
+            if (isSocialAccount.value && userId !== pendingSocialUserId.value)
               return setErrors('delete-account', [t('invalid-auth')], {})
 
             const { data: user } = await supabaseClient
@@ -171,7 +179,7 @@ async function deleteAccount() {
               }
               if (deleteError.message?.includes('reauth_required')) {
                 isLoading.value = false
-                return setErrors('delete-account', [t('invalid-auth')], {})
+                return setErrors('delete-account', [t(isGoogleAccount.value ? 'google-delete-reauth-required' : 'invalid-auth')], {})
               }
               isLoading.value = false
               return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
@@ -190,7 +198,7 @@ async function deleteAccount() {
           finally {
             isLoading.value = false
             pendingAppleCode.value = ''
-            pendingAppleUserId.value = ''
+            pendingSocialUserId.value = ''
             pendingEmail.value = ''
             pendingPassword.value = ''
             confirmCaptchaToken.value = ''
@@ -210,7 +218,7 @@ async function deleteAccount() {
   const dismissed = await dialogStore.onDialogDismiss()
   if (dismissed) {
     pendingAppleCode.value = ''
-    pendingAppleUserId.value = ''
+    pendingSocialUserId.value = ''
     pendingEmail.value = ''
     pendingPassword.value = ''
     confirmCaptchaToken.value = ''
@@ -219,7 +227,7 @@ async function deleteAccount() {
   return dismissed
 }
 
-async function prepareAppleDeletionMfa() {
+async function prepareSocialDeletionMfa() {
   const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
   if (assuranceError)
     throw assuranceError
@@ -233,22 +241,22 @@ async function prepareAppleDeletionMfa() {
     const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: factor.id })
     if (challengeError)
       throw challengeError
-    appleMfaFactorId.value = factor.id
-    appleMfaChallengeId.value = challenge.id
+    socialMfaFactorId.value = factor.id
+    socialMfaChallengeId.value = challenge.id
     return true
   }
   return false
 }
 
-async function startAppleDeletion() {
-  if (isLoading.value || !isAppleAccount.value)
+async function startSocialDeletion() {
+  if (isLoading.value || !isSocialAccount.value)
     return
   if (captchaKey.value && !turnstileToken.value) {
     setErrors('delete-account', [t('captcha-required')], {})
     return
   }
   isLoading.value = true
-  pendingAppleCode.value = ''
+  resetSocialDeletionAuthorization()
   try {
     const { data: claims, error: claimsError } = await supabase.auth.getClaims()
     const userId = claims?.claims?.sub
@@ -256,26 +264,30 @@ async function startAppleDeletion() {
       throw new Error('Authentication required')
     if (!await ensureRecentEmailVerification(userId))
       return
-    const result = await signInWithApple(supabase, turnstileToken.value || undefined, { reauthenticate: true })
+    const result = isAppleAccount.value
+      ? await signInWithApple(supabase, turnstileToken.value || undefined, { reauthenticate: true })
+      : await signInWithGoogle(supabase, turnstileToken.value || undefined, { reauthenticate: true })
     if (!result)
       return
     if (result.user.id !== userId) {
       await supabase.auth.signOut({ scope: 'local' })
       await router.replace('/login')
-      throw new Error('Apple account does not match the account being deleted')
+      throw new Error('Account does not match the account being deleted')
     }
-    if (!result.authorizationCode)
-      throw new Error('Missing Apple authorization code')
-    pendingAppleCode.value = result.authorizationCode
-    pendingAppleUserId.value = userId
-    if (await prepareAppleDeletionMfa())
+    if (isAppleAccount.value) {
+      if (!('authorizationCode' in result) || !result.authorizationCode)
+        throw new Error('Missing Apple authorization code')
+      pendingAppleCode.value = result.authorizationCode
+    }
+    pendingSocialUserId.value = userId
+    if (await prepareSocialDeletionMfa())
       return
     isLoading.value = false
     await deleteAccount()
   }
   catch {
-    pendingAppleCode.value = ''
-    toast.error(t('apple-login-failed'))
+    resetSocialDeletionAuthorization()
+    toast.error(t(socialLoginError.value))
   }
   finally {
     turnstileToken.value = ''
@@ -284,21 +296,21 @@ async function startAppleDeletion() {
   }
 }
 
-function resetAppleDeletionAuthorization() {
-  appleMfaFactorId.value = ''
-  appleMfaChallengeId.value = ''
+function resetSocialDeletionAuthorization() {
+  socialMfaFactorId.value = ''
+  socialMfaChallengeId.value = ''
   pendingAppleCode.value = ''
-  pendingAppleUserId.value = ''
+  pendingSocialUserId.value = ''
 }
 
-async function verifyAppleDeletionMfa(form: { code: string }) {
+async function verifySocialDeletionMfa(form: { code: string }) {
   if (isLoading.value)
     return
   isLoading.value = true
   try {
     const { error } = await supabase.auth.mfa.verify({
-      factorId: appleMfaFactorId.value,
-      challengeId: appleMfaChallengeId.value,
+      factorId: socialMfaFactorId.value,
+      challengeId: socialMfaChallengeId.value,
       code: form.code.replaceAll(' ', ''),
     })
     if (error) {
@@ -306,19 +318,19 @@ async function verifyAppleDeletionMfa(form: { code: string }) {
         toast.error(t('invalid-mfa-code'))
       }
       else {
-        resetAppleDeletionAuthorization()
-        toast.error(t('apple-login-failed'))
+        resetSocialDeletionAuthorization()
+        toast.error(t(socialLoginError.value))
       }
       return
     }
-    appleMfaFactorId.value = ''
-    appleMfaChallengeId.value = ''
+    socialMfaFactorId.value = ''
+    socialMfaChallengeId.value = ''
     isLoading.value = false
     await deleteAccount()
   }
   catch {
-    resetAppleDeletionAuthorization()
-    toast.error(t('apple-login-failed'))
+    resetSocialDeletionAuthorization()
+    toast.error(t(socialLoginError.value))
   }
   finally {
     isLoading.value = false
@@ -408,11 +420,11 @@ onMounted (() => {
       </router-link>
     </div>
 
-    <div v-else-if="isAppleAccount" class="space-y-5">
+    <div v-else-if="isSocialAccount" class="space-y-5">
       <p class="text-sm text-slate-600 dark:text-slate-300">
-        {{ t('apple-delete-account-hint') }}
+        {{ t(isAppleAccount ? 'apple-delete-account-hint' : 'google-delete-account-hint') }}
       </p>
-      <FormKit v-if="appleMfaFactorId" id="delete-account" type="form" :actions="false" @submit="verifyAppleDeletionMfa">
+      <FormKit v-if="socialMfaFactorId" id="delete-account" type="form" :actions="false" @submit="verifySocialDeletionMfa">
         <FormKit
           name="code"
           type="text"
@@ -426,10 +438,11 @@ onMounted (() => {
           {{ t('verify') }}
         </button>
       </FormKit>
-      <FormKit v-else id="delete-account" type="form" :actions="false" @submit="startAppleDeletion">
+      <FormKit v-else id="delete-account" type="form" :actions="false" @submit="startSocialDeletion">
         <VueTurnstile v-if="captchaKey" ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
         <FormKitMessages />
-        <AppleSignInButton :disabled="isLoading" :loading="isLoading" @click="startAppleDeletion" />
+        <AppleSignInButton v-if="isAppleAccount" :disabled="isLoading" :loading="isLoading" @click="startSocialDeletion" />
+        <GoogleSignInButton v-else :disabled="isLoading" :loading="isLoading" @click="startSocialDeletion" />
       </FormKit>
     </div>
 
