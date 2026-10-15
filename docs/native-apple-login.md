@@ -1,6 +1,6 @@
 # Native iOS Sign in with Apple
 
-The Apple button is available only on iOS binaries containing the SocialLogin plugin, after server configuration explicitly enables it. Web and Android keep their current login UI. Older iOS binaries cannot call the missing plugin. Native login exchanges an Apple identity token with Supabase, with a random nonce whose SHA-256 hash is sent to Apple; Supabase verifies the original nonce. Existing MFA, SSO enforcement, disabled-account handling and onboarding remain in the login flow.
+The Apple button is available only on iOS binaries containing the SocialLogin plugin, after server configuration explicitly enables it. Web and Android keep their current login UI. Older iOS binaries cannot call the missing plugin. Native login sends an Apple identity token to the shared backend `/auth/apple` endpoint, which exchanges it with Supabase, with a random nonce whose SHA-256 hash is sent to Apple; Supabase verifies the original nonce. Existing MFA, SSO enforcement, disabled-account handling and onboarding remain in the login flow.
 
 ## Signing and provider setup
 
@@ -14,7 +14,7 @@ The Apple button is available only on iOS binaries containing the SocialLogin pl
 
 ## Account deletion
 
-Apple accounts use the same account-deletion screen, with Apple reauthentication instead of a password. Email OTP, matching account identity, fresh authentication and any enrolled MFA remain required. Before scheduling deletion, the authenticated backend exchanges the fresh Apple authorization code, validates its signed identity token against the authenticated user's server-side Apple identity, and revokes the access token with Apple. Codes and tokens are not persisted or logged by this implementation. The Apple sign-in must be less than five minutes old when revocation starts, including any time spent on MFA and confirmation. If it expires, restart Sign in with Apple; later MFA does not extend that window. A failed revocation leaves the account intact and asks the user to retry.
+Apple accounts use the same account-deletion screen, with Apple reauthentication instead of a password. Email OTP, matching account identity, fresh authentication and any enrolled MFA remain required. Before scheduling deletion, the authenticated backend exchanges the fresh Apple authorization code, validates its signed identity token against the authenticated user's server-side Apple identity, and revokes the access token with Apple. Native codes and session tokens are never logged. The shared browser OAuth transport temporarily encrypts pending Apple credentials in restricted server storage; see [the shared API contract](apple-auth-api.md). The Apple sign-in must be less than five minutes old when revocation starts, including any time spent on MFA and confirmation. If it expires, restart Sign in with Apple; later MFA does not extend that window. A failed revocation leaves the account intact and asks the user to retry.
 
 The existing delayed deletion and restoration policy remains in place. Authorization revocation does not delete the Capgo account by itself; deletion is scheduled through the existing user-scoped RPC.
 
@@ -25,3 +25,5 @@ Use the release automation's native major-version boundary. Production currently
 Build with Capgo Builder, then verify on TestFlight: first authorization with both real and relay email; returning login without another name; cancellation; existing-email account linking; MFA; managed SSO domains; disabled/deleted accounts; new-user onboarding; passwordless deletion and token revocation; and restoring within the existing deletion window. Verify web/Android and older iOS binaries never show the button. Use manual App Store release to hold the reviewed binary until launch.
 
 The local production-backed visual preview uses an ignored Vite configuration under `.context/` to display the button in a browser. That override is not part of the PR and cannot perform the native Apple sheet in a web browser.
+
+The native app has no direct Supabase Apple token-exchange fallback, including deletion reauthentication. Apple names are sanitized, retained against the verified Apple identity across interrupted completion, and saved to the actual public profile without overwriting chosen names. Missing names remain optional and can be added in account settings. See [the cross-platform API contract](apple-auth-api.md) for OAuth consumers and rollout dependencies.

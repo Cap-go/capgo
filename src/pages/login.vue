@@ -18,6 +18,7 @@ import IconScanQrCode from '~icons/lucide/scan-qr-code'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
+import { captureAppleOAuthCallback, completeAppleOAuth, hasPendingAppleOAuth, startAppleOAuth } from '~/services/appleOAuth'
 import { hideLoader } from '~/services/loader'
 import { isNativeAppleLoginAvailable, signInWithApple } from '~/services/nativeAppleLogin'
 import { autoAuth, defaultApiHost, hashEmail, useSupabase } from '~/services/supabase'
@@ -374,7 +375,7 @@ async function handleAppleLogin() {
       return
     }
 
-    if (result.profileSaveFailed)
+    if (result.profileSaveFailed || result.nameUnavailable)
       toast.warning(t('apple-login-name-save-failed'))
     if (!await checkMfa())
       throw new Error('Apple login could not complete MFA setup')
@@ -764,6 +765,24 @@ async function checkLogin() {
     const parsedUrl = new URL(route.fullPath, globalThis.location.origin)
     const params = new URLSearchParams(parsedUrl.search)
 
+    if (params.get('apple_oauth') === '1' && !Capacitor.isNativePlatform()) {
+      // Console owns the verifier and resulting session across the Apple round trip.
+      const entry = new URL(parsedUrl)
+      parsedUrl.searchParams.delete('apple_oauth')
+      parsedUrl.searchParams.delete('apple_website_state')
+      globalThis.history.replaceState({}, '', parsedUrl)
+      await startAppleOAuth(entry)
+      return
+    }
+    captureAppleOAuthCallback(parsedUrl)
+    if (hasPendingAppleOAuth()) {
+      isLoading.value = false
+      hideLoader()
+      if (!captchaKey.value || turnstileToken.value)
+        await finishAppleOAuth()
+      return
+    }
+
     if (params.get('message') === 'sso_account_linked') {
       parsedUrl.searchParams.delete('message')
       globalThis.history.replaceState({}, '', parsedUrl.toString())
@@ -813,6 +832,29 @@ async function checkLogin() {
     isCheckingSavedSession.value = false
   }
 }
+
+async function finishAppleOAuth() {
+  if (isAppleLoading.value || !hasPendingAppleOAuth())
+    return
+  isAppleLoading.value = true
+  isLoading.value = true
+  try {
+    await completeAppleOAuth(supabase, turnstileToken.value || undefined)
+    await checkMfa()
+  }
+  catch {
+    toast.error(t('apple-login-failed'))
+  }
+  finally {
+    isAppleLoading.value = false
+    isLoading.value = false
+  }
+}
+
+watch(turnstileToken, (token) => {
+  if (token && hasPendingAppleOAuth())
+    void finishAppleOAuth()
+})
 
 function declineQuerySession() {
   hasQuerySession.value = false

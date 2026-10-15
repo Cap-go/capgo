@@ -1,7 +1,6 @@
-import type { AppleProviderResponse } from '@capgo/capacitor-social-login'
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { Capacitor } from '@capacitor/core'
-import { nativeAppleLoginEnabled } from './supabase'
+import { defaultApiHost, nativeAppleLoginEnabled } from './supabase'
 
 export function isNativeAppleLoginAvailable(reauthenticate = false) {
   return (reauthenticate || nativeAppleLoginEnabled.value)
@@ -34,40 +33,38 @@ export async function signInWithApple(supabase: SupabaseClient, captchaToken?: s
   if (!credential.result.idToken)
     throw new Error('Apple did not return an identity token')
 
-  const { data, error } = await supabase.auth.signInWithIdToken({
-    provider: 'apple',
-    token: credential.result.idToken,
-    nonce,
-    options: { captchaToken },
+  const { data: current } = options.reauthenticate ? await supabase.auth.getSession() : { data: { session: null } }
+  if (options.reauthenticate && !current.session)
+    throw new Error('Authentication required')
+  const response = await fetch(`${defaultApiHost}/auth/apple`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(current.session ? { Authorization: `Bearer ${current.session.access_token}` } : {}),
+    },
+    body: JSON.stringify({
+      id_token: credential.result.idToken,
+      nonce,
+      first_name: credential.result.profile.givenName ?? undefined,
+      last_name: credential.result.profile.familyName ?? undefined,
+      captcha_token: captchaToken,
+      reauthenticate: options.reauthenticate,
+      registration_metadata: { registration_device_type: 'mobile', registration_os: 'iOS', registration_browser: 'native' },
+    }),
   })
-  if (error)
-    throw error
-  if (!data.session || !data.user)
-    throw new Error('Apple login did not create a Supabase session')
-
-  const profileSaveFailed = await saveAppleProfile(supabase, data.user, credential.result.profile)
-  return { user: data.user, profileSaveFailed, authorizationCode: credential.result.authorizationCode }
-}
-
-async function saveAppleProfile(supabase: SupabaseClient, user: User, profile: AppleProviderResponse['profile']) {
-  // Apple supplies names only on the first authorization. Do not replace chosen names.
-  const firstName = profile.givenName?.trim()
-  const lastName = profile.familyName?.trim()
-  const metadata: Record<string, string> = {}
-  if (firstName && !user.user_metadata.first_name)
-    metadata.first_name = firstName
-  if (lastName && !user.user_metadata.last_name)
-    metadata.last_name = lastName
-  if ((firstName || lastName) && !user.user_metadata.full_name)
-    metadata.full_name = [firstName, lastName].filter(Boolean).join(' ')
-
-  if (Object.keys(metadata).length === 0)
-    return false
-  try {
-    const { error } = await supabase.auth.updateUser({ data: metadata })
-    return !!error
+  const result = await response.json() as {
+    user?: User
+    session?: { access_token: string, refresh_token: string }
+    name_status?: 'saved' | 'unavailable'
+    error?: string
   }
-  catch {
-    return true
-  }
+  if (!response.ok || !result.user || !result.session)
+    throw new Error(result.error || 'Apple authentication failed')
+  // Check again before installing a replacement session during account deletion.
+  if (current.session && result.user.id !== current.session.user.id)
+    throw new Error('Apple account does not match the authenticated account')
+  const { data, error } = await supabase.auth.setSession(result.session)
+  if (error || !data.user)
+    throw error || new Error('Apple session could not be installed')
+  return { user: data.user, profileSaveFailed: false, nameUnavailable: result.name_status === 'unavailable', authorizationCode: credential.result.authorizationCode }
 }

@@ -1,11 +1,36 @@
 import type { Context } from 'hono'
-import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from 'jose'
+import { base64url, createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from 'jose'
 import { CacheHelper } from './cache.ts'
 import { closeClient, getPgClient } from './pg.ts'
 import { getEnv } from './utils.ts'
 
 const appleKeys = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'))
 const requiredSettings = ['APPLE_SIGN_IN_CLIENT_ID', 'APPLE_SIGN_IN_TEAM_ID', 'APPLE_SIGN_IN_KEY_ID', 'APPLE_SIGN_IN_PRIVATE_KEY'] as const
+
+export async function verifyAppleIdentity(c: Context, token: string, nonce: string, web = false, code?: string) {
+  const audience = getEnv(c, web ? 'APPLE_SIGN_IN_WEB_CLIENT_ID' : 'APPLE_SIGN_IN_CLIENT_ID').trim()
+  if (!audience)
+    throw new Error('Apple audience unavailable')
+  const { payload } = await jwtVerify(token, appleKeys, {
+    issuer: 'https://appleid.apple.com',
+    audience,
+    algorithms: ['RS256'],
+    requiredClaims: ['sub', 'exp', 'iat', 'nonce', 'email'],
+    maxTokenAge: '10m',
+  })
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(nonce))
+  const hashedNonce = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+  if (payload.nonce !== hashedNonce || !payload.sub || typeof payload.email !== 'string'
+    || (payload.email_verified !== true && payload.email_verified !== 'true')) {
+    throw new Error('Invalid Apple identity')
+  }
+  if (code) {
+    const codeHash = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code)))
+    if (payload.c_hash !== base64url.encode(codeHash.slice(0, 16)))
+      throw new Error('Invalid Apple code binding')
+  }
+  return { subject: payload.sub, email: payload.email.trim().toLowerCase() }
+}
 
 export function isAppleSignInConfigured(c: Context) {
   return requiredSettings.every(key => getEnv(c, key).trim().length > 0)
@@ -14,20 +39,24 @@ export function isAppleSignInConfigured(c: Context) {
 export async function isNativeAppleLoginConfigured(c: Context) {
   if (!isAppleSignInConfigured(c))
     return false
+  return isAppleRolloutEnabled(c, 'NATIVE_APPLE_LOGIN_ENABLED')
+}
+
+export async function isAppleRolloutEnabled(c: Context, setting: 'NATIVE_APPLE_LOGIN_ENABLED' | 'WEB_APPLE_LOGIN_ENABLED') {
   // Environment values are deployment-time overrides; Vault owns runtime rollout.
-  const override = getEnv(c, 'NATIVE_APPLE_LOGIN_ENABLED')
+  const override = getEnv(c, setting)
   if (override)
     return override === 'true'
   try {
     const cache = new CacheHelper(c)
-    const request = cache.buildRequest('/.native-apple-login-enabled')
+    const request = cache.buildRequest(`/.${setting.toLowerCase().replaceAll('_', '-')}`)
     const cached = await cache.matchJson<{ enabled: boolean }>(request)
     if (cached)
       return cached.enabled === true
     const client = await getPgClient(c)
     let enabled = false
     try {
-      const result = await client.query<{ decrypted_secret: string }>('SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = $1 LIMIT 1', ['NATIVE_APPLE_LOGIN_ENABLED'])
+      const result = await client.query<{ decrypted_secret: string }>('SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = $1 LIMIT 1', [setting])
       enabled = result.rows[0]?.decrypted_secret?.trim() === 'true'
     }
     finally {
@@ -41,8 +70,10 @@ export async function isNativeAppleLoginConfigured(c: Context) {
   }
 }
 
-export async function revokeAppleAuthorization(c: Context, code: string, expectedSubject: string) {
-  const clientId = getEnv(c, 'APPLE_SIGN_IN_CLIENT_ID')
+export async function revokeAppleAuthorization(c: Context, code: string, expectedSubject: string, web = false) {
+  const clientId = getEnv(c, web ? 'APPLE_SIGN_IN_WEB_CLIENT_ID' : 'APPLE_SIGN_IN_CLIENT_ID')
+  if (!clientId)
+    throw new Error('Apple audience unavailable')
   const key = await importPKCS8(getEnv(c, 'APPLE_SIGN_IN_PRIVATE_KEY').replace(/\\n/g, '\n'), 'ES256')
   const secret = await new SignJWT({})
     .setProtectedHeader({ alg: 'ES256', kid: getEnv(c, 'APPLE_SIGN_IN_KEY_ID') })
