@@ -845,11 +845,18 @@ async function finishAppleOAuth() {
     return
   isAppleLoading.value = true
   isLoading.value = true
+  let hasAppleSession = false
   try {
     await completeAppleOAuth(supabase, turnstileToken.value || undefined)
-    await checkMfa()
+    hasAppleSession = true
+    if (!await checkMfa())
+      throw new Error('Apple login could not complete MFA setup')
   }
   catch {
+    if (hasAppleSession)
+      await supabase.auth.signOut({ scope: 'local' })
+    turnstileToken.value = ''
+    safeResetTurnstile(captchaComponent.value)
     toast.error(t('apple-login-failed'))
   }
   finally {

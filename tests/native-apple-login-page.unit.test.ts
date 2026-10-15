@@ -18,10 +18,12 @@ const mocks = vi.hoisted(() => ({
   listFactors: vi.fn(),
   challenge: vi.fn(),
   verify: vi.fn(),
+  setSession: vi.fn(),
+  fullPath: '/login',
 }))
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => mocks.available } }))
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: { to: '/apps' }, fullPath: '/login', hash: '' }),
+  useRoute: () => ({ query: { to: '/apps' }, fullPath: mocks.fullPath, hash: '' }),
   useRouter: () => ({ replace: mocks.replace }),
 }))
 vi.mock('vue-sonner', () => ({ toast: { error: mocks.error, warning: vi.fn(), success: vi.fn() } }))
@@ -36,6 +38,7 @@ vi.mock('~/services/supabase', () => ({
       getClaims: async () => ({ data: { claims: null } }),
       getSession: async () => ({ data: { session: null } }),
       signOut: mocks.signOut,
+      setSession: mocks.setSession,
       mfa: { listFactors: mocks.listFactors, challenge: mocks.challenge, verify: mocks.verify },
     },
   }),
@@ -68,9 +71,12 @@ async function mount() {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.available = true
+  mocks.fullPath = '/login'
+  sessionStorage.clear()
   mocks.signIn.mockResolvedValue({ user: { id: 'apple-user', email: 'apple@example.com' } })
   mocks.rpc.mockResolvedValue({ data: true, error: null })
   mocks.signOut.mockResolvedValue({ error: null })
+  mocks.setSession.mockResolvedValue({ data: { user: { id: 'apple-user', email: 'apple@example.com' } }, error: null })
   mocks.listFactors.mockResolvedValue({ data: { all: [] }, error: null })
   mocks.challenge.mockResolvedValue({ data: { id: 'challenge-id' }, error: null })
   mocks.verify.mockResolvedValue({ error: null })
@@ -84,6 +90,39 @@ afterEach(() => {
 })
 
 describe('native Apple login page', () => {
+  async function mountOAuthCallback() {
+    mocks.available = false
+    const state = 's'.repeat(43)
+    sessionStorage.setItem('capgo.apple-oauth.v1', JSON.stringify({ state, verifier: 'v'.repeat(43), created: Date.now() }))
+    mocks.fullPath = `/login#apple_code=${'c'.repeat(43)}&state=${state}`
+    vi.mocked(fetch).mockResolvedValue(Response.json({ user: { id: 'apple-user', email: 'apple@example.com' }, session: { access_token: 'access', refresh_token: 'refresh' } }))
+    return mount()
+  }
+
+  it('enters the existing MFA challenge after browser OAuth session installation', async () => {
+    mocks.listFactors.mockResolvedValue({ data: { all: [{ id: 'factor-id', status: 'verified' }] }, error: null })
+    await mountOAuthCallback()
+    expect(mocks.setSession).toHaveBeenCalledOnce()
+    expect(mocks.challenge).toHaveBeenCalledWith({ factorId: 'factor-id' })
+    expect(mocks.replace).not.toHaveBeenCalled()
+    expect(mocks.signOut).not.toHaveBeenCalled()
+  })
+
+  it.each(['factors', 'challenge'])('signs out the fresh browser OAuth session if MFA %s setup fails', async (stage) => {
+    if (stage === 'factors') {
+      mocks.listFactors.mockResolvedValue({ data: null, error: new Error('Factors unavailable') })
+    }
+    else {
+      mocks.listFactors.mockResolvedValue({ data: { all: [{ id: 'factor-id', status: 'verified' }] }, error: null })
+      mocks.challenge.mockResolvedValue({ data: null, error: new Error('Challenge unavailable') })
+    }
+    await mountOAuthCallback()
+    expect(mocks.setSession).toHaveBeenCalledOnce()
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
+    expect(mocks.replace).not.toHaveBeenCalled()
+    expect(mocks.error).toHaveBeenCalledWith(messages['apple-login-failed'])
+  })
+
   it('hides the Apple button when the native availability gate is false', async () => {
     mocks.available = false
     const root = await mount()
@@ -133,8 +172,9 @@ describe('native Apple login page', () => {
     expect(mocks.replace).not.toHaveBeenCalled()
   })
   it.each(['factors', 'challenge'])('signs out the fresh Apple session if MFA %s setup fails', async (stage) => {
-    if (stage === 'factors')
+    if (stage === 'factors') {
       mocks.listFactors.mockResolvedValue({ data: null, error: new Error('Factors unavailable') })
+    }
     else {
       mocks.listFactors.mockResolvedValue({ data: { all: [{ id: 'factor-id', status: 'verified' }] }, error: null })
       mocks.challenge.mockResolvedValue({ data: null, error: new Error('Challenge unavailable') })
@@ -146,5 +186,4 @@ describe('native Apple login page', () => {
     expect(mocks.replace).not.toHaveBeenCalled()
     expect(mocks.error).toHaveBeenCalledWith(messages['apple-login-failed'])
   })
-
 })
