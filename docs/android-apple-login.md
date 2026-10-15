@@ -1,6 +1,6 @@
 # Android Sign in with Apple
 
-This is a future Android feature. It does not change the `capgo-17.0.0` release or enable any production setting. Merge and deploy the shared backend/iOS Apple authentication PR (`wolny/shared-apple-auth`) and its migration **before** enabling this Android build. The authoritative endpoint contract is `docs/apple-auth-api.md` in that PR. Keep this PR based on `main`; do not change its base to the unmerged backend branch.
+This is a future Android feature. It does not change the `capgo-17.0.0` release or enable any production setting. Merge and deploy [shared backend/iOS Apple authentication PR #3715](https://github.com/Cap-go/capgo.app/pull/3715) and its migration **before** enabling this Android build. The authoritative endpoint contract is `docs/apple-auth-api.md` in that PR. Keep this PR based on `main`; do not change its base to the unmerged backend branch.
 
 ## Visibility and rollout
 
