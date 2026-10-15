@@ -82,6 +82,9 @@ Once PR #974 is merged, you can use these exact URLs to access the banners direc
 - Large Mobile Banner (320x100): `https://capgo.app/affiliate/banner-320x100-mobile.png`
 - Standard Banner (468x60): `https://capgo.app/affiliate/banner-468x60.png`
 
+**Brand Assets:**
+- Logo (1024x1024): `https://capgo.app/affiliate/logo-1024x1024.png`
+
 **Other Capgo Examples:**
 - `https://capgo.app/affiliate/capgo-example-og.png`
 - `https://capgo.app/affiliate/capgo-example-rectangle.png`
