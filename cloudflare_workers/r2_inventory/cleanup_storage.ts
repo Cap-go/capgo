@@ -11,13 +11,16 @@ export interface CleanupStorageEnv {
 export interface CleanupStorage {
   remove: (bucket: string, key: string, etag: string | null, signal: AbortSignal) => Promise<void>
 }
+type StorageOperation = 'head_source' | 'head_backup' | 'copy' | 'delete'
 export interface CleanupStorageDiagnostic {
-  stage: 'head_source' | 'head_backup' | 'copy' | 'copy_response' | 'delete'
+  stage: StorageOperation | 'copy_response'
   errorType: string
   httpStatus?: number
   hasCopyResult?: boolean
   hasCopyEtag?: boolean
   hasCopyLastModified?: boolean
+  elapsedMs?: number
+  operationMs?: Partial<Record<StorageOperation, number>>
 }
 type ReportFailure = (diagnostic: CleanupStorageDiagnostic) => void
 // An error name can contain provider/input data. Emit only known fixed names.
@@ -57,14 +60,26 @@ const quoted = (etag: string) => `"${normalizeEtag(etag)}"`
 // Exposed for transport tests; the production client has exactly one SDK attempt.
 export function cleanupStorage(client: S3Client, reportFailure?: ReportFailure): CleanupStorage {
   return { remove: async (bucket, key, expectedEtag, signal) => {
+    const startedAt = Date.now()
+    const operationMs: Partial<Record<StorageOperation, number>> = {}
     const diagnostic: Omit<CleanupStorageDiagnostic, 'errorType'> = { stage: 'head_source' }
+    const request = async <T>(operation: StorageOperation, work: () => Promise<T>) => {
+      diagnostic.stage = operation
+      const started = Date.now()
+      try {
+        return await work()
+      }
+      finally {
+        operationMs[operation] = (operationMs[operation] ?? 0) + Math.max(0, Date.now() - started)
+      }
+    }
     try {
       const check = () => signal.throwIfAborted()
       const head = async (path: string) => {
         diagnostic.stage = path === key ? 'head_source' : 'head_backup'
         check()
         try {
-          return await client.send(new HeadObjectCommand({ Bucket: bucket, Key: path }), { abortSignal: signal })
+          return await request(path === key ? 'head_source' : 'head_backup', () => client.send(new HeadObjectCommand({ Bucket: bucket, Key: path }), { abortSignal: signal }))
         }
         catch (error) {
           const code = errorCode(error)
@@ -100,7 +115,7 @@ export function cleanupStorage(client: S3Client, reportFailure?: ReportFailure):
       check()
       diagnostic.stage = 'copy'
       try {
-        const result = await client.send(copy, { abortSignal: signal })
+        const result = await request('copy', () => client.send(copy, { abortSignal: signal }))
         diagnostic.stage = 'copy_response'
         diagnostic.httpStatus = result.$metadata?.httpStatusCode
         diagnostic.hasCopyResult = !!result.CopyObjectResult
@@ -141,7 +156,7 @@ export function cleanupStorage(client: S3Client, reportFailure?: ReportFailure):
       // start DELETE after the workflow deadline has abandoned this job.
       check()
       diagnostic.stage = 'delete'
-      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: signal })
+      await request('delete', () => client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: signal }))
       check()
     }
     catch (error) {
@@ -150,6 +165,8 @@ export function cleanupStorage(client: S3Client, reportFailure?: ReportFailure):
       try {
         reportFailure?.({
           ...diagnostic,
+          elapsedMs: Math.max(0, Date.now() - startedAt),
+          operationMs,
           errorType: code.name && diagnosticErrorTypes.has(code.name) ? code.name : 'OtherError',
           httpStatus: typeof status === 'number' && Number.isInteger(status) && status >= 100 && status <= 599 ? status : undefined,
         })

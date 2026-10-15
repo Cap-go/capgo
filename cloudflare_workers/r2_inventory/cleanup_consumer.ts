@@ -71,7 +71,7 @@ export async function cleanupWorkflow(storage: CleanupStorage, value: CleanupMes
 export async function consumeCleanupBatch(batch: MessageBatch<unknown>, env: CleanupConsumerEnv, deps = dependencies(env)) {
   const settled = new Set<Message<unknown>>()
   const counts: AlertCounts = {}
-  let storageFailure: CleanupStorageDiagnostic | undefined
+  const storageFailures = new Set<string>()
   const problem = (reason: AlertReason, count = 1) => {
     counts[reason] = (counts[reason] ?? 0) + count
   }
@@ -166,7 +166,11 @@ export async function consumeCleanupBatch(batch: MessageBatch<unknown>, env: Cle
                 return
               }
               storage ??= deps.storage((diagnostic) => {
-                storageFailure ??= diagnostic
+                const identity = JSON.stringify([diagnostic.stage, diagnostic.errorType, diagnostic.httpStatus, diagnostic.hasCopyResult, diagnostic.hasCopyEtag, diagnostic.hasCopyLastModified])
+                if (storageFailures.size < 3 && !storageFailures.has(identity)) {
+                  storageFailures.add(identity)
+                  console.log(JSON.stringify({ event: 'r2_cleanup_storage_failure', ...diagnostic }))
+                }
               })
               await cleanupWorkflow(storage, job.value, rows.get(job.value.key)?.etag ?? null, Math.min(deps.now() + CLEANUP_CONSUMER.objectMs, until), deps.now)
               // Storage success is final for queue delivery. ACK precedes every
@@ -204,6 +208,6 @@ export async function consumeCleanupBatch(batch: MessageBatch<unknown>, env: Cle
     // Never use retryAll: it would erase successful per-message isolation.
     retry(batch.messages)
     await sendCleanupAlert(deps.database, env.INVENTORY_BUCKET, env.R2_CLEANUP_DISCORD_WEBHOOK_URL, counts)
-    console.log(JSON.stringify({ event: 'r2_cleanup_batch', received: batch.messages.length, counts, ...(storageFailure ? { storageFailure } : {}) }))
+    console.log(JSON.stringify({ event: 'r2_cleanup_batch', received: batch.messages.length, counts }))
   }
 }

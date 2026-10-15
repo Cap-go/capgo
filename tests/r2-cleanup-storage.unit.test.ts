@@ -56,6 +56,8 @@ describe('cleanup real S3 transport', () => {
       hasCopyResult: true,
       hasCopyEtag: true,
       hasCopyLastModified: false,
+      elapsedMs: expect.any(Number),
+      operationMs: { copy: expect.any(Number) },
     })
     for (const privateValue of [key, env.S3_ENDPOINT, env.S3_ACCESS_KEY_ID, env.S3_SECRET_ACCESS_KEY])
       expect(JSON.stringify(report.mock.calls)).not.toContain(privateValue)
@@ -73,6 +75,8 @@ describe('cleanup real S3 transport', () => {
       hasCopyResult: true,
       hasCopyEtag: true,
       hasCopyLastModified: true,
+      elapsedMs: expect.any(Number),
+      operationMs: { copy: expect.any(Number), delete: expect.any(Number) },
     })
   })
 
@@ -90,6 +94,8 @@ describe('cleanup real S3 transport', () => {
       hasCopyResult: true,
       hasCopyEtag: true,
       hasCopyLastModified: true,
+      elapsedMs: expect.any(Number),
+      operationMs: { copy: expect.any(Number), delete: expect.any(Number) },
     })
   })
 })
@@ -129,7 +135,33 @@ describe('cleanup retry recovery and deadlines', () => {
     const report = vi.fn()
     const send = vi.fn().mockRejectedValueOnce(failure).mockResolvedValueOnce(head)
     await expect(cleanupStorage({ send } as unknown as S3Client, report).remove('capgo', key, 'etag', new AbortController().signal)).rejects.toBe(failure)
-    expect(report).toHaveBeenCalledExactlyOnceWith({ stage: 'copy', errorType: 'NoSuchKey', httpStatus: 404 })
+    expect(report).toHaveBeenCalledExactlyOnceWith({
+      stage: 'copy',
+      errorType: 'NoSuchKey',
+      httpStatus: 404,
+      elapsedMs: expect.any(Number),
+      operationMs: { copy: expect.any(Number), head_source: expect.any(Number) },
+    })
+  })
+
+  it('separates time spent copying from time spent in a failed recovery HEAD', async () => {
+    vi.useFakeTimers()
+    const report = vi.fn()
+    const send = vi.fn().mockImplementationOnce(async () => {
+      vi.advanceTimersByTime(15000)
+      throw condition()
+    }).mockImplementationOnce(async () => {
+      vi.advanceTimersByTime(5000)
+      throw Object.assign(new Error('Synthetic abort'), { name: 'AbortError' })
+    })
+    await expect(cleanupStorage({ send } as unknown as S3Client, report).remove('capgo', key, 'etag', new AbortController().signal)).rejects.toThrow('Synthetic abort')
+    expect(report).toHaveBeenCalledExactlyOnceWith({
+      stage: 'head_source',
+      errorType: 'AbortError',
+      httpStatus: undefined,
+      elapsedMs: 20000,
+      operationMs: { copy: 15000, head_source: 5000 },
+    })
   })
 
   it('obtains missing inventory ETag with HEAD and fails closed on unknown absence or missing bucket', async () => {
