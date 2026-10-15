@@ -575,6 +575,9 @@ export class CapgoSDK {
           acceptIncompatible: parsed.acceptIncompatible,
           codeCheck: !parsed.disableCodeCheck, // disable if requested, otherwise check
           zip: parsed.useZip, // use legacy zip upload if requested
+          delta: parsed.delta,
+          deltaOnly: parsed.deltaOnly,
+          encryptDelta: parsed.encryptDelta,
         }
 
         // Call internal upload function but suppress CLI behaviors

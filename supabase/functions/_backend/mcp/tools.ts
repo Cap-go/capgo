@@ -35,6 +35,8 @@ export interface McpCaller {
 export interface McpToolContext {
   call: (request: McpApiRequest) => Promise<McpApiResponse>
   caller: McpCaller
+  /** The caller's own API key, for tools that hand a ready-to-run CLI command back to the agent. */
+  apikey?: string
 }
 
 export interface McpToolResult {
@@ -128,6 +130,67 @@ function compact<T extends Record<string, unknown>>(value: T): Record<string, un
 
 function enc(value: string): string {
   return encodeURIComponent(value)
+}
+
+/** POSIX single-quote a shell argument. */
+function shellQuote(value: string): string {
+  return `'${value.replaceAll('\'', `'\\''`)}'`
+}
+
+const uploadCommandTool: McpTool = {
+  name: 'capgo_get_upload_command',
+  title: 'Get bundle upload command',
+  description: 'Get a ready-to-run Capgo CLI command that uploads a local web build (zip and, with delta=true, the per-file manifest for delta updates). '
+    + 'The command authenticates with the same API key this MCP connection uses, so run it in your own shell and do not share or log it. '
+    + 'Use this when you have a shell but the Capgo CLI is not logged in.',
+  inputSchema: z.object({
+    appId,
+    path: z.string().min(1).optional().describe('Folder of the web build to upload, e.g. dist. Defaults to webDir from capacitor.config.'),
+    bundle: z.string().min(1).optional().describe('Bundle version, e.g. 1.2.3. Defaults to the package.json version.'),
+    channel: z.string().min(1).optional().describe('Channel to link the uploaded bundle to'),
+    comment: z.string().min(1).optional(),
+    delta: z.boolean().optional().describe('Also upload the per-file manifest for delta updates'),
+    deltaOnly: z.boolean().optional().describe('Upload only the delta manifest files, no full zip'),
+  }) as unknown as z.ZodObject<z.ZodRawShape>,
+  annotations: { title: 'Get bundle upload command', ...READ },
+  run: async (input, ctx) => {
+    const { appId: id, path, bundle, channel, comment, delta, deltaOnly } = input as {
+      appId: string
+      path?: string
+      bundle?: string
+      channel?: string
+      comment?: string
+      delta?: boolean
+      deltaOnly?: boolean
+    }
+    if (!ctx.apikey)
+      return textResult({ error: 'no_apikey', message: 'This connection has no API key to hand to the CLI. Run: bunx @capgo/cli@latest login' }, true)
+
+    // Fail early when the key cannot see the app; upload rights are enforced again by the upload endpoints.
+    const app = await ctx.call({ method: 'GET', path: `/app/${enc(id)}` })
+    if (!app.ok)
+      return apiResult(app)
+
+    const args = ['bunx', '@capgo/cli@latest', 'bundle', 'upload', shellQuote(id)]
+    if (path)
+      args.push('--path', shellQuote(path))
+    if (bundle)
+      args.push('--bundle', shellQuote(bundle))
+    if (channel)
+      args.push('--channel', shellQuote(channel))
+    if (comment)
+      args.push('--comment', shellQuote(comment))
+    if (deltaOnly)
+      args.push('--delta-only')
+    else if (delta)
+      args.push('--delta')
+
+    return textResult({
+      command: `CAPGO_TOKEN=${shellQuote(ctx.apikey)} ${args.join(' ')}`,
+      apikeyExpiresAt: ctx.caller.apikeyExpiresAt,
+      note: 'Run from the project root after building the web assets. The key needs upload rights on this app.',
+    })
+  },
 }
 
 // ---------------------------------------------------------------------------
@@ -353,6 +416,7 @@ const appTools: McpTool[] = [
 // Bundles
 // ---------------------------------------------------------------------------
 const bundleTools: McpTool[] = [
+  uploadCommandTool,
   apiTool({
     name: 'capgo_list_bundles',
     title: 'List bundles',
@@ -373,7 +437,7 @@ const bundleTools: McpTool[] = [
   apiTool({
     name: 'capgo_create_bundle_from_url',
     title: 'Register external bundle',
-    description: 'Record a new bundle version for an app the user owns, pointing to a zip the user already hosts at an https URL. This only creates the version entry: no device receives it until a channel is set to this version with capgo_update_channel or capgo_set_bundle_channel. Only use a URL and checksum the user provided.',
+    description: 'Record a new bundle version for an app the user owns, pointing to a zip the user already hosts at an https URL. This only creates the version entry: no device receives it until a channel is set to this version with capgo_update_channel or capgo_set_bundle_channel. Only use a URL and checksum the user provided. To upload local files use capgo_get_upload_command.',
     input: {
       appId,
       version: z.string().min(1).describe('Semver version name, e.g. 1.2.3'),
