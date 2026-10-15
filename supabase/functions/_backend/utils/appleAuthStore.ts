@@ -38,8 +38,8 @@ export async function appleQuery<T extends Record<string, any>>(c: Context, quer
 }
 
 export function sanitizeAppleName(value: unknown) {
-  return typeof value === 'string'
-    ? value.normalize('NFC').replace(/<[^>]*>/g, '').replace(/[\p{Cc}\p{Cf}]/gu, '').trim().slice(0, 100)
+  return typeof value === 'string' && !/[<>]/.test(value)
+    ? value.normalize('NFC').replace(/[\p{Cc}\p{Cf}]/gu, '').trim().slice(0, 100)
     : ''
 }
 

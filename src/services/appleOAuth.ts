@@ -12,6 +12,7 @@ interface PendingAppleOAuth {
   websiteState?: string
   code?: string
 }
+let pendingCompletion: PendingAppleOAuth | null = null
 
 function readAttempt(): PendingAppleOAuth | null {
   try {
@@ -67,25 +68,28 @@ export function captureAppleOAuthCallback(url: URL) {
   history.replaceState({}, '', url)
   const attempt = readAttempt()
   if (!attempt || fragment.get('state') !== attempt.state || fragment.has('apple_error')) {
+    pendingCompletion = null
     sessionStorage.removeItem(storageKey)
     throw new Error('Apple authorization failed')
   }
   const code = fragment.get('apple_code') ?? ''
   if (!/^[\w-]{43}$/.test(code))
     throw new Error('Apple authorization failed')
-  sessionStorage.setItem(storageKey, JSON.stringify({ ...attempt, code }))
+  // Keep the returned code and verifier together only in memory, never in storage.
+  pendingCompletion = { ...attempt, code }
+  sessionStorage.removeItem(storageKey)
   return true
 }
 
 export function hasPendingAppleOAuth() {
-  return !!readAttempt()?.code
+  return !!pendingCompletion?.code && Date.now() - pendingCompletion.created < 600_000
 }
 
 export async function completeAppleOAuth(supabase: SupabaseClient, captchaToken?: string) {
-  const attempt = readAttempt()
+  const attempt = pendingCompletion
+  pendingCompletion = null
   if (!attempt?.code)
     throw new Error('Apple authorization expired')
-  sessionStorage.removeItem(storageKey)
   const response = await fetch(`${defaultApiHost}/auth/apple/exchange`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -32,6 +32,7 @@ describe('console-owned Apple OAuth completion', () => {
     expect(captureAppleOAuthCallback(new URL(`https://console.capgo.app/login#apple_code=${code}&state=${state}`))).toBe(true)
     expect(history.replaceState).toHaveBeenCalledWith({}, '', new URL('https://console.capgo.app/login'))
     expect(hasPendingAppleOAuth()).toBe(true)
+    expect(sessionStorage.getItem(key)).toBeNull()
     const result = await completeAppleOAuth(client, 'captcha')
     expect(exchange).toHaveBeenCalledWith('https://api.example.com/auth/apple/exchange', expect.objectContaining({ body: JSON.stringify({ code, code_verifier: 'v'.repeat(43), captcha_token: 'captcha' }) }))
     expect(setSession).toHaveBeenCalledWith(session)

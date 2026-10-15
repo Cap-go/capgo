@@ -133,7 +133,7 @@ afterEach(() => {
 describe('shared Apple endpoint', () => {
   it('verifies credentials, provisions the actual profile with opted-out consent and keeps MFA factors', async () => {
     const idToken = await token()
-    const response = await request('/', { id_token: idToken, nonce: 'n'.repeat(64), captcha_token: 'captcha', first_name: '<b>First</b>\u0000', last_name: ' Name ' })
+    const response = await request('/', { id_token: idToken, nonce: 'n'.repeat(64), captcha_token: 'captcha', first_name: 'First\u0000', last_name: ' Name ' })
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
     expect(profile).toMatchObject({ id: user.id, first_name: 'First', last_name: 'Name', enable_notifications: true, opt_for_newsletters: false })
@@ -197,6 +197,13 @@ describe('shared Apple endpoint', () => {
     expect((await request('/', { ...body, id_token: foreign }, { Authorization: 'Bearer current-session' })).status).toBe(403)
     expect(mocks.exchange).not.toHaveBeenCalled()
     expect((await request('/', body, { Authorization: 'Bearer current-session' })).status).toBe(200)
+  })
+  it('rejects malformed markup in optional names instead of retaining partial tags', async () => {
+    const response = await request('/', { id_token: await token(), nonce: 'n'.repeat(64), captcha_token: 'captcha', first_name: '<<scr<script>ipt>', last_name: '<img src=x>' })
+    expect(response.status).toBe(200)
+    expect(profile.first_name).toBe('')
+    expect(profile.last_name).toBe('')
+    expect(await response.json()).toMatchObject({ name_status: 'unavailable' })
   })
   it('reports truly unavailable names without requiring disclosure', async () => {
     const response = await request('/', { id_token: await token(), nonce: 'n'.repeat(64), captcha_token: 'captcha' })
