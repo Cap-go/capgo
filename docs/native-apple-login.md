@@ -14,7 +14,7 @@ The Apple button is available only on iOS binaries containing the SocialLogin pl
 
 ## Account deletion
 
-Apple accounts use the same account-deletion screen, with Apple reauthentication instead of a password. Email OTP, matching account identity, fresh authentication and any enrolled MFA remain required. Before scheduling deletion, the authenticated backend exchanges the fresh Apple authorization code, validates its signed identity token against the authenticated user's server-side Apple identity, and revokes the access token with Apple. Codes and tokens are not persisted or logged by this implementation. A failed revocation leaves the account intact and asks the user to retry.
+Apple accounts use the same account-deletion screen, with Apple reauthentication instead of a password. Email OTP, matching account identity, fresh authentication and any enrolled MFA remain required. Before scheduling deletion, the authenticated backend exchanges the fresh Apple authorization code, validates its signed identity token against the authenticated user's server-side Apple identity, and revokes the access token with Apple. Codes and tokens are not persisted or logged by this implementation. The Apple sign-in must be less than five minutes old when revocation starts, including any time spent on MFA and confirmation. If it expires, restart Sign in with Apple; later MFA does not extend that window. A failed revocation leaves the account intact and asks the user to retry.
 
 The existing delayed deletion and restoration policy remains in place. Authorization revocation does not delete the Capgo account by itself; deletion is scheduled through the existing user-scoped RPC.
 

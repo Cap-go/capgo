@@ -30,6 +30,7 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(403, 'apple_identity_required', 'An Apple identity is required')
   if (user.factors?.some(factor => factor.status === 'verified') && auth.claims?.aal !== 'aal2')
     return quickError(403, 'mfa_required', 'Complete two-factor authentication first')
+  // Require Apple sign-in within five minutes; later MFA must not extend this window.
   const lastSignIn = Date.parse(user.last_sign_in_at ?? '')
   if (!Number.isFinite(lastSignIn) || Date.now() - lastSignIn > 5 * 60_000)
     return quickError(403, 'reauth_required', 'Sign in again before deleting your account')

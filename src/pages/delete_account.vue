@@ -9,7 +9,7 @@ import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import { authGhostButtonClass, authPanelClass, authPrimaryButtonClass, authSecondaryButtonClass } from '~/components/auth/pageStyles'
-import { invokeCapgoApi } from '~/services/capgoApi'
+import { getCapgoApiErrorCode, invokeCapgoApi } from '~/services/capgoApi'
 import { getRecentEmailOtpVerification } from '~/services/emailOtp'
 import { hideLoader } from '~/services/loader'
 import { isNativeAppleLoginAvailable, signInWithApple } from '~/services/nativeAppleLogin'
@@ -153,8 +153,10 @@ async function deleteAccount() {
                 client: supabase,
                 body: { code: pendingAppleCode.value },
               })
-              if (revokeError)
-                return setErrors('delete-account', [t('apple-revoke-failed')], {})
+              if (revokeError) {
+                const errorCode = await getCapgoApiErrorCode(revokeError)
+                return setErrors('delete-account', [t(errorCode === 'reauth_required' ? 'apple-delete-reauth-required' : 'apple-revoke-failed')], {})
+              }
             }
 
             // Delete user using RPC function
@@ -217,6 +219,27 @@ async function deleteAccount() {
   return dismissed
 }
 
+async function prepareAppleDeletionMfa() {
+  const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  if (assuranceError)
+    throw assuranceError
+  if (assurance.currentLevel === 'aal1' && assurance.nextLevel === 'aal2') {
+    const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors()
+    if (factorsError)
+      throw factorsError
+    const factor = factors.all.find(factor => factor.status === 'verified')
+    if (!factor)
+      throw new Error('Missing MFA factor')
+    const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: factor.id })
+    if (challengeError)
+      throw challengeError
+    appleMfaFactorId.value = factor.id
+    appleMfaChallengeId.value = challenge.id
+    return true
+  }
+  return false
+}
+
 async function startAppleDeletion() {
   if (isLoading.value || !isAppleAccount.value)
     return
@@ -245,23 +268,8 @@ async function startAppleDeletion() {
       throw new Error('Missing Apple authorization code')
     pendingAppleCode.value = result.authorizationCode
     pendingAppleUserId.value = userId
-    const { data: assurance, error: assuranceError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-    if (assuranceError)
-      throw assuranceError
-    if (assurance.currentLevel === 'aal1' && assurance.nextLevel === 'aal2') {
-      const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors()
-      if (factorsError)
-        throw factorsError
-      const factor = factors.all.find(factor => factor.status === 'verified')
-      if (!factor)
-        throw new Error('Missing MFA factor')
-      const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: factor.id })
-      if (challengeError)
-        throw challengeError
-      appleMfaFactorId.value = factor.id
-      appleMfaChallengeId.value = challenge.id
+    if (await prepareAppleDeletionMfa())
       return
-    }
     isLoading.value = false
     await deleteAccount()
   }
@@ -276,6 +284,13 @@ async function startAppleDeletion() {
   }
 }
 
+function resetAppleDeletionAuthorization() {
+  appleMfaFactorId.value = ''
+  appleMfaChallengeId.value = ''
+  pendingAppleCode.value = ''
+  pendingAppleUserId.value = ''
+}
+
 async function verifyAppleDeletionMfa(form: { code: string }) {
   if (isLoading.value)
     return
@@ -287,13 +302,23 @@ async function verifyAppleDeletionMfa(form: { code: string }) {
       code: form.code.replaceAll(' ', ''),
     })
     if (error) {
-      toast.error(t('invalid-mfa-code'))
+      if (error.code === 'mfa_verification_failed') {
+        toast.error(t('invalid-mfa-code'))
+      }
+      else {
+        resetAppleDeletionAuthorization()
+        toast.error(t('apple-login-failed'))
+      }
       return
     }
     appleMfaFactorId.value = ''
     appleMfaChallengeId.value = ''
     isLoading.value = false
     await deleteAccount()
+  }
+  catch {
+    resetAppleDeletionAuthorization()
+    toast.error(t('apple-login-failed'))
   }
   finally {
     isLoading.value = false
@@ -388,7 +413,15 @@ onMounted (() => {
         {{ t('apple-delete-account-hint') }}
       </p>
       <FormKit v-if="appleMfaFactorId" id="delete-account" type="form" :actions="false" @submit="verifyAppleDeletionMfa">
-        <FormKit name="code" type="text" :label="t('2fa-code')" inputmode="numeric" autocomplete="one-time-code" validation="required|length:6" :disabled="isLoading" />
+        <FormKit
+          name="code"
+          type="text"
+          :label="t('2fa-code')"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          validation="required|length:6"
+          :disabled="isLoading"
+        />
         <button type="submit" :disabled="isLoading" :class="authPrimaryButtonClass">
           {{ t('verify') }}
         </button>

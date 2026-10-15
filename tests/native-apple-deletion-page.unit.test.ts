@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   getClaims: vi.fn(),
   signOut: vi.fn(),
   invoke: vi.fn(),
+  errorCode: vi.fn(),
   rpc: vi.fn(),
   assurance: vi.fn(),
   listFactors: vi.fn(),
@@ -27,7 +28,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('vue-router', () => ({ useRouter: () => ({ replace: mocks.replace, push: mocks.push }) }))
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 vi.mock('~/services/nativeAppleLogin', () => ({ isNativeAppleLoginAvailable: () => true, signInWithApple: mocks.signIn }))
-vi.mock('~/services/capgoApi', () => ({ invokeCapgoApi: mocks.invoke }))
+vi.mock('~/services/capgoApi', () => ({ invokeCapgoApi: mocks.invoke, getCapgoApiErrorCode: mocks.errorCode }))
 vi.mock('~/services/emailOtp', () => ({ getRecentEmailOtpVerification: async () => ({ isVerified: true }) }))
 vi.mock('~/services/loader', () => ({ hideLoader: vi.fn() }))
 vi.mock('~/services/support', () => ({ openSupport: vi.fn() }))
@@ -82,6 +83,7 @@ beforeEach(() => {
   mocks.challenge.mockResolvedValue({ data: { id: 'challenge' }, error: null })
   mocks.verify.mockResolvedValue({ error: null })
   mocks.invoke.mockResolvedValue({ error: null })
+  mocks.errorCode.mockResolvedValue(undefined)
   mocks.rpc.mockResolvedValue({ error: null })
 })
 afterEach(() => {
@@ -118,7 +120,9 @@ describe('apple account deletion', () => {
   })
   it('requires enrolled MFA before opening deletion confirmation', async () => {
     mocks.assurance.mockResolvedValue({ data: { currentLevel: 'aal1', nextLevel: 'aal2' }, error: null })
-    await start(await mount())
+    const root = await mount()
+    await start(root)
+    expect(root.querySelector('input[name="code"]')?.getAttribute('autocomplete')).toBe('one-time-code')
     expect(mocks.challenge).toHaveBeenCalledWith({ factorId: 'factor' })
     expect(mocks.openDialog).not.toHaveBeenCalled()
     await getNode('delete-account')!.input({ code: '123456' })
@@ -135,4 +139,52 @@ describe('apple account deletion', () => {
     expect(mocks.captchaReset).toHaveBeenCalled()
     expect((root.querySelector('[data-test="apple-sign-in"]') as HTMLButtonElement).disabled).toBe(false)
   })
+  it.each(['mfa_challenge_expired', 'mfa_ip_address_mismatch', 'mfa_factor_not_found', 'exception'])('restarts Apple authorization after %s', async (failure) => {
+    mocks.assurance.mockResolvedValue({ data: { currentLevel: 'aal1', nextLevel: 'aal2' }, error: null })
+    if (failure !== 'exception')
+      mocks.verify.mockResolvedValue({ error: { code: failure } })
+    else
+      mocks.verify.mockRejectedValue(new Error('Network unavailable'))
+    const root = await mount()
+    await start(root)
+    await getNode('delete-account')!.input({ code: '123456' })
+    getNode('delete-account')!.submit()
+    await vi.waitFor(() => expect(root.querySelector('[data-test="apple-sign-in"]')).not.toBeNull())
+    expect(mocks.openDialog).not.toHaveBeenCalled()
+    expect(mocks.invoke).not.toHaveBeenCalled()
+    expect(mocks.rpc).not.toHaveBeenCalled()
+    mocks.assurance.mockResolvedValue({ data: { currentLevel: 'aal1', nextLevel: 'aal1' }, error: null })
+    mocks.signIn.mockResolvedValue({ user: { id: 'apple-user' }, authorizationCode: 'new-code' })
+    await start(root)
+    await mocks.openDialog.mock.calls[0][0].buttons[0].handler()
+    expect(mocks.invoke).toHaveBeenCalledWith('private/revoke_apple_authorization', expect.objectContaining({ body: { code: 'new-code' } }))
+  })
+  it('keeps the challenge so a mistyped MFA code can be retried', async () => {
+    mocks.assurance.mockResolvedValue({ data: { currentLevel: 'aal1', nextLevel: 'aal2' }, error: null })
+    mocks.verify.mockResolvedValueOnce({ error: { code: 'mfa_verification_failed' } })
+    const root = await mount()
+    await start(root)
+    await getNode('delete-account')!.input({ code: '000000' })
+    getNode('delete-account')!.submit()
+    await vi.waitFor(() => expect(mocks.verify).toHaveBeenCalledOnce())
+    await settle()
+    expect(root.querySelector('[data-test="apple-sign-in"]')).toBeNull()
+    expect(mocks.openDialog).not.toHaveBeenCalled()
+    await getNode('delete-account')!.input({ code: '123456' })
+    getNode('delete-account')!.submit()
+    await vi.waitFor(() => expect(mocks.openDialog).toHaveBeenCalledOnce())
+    expect(mocks.signIn).toHaveBeenCalledOnce()
+    expect(mocks.verify).toHaveBeenLastCalledWith({ factorId: 'factor', challengeId: 'challenge', code: '123456' })
+  })
+  it('explains how to retry when Apple authorization expires before revocation', async () => {
+    mocks.invoke.mockResolvedValue({ error: new Error('Fresh Apple sign-in required') })
+    mocks.errorCode.mockResolvedValue('reauth_required')
+    const root = await mount()
+    await start(root)
+    await mocks.openDialog.mock.calls[0][0].buttons[0].handler()
+    await settle()
+    expect(root.textContent).toContain(messages['apple-delete-reauth-required'])
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+
 })

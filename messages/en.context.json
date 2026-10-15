@@ -674,6 +674,7 @@
   "app-to-channel": "Used in application settings or app detail. Role: UI label about \"app to channel\". Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "app-transferred": "Used in Capgo web console areas: components/dashboard. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "app-will-be-transferred": "Used in Capgo web console areas: components/dashboard. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "apple-delete-reauth-required": "Error shown during account deletion when the native Apple sign-in is older than five minutes; instructs the user to restart Apple authentication.",
   "apple-delete-account-hint": "Used in Capgo web console areas: pages. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "apple-login-failed": "Used in Capgo web console areas: pages. Role: toast or status message. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "apple-login-name-save-failed": "Used in Capgo web console areas: pages. Role: toast or status message. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",

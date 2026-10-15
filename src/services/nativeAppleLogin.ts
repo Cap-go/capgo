@@ -1,4 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { AppleProviderResponse } from '@capgo/capacitor-social-login'
+import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { Capacitor } from '@capacitor/core'
 import { nativeAppleLoginEnabled } from './supabase'
 
@@ -44,26 +45,29 @@ export async function signInWithApple(supabase: SupabaseClient, captchaToken?: s
   if (!data.session || !data.user)
     throw new Error('Apple login did not create a Supabase session')
 
+  const profileSaveFailed = await saveAppleProfile(supabase, data.user, credential.result.profile)
+  return { user: data.user, profileSaveFailed, authorizationCode: credential.result.authorizationCode }
+}
+
+async function saveAppleProfile(supabase: SupabaseClient, user: User, profile: AppleProviderResponse['profile']) {
   // Apple supplies names only on the first authorization. Do not replace chosen names.
-  const firstName = credential.result.profile.givenName?.trim()
-  const lastName = credential.result.profile.familyName?.trim()
+  const firstName = profile.givenName?.trim()
+  const lastName = profile.familyName?.trim()
   const metadata: Record<string, string> = {}
-  if (firstName && !data.user.user_metadata.first_name)
+  if (firstName && !user.user_metadata.first_name)
     metadata.first_name = firstName
-  if (lastName && !data.user.user_metadata.last_name)
+  if (lastName && !user.user_metadata.last_name)
     metadata.last_name = lastName
-  if ((firstName || lastName) && !data.user.user_metadata.full_name)
+  if ((firstName || lastName) && !user.user_metadata.full_name)
     metadata.full_name = [firstName, lastName].filter(Boolean).join(' ')
 
-  let profileSaveFailed = false
-  if (Object.keys(metadata).length > 0) {
-    try {
-      const { error: profileError } = await supabase.auth.updateUser({ data: metadata })
-      profileSaveFailed = !!profileError
-    }
-    catch {
-      profileSaveFailed = true
-    }
+  if (Object.keys(metadata).length === 0)
+    return false
+  try {
+    const { error } = await supabase.auth.updateUser({ data: metadata })
+    return !!error
   }
-  return { user: data.user, profileSaveFailed, authorizationCode: credential.result.authorizationCode }
+  catch {
+    return true
+  }
 }

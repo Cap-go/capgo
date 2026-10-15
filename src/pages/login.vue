@@ -235,7 +235,7 @@ async function checkMfa() {
   if (mfaError) {
     setErrors('login-account', ['See browser console'], {})
     console.error('Cannot get MFA factors', mfaError)
-    return
+    return false
   }
 
   const unverified = mfaFactors.all.filter(factor => factor.status === 'unverified')
@@ -258,7 +258,7 @@ async function checkMfa() {
       isLoading.value = false
       setErrors('login-account', ['See browser console'], {})
       console.error('Cannot challenge mfa', errorChallenge)
-      return
+      return false
     }
 
     mfaChallengeId.value = challenge.id
@@ -271,6 +271,7 @@ async function checkMfa() {
   else {
     await nextLogin()
   }
+  return true
 }
 
 async function checkReviewAccount(form: { email: string }) {
@@ -375,7 +376,8 @@ async function handleAppleLogin() {
 
     if (result.profileSaveFailed)
       toast.warning(t('apple-login-name-save-failed'))
-    await checkMfa()
+    if (!await checkMfa())
+      throw new Error('Apple login could not complete MFA setup')
   }
   catch {
     if (hasAppleSession)

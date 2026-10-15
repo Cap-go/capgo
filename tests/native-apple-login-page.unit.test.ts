@@ -132,4 +132,19 @@ describe('native Apple login page', () => {
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
     expect(mocks.replace).not.toHaveBeenCalled()
   })
+  it.each(['factors', 'challenge'])('signs out the fresh Apple session if MFA %s setup fails', async (stage) => {
+    if (stage === 'factors')
+      mocks.listFactors.mockResolvedValue({ data: null, error: new Error('Factors unavailable') })
+    else {
+      mocks.listFactors.mockResolvedValue({ data: { all: [{ id: 'factor-id', status: 'verified' }] }, error: null })
+      mocks.challenge.mockResolvedValue({ data: null, error: new Error('Challenge unavailable') })
+    }
+    const root = await mount()
+    ;(root.querySelector('[data-test="apple-sign-in"]') as HTMLButtonElement).click()
+    await settle()
+    expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
+    expect(mocks.replace).not.toHaveBeenCalled()
+    expect(mocks.error).toHaveBeenCalledWith(messages['apple-login-failed'])
+  })
+
 })
