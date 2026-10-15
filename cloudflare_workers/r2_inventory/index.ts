@@ -1,8 +1,10 @@
 import type { InventoryConfig, RepairTask } from '../../supabase/functions/_backend/utils/r2_inventory.ts'
 import type { CleanupQueue } from './cleanup.ts'
+import type { CleanupConsumerEnv } from './cleanup_consumer.ts'
 import { Client } from 'pg'
 import { applyInventoryEvents, applyObservations, INVENTORY_CONFIG, normalizeEtag, parseInventoryEvent, readObservationSnapshot } from '../../supabase/functions/_backend/utils/r2_inventory.ts'
 import { CLEANUP_ACTIVATED, runCleanupProducer } from './cleanup.ts'
+import { consumeCleanupBatch } from './cleanup_consumer.ts'
 import { checkCleanupHealth } from './health.ts'
 
 interface RejectedInventoryMessage {
@@ -15,7 +17,8 @@ interface RejectedInventoryMessage {
   body: unknown
 }
 
-export interface InventoryEnv {
+export interface InventoryEnv extends Omit<CleanupConsumerEnv, 'CLEANUP_DLQ'> {
+  CLEANUP_DLQ?: Queue<unknown>
   INVENTORY_BUCKET: string
   HYPERDRIVE_R2_INVENTORY: Hyperdrive
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive
@@ -132,6 +135,12 @@ async function publishInvalidMessages(batch: MessageBatch<unknown>, invalid: { m
 }
 
 export async function consumeInventoryBatch(batch: MessageBatch<unknown>, env: InventoryEnv) {
+  // Dispatch outside the legacy catch/retryAll path: cleanup acknowledges each
+  // storage success before best-effort bookkeeping and must never retry it.
+  if (batch.queue === 'capgo-r2-inventory-prod-cleanup') {
+    await consumeCleanupBatch(batch, env as CleanupConsumerEnv)
+    return
+  }
   try {
     if (batch.queue.endsWith('-repair')) {
       const { valid, invalid } = parseMessages(batch.messages, body => parseRepairTask(body, env.INVENTORY_BUCKET))

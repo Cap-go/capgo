@@ -47,8 +47,10 @@ in `public.r2_inventory_checkpoints`. Its JSON checkpoint uses **schemaVersion 3
 
 The producer uses the helper's returned object and never reads `cleanup_health`.
 It checks the in-memory result before each transaction and expires it after
-30 seconds. The future consumer must require schemaVersion 3, `healthy=true`,
-`manifestReplicationHealthy=true`, and observation age between zero and 120 seconds.
+30 seconds. The cleanup consumer accepts schemaVersion 3 alongside the legacy
+schemas, checks `manifestReplicationHealthy=true`, and retains its independent
+observation age bound of zero to 300 seconds. Its remaining health budget bounds
+storage work; the writer's `maxAgeSeconds` does not change that consumer policy.
 Schema 3 replaces schema 2's queue-dependent verdict and removes its queue flags,
 `producerReady` and `deletionBacklog`; older schemas are not the new contract.
 Older observations cannot replace a newer checkpoint.
@@ -58,13 +60,14 @@ consumer evidence to expire normally. The persisted verdict describes replicatio
 ## Deployment and the separate consumer rollout
 
 The stable release workflow creates `capgo-r2-inventory-prod-cleanup` before
-binding `CLEANUP_QUEUE` and deploying the enabled producer. This PR creates no
-cleanup consumer. Existing notification and repair consumers retain their settings.
+binding `CLEANUP_QUEUE` and deploying the enabled producer. The separately added
+cleanup consumer retains its deletion safeguards and accepts the new checkpoint
+schema. Existing notification and repair consumers retain their settings.
 The inventory runtime role needs only column SELECT on `manifest.s3_path` in
 addition to its existing inventory/checkpoint grants. The narrow grant was applied
 and verified separately before activation; no broader manifest access is required.
 
-The future deletion consumer must validate exact committed retirement identity
+The deletion consumer must validate exact committed retirement identity
 before R2 work and establish authoritative reference absence, including late
 legacy finalization. Inventory retirement and primary manifest writes are separate
 transactions: operational replication health and object age do not close that
