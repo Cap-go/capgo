@@ -108,12 +108,17 @@ describe('r2 inventory queue', () => {
     expect(wrangler.env.prod.name).toBe('capgo-r2-inventory-prod')
     expect(wrangler.env.prod.vars).toEqual({ INVENTORY_BUCKET: 'capgo' })
     expect(wrangler.env.prod.r2_buckets).toEqual([{ binding: 'ATTACHMENT_BUCKET', bucket_name: 'capgo' }])
-    expect(wrangler.env.prod.hyperdrive).toEqual([{ binding: 'HYPERDRIVE_R2_INVENTORY', id: 'af73fa6a112b495f80e81718b153db76' }])
+    expect(wrangler.env.prod.hyperdrive).toEqual([
+      { binding: 'HYPERDRIVE_CAPGO_DIRECT_EU', id: 'ae1fe6178b564adc9fc9a71ccc769a35' },
+      { binding: 'HYPERDRIVE_R2_INVENTORY', id: 'af73fa6a112b495f80e81718b153db76' },
+    ])
   })
 
   it('preserves production queue bindings, batching, concurrency and the five-delivery budget', () => {
     const wrangler = JSON.parse(readFileSync(new URL('../cloudflare_workers/r2_inventory/wrangler.jsonc', import.meta.url), 'utf8'))
     expect(wrangler.env.prod.queues.producers).toEqual([
+      { binding: 'EVENT_QUEUE', queue: 'capgo-r2-inventory-prod' },
+      { binding: 'CLEANUP_QUEUE', queue: 'capgo-r2-inventory-prod-cleanup' },
       { binding: 'REPAIR_QUEUE', queue: 'capgo-r2-inventory-prod-repair' },
       { binding: 'EVENT_DLQ', queue: 'capgo-r2-inventory-prod-dlq' },
       { binding: 'REPAIR_DLQ', queue: 'capgo-r2-inventory-prod-repair-dlq' },
