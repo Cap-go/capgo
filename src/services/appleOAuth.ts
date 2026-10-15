@@ -2,7 +2,6 @@ import { createSocialOAuth } from './socialOAuth'
 
 export const appleOAuth = createSocialOAuth('apple')
 
-export const startAppleOAuth = appleOAuth.start
 export const captureAppleOAuthCallback = appleOAuth.capture
 export const hasPendingAppleOAuth = appleOAuth.hasPending
 export const completeAppleOAuth = appleOAuth.complete

@@ -73,7 +73,7 @@ Missing configuration, failed lookups or a disabled Supabase Google provider fai
 | --- | --- |
 | `GOOGLE_SIGN_IN_WEB_CLIENT_ID` | Dedicated web app sign-in client; also the native server audience |
 | `GOOGLE_SIGN_IN_WEB_CLIENT_SECRET` | Server-only web code exchange and temporary credential encryption |
-| `GOOGLE_SIGN_IN_IOS_CLIENT_ID` | Dedicated client for the actual iOS bundle identifier |
+| `GOOGLE_SIGN_IN_IOS_CLIENT_ID` | Dedicated client for the checked-in iOS bundle identifier `ee.forgr.capacitorgo` (not the OTA app ID `ee.forgr.capacitor_go`) |
 | `GOOGLE_SIGN_IN_ANDROID_CLIENT_IDS` | Optional JSON array of allowed Android client IDs |
 | `GOOGLE_SIGN_IN_OAUTH_CALLBACK_URL` | Fixed HTTPS form-post callback above |
 | `GOOGLE_SIGN_IN_REDIRECT_URLS` | JSON array of exact allowed client redirects |
@@ -84,7 +84,7 @@ Vault-backed runtime settings `NATIVE_GOOGLE_LOGIN_ENABLED` and `WEB_GOOGLE_LOGI
 
 The compiled SocialLogin Google provider is enabled and Google callback URLs are offered to `GIDSignIn` before the existing preview/deep-link handler. Google is shown alongside Apple only on iOS with SocialLogin and a configured compatible binary. The native version comes from `App.getInfo().version`, never the OTA bundle/package version. Missing or older binary versions keep Google hidden.
 
-**Release prerequisites remain external:** create dedicated iOS and web OAuth clients; register the actual reversed iOS client-ID URL scheme in `ios/App/App/Info.plist`; rebuild/sync the native project with Google SDK dependencies; choose the first compatible native release version; configure Google and Supabase provider audiences with nonce verification enabled. The existing broker and Desktop clients must not be reused. No guessed client IDs, empty URL scheme, release version, CI credentials or signing targets are added here. Until the actual client IDs and compatible binary are configured, native availability remains false.
+**Release prerequisites remain external:** create dedicated iOS and web OAuth clients; register the actual reversed iOS client-ID URL scheme in `ios/App/App/Info.plist`; rebuild/sync the native project with Google SDK dependencies; choose the first compatible native release version; configure Google and Supabase provider audiences with nonce verification enabled. The existing broker and Desktop clients must not be reused. No guessed client IDs, empty URL scheme, release version, CI credentials or signing targets are added here. Preserve the iOS16/FastSQL8.2.13 repair from #3716 when integrating this dependent branch with current main. Until the actual client IDs and compatible binary are configured, native availability remains false.
 
 Google-linked accounts on a compatible iOS binary can delete their account without inventing a password. Reauthentication sends `reauthenticate: true` with the current Supabase Bearer token. The backend requires the existing verified Google subject and the same resulting user ID, even when signup rollout is off. The page rechecks the account at confirmation and retains existing email OTP, enrolled MFA and the deletion RPC's five-minute fresh-login requirement. Apple-linked accounts retain Apple reauthentication and authorization-code revocation before deletion.
 
