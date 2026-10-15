@@ -1,6 +1,6 @@
 import type { CleanupMessage } from './cleanup.ts'
 import type { AlertCounts, AlertReason, CleanupDatabase } from './cleanup_alerts.ts'
-import type { CleanupStorage, CleanupStorageEnv } from './cleanup_storage.ts'
+import type { CleanupStorage, CleanupStorageDiagnostic, CleanupStorageEnv } from './cleanup_storage.ts'
 import { Client } from 'pg'
 import { publicationDeadline } from './cleanup.ts'
 import { sendCleanupAlert } from './cleanup_alerts.ts'
@@ -16,14 +16,14 @@ export interface CleanupConsumerEnv extends CleanupStorageEnv {
 interface Job { value: CleanupMessage, messages: Message<unknown>[] }
 export interface CleanupDependencies {
   database: CleanupDatabase
-  storage: () => CleanupStorage
+  storage: (reportFailure?: (diagnostic: CleanupStorageDiagnostic) => void) => CleanupStorage
   now: () => number
 }
 
 function dependencies(env: CleanupConsumerEnv): CleanupDependencies {
   return {
     now: Date.now,
-    storage: () => createCleanupStorage(env),
+    storage: reportFailure => createCleanupStorage(env, reportFailure),
     database: async (work) => {
       const connectionString = env.HYPERDRIVE_R2_INVENTORY?.connectionString
       if (!connectionString)
@@ -71,6 +71,7 @@ export async function cleanupWorkflow(storage: CleanupStorage, value: CleanupMes
 export async function consumeCleanupBatch(batch: MessageBatch<unknown>, env: CleanupConsumerEnv, deps = dependencies(env)) {
   const settled = new Set<Message<unknown>>()
   const counts: AlertCounts = {}
+  let storageFailure: CleanupStorageDiagnostic | undefined
   const problem = (reason: AlertReason, count = 1) => {
     counts[reason] = (counts[reason] ?? 0) + count
   }
@@ -164,7 +165,9 @@ export async function consumeCleanupBatch(batch: MessageBatch<unknown>, env: Cle
                 retry(job.messages)
                 return
               }
-              storage ??= deps.storage()
+              storage ??= deps.storage((diagnostic) => {
+                storageFailure ??= diagnostic
+              })
               await cleanupWorkflow(storage, job.value, rows.get(job.value.key)?.etag ?? null, Math.min(deps.now() + CLEANUP_CONSUMER.objectMs, until), deps.now)
               // Storage success is final for queue delivery. ACK precedes every
               // completion query; post-ACK bookkeeping can never retry this job.
@@ -201,6 +204,6 @@ export async function consumeCleanupBatch(batch: MessageBatch<unknown>, env: Cle
     // Never use retryAll: it would erase successful per-message isolation.
     retry(batch.messages)
     await sendCleanupAlert(deps.database, env.INVENTORY_BUCKET, env.R2_CLEANUP_DISCORD_WEBHOOK_URL, counts)
-    console.log(JSON.stringify({ event: 'r2_cleanup_batch', received: batch.messages.length, counts }))
+    console.log(JSON.stringify({ event: 'r2_cleanup_batch', received: batch.messages.length, counts, ...(storageFailure ? { storageFailure } : {}) }))
   }
 }
