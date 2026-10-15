@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { captureAppleOAuthCallback, completeAppleOAuth, hasPendingAppleOAuth } from '../src/services/appleOAuth'
+import { captureAppleOAuthCallback, completeAppleOAuth, consumeAppleOAuthLandingError, hasPendingAppleOAuth, prepareAppleOAuthLanding } from '../src/services/appleOAuth'
 
 vi.mock('~/services/supabase', () => ({ defaultApiHost: 'https://api.example.com' }))
 const key = 'capgo.apple-oauth.v1'
@@ -16,6 +17,7 @@ const setSession = vi.fn()
 const client = { auth: { setSession } } as unknown as SupabaseClient
 beforeEach(() => {
   vi.clearAllMocks()
+  consumeAppleOAuthLandingError()
   sessionStorage.clear()
   sessionStorage.setItem(key, JSON.stringify({ state, verifier: 'v'.repeat(43), created: Date.now(), websiteState }))
   vi.stubGlobal('location', { origin: 'https://console.capgo.app' })
@@ -27,6 +29,32 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 describe('console-owned Apple OAuth completion', () => {
+  it('captures and strips the landing callback before router and analytics startup', async () => {
+    vi.stubGlobal('location', { origin: 'https://console.capgo.app', href: `https://console.capgo.app/login#apple_code=${code}&state=${state}` })
+    prepareAppleOAuthLanding()
+    expect(history.replaceState).toHaveBeenCalledWith({}, '', new URL('https://console.capgo.app/login'))
+    expect(sessionStorage.getItem(key)).toBeNull()
+    expect(hasPendingAppleOAuth()).toBe(true)
+    expect(consumeAppleOAuthLandingError()).toBe(false)
+    await completeAppleOAuth(client)
+    expect(setSession).toHaveBeenCalledWith(session)
+
+    const bootstrap = readFileSync('src/main.ts', 'utf8')
+    const capture = bootstrap.indexOf('prepareAppleOAuthLanding()')
+    expect(capture).toBeGreaterThan(0)
+    expect(capture).toBeLessThan(bootstrap.indexOf('createRouter({'))
+    expect(capture).toBeLessThan(bootstrap.indexOf('posthogLoader(config.supaHost)'))
+  })
+  it('strips invalid landing callbacks and defers a generic error to the login page', () => {
+    vi.stubGlobal('location', { href: `https://console.capgo.app/login#apple_code=${code}&state=foreign` })
+    expect(() => prepareAppleOAuthLanding()).not.toThrow()
+    expect(history.replaceState).toHaveBeenCalled()
+    expect(hasPendingAppleOAuth()).toBe(false)
+    expect(sessionStorage.getItem(key)).toBeNull()
+    expect(consumeAppleOAuthLandingError()).toBe(true)
+    expect(consumeAppleOAuthLandingError()).toBe(false)
+    expect(exchange).not.toHaveBeenCalled()
+  })
   it.each([true, false])('installs the shared backend session, retains MFA and reports newness %s without credentials', async (isNew) => {
     exchange.mockImplementation(async () => Response.json({ user, session, is_new_user: isNew, name_status: 'unavailable' }))
     expect(captureAppleOAuthCallback(new URL(`https://console.capgo.app/login#apple_code=${code}&state=${state}`))).toBe(true)

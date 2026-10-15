@@ -13,6 +13,7 @@ interface PendingAppleOAuth {
   code?: string
 }
 let pendingCompletion: PendingAppleOAuth | null = null
+let landingError = false
 
 function readAttempt(): PendingAppleOAuth | null {
   try {
@@ -67,9 +68,9 @@ export function captureAppleOAuthCallback(url: URL) {
   url.hash = ''
   history.replaceState({}, '', url)
   const attempt = readAttempt()
-  if (!attempt || fragment.get('state') !== attempt.state || fragment.has('apple_error')) {
+  sessionStorage.removeItem(storageKey)
+  if (fragment.get('state') !== attempt?.state || fragment.has('apple_error')) {
     pendingCompletion = null
-    sessionStorage.removeItem(storageKey)
     throw new Error('Apple authorization failed')
   }
   const code = fragment.get('apple_code') ?? ''
@@ -77,8 +78,24 @@ export function captureAppleOAuthCallback(url: URL) {
     throw new Error('Apple authorization failed')
   // Keep the returned code and verifier together only in memory, never in storage.
   pendingCompletion = { ...attempt, code }
-  sessionStorage.removeItem(storageKey)
   return true
+}
+
+// Run before router and analytics startup so the callback never becomes a page URL.
+export function prepareAppleOAuthLanding() {
+  try {
+    captureAppleOAuthCallback(new URL(location.href))
+  }
+  catch {
+    pendingCompletion = null
+    landingError = true
+  }
+}
+
+export function consumeAppleOAuthLandingError() {
+  const failed = landingError
+  landingError = false
+  return failed
 }
 
 export function hasPendingAppleOAuth() {

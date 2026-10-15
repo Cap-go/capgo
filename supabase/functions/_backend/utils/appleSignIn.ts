@@ -74,6 +74,9 @@ export async function revokeAppleAuthorization(c: Context, code: string, expecte
   const clientId = getEnv(c, web ? 'APPLE_SIGN_IN_WEB_CLIENT_ID' : 'APPLE_SIGN_IN_CLIENT_ID')
   if (!clientId)
     throw new Error('Apple audience unavailable')
+  const redirectUri = web ? getEnv(c, 'APPLE_SIGN_IN_OAUTH_CALLBACK_URL').trim() : ''
+  if (web && !redirectUri.startsWith('https://'))
+    throw new Error('Apple callback unavailable')
   const key = await importPKCS8(getEnv(c, 'APPLE_SIGN_IN_PRIVATE_KEY').replace(/\\n/g, '\n'), 'ES256')
   const secret = await new SignJWT({})
     .setProtectedHeader({ alg: 'ES256', kid: getEnv(c, 'APPLE_SIGN_IN_KEY_ID') })
@@ -87,7 +90,13 @@ export async function revokeAppleAuthorization(c: Context, code: string, expecte
   const exchanged = await fetch('https://appleid.apple.com/auth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: clientId, client_secret: secret, code, grant_type: 'authorization_code' }),
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: secret,
+      code,
+      grant_type: 'authorization_code',
+      ...(web ? { redirect_uri: redirectUri } : {}),
+    }),
     signal: AbortSignal.timeout(5000),
   })
   if (!exchanged.ok)

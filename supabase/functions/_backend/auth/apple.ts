@@ -1,3 +1,4 @@
+import type { User } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { AppleAttempt } from '../utils/appleAuthStore.ts'
@@ -134,7 +135,11 @@ async function checkEmail(c: Context, email: string) {
     throw new AppleAuthError(403, 'sso_required')
 }
 
-async function complete(c: Context, body: z.infer<typeof credentialSchema>, web = false, expectedId: string | null = null, expectedSubject: string | null = null) {
+type AppleCredential = z.infer<typeof credentialSchema>
+type AppleName = Awaited<ReturnType<typeof rememberAppleName>>
+type AuthClient = ReturnType<typeof emptySupabaseWithClientIP>
+
+async function verifyCredential(c: Context, body: AppleCredential, web: boolean, expectedSubject: string | null) {
   if (!web && !body.reauthenticate && !await isNativeAppleLoginConfigured(c))
     throw new AppleAuthError(503, 'apple_login_unavailable')
   if (getCaptchaSecret(c) && !body.captcha_token)
@@ -150,10 +155,61 @@ async function complete(c: Context, body: z.infer<typeof credentialSchema>, web 
     throw new AppleAuthError(403, 'reauth_user_mismatch')
   const caller = await expectedUser(c, body.reauthenticate)
   if (caller) {
-    expectedId = caller.id
     if (!caller.identities?.some(item => item.provider === 'apple' && item.identity_data?.sub === identity.subject))
       throw new AppleAuthError(403, 'reauth_user_mismatch')
   }
+  return { identity, caller }
+}
+
+async function updateRegistrationMetadata(c: Context, client: AuthClient, user: User, rawMetadata: AppleCredential['registration_metadata'] = {}) {
+  const existing = await supabaseAdmin(c).from('users').select('id').eq('id', user.id).maybeSingle()
+  if (existing.error)
+    throw new AppleAuthError(500, 'apple_login_failed')
+  if (existing.data)
+    return
+  const metadata: Record<string, string> = { ...parseSignupAttributionRecord(rawMetadata) }
+  for (const [key, value] of Object.entries(rawMetadata)) {
+    if (key.startsWith('registration_') && value)
+      metadata[key] = value
+  }
+  // Hooks read auth metadata when the public profile insert queues on_user_create.
+  const updated = await client.auth.updateUser({ data: Object.fromEntries(Object.entries(metadata).filter(([key]) => !user.user_metadata[key])) })
+  if (updated.error)
+    throw new AppleAuthError(500, 'apple_login_failed')
+}
+
+async function saveProfile(c: Context, client: AuthClient, user: User & { email: string }, name: AppleName, metadata: AppleCredential['registration_metadata']) {
+  await updateRegistrationMetadata(c, client, user, metadata)
+  const profile = await provisionUserProfile(c, {
+    id: user.id,
+    email: user.email,
+    first_name: name.first_name || '',
+    last_name: name.last_name || '',
+  }, true).select('id')
+  if (profile.error)
+    throw new AppleAuthError(500, 'apple_login_failed')
+  const admin = supabaseAdmin(c)
+  // Conditional updates are atomic: parallel sign-ins cannot erase a chosen name.
+  await Promise.all((['first_name', 'last_name'] as const).map(async (field) => {
+    if (!name[field])
+      return
+    const patch = field === 'first_name' ? { first_name: name.first_name } : { last_name: name.last_name }
+    const update = await admin.from('users').update(patch).eq('id', user.id).or(`${field}.is.null,${field}.eq.`)
+    if (update.error)
+      throw new AppleAuthError(500, 'apple_login_failed')
+  }))
+  const saved = await admin.from('users').select('first_name,last_name').eq('id', user.id).single()
+  if (saved.error)
+    throw new AppleAuthError(500, 'apple_login_failed')
+  return {
+    is_new_user: (profile.data?.length ?? 0) > 0,
+    name_status: saved.data.first_name || saved.data.last_name ? 'saved' : 'unavailable',
+  }
+}
+
+async function complete(c: Context, body: AppleCredential, web = false, expectedId: string | null = null, expectedSubject: string | null = null) {
+  const { identity, caller } = await verifyCredential(c, body, web, expectedSubject)
+  expectedId = caller?.id ?? expectedId
   await checkEmail(c, identity.email)
   // Save before any network exchange/profile write that could fail or be interrupted.
   const name = await rememberAppleName(c, identity.subject, body.first_name, body.last_name)
@@ -202,54 +258,18 @@ async function complete(c: Context, body: z.infer<typeof credentialSchema>, web 
         session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token },
       }
     }
-    const admin = supabaseAdmin(c)
-    const existing = await admin.from('users').select('id').eq('id', user.id).maybeSingle()
-    if (existing.error)
-      throw new AppleAuthError(500, 'apple_login_failed')
-    if (!existing.data) {
-      const rawMetadata = body.registration_metadata ?? {}
-      const metadata: Record<string, string> = { ...parseSignupAttributionRecord(rawMetadata) }
-      for (const [key, value] of Object.entries(rawMetadata)) {
-        if (key.startsWith('registration_') && value)
-          metadata[key] = value
-      }
-      // Hooks read auth metadata when the public profile insert queues on_user_create.
-      const updated = await client.auth.updateUser({ data: Object.fromEntries(Object.entries(metadata).filter(([key]) => !user.user_metadata[key])) })
-      if (updated.error)
-        throw new AppleAuthError(500, 'apple_login_failed')
-    }
-    const profile = await provisionUserProfile(c, {
-      id: user.id,
-      email: user.email,
-      first_name: name.first_name || '',
-      last_name: name.last_name || '',
-    }, true).select('id')
-    if (profile.error)
-      throw new AppleAuthError(500, 'apple_login_failed')
-    // Conditional updates are atomic: parallel sign-ins cannot erase a chosen name.
-    for (const field of ['first_name', 'last_name'] as const) {
-      if (!name[field])
-        continue
-      const patch = field === 'first_name' ? { first_name: name.first_name } : { last_name: name.last_name }
-      const update = await admin.from('users').update(patch).eq('id', user.id).or(`${field}.is.null,${field}.eq.`)
-      if (update.error)
-        throw new AppleAuthError(500, 'apple_login_failed')
-    }
-    const saved = await admin.from('users').select('first_name,last_name').eq('id', user.id).single()
-    if (saved.error)
-      throw new AppleAuthError(500, 'apple_login_failed')
+    const profile = await saveProfile(c, client, { ...user, email: user.email }, name, body.registration_metadata)
     return {
       user,
       account_status: 'active',
-      is_new_user: (profile.data?.length ?? 0) > 0,
+      ...profile,
       session: { access_token: data.session.access_token, refresh_token: data.session.refresh_token },
-      name_status: saved.data.first_name || saved.data.last_name ? 'saved' : 'unavailable',
     }
   }
-  catch (failure) {
+  catch (error_) {
     // Only revoke the just-created session. Never delete existing/linked auth users.
     await client.auth.signOut({ scope: 'local' }).catch(() => {})
-    throw failure
+    throw error_
   }
 }
 

@@ -18,7 +18,7 @@ import IconScanQrCode from '~icons/lucide/scan-qr-code'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
-import { captureAppleOAuthCallback, completeAppleOAuth, hasPendingAppleOAuth, startAppleOAuth } from '~/services/appleOAuth'
+import { captureAppleOAuthCallback, completeAppleOAuth, consumeAppleOAuthLandingError, hasPendingAppleOAuth, startAppleOAuth } from '~/services/appleOAuth'
 import { hideLoader } from '~/services/loader'
 import { isNativeAppleLoginAvailable, signInWithApple } from '~/services/nativeAppleLogin'
 import { autoAuth, defaultApiHost, hashEmail, useSupabase } from '~/services/supabase'
@@ -760,28 +760,35 @@ async function handleQuerySessionHandoff(accessToken: string, refreshToken: stri
   hideLoader()
 }
 
+async function handleAppleOAuthLanding(parsedUrl: URL) {
+  if (consumeAppleOAuthLandingError())
+    throw new Error('Apple authorization failed')
+  if (parsedUrl.searchParams.get('apple_oauth') === '1' && !Capacitor.isNativePlatform()) {
+    // Console owns the verifier and resulting session across the Apple round trip.
+    const entry = new URL(parsedUrl)
+    parsedUrl.searchParams.delete('apple_oauth')
+    parsedUrl.searchParams.delete('apple_website_state')
+    globalThis.history.replaceState({}, '', parsedUrl)
+    await startAppleOAuth(entry)
+    return true
+  }
+  captureAppleOAuthCallback(parsedUrl)
+  if (hasPendingAppleOAuth()) {
+    isLoading.value = false
+    hideLoader()
+    if (!captchaKey.value || turnstileToken.value)
+      await finishAppleOAuth()
+    return true
+  }
+  return false
+}
+
 async function checkLogin() {
   try {
     const parsedUrl = new URL(route.fullPath, globalThis.location.origin)
+    if (await handleAppleOAuthLanding(parsedUrl))
+      return
     const params = new URLSearchParams(parsedUrl.search)
-
-    if (params.get('apple_oauth') === '1' && !Capacitor.isNativePlatform()) {
-      // Console owns the verifier and resulting session across the Apple round trip.
-      const entry = new URL(parsedUrl)
-      parsedUrl.searchParams.delete('apple_oauth')
-      parsedUrl.searchParams.delete('apple_website_state')
-      globalThis.history.replaceState({}, '', parsedUrl)
-      await startAppleOAuth(entry)
-      return
-    }
-    captureAppleOAuthCallback(parsedUrl)
-    if (hasPendingAppleOAuth()) {
-      isLoading.value = false
-      hideLoader()
-      if (!captchaKey.value || turnstileToken.value)
-        await finishAppleOAuth()
-      return
-    }
 
     if (params.get('message') === 'sso_account_linked') {
       parsedUrl.searchParams.delete('message')

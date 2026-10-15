@@ -8,6 +8,7 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({ getPgClient: asyn
 
 let privateKey: string
 let identityToken: string
+let webIdentityToken: string
 let jwks: unknown
 beforeAll(async () => {
   const clientKeys = await generateKeyPair('ES256', { extractable: true })
@@ -15,6 +16,7 @@ beforeAll(async () => {
   const appleKeys = await generateKeyPair('RS256', { extractable: true })
   jwks = { keys: [{ ...await exportJWK(appleKeys.publicKey), kid: 'test-apple-key', alg: 'RS256' }] }
   identityToken = await new SignJWT({ sub: 'apple-subject' }).setProtectedHeader({ alg: 'RS256', kid: 'test-apple-key' }).setIssuer('https://appleid.apple.com').setAudience('com.example.capgo').setIssuedAt().setExpirationTime('5m').sign(appleKeys.privateKey)
+  webIdentityToken = await new SignJWT({ sub: 'apple-subject' }).setProtectedHeader({ alg: 'RS256', kid: 'test-apple-key' }).setIssuer('https://appleid.apple.com').setAudience('com.example.web').setIssuedAt().setExpirationTime('5m').sign(appleKeys.privateKey)
 })
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -79,6 +81,18 @@ describe('apple token exchange and revocation', () => {
     const fetchMock = mockApple()
     await expect(revokeAppleAuthorization(c, 'foreign-code', 'another-apple-subject')).rejects.toThrow('does not belong')
     expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith('/auth/revoke'))).toBe(false)
+  })
+  it('binds browser/Android code exchange to the configured web client and original callback', async () => {
+    const c = context()
+    vi.stubEnv('APPLE_SIGN_IN_WEB_CLIENT_ID', 'com.example.web')
+    vi.stubEnv('APPLE_SIGN_IN_OAUTH_CALLBACK_URL', 'https://api.example.com/auth/apple/callback')
+    const fetchMock = mockApple({ idToken: webIdentityToken })
+    await revokeAppleAuthorization(c, 'fresh-web-code', 'apple-subject', true)
+    const exchange = fetchMock.mock.calls.find(call => String(call[0]).endsWith('/auth/token')) as unknown as [string, RequestInit]
+    const form = exchange[1].body as URLSearchParams
+    expect(form.get('client_id')).toBe('com.example.web')
+    expect(form.get('redirect_uri')).toBe('https://api.example.com/auth/apple/callback')
+    expect(fetchMock.mock.calls.some(call => String(call[0]).endsWith('/auth/revoke'))).toBe(true)
   })
   it('rejects an invalid identity token before revocation', async () => {
     const c = context()
