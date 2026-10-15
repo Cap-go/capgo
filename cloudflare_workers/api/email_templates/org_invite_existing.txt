@@ -1,0 +1,9 @@
+Hi {{ invited_first_name }} {{ invited_last_name }},
+
+{{ org_admin_name }} has invited you to join the "{{ org_name }}" organization on Capgo.app with your existing account.
+
+To accept this invitation, please use the link below. If needed, sign in to your Capgo.app account first.
+
+{{ invite_link }}
+
+If you did not expect this invitation, you can safely ignore this email.

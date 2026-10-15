@@ -85,7 +85,7 @@ async function persistWithAppOnboardingLock<T>(
   operation: (tx: WriteTransaction, row: { onboarding: unknown, owner_org: string }) => Promise<T>,
   client?: Parameters<typeof getDrizzleClient>[0],
 ): Promise<T | null> {
-  const pool = client ? null : getPgClient(c)
+  const pool = client ? null : await getPgClient(c)
   try {
     return await retryAppOnboardingWrite(getDrizzleClient(client ?? pool!, { logger: false }), async (tx) => {
       const row = await lockAppOnboardingForWrite(tx, appId)

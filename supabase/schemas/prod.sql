@@ -7363,6 +7363,66 @@ $$;
 ALTER FUNCTION "public"."exist_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."expire_r2_manifest_placeholders"("p_bucket" "text", "p_limit" integer) RETURNS integer
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    SET "statement_timeout" TO '5s'
+    SET "lock_timeout" TO '1s'
+    AS $$
+DECLARE
+    removed integer;
+BEGIN
+    IF p_bucket IS NULL OR pg_catalog.octet_length(p_bucket) NOT BETWEEN 1 AND 256
+       OR p_limit IS NULL OR p_limit NOT BETWEEN 1 AND 1000 THEN
+        RAISE EXCEPTION 'Invalid placeholder expiry bound' USING ERRCODE = '22023';
+    END IF;
+    -- A missing/unfinished separately deployed index must never turn maintenance
+    -- into a sequential scan over the production inventory.
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_catalog.pg_index AS idx
+        WHERE idx.indexrelid = pg_catalog.to_regclass('public.r2_objects_expired_manifest_leases_idx')
+          AND idx.indrelid = 'public.r2_objects'::pg_catalog.regclass
+          AND idx.indisvalid AND idx.indisready
+    ) THEN
+        RAISE EXCEPTION 'Placeholder expiry index is missing or not ready';
+    END IF;
+    -- Consumer holds FOR SHARE across INSERT and SELECT. This exclusive lock
+    -- prevents expiry from removing a placeholder in that gap. Repairs use CAS
+    -- revisions and retry a missing/reinserted row rather than acknowledging it.
+    PERFORM 1 FROM public.r2_inventory_checkpoints
+    WHERE bucket_name = p_bucket AND job_name = 'admission' AND partition_key = ''
+    FOR UPDATE;
+    IF NOT FOUND THEN
+        RETURN 0;
+    END IF;
+    WITH candidates AS MATERIALIZED (
+        SELECT bucket_name, r2_key FROM public.r2_objects
+        WHERE bucket_name = p_bucket
+          AND r2_state = 'to_be_uploaded'::public.r2_object_state
+          AND manifest_lease_expires_at IS NOT NULL
+          AND manifest_lease_expires_at <= pg_catalog.now()
+        ORDER BY manifest_lease_expires_at, r2_key
+        LIMIT p_limit FOR UPDATE SKIP LOCKED
+    ), deleted AS (
+        DELETE FROM public.r2_objects AS target USING candidates
+        WHERE target.bucket_name = candidates.bucket_name AND target.r2_key = candidates.r2_key
+          AND target.r2_state = 'to_be_uploaded'::public.r2_object_state
+          AND target.manifest_lease_expires_at IS NOT NULL
+          AND target.manifest_lease_expires_at <= pg_catalog.now()
+        RETURNING 1
+    ) SELECT pg_catalog.count(*)::integer INTO removed FROM deleted;
+    RETURN removed;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."expire_r2_manifest_placeholders"("p_bucket" "text", "p_limit" integer) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."expire_r2_manifest_placeholders"("p_bucket" "text", "p_limit" integer) IS 'Internal expiry: bounded indexed placeholder deletion under the admission lock. No R2 deletion.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."expire_usage_credits"() RETURNS bigint
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -15992,6 +16052,88 @@ END; $$;
 ALTER FUNCTION "public"."queue_legacy_manifest_size_lookup_compat"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."queue_org_invitation_email"("p_kind" "text", "p_invite_id" bigint, "p_inviter_id" "uuid" DEFAULT NULL::"uuid") RETURNS "text"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+    v_generation uuid;
+BEGIN
+    IF p_kind = 'existing' THEN
+        PERFORM 1 FROM public.org_users AS invitation
+        WHERE invitation.id = p_invite_id
+            AND invitation.is_invite
+            AND invitation.app_id IS NULL
+            AND invitation.channel_id IS NULL;
+        IF NOT FOUND THEN
+            RETURN 'NOT_PENDING';
+        END IF;
+
+        INSERT INTO public.org_invitation_email_requests AS request (
+            org_user_id, invited_by_user_id
+        ) VALUES (p_invite_id, p_inviter_id)
+        ON CONFLICT (org_user_id) DO UPDATE
+        SET id = EXCLUDED.id,
+            invited_by_user_id = EXCLUDED.invited_by_user_id,
+            requested_at = pg_catalog.clock_timestamp(),
+            sent_at = NULL,
+            message_id = NULL
+        WHERE request.requested_at <= pg_catalog.clock_timestamp() - interval '5 minutes'
+        RETURNING id INTO v_generation;
+    ELSIF p_kind = 'new' THEN
+        PERFORM 1 FROM public.tmp_users AS invitation
+        WHERE invitation.id = p_invite_id AND invitation.cancelled_at IS NULL;
+        IF NOT FOUND THEN
+            RETURN 'NOT_PENDING';
+        END IF;
+
+        INSERT INTO public.org_invitation_email_requests AS request (
+            tmp_user_id, invited_by_user_id
+        ) VALUES (p_invite_id, p_inviter_id)
+        ON CONFLICT (tmp_user_id) DO UPDATE
+        SET id = EXCLUDED.id,
+            invited_by_user_id = EXCLUDED.invited_by_user_id,
+            requested_at = pg_catalog.clock_timestamp(),
+            sent_at = NULL,
+            message_id = NULL
+        WHERE request.requested_at <= pg_catalog.clock_timestamp() - interval '5 minutes'
+        RETURNING id INTO v_generation;
+    ELSE
+        RETURN 'NOT_PENDING';
+    END IF;
+
+    -- ON CONFLICT locks the one state row before checking cooldown, including
+    -- concurrent first requests. Update the row in place to match the sender's
+    -- FOR UPDATE lock; never delete/reinsert delivery state. Invitation reads
+    -- deliberately take no row lock: token rotation already holds that row,
+    -- while the sender locks only state and reads the invitation afterward.
+    IF v_generation IS NULL THEN
+        RETURN 'COOLDOWN';
+    END IF;
+
+    -- Queue insertion and generation replacement commit together. Let enqueue
+    -- failures abort the invitation write rather than silently losing email.
+    PERFORM pgmq.send(
+        'send_email',
+        pg_catalog.jsonb_build_object(
+            'function_name', 'send_email',
+            'function_type', 'cloudflare',
+            'payload', pg_catalog.jsonb_build_object('org_invitation_id', v_generation)
+        )
+    );
+    RETURN 'QUEUED';
+END;
+$$;
+
+
+ALTER FUNCTION "public"."queue_org_invitation_email"("p_kind" "text", "p_invite_id" bigint, "p_inviter_id" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."queue_org_invitation_email"("p_kind" "text", "p_invite_id" bigint, "p_inviter_id" "uuid") IS 'Internal existing/new invitation email request. Returns QUEUED, COOLDOWN,
+or NOT_PENDING; the state row serializes a five-minute cooldown.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."r2_inventory_checkpoints_before_write"() RETURNS "trigger"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
@@ -20804,6 +20946,36 @@ $$;
 ALTER FUNCTION "public"."trigger_http_queue_post_to_function"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."trigger_queue_org_invitation_email"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+    v_result text;
+BEGIN
+    IF TG_TABLE_NAME = 'org_users' THEN
+        -- Service/API callers may have no auth.uid(). Keep unknown attribution
+        -- NULL so the email sender can use its Capgo team fallback.
+        PERFORM public.queue_org_invitation_email('existing', NEW.id, auth.uid());
+    ELSIF TG_TABLE_NAME = 'tmp_users' THEN
+        IF TG_OP = 'UPDATE' THEN
+            IF NEW.invite_magic_string IS NOT DISTINCT FROM OLD.invite_magic_string THEN
+                RETURN NEW;
+            END IF;
+        END IF;
+        v_result := public.queue_org_invitation_email('new', NEW.id, NEW.invited_by_user_id);
+        IF TG_OP = 'UPDATE' AND v_result = 'COOLDOWN' THEN
+            RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'INVITE_EMAIL_COOLDOWN';
+        END IF;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."trigger_queue_org_invitation_email"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."trigger_webhook_on_audit_log"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -22510,6 +22682,9 @@ CREATE TABLE IF NOT EXISTS "public"."build_requests" (
     "ai_analyzed" boolean DEFAULT false NOT NULL,
     "started_at" timestamp with time zone,
     "completed_at" timestamp with time zone,
+    "ios_dependency_manager" "text",
+    "xcode_version" "text",
+    CONSTRAINT "build_requests_ios_dependency_manager_check" CHECK ((("ios_dependency_manager" IS NULL) OR ("ios_dependency_manager" = ANY (ARRAY['cocoapods'::"text", 'spm'::"text"])))),
     CONSTRAINT "build_requests_platform_check" CHECK ((("platform")::"text" = ANY (ARRAY[('ios'::character varying)::"text", ('android'::character varying)::"text"]))),
     CONSTRAINT "build_requests_run_interval_check" CHECK ((("started_at" IS NULL) OR ("completed_at" IS NULL) OR ("completed_at" >= "started_at")))
 );
@@ -22531,6 +22706,14 @@ COMMENT ON COLUMN "public"."build_requests"."started_at" IS 'Builder-reported jo
 
 
 COMMENT ON COLUMN "public"."build_requests"."completed_at" IS 'Builder-reported job completion (UTC). Used for capacity reconstruction.';
+
+
+
+COMMENT ON COLUMN "public"."build_requests"."ios_dependency_manager" IS 'iOS dependency manager detected by the CLI (cocoapods or spm). NULL for Android builds or CLIs that do not report it.';
+
+
+
+COMMENT ON COLUMN "public"."build_requests"."xcode_version" IS 'Xcode version of the builder runner that ran the build (its major is the iOS SDK). NULL until a runner claims the build or when the builder does not report it.';
 
 
 
@@ -23362,7 +23545,11 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "users_with_2fa" bigint DEFAULT 0 NOT NULL,
     "apps_with_store_url" bigint DEFAULT 0 NOT NULL,
     "refunds_count" bigint DEFAULT 0 NOT NULL,
-    "refunds_amount" double precision DEFAULT 0 NOT NULL
+    "refunds_amount" double precision DEFAULT 0 NOT NULL,
+    "build_requests_day_ios_cocoapods" integer DEFAULT 0 NOT NULL,
+    "build_requests_day_ios_spm" integer DEFAULT 0 NOT NULL,
+    "build_requests_day_ios_unknown" integer DEFAULT 0 NOT NULL,
+    "build_requests_day_ios_sdk" "jsonb" DEFAULT '{}'::"jsonb" NOT NULL
 );
 
 
@@ -23698,6 +23885,22 @@ COMMENT ON COLUMN "public"."global_stats"."refunds_count" IS 'Number of Stripe r
 
 
 COMMENT ON COLUMN "public"."global_stats"."refunds_amount" IS 'Total USD amount refunded on the snapshot UTC day, in dollars (failed and canceled refunds excluded).';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."build_requests_day_ios_cocoapods" IS 'iOS native build requests on the snapshot UTC day whose project uses CocoaPods.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."build_requests_day_ios_spm" IS 'iOS native build requests on the snapshot UTC day whose project uses Swift Package Manager.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."build_requests_day_ios_unknown" IS 'iOS native build requests on the snapshot UTC day without a reported dependency manager (older CLI).';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."build_requests_day_ios_sdk" IS 'iOS native build requests on the snapshot UTC day by iOS SDK (Xcode major), e.g. {"26": 120, "27": 4, "unknown": 3}. unknown = never claimed by a runner or not reported.';
 
 
 
@@ -24039,6 +24242,26 @@ COMMENT ON COLUMN "public"."org_id_tombstones"."org_id" IS 'Deleted organization
 
 
 
+CREATE TABLE IF NOT EXISTS "public"."org_invitation_email_requests" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "org_user_id" bigint,
+    "tmp_user_id" integer,
+    "invited_by_user_id" "uuid",
+    "requested_at" timestamp with time zone DEFAULT "clock_timestamp"() NOT NULL,
+    "sent_at" timestamp with time zone,
+    "message_id" "text",
+    CONSTRAINT "org_invitation_email_requests_one_invite" CHECK (("num_nonnulls"("org_user_id", "tmp_user_id") = 1))
+);
+
+
+ALTER TABLE "public"."org_invitation_email_requests" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."org_invitation_email_requests" IS 'Internal invitation delivery state. Each invitation has one mutable row;
+id is the current send generation, so old queued generations are skipped.';
+
+
+
 CREATE TABLE IF NOT EXISTS "public"."org_stats_refresh_state" (
     "org_id" "uuid" NOT NULL,
     "stats_updated_at" timestamp without time zone,
@@ -24120,6 +24343,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "support_channel_url" "text",
     "support_channel_set_at" timestamp with time zone,
     "auto_top_up_monthly_limit" numeric(18,6) DEFAULT 0 NOT NULL,
+    "signup_plugin" "text",
     CONSTRAINT "orgs_max_apikey_expiration_days_valid" CHECK ((("max_apikey_expiration_days" IS NULL) OR (("max_apikey_expiration_days" >= 1) AND ("max_apikey_expiration_days" <= 365)))),
     CONSTRAINT "orgs_password_policy_config_min_length_check" CHECK ((("password_policy_config" IS NULL) OR (("jsonb_typeof"("password_policy_config") = 'object'::"text") AND ((NOT ("password_policy_config" ? 'min_length'::"text")) OR (("jsonb_typeof"(("password_policy_config" -> 'min_length'::"text")) = 'number'::"text") AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric = "trunc"((("password_policy_config" ->> 'min_length'::"text"))::numeric)) AND (((("password_policy_config" ->> 'min_length'::"text"))::numeric >= (6)::numeric) AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric <= (72)::numeric))))))),
     CONSTRAINT "orgs_required_encryption_key_valid" CHECK ((("required_encryption_key" IS NULL) OR ("length"(("required_encryption_key")::"text") = ANY (ARRAY[20, 21])))),
@@ -24198,6 +24422,10 @@ COMMENT ON COLUMN "public"."orgs"."support_channel_set_at" IS 'When the support 
 
 
 COMMENT ON COLUMN "public"."orgs"."auto_top_up_monthly_limit" IS 'Maximum credits (USD, 1:1) that auto top-up may buy per calendar month (UTC). 0 means no limit; otherwise it must be at least auto_top_up_threshold. Auto top-up stops once the next charge would exceed it.';
+
+
+
+COMMENT ON COLUMN "public"."orgs"."signup_plugin" IS 'Plugin name from signup ref=plugin_<name> for SQL attribution. No PII.';
 
 
 
@@ -24326,6 +24554,7 @@ CREATE TABLE IF NOT EXISTS "public"."r2_objects" (
     "first_seen_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "revision" bigint DEFAULT 1 NOT NULL,
+    "manifest_lease_expires_at" timestamp with time zone,
     CONSTRAINT "r2_objects_bucket_check" CHECK ((("octet_length"("bucket_name") >= 1) AND ("octet_length"("bucket_name") <= 256))),
     CONSTRAINT "r2_objects_cleanup_check" CHECK ((("cleanup_requested_at" IS NULL) OR ("r2_state" = ANY (ARRAY['to_be_deleted'::"public"."r2_object_state", 'deleted'::"public"."r2_object_state"])))),
     CONSTRAINT "r2_objects_key_check" CHECK ((("octet_length"("r2_key") >= 1) AND ("octet_length"("r2_key") <= 1024))),
@@ -24351,6 +24580,10 @@ COMMENT ON COLUMN "public"."r2_objects"."last_event_at" IS 'Latest accepted R2 e
 
 
 COMMENT ON COLUMN "public"."r2_objects"."last_reconciled_at" IS 'Conservative request-start boundary of an applied direct R2 observation.';
+
+
+
+COMMENT ON COLUMN "public"."r2_objects"."manifest_lease_expires_at" IS 'Expiry for future manifest upload reservations and cleanup; NULL means no lease. Future reservations extend it with GREATEST(COALESCE(existing_expiry, database_now), database_now + interval ''30 minutes'').';
 
 
 
@@ -24429,6 +24662,25 @@ ALTER TABLE "public"."roles" OWNER TO "postgres";
 
 
 COMMENT ON TABLE "public"."roles" IS 'Canonical RBAC roles. Scope_type indicates the native scope the role is defined for.';
+
+
+
+CREATE TABLE IF NOT EXISTS "public"."sso_provider_org_links" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "sso_provider_id" "uuid" NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "role_mapping" "jsonb",
+    "linked_by" "uuid",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "sso_provider_org_links_role_mapping_object_check" CHECK ((("role_mapping" IS NULL) OR ("jsonb_typeof"("role_mapping") = 'object'::"text")))
+);
+
+
+ALTER TABLE "public"."sso_provider_org_links" OWNER TO "postgres";
+
+
+COMMENT ON TABLE "public"."sso_provider_org_links" IS 'Orgs sharing an SSO provider owned by another org (same company, same IdP). Each link carries the role mapping applied to that org on every SSO login. Written only by /private/sso/providers/:id/links.';
 
 
 
@@ -25602,6 +25854,21 @@ ALTER TABLE ONLY "public"."org_id_tombstones"
 
 
 
+ALTER TABLE ONLY "public"."org_invitation_email_requests"
+    ADD CONSTRAINT "org_invitation_email_requests_org_user_id_key" UNIQUE ("org_user_id");
+
+
+
+ALTER TABLE ONLY "public"."org_invitation_email_requests"
+    ADD CONSTRAINT "org_invitation_email_requests_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."org_invitation_email_requests"
+    ADD CONSTRAINT "org_invitation_email_requests_tmp_user_id_key" UNIQUE ("tmp_user_id");
+
+
+
 ALTER TABLE ONLY "public"."org_metrics_cache"
     ADD CONSTRAINT "org_metrics_cache_pkey" PRIMARY KEY ("org_id");
 
@@ -25699,6 +25966,16 @@ ALTER TABLE ONLY "public"."roles"
 
 ALTER TABLE ONLY "public"."roles"
     ADD CONSTRAINT "roles_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_provider_org_key" UNIQUE ("sso_provider_id", "org_id");
 
 
 
@@ -26144,6 +26421,10 @@ CREATE INDEX "idx_build_requests_app_created_at" ON "public"."build_requests" US
 
 
 
+CREATE INDEX "idx_build_requests_created_at_platform" ON "public"."build_requests" USING "btree" ("created_at", "platform");
+
+
+
 CREATE INDEX "idx_build_requests_job" ON "public"."build_requests" USING "btree" ("builder_job_id");
 
 
@@ -26484,6 +26765,10 @@ CREATE INDEX "onboarding_demo_data_seed_id_idx" ON "public"."onboarding_demo_dat
 
 
 
+CREATE INDEX "org_invitation_email_requests_inviter_idx" ON "public"."org_invitation_email_requests" USING "btree" ("invited_by_user_id") WHERE ("invited_by_user_id" IS NOT NULL);
+
+
+
 CREATE INDEX "org_users_app_id_idx" ON "public"."org_users" USING "btree" ("app_id");
 
 
@@ -26497,6 +26782,10 @@ CREATE INDEX "platform_impersonation_sessions_expires_at_idx" ON "public"."platf
 
 
 CREATE INDEX "processed_stripe_events_customer_id_date_id_idx" ON "public"."processed_stripe_events" USING "btree" ("customer_id", "date_id");
+
+
+
+CREATE INDEX "r2_objects_expired_manifest_leases_idx" ON "public"."r2_objects" USING "btree" ("bucket_name", "manifest_lease_expires_at", "r2_key") WHERE (("r2_state" = 'to_be_uploaded'::"public"."r2_object_state") AND ("manifest_lease_expires_at" IS NOT NULL));
 
 
 
@@ -26541,6 +26830,10 @@ CREATE UNIQUE INDEX "si_customer_cover_uidx" ON "public"."stripe_info" USING "bt
 
 
 CREATE INDEX "si_customer_status_trial_idx" ON "public"."stripe_info" USING "btree" ("customer_id", "status", "trial_at") INCLUDE ("mau_exceeded", "storage_exceeded", "bandwidth_exceeded");
+
+
+
+CREATE INDEX "sso_provider_org_links_org_id_idx" ON "public"."sso_provider_org_links" USING "btree" ("org_id");
 
 
 
@@ -27044,6 +27337,14 @@ CREATE OR REPLACE TRIGGER "protect_apps_onboarding" BEFORE INSERT OR UPDATE ON "
 
 
 
+CREATE OR REPLACE TRIGGER "queue_org_user_invitation_email" AFTER INSERT ON "public"."org_users" FOR EACH ROW WHEN (("new"."is_invite" AND ("new"."app_id" IS NULL) AND ("new"."channel_id" IS NULL))) EXECUTE FUNCTION "public"."trigger_queue_org_invitation_email"();
+
+
+
+CREATE OR REPLACE TRIGGER "queue_tmp_user_invitation_email" AFTER INSERT OR UPDATE OF "invite_magic_string" ON "public"."tmp_users" FOR EACH ROW WHEN (("new"."cancelled_at" IS NULL)) EXECUTE FUNCTION "public"."trigger_queue_org_invitation_email"();
+
+
+
 CREATE OR REPLACE TRIGGER "r2_inventory_checkpoints_before_write" BEFORE INSERT OR DELETE OR UPDATE ON "public"."r2_inventory_checkpoints" FOR EACH ROW EXECUTE FUNCTION "public"."r2_inventory_checkpoints_before_write"();
 
 
@@ -27394,6 +27695,21 @@ ALTER TABLE ONLY "public"."org_custom_domains"
 
 
 
+ALTER TABLE ONLY "public"."org_invitation_email_requests"
+    ADD CONSTRAINT "org_invitation_email_requests_invited_by_user_id_fkey" FOREIGN KEY ("invited_by_user_id") REFERENCES "public"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."org_invitation_email_requests"
+    ADD CONSTRAINT "org_invitation_email_requests_org_user_id_fkey" FOREIGN KEY ("org_user_id") REFERENCES "public"."org_users"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."org_invitation_email_requests"
+    ADD CONSTRAINT "org_invitation_email_requests_tmp_user_id_fkey" FOREIGN KEY ("tmp_user_id") REFERENCES "public"."tmp_users"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."org_metrics_cache"
     ADD CONSTRAINT "org_metrics_cache_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
 
@@ -27516,6 +27832,21 @@ ALTER TABLE ONLY "public"."role_permissions"
 
 ALTER TABLE ONLY "public"."role_permissions"
     ADD CONSTRAINT "role_permissions_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "public"."roles"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_linked_by_fkey" FOREIGN KEY ("linked_by") REFERENCES "auth"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."sso_provider_org_links"
+    ADD CONSTRAINT "sso_provider_org_links_sso_provider_id_fkey" FOREIGN KEY ("sso_provider_id") REFERENCES "public"."sso_providers"("id") ON DELETE CASCADE;
 
 
 
@@ -27900,6 +28231,10 @@ CREATE POLICY "Deny all access" ON "public"."daily_revenue_metrics" USING (false
 
 
 CREATE POLICY "Deny all access" ON "public"."processed_stripe_events" USING (false) WITH CHECK (false);
+
+
+
+CREATE POLICY "Deny all access" ON "public"."sso_provider_org_links" TO "anon", "authenticated" USING (false) WITH CHECK (false);
 
 
 
@@ -28480,6 +28815,10 @@ CREATE POLICY "deny_direct_update_on_webhooks" ON "public"."webhooks" AS RESTRIC
 
 
 
+CREATE POLICY "deny_user_invitation_email_requests" ON "public"."org_invitation_email_requests" AS RESTRICTIVE TO "anon", "authenticated" USING (false) WITH CHECK (false);
+
+
+
 ALTER TABLE "public"."deploy_history" ENABLE ROW LEVEL SECURITY;
 
 
@@ -28573,6 +28912,9 @@ ALTER TABLE "public"."org_custom_domains" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_id_tombstones" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."org_invitation_email_requests" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."org_metrics_cache" ENABLE ROW LEVEL SECURITY;
@@ -28731,6 +29073,9 @@ COMMENT ON POLICY "roles_select" ON "public"."roles" IS 'All authenticated users
 
 CREATE POLICY "roles_update" ON "public"."roles" FOR UPDATE TO "authenticated" USING (false);
 
+
+
+ALTER TABLE "public"."sso_provider_org_links" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."sso_providers" ENABLE ROW LEVEL SECURITY;
@@ -29847,6 +30192,11 @@ GRANT ALL ON FUNCTION "public"."exist_app_versions"("appid" character varying, "
 
 
 
+REVOKE ALL ON FUNCTION "public"."expire_r2_manifest_placeholders"("p_bucket" "text", "p_limit" integer) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."expire_r2_manifest_placeholders"("p_bucket" "text", "p_limit" integer) TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."expire_usage_credits"() FROM PUBLIC;
 
 
@@ -30935,6 +31285,11 @@ GRANT ALL ON FUNCTION "public"."queue_legacy_manifest_size_lookup_compat"() TO "
 
 
 
+REVOKE ALL ON FUNCTION "public"."queue_org_invitation_email"("p_kind" "text", "p_invite_id" bigint, "p_inviter_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."queue_org_invitation_email"("p_kind" "text", "p_invite_id" bigint, "p_inviter_id" "uuid") TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."r2_inventory_checkpoints_before_write"() FROM PUBLIC;
 
 
@@ -31803,6 +32158,11 @@ REVOKE ALL ON FUNCTION "public"."trigger_http_queue_post_to_function"() FROM PUB
 
 
 
+REVOKE ALL ON FUNCTION "public"."trigger_queue_org_invitation_email"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."trigger_queue_org_invitation_email"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."trigger_webhook_on_audit_log"() FROM PUBLIC;
 
 
@@ -32374,6 +32734,10 @@ GRANT ALL ON TABLE "public"."org_id_tombstones" TO "service_role";
 
 
 
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."org_invitation_email_requests" TO "service_role";
+
+
+
 GRANT ALL ON TABLE "public"."org_stats_refresh_state" TO "service_role";
 
 
@@ -32445,6 +32809,10 @@ GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public".
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."roles" TO "anon";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."roles" TO "authenticated";
 GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE "public"."roles" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."sso_provider_org_links" TO "service_role";
 
 
 

@@ -172,7 +172,7 @@ export function createMcpApp(dispatch: McpDispatch) {
       apikeyName: apikey.name,
       apikeyExpiresAt: apikey.expires_at,
     }
-    const ctx: McpToolContext = { call: createCaller(c, dispatch, token), caller }
+    const ctx: McpToolContext = { call: createCaller(c, dispatch, token), caller, apikey: token }
 
     if (Array.isArray(payload) && (payload.length === 0 || payload.length > MAX_BATCH_MESSAGES))
       return c.json(jsonRpcError(null, JSON_RPC_ERRORS.invalidRequest, `Batches must contain 1 to ${MAX_BATCH_MESSAGES} messages`), 400)

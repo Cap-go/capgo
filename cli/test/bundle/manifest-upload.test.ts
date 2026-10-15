@@ -183,6 +183,41 @@ describe('manifest upload response contract', () => {
     expect(resolved.entries).toHaveLength(3)
   })
 
+  it('retries 503 authorization responses using Retry-After', async () => {
+    const delays: number[] = []
+    let calls = 0
+    const resolved = await requestManifestUpload('api-key', request, {}, async () => {
+      calls++
+      if (calls === 1)
+        return { data: null, error: Object.assign(new Error('unavailable'), { context: new Response('{}', { status: 503, headers: { 'Retry-After': '3' } }) }) }
+      return { data: response(), error: null }
+    }, async (ms) => {
+      delays.push(ms)
+    })
+
+    expect(resolved.entries).toHaveLength(3)
+    expect(calls).toBe(2)
+    expect(delays).toEqual([3000])
+  })
+
+  it('stops retrying after the retry budget and does not retry other errors', async () => {
+    let calls = 0
+    const unavailable = requestManifestUpload('api-key', request, {}, async () => {
+      calls++
+      return { data: null, error: Object.assign(new Error('unavailable'), { context: new Response('{}', { status: 503 }) }) }
+    }, async () => {})
+    await expect(unavailable).rejects.toThrow('Cannot request manifest upload')
+    expect(calls).toBe(3)
+
+    calls = 0
+    const forbidden = requestManifestUpload('api-key', request, {}, async () => {
+      calls++
+      return { data: null, error: Object.assign(new Error('forbidden'), { context: new Response('{}', { status: 403 }) }) }
+    }, async () => {})
+    await expect(forbidden).rejects.toThrow('Cannot request manifest upload')
+    expect(calls).toBe(1)
+  })
+
   it('only shows the authorization spinner when the request takes longer than 500 ms', async () => {
     const fastEvents: string[] = []
     await runWithUploadReporter(recordingReporter(fastEvents), async () => requestManifestUpload('api-key', request, {}, async () => ({
@@ -317,9 +352,31 @@ describe('manifest upload existence probe', () => {
       )
       expect(result).toEqual({ exists: true, receipt: 'signed-size' })
       expect(requestedUrl).toContain('/files/read/attachments/orgs%2Forg%2Fapps%2Fapp%2Fdelta%2Fhash_assets%2Flogo.png?nocache=')
+      expect(requestedUrl).not.toMatch(/\.htaccess/i)
       expect(requestedHeaders?.['x-cli-version']).toBeTruthy()
       expect(requestedHeaders?.range).toBeUndefined()
       expect(redirectMode).toBe('error')
+    }
+    finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('builds WAF-safe existence-check URLs for dotfile delta paths', async () => {
+    const originalFetch = globalThis.fetch
+    let requestedUrl = ''
+    globalThis.fetch = (async (input) => {
+      requestedUrl = String(input)
+      return new Response('', { status: 404 })
+    }) as typeof fetch
+    try {
+      const hash = 'b'.repeat(64)
+      await fileExistsAtUploadTarget(
+        'https://files.example.test/files/read/attachments/',
+        `orgs/org/apps/app/delta/${hash}_%2Ehtaccess`,
+      )
+      expect(requestedUrl).toContain(`${hash}_%252Ehtaccess`)
+      expect(requestedUrl.toLowerCase()).not.toContain('.htaccess')
     }
     finally {
       globalThis.fetch = originalFetch

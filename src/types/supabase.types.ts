@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.15"
   }
   graphql_public: {
     Tables: {
@@ -703,6 +703,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           id: string
+          ios_dependency_manager: string | null
           last_error: string | null
           owner_org: string
           platform: string
@@ -715,6 +716,7 @@ export type Database = {
           upload_path: string
           upload_session_key: string
           upload_url: string
+          xcode_version: string | null
         }
         Insert: {
           ai_analyzed?: boolean
@@ -725,6 +727,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: string
+          ios_dependency_manager?: string | null
           last_error?: string | null
           owner_org: string
           platform: string
@@ -737,6 +740,7 @@ export type Database = {
           upload_path: string
           upload_session_key: string
           upload_url: string
+          xcode_version?: string | null
         }
         Update: {
           ai_analyzed?: boolean
@@ -747,6 +751,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           id?: string
+          ios_dependency_manager?: string | null
           last_error?: string | null
           owner_org?: string
           platform?: string
@@ -759,6 +764,7 @@ export type Database = {
           upload_path?: string
           upload_session_key?: string
           upload_url?: string
+          xcode_version?: string | null
         }
         Relationships: [
           {
@@ -1723,6 +1729,10 @@ export type Database = {
           build_avg_seconds_day_ios: number
           build_count_day_android: number
           build_count_day_ios: number
+          build_requests_day_ios_cocoapods: number
+          build_requests_day_ios_sdk: Json
+          build_requests_day_ios_spm: number
+          build_requests_day_ios_unknown: number
           build_total_seconds_day_android: number
           build_total_seconds_day_ios: number
           builder_active_paying_clients_60d: number
@@ -1838,6 +1848,10 @@ export type Database = {
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
           build_count_day_ios?: number
+          build_requests_day_ios_cocoapods?: number
+          build_requests_day_ios_sdk?: Json
+          build_requests_day_ios_spm?: number
+          build_requests_day_ios_unknown?: number
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
           builder_active_paying_clients_60d?: number
@@ -1953,6 +1967,10 @@ export type Database = {
           build_avg_seconds_day_ios?: number
           build_count_day_android?: number
           build_count_day_ios?: number
+          build_requests_day_ios_cocoapods?: number
+          build_requests_day_ios_sdk?: Json
+          build_requests_day_ios_spm?: number
+          build_requests_day_ios_unknown?: number
           build_total_seconds_day_android?: number
           build_total_seconds_day_ios?: number
           builder_active_paying_clients_60d?: number
@@ -2703,6 +2721,58 @@ export type Database = {
         }
         Relationships: []
       }
+      org_invitation_email_requests: {
+        Row: {
+          id: string
+          invited_by_user_id: string | null
+          message_id: string | null
+          org_user_id: number | null
+          requested_at: string
+          sent_at: string | null
+          tmp_user_id: number | null
+        }
+        Insert: {
+          id?: string
+          invited_by_user_id?: string | null
+          message_id?: string | null
+          org_user_id?: number | null
+          requested_at?: string
+          sent_at?: string | null
+          tmp_user_id?: number | null
+        }
+        Update: {
+          id?: string
+          invited_by_user_id?: string | null
+          message_id?: string | null
+          org_user_id?: number | null
+          requested_at?: string
+          sent_at?: string | null
+          tmp_user_id?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_invitation_email_requests_invited_by_user_id_fkey"
+            columns: ["invited_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_invitation_email_requests_org_user_id_fkey"
+            columns: ["org_user_id"]
+            isOneToOne: true
+            referencedRelation: "org_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "org_invitation_email_requests_tmp_user_id_fkey"
+            columns: ["tmp_user_id"]
+            isOneToOne: true
+            referencedRelation: "tmp_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_metrics_cache: {
         Row: {
           bandwidth: number
@@ -2877,6 +2947,7 @@ export type Database = {
           password_policy_config: Json | null
           require_apikey_expiration: boolean
           required_encryption_key: string | null
+          signup_plugin: string | null
           stats_refresh_requested_at: string | null
           stats_updated_at: string | null
           support_channel_set_at: string | null
@@ -2908,6 +2979,7 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
+          signup_plugin?: string | null
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           support_channel_set_at?: string | null
@@ -2939,6 +3011,7 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
+          signup_plugin?: string | null
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           support_channel_set_at?: string | null
@@ -3139,6 +3212,7 @@ export type Database = {
           first_seen_at: string
           last_event_at: string | null
           last_reconciled_at: string | null
+          manifest_lease_expires_at: string | null
           r2_key: string
           r2_last_modified_at: string | null
           r2_state: Database["public"]["Enums"]["r2_object_state"]
@@ -3154,6 +3228,7 @@ export type Database = {
           first_seen_at?: string
           last_event_at?: string | null
           last_reconciled_at?: string | null
+          manifest_lease_expires_at?: string | null
           r2_key: string
           r2_last_modified_at?: string | null
           r2_state: Database["public"]["Enums"]["r2_object_state"]
@@ -3169,6 +3244,7 @@ export type Database = {
           first_seen_at?: string
           last_event_at?: string | null
           last_reconciled_at?: string | null
+          manifest_lease_expires_at?: string | null
           r2_key?: string
           r2_last_modified_at?: string | null
           r2_state?: Database["public"]["Enums"]["r2_object_state"]
@@ -3368,6 +3444,51 @@ export type Database = {
           scope_type?: string
         }
         Relationships: []
+      }
+      sso_provider_org_links: {
+        Row: {
+          created_at: string
+          id: string
+          linked_by: string | null
+          org_id: string
+          role_mapping: Json | null
+          sso_provider_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          linked_by?: string | null
+          org_id: string
+          role_mapping?: Json | null
+          sso_provider_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          linked_by?: string | null
+          org_id?: string
+          role_mapping?: Json | null
+          sso_provider_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sso_provider_org_links_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sso_provider_org_links_sso_provider_id_fkey"
+            columns: ["sso_provider_id"]
+            isOneToOne: false
+            referencedRelation: "sso_providers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sso_providers: {
         Row: {
@@ -4739,6 +4860,10 @@ export type Database = {
             Args: { apikey: string; appid: string; name_version: string }
             Returns: boolean
           }
+      expire_r2_manifest_placeholders: {
+        Args: { p_bucket: string; p_limit: number }
+        Returns: number
+      }
       expire_usage_credits: { Args: never; Returns: number }
       find_apikey_by_value: {
         Args: { key_value: string }
@@ -5705,6 +5830,10 @@ export type Database = {
       queue_cron_stat_org_for_org: {
         Args: { customer_id: string; org_id: string }
         Returns: undefined
+      }
+      queue_org_invitation_email: {
+        Args: { p_invite_id: number; p_inviter_id?: string; p_kind: string }
+        Returns: string
       }
       rbac_check_permission: {
         Args: {

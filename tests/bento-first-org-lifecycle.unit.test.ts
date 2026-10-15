@@ -71,7 +71,8 @@ vi.mock('../supabase/functions/_backend/utils/hono.ts', async () => {
   }
 })
 
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
+  ...(await import('./helpers/pg-checkout-release-mocks.ts')),
   closeClient: closeClientMock,
   getPgClient: getPgClientMock,
 }))
@@ -238,11 +239,13 @@ describe('first-organization lifecycle on user registration', () => {
     ['unknown', false],
     [undefined, false],
   ])('emits the mobile registration event for %s device metadata', async (deviceType, shouldEmit) => {
-    mockRegistrationMetadata(deviceType === undefined ? null : {
-      registration_browser: 'Mobile Safari',
-      registration_device_type: deviceType,
-      registration_os: 'iOS',
-    })
+    mockRegistrationMetadata(deviceType === undefined
+      ? null
+      : {
+          registration_browser: 'Mobile Safari',
+          registration_device_type: deviceType,
+          registration_os: 'iOS',
+        })
 
     const response = await postUser()
     const mobileEvents = trackBentoEventMock.mock.calls.filter(call => call[3] === 'user:registered_from_mobile')

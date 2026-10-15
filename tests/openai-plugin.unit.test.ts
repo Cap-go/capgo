@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import apiWorker from '../cloudflare_workers/api/index.ts'
-import { PLUGIN_DIR, validateOpenAiPlugin } from '../scripts/build-openai-plugin.ts'
+import { PACKAGE_ENTRIES, PLUGIN_ASSETS_DIR, PLUGIN_DIR, validateOpenAiPlugin } from '../scripts/build-openai-plugin.ts'
 import { MCP_TOOLS } from '../supabase/functions/_backend/mcp/tools.ts'
 
 describe('plugin package for OpenAI', () => {
@@ -14,18 +14,19 @@ describe('plugin package for OpenAI', () => {
   it('rejects blank or multiline names, assets outside the package, non-PNG icons and invalid URLs', () => {
     const dir = mkdtempSync(join(tmpdir(), 'capgo-openai-plugin-'))
     try {
-      cpSync(PLUGIN_DIR, dir, { recursive: true })
-      writeFileSync(join(dir, 'assets', 'broken.png'), 'not a png')
+      for (const entry of PACKAGE_ENTRIES)
+        cpSync(join(PLUGIN_DIR, entry), join(dir, entry), { recursive: true })
+      writeFileSync(join(dir, PLUGIN_ASSETS_DIR, 'broken.png'), 'not a png')
       const manifest = JSON.parse(readFileSync(join(dir, 'plugin.json'), 'utf8'))
       const ui = manifest.extensions['com.openai'].interface
-      ui.logo = './assets/../README.md'
-      ui.composerIcon = './assets/broken.png'
+      ui.logo = './assets/plugin/../../README.md'
+      ui.composerIcon = './assets/plugin/broken.png'
       ui.displayName = '  '
       ui.shortDescription = 'Live updates\nfor apps'
       ui.websiteURL = 'https://?'
       ui.supportURL = 'https://user:secret@capgo.app/support'
       ui.defaultPrompt = 'List my Capgo apps'
-      ui.screenshots = './assets/logo.png'
+      ui.screenshots = './assets/plugin/logo.png'
       writeFileSync(join(dir, 'plugin.json'), JSON.stringify(manifest))
 
       expect(validateOpenAiPlugin(dir)).toEqual([
@@ -33,7 +34,7 @@ describe('plugin package for OpenAI', () => {
         'shortDescription must be a single non-blank line',
         'websiteURL must be an https URL',
         'supportURL must be an https URL',
-        'logo must point to a non-hidden file under ./assets/ so it is packaged',
+        'logo must point to a non-hidden file under ./assets/plugin/ so it is packaged',
         'composerIcon must be a valid PNG file',
         'screenshots must be an array of paths',
       ])

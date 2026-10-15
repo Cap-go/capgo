@@ -1734,8 +1734,10 @@ export async function getAppByIdPg(
     return app
   }
   catch (e: unknown) {
+    // Rethrow: a null here means "app missing" and returns a publicly cached
+    // on_premise_app 429. Database failures must surface as 503 via onError.
     logPgError(c, 'getAppByIdPg', e)
-    return null
+    throw e
   }
 }
 

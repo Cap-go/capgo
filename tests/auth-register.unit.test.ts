@@ -99,13 +99,32 @@ describe('pOST /auth/register unit', () => {
       first_name: undefined,
       last_name: undefined,
       ref: 'readme-example',
+      signup_source: 'plugin_example',
+      signup_plugin: 'example',
+      first_touch_type: 'plugin',
+      first_touch_path: '/plugins/example/',
+      utm_source: 'example-source',
+      utm_medium: 'readme',
+      utm_campaign: 'example-campaign',
       opt_for_newsletters: true,
     })
     expect(response.status).toBe(200)
     expect(signUpMock).toHaveBeenCalledWith({
       email: validBody.email,
       password: validBody.password,
-      options: { captchaToken: validBody.captcha_token, data: { ref: 'readme-example' } },
+      options: {
+        captchaToken: validBody.captcha_token,
+        data: {
+          ref: 'readme-example',
+          signup_source: 'plugin_example',
+          signup_plugin: 'example',
+          first_touch_type: 'plugin',
+          first_touch_path: '/plugins/example/',
+          utm_source: 'example-source',
+          utm_medium: 'readme',
+          utm_campaign: 'example-campaign',
+        },
+      },
     })
     expect(usersUpsertMock).toHaveBeenCalledWith({
       id: '11111111-1111-1111-1111-111111111111',

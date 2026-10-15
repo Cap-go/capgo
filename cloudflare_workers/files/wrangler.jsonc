@@ -256,6 +256,7 @@
       }
     },
     "local": {
+      "vars": { "ENV_NAME": "capgo_files-local" },
       "name": "capgo_files-local",
       "durable_objects": {
         "bindings": [

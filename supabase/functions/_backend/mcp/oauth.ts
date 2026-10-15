@@ -98,8 +98,8 @@ async function readParams(c: McpContext): Promise<Record<string, string>> {
   return Object.fromEntries(Object.entries(form).filter(([, value]) => typeof value === 'string')) as Record<string, string>
 }
 
-async function withPg<T>(c: McpContext, fn: (pg: ReturnType<typeof getPgClient>) => Promise<T>): Promise<T> {
-  const pg = getPgClient(c)
+async function withPg<T>(c: McpContext, fn: (pg: Awaited<ReturnType<typeof getPgClient>>) => Promise<T>): Promise<T> {
+  const pg = await getPgClient(c)
   try {
     return await fn(pg)
   }
