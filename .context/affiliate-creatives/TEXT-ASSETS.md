@@ -1,6 +1,7 @@
 # Rewardful text assets (copy-paste)
 
 Replace YOUR_AFFILIATE_LINK with the partner's Rewardful link.
+When publishing any promotion below, place a clear disclosure near the link. For example: "I may earn a commission if you sign up through this link."
 
 ## Program Description (For Rewardful Setup)
 
@@ -8,7 +9,7 @@ Replace YOUR_AFFILIATE_LINK with the partner's Rewardful link.
 Capgo is the ultimate live-update and delivery platform for Ionic and Capacitor mobile apps. We help mobile development teams bypass lengthy App Store and Google Play review times by allowing them to push web-layer updates instantly Over-The-Air (OTA). 
 
 **The Problem We Solve**
-When a bug hits production, waiting days for App Store approval is unacceptable. Capgo empowers developers and their AI agents to ship fixes, run cloud native builds, and manage release channels (staging, beta, production) in minutes, complete with one-click rollbacks. It is also the #1 migration path for teams moving off Ionic Appflow (shutting down in 2027).
+When a bug hits production, waiting days for App Store approval is unacceptable. Capgo empowers developers and their AI agents to ship fixes, run native cloud builds, and manage release channels (staging, beta, production) in minutes, complete with one-click rollbacks. It is also the #1 migration path for teams moving off Ionic Appflow (shutting down in 2027).
 
 **Ideal Audience & Target Market**
 *   **Mobile App Developers:** Engineers building hybrid apps using Capacitor or Ionic with frameworks like Vue, React, Svelte, or Angular.
@@ -20,7 +21,7 @@ When a bug hits production, waiting days for App Store approval is unacceptable.
 When promoting Capgo to your audience, focus on speed and developer experience:
 *   **Speed:** "Ship fixes instantly. Skip the App Store wait."
 *   **Safety:** "Total release control with environments and instant 1-click rollbacks if something breaks."
-*   **Completeness:** "The all-in-one Capacitor toolchain: OTA updates, cloud native builds, and essential plugins."
+*   **Completeness:** "The all-in-one Capacitor toolchain: OTA updates, native cloud builds, and essential plugins."
 *   **Developer-Friendly:** Easy to drop into any existing Capacitor project with our CLI.
 *   **AI-Ready:** Full support for AI coding agents (Cursor, Claude Code, Windsurf) via our official MCP server and Agent Skills.
 *   **Appflow Alternative:** The clear, maintained upgrade path for teams migrating off Ionic Appflow and Microsoft CodePush.
@@ -69,7 +70,7 @@ Docs: https://capgo.app/docs/
 
 ## Hosted Image Assets
 
-Once PR #974 is merged, you can use these exact URLs to access the banners directly from Capgo's domain:
+You can use these exact URLs to access the banners directly from Capgo's domain:
 
 **Social Media / Open Graph:**
 - `https://capgo.app/affiliate/social-1200x628-open-graph.png`
@@ -99,7 +100,7 @@ Once PR #974 is merged, you can use these exact URLs to access the banners direc
 ## Example Banner HTML embed
 
 ```html
-<a href="YOUR_AFFILIATE_LINK" target="_blank" rel="noopener">
+<a href="YOUR_AFFILIATE_LINK" target="_blank" rel="noopener sponsored">
   <img src="https://capgo.app/affiliate/banner-300x250-medium-rectangle.png" width="300" height="250" alt="Capgo — live updates for Capacitor apps">
 </a>
 ```
