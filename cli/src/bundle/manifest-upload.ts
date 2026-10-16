@@ -88,7 +88,7 @@ export function isManifestUploadAutoEnabled(userRequestedDelta: boolean, fullZip
 
 type ManifestUploadInvoke = typeof invokeCapgoCliApi
 
-const HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/
+const HEADER_NAME = /^[!#$%&'*+\-.^\w`|~]+$/
 const ACTIONS = new Set<ManifestUploadAction>(['upload_if_doesnt_exist', 'reuse', 'upload'])
 const MAX_S3_PATH_LENGTH = 2_048
 
@@ -300,11 +300,27 @@ export function resolveManifestUploadResponse(request: ManifestUploadRequest, in
   }
 }
 
+const MANIFEST_UPLOAD_MAX_RETRIES = 2
+const MANIFEST_UPLOAD_DEFAULT_RETRY_MS = 2000
+const MANIFEST_UPLOAD_MAX_RETRY_MS = 10_000
+
+/** Delay before retrying a 503 authorization response, from Retry-After when present. */
+function manifestUploadRetryDelayMs(error: unknown): number | null {
+  const context = (error as { context?: unknown } | null)?.context
+  if (!(context instanceof Response) || context.status !== 503)
+    return null
+  const retryAfter = Number(context.headers.get('retry-after'))
+  if (!Number.isFinite(retryAfter) || retryAfter <= 0)
+    return MANIFEST_UPLOAD_DEFAULT_RETRY_MS
+  return Math.min(retryAfter * 1000, MANIFEST_UPLOAD_MAX_RETRY_MS)
+}
+
 export async function requestManifestUpload(
   apikey: string,
   request: ManifestUploadRequest,
   options: Pick<CapgoCliInvokeOptions, 'supaHost' | 'supaAnon'> = {},
   invoke: ManifestUploadInvoke = invokeCapgoCliApi,
+  sleep: (ms: number) => Promise<void> = ms => new Promise(resolve => setTimeout(resolve, ms)),
 ): Promise<ResolvedManifestUpload> {
   let spinner: UploadSpinner | undefined
   const spinnerTimer = setTimeout(() => {
@@ -313,12 +329,25 @@ export async function requestManifestUpload(
   }, 500)
 
   try {
-    const { data, error } = await invoke<unknown>('private/request_manifest_upload', {
+    let { data, error } = await invoke<unknown>('private/request_manifest_upload', {
       apikey,
       body: request,
       supaHost: options.supaHost,
       supaAnon: options.supaAnon,
     })
+    // The server answers 503 for transient database failures; retry briefly.
+    for (let attempt = 0; error && attempt < MANIFEST_UPLOAD_MAX_RETRIES; attempt++) {
+      const delayMs = manifestUploadRetryDelayMs(error)
+      if (delayMs === null)
+        break
+      await sleep(delayMs)
+      ;({ data, error } = await invoke<unknown>('private/request_manifest_upload', {
+        apikey,
+        body: request,
+        supaHost: options.supaHost,
+        supaAnon: options.supaAnon,
+      }))
+    }
     if (error)
       throw new CliUserError(`Cannot request manifest upload: ${await formatCapgoCliInvokeError(error)}`)
     const resolved = resolveManifestUploadResponse(request, data)

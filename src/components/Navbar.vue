@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { Capacitor } from '@capacitor/core'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import IconPanelLeft from '~icons/lucide/panel-left'
-import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import IconMenu from '~icons/material-symbols/menu-rounded'
 import { useDisplayStore } from '~/stores/display'
 import Banner from './Banner.vue'
@@ -21,10 +19,6 @@ const props = defineProps({
 })
 
 defineEmits(['toggleSidebar', 'toggleSidebarCollapse'])
-const isMobile = ref(Capacitor.isNativePlatform())
-
-const router = useRouter()
-
 const displayStore = useDisplayStore()
 const { t } = useI18n()
 const showNavTitle = computed(() => displayStore.NavTitle && displayStore.pathTitle.length === 0)
@@ -49,12 +43,6 @@ const mobileTitle = computed(() => {
     return ''
   return last.translate === false ? last.name : t(last.name)
 })
-function back() {
-  if (window.history.length > 2)
-    router.back()
-  else
-    router.push(displayStore.defaultBack)
-}
 </script>
 
 <template>
@@ -63,21 +51,10 @@ function back() {
       <div class="relative flex items-center justify-between h-16 -mb-px">
         <!-- Header: Left side -->
         <div class="flex items-center space-x-4 lg:space-x-3">
-          <div v-if="displayStore.NavTitle && isMobile" class="pr-2">
-            <button
-              type="button"
-              class="flex p-2 rounded-sm dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:bg-slate-600 hover:bg-slate-300"
-              :aria-label="t('button-back')"
-              @click="back()"
-            >
-              <IconBack class="w-6 h-6 fill-current" />
-              <span class="hidden md:block">{{ t('button-back') }}</span>
-            </button>
-          </div>
           <div class="hidden lg:block">
             <button
               type="button"
-              class="d-btn d-btn-ghost d-btn-square d-btn-sm dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
+              class="d-btn d-btn-ghost d-btn-square d-btn-sm dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
               data-test="sidebar-collapse-toggle"
               aria-controls="sidebar"
               :aria-expanded="!props.sidebarCollapsed"
@@ -91,7 +68,7 @@ function back() {
           <!-- Hamburger button -->
           <button
             type="button"
-            class="p-1 rounded-md lg:hidden dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
+            class="p-1 rounded-md lg:hidden dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
             data-test="sidebar-mobile-toggle"
             aria-controls="sidebar"
             :aria-expanded="props.sidebarOpen"
@@ -107,7 +84,7 @@ function back() {
             <div class="flex items-center space-x-2 font-bold truncate md:text-2xl dark:text-white text-md text-dark">
               <nav class="text-sm font-normal text-slate-600 dark:text-slate-400" aria-label="Breadcrumb">
                 <ol class="inline-flex items-center space-x-1">
-                  <li v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i" class="flex items-center">
+                  <li v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i" class="flex items-center h-16">
                     <span v-if="i > 0" class="mx-1" aria-hidden="true"> / </span>
                     <!-- Last crumb points at the current route, so render it as plain text rather than a dead link -->
                     <span
@@ -120,7 +97,7 @@ function back() {
                     <router-link
                       v-else
                       :to="breadcrumb.path"
-                      class="flex items-center h-16 px-2 rounded-sm underline underline-offset-2 decoration-slate-400/60 hover:decoration-slate-600 hover:text-slate-800 dark:decoration-slate-500 dark:hover:decoration-slate-300 dark:hover:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none"
+                      class="flex items-center px-2 py-1 rounded-md underline underline-offset-2 decoration-slate-400/60 hover:bg-slate-200/70 hover:decoration-slate-600 hover:text-slate-800 active:bg-slate-200 dark:decoration-slate-500 dark:hover:bg-slate-800 dark:hover:decoration-slate-300 dark:hover:text-white dark:active:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
                       {{ breadcrumb.translate === false ? breadcrumb.name : t(breadcrumb.name) }}
                     </router-link>

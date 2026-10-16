@@ -16,7 +16,8 @@ vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
   checkPermission: (...args: unknown[]) => checkPermissionMock(...args),
 }))
 
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
+  ...(await import('./helpers/pg-checkout-release-mocks.ts')),
   closeClient: (...args: unknown[]) => closeClientMock(...args),
   getPgClient: (...args: unknown[]) => getPgClientMock(...args),
   logPgError: (...args: unknown[]) => logPgErrorMock(...args),

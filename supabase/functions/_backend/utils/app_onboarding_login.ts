@@ -28,7 +28,7 @@ export async function markAppOnboardingLoginFromTracking(
   if (!source || auth?.authType !== 'apikey')
     return
 
-  const pool = getPgClient(c)
+  const pool = await getPgClient(c)
   try {
     const committed = await getDrizzleClient(pool).transaction(async (tx) => {
       const result = await tx.execute<{ app_id: string, onboarding: unknown, owner_org: string }>(sql`

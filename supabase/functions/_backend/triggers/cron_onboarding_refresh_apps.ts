@@ -11,7 +11,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   const parsed = onboardingRefreshBody.safeParse(await parseBody(c))
   if (!parsed.success || new Set(parsed.data.appIds).size !== parsed.data.appIds.length)
     throw quickError(400, 'invalid_body', 'Invalid onboarding refresh batch')
-  const pool = getPgClient(c)
+  const pool = await getPgClient(c)
   try {
     const database = getDrizzleClient(pool)
     const refreshed = await refreshAppOnboardingBatch(database, parsed.data)

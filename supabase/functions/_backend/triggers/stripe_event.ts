@@ -2,10 +2,11 @@ import type { Context } from 'hono'
 import type Stripe from 'stripe'
 import type { MiddlewareKeyVariablesStripe } from '../utils/hono_middleware_stripe.ts'
 import type { NotificationAudience } from '../utils/org_email_notifications.ts'
-import type { StripeData, StripeWebhookStatus } from '../utils/stripe.ts'
+import type { OpenSubscriptionInvoiceSummary, StripeData, StripeWebhookStatus } from '../utils/stripe.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { eq, sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
+import { stripeAmountToMajorUnits } from '../../shared/stripe-amount.ts'
 import { isBentoConfigured, syncBentoSubscriberTags, trackBentoEvent } from '../utils/bento.ts'
 import { purgeOnPremCacheForOrg, purgePlanCacheForOrg } from '../utils/cloudflare_cache_purge.ts'
 import { handleAutoTopUpPaymentIntent } from '../utils/credit_auto_top_up.ts'
@@ -17,8 +18,10 @@ import { getOrgAdminMemberEmailsForTags } from '../utils/org_email_notifications
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { groupIdentifyPosthog } from '../utils/posthog.ts'
-import { ensureCustomerMetadata, getCreditCheckoutDetails, getStripe, syncStripeCustomerCountry } from '../utils/stripe.ts'
+import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
+import { ensureCustomerMetadata, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isSubscriptionInvoice, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
 import { buildTransferInvoiceFooter, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
+import { recordChargeRefunds } from '../utils/stripe_refunds.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask, isStripeConfigured } from '../utils/utils.ts'
@@ -31,6 +34,7 @@ interface Org {
   management_email: string
   created_by: string
   customer_id?: string | null
+  signup_plugin?: string | null
 }
 
 type StripeInfoRow = Database['public']['Tables']['stripe_info']['Row']
@@ -66,6 +70,7 @@ interface BentoSegmentUpdate { segments: string[], deleteSegments: string[] }
 interface BentoSubscriberTagUpdate { email: string, segments: string[], deleteSegments: string[] }
 const BENTO_CHARGE_SUCCEEDED_EVENT = 'org:charge_succeeded'
 const BENTO_FAILED_PAYMENT_EVENT = 'org:failed_payment'
+const BENTO_PAYMENT_ACTION_REQUIRED_EVENT = 'org:payment_action_required'
 const BENTO_DUNNING_EVENT_AUDIENCE: NotificationAudience = 'all'
 const BENTO_TAG_AUDIENCE: NotificationAudience = 'billing'
 
@@ -84,6 +89,7 @@ const STRIPE_INFO_TRANSACTION_COLUMNS = [
   'canceled_at',
   'churn_reason',
   'customer_country',
+  'extra_mau',
   'is_good_plan',
   'last_stripe_event_at',
   'mau_exceeded',
@@ -356,7 +362,7 @@ async function getBillingBentoEmails(
   audience: NotificationAudience = BENTO_TAG_AUDIENCE,
 ) {
   const emails: Array<string | null | undefined> = [org.management_email]
-  const pgClient = getPgClient(c, true)
+  const pgClient = await getPgClient(c, true)
 
   try {
     const drizzleClient = getDrizzleClient(pgClient)
@@ -650,7 +656,7 @@ async function persistStripeInfoAndRevenueMovement(
   if (Object.keys(transactionUpdateData).length === 0 && !shouldRecordMovement)
     return 'applied'
 
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
 
   try {
     await pgClient.query('BEGIN')
@@ -792,7 +798,7 @@ async function persistStripeInfoAndRevenueMovement(
 }
 
 async function writePaidAtAtomically(c: Context, customerId: string, eventOccurredAtIso: string) {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {
@@ -811,7 +817,7 @@ async function writePaidAtAtomically(c: Context, customerId: string, eventOccurr
 }
 
 async function getCreditTopUpProductIdFromCustomer(c: Context, customerId: string): Promise<string> {
-  const pgClient = getPgClient(c, true)
+  const pgClient = await getPgClient(c, true)
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {
@@ -982,6 +988,42 @@ async function handleCheckoutSessionCompleted(
   return c.json(BRES)
 }
 
+// Bento email payload: hosted_invoice_url lets the customer pay with any method
+// (another card, bank transfer...) when the saved card keeps declining.
+function buildDunningInvoiceBentoData(invoice: OpenSubscriptionInvoiceSummary | null) {
+  if (!invoice)
+    return {}
+  return {
+    hosted_invoice_url: invoice.hosted_invoice_url,
+    attempt_count: invoice.attempt_count,
+    next_payment_attempt: invoice.next_payment_attempt,
+    amount: stripeAmountToMajorUnits(invoice.amount_due, invoice.currency),
+    currency: invoice.currency,
+  }
+}
+
+async function invoicePaymentActionRequired(c: Context, org: Org, stripeEvent: Stripe.InvoicePaymentActionRequiredEvent, customerId: string) {
+  const invoice = stripeEvent.data.object
+  if (!isSubscriptionInvoice(invoice) || !invoice.hosted_invoice_url) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Skipping payment action required email',
+      invoiceId: invoice.id,
+      billingReason: invoice.billing_reason,
+      hasHostedInvoiceUrl: Boolean(invoice.hosted_invoice_url),
+    })
+    return c.json(BRES)
+  }
+  await trackBillingBentoEvent(
+    c,
+    org,
+    customerId,
+    BENTO_PAYMENT_ACTION_REQUIRED_EVENT,
+    buildDunningInvoiceBentoData(toOpenSubscriptionInvoiceSummary(invoice)),
+  )
+  return c.json(BRES)
+}
+
 async function customerSourceCreated(c: Context, org: Org, stripeEvent: Stripe.CustomerSourceCreatedEvent) {
   const card = stripeEvent.data.object as any
   const expirationDate = card.exp_month && card.exp_year ? `${card.exp_month}/${card.exp_year}` : 'unknown'
@@ -1085,17 +1127,23 @@ async function invoiceUpcoming(c: Context, org: Org, stripeEvent: Stripe.Invoice
   const invoice = stripeEvent.data.object as any
   let planName = null
   let planType = 'monthly'
-  if (stripeData.data.product_id) {
-    const { data: plan } = await supabaseAdmin(c)
+  // The first line can be the extra MAU item: match any line against the plans.
+  const lineProductIds = (invoice.lines?.data ?? [])
+    .map((line: any) => line.pricing?.price_details?.product)
+    .filter((productId: unknown): productId is string => typeof productId === 'string')
+  const productIds = [...new Set([stripeData.data.product_id, ...lineProductIds].filter((id): id is string => !!id))]
+  if (productIds.length) {
+    const { data: plans } = await supabaseAdmin(c)
       .from('plans')
-      .select('name, price_y_id')
-      .eq('stripe_id', stripeData.data.product_id)
-      .single()
+      .select('name, stripe_id, price_y_id')
+      .in('stripe_id', productIds)
+    const plan = plans?.[0]
     if (!plan) {
       throw simpleError('failed_to_get_plan', 'failed to get plan', { stripeData })
     }
     planName = plan.name
-    if (plan.price_y_id === stripeData.data.price_id) {
+    const linePriceIds = (invoice.lines?.data ?? []).map((line: any) => line.pricing?.price_details?.price)
+    if (plan.price_y_id === stripeData.data.price_id || linePriceIds.includes(plan.price_y_id)) {
       planType = 'yearly'
     }
   }
@@ -1198,6 +1246,23 @@ async function createdOrUpdated(
     if (status === 'past_due')
       return
 
+    const isNewSubscription = status === 'created'
+    let signupAttributionTagsTask: Promise<Awaited<ReturnType<typeof signupAttributionTagsForOrg>>> | null = null
+    const loadSignupAttributionTags = () => {
+      if (!signupAttributionTagsTask) {
+        signupAttributionTagsTask = signupAttributionTagsForOrg(c, org).catch((error) => {
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'signup attribution tags lookup failed',
+            orgId: org.id,
+            error,
+          })
+          return {}
+        })
+      }
+      return signupAttributionTagsTask
+    }
+
     let previousPlan: PlanRow | null = null
     if (trackingState.shouldSendPlanChange && stripeData.previousProductId) {
       const previousProduct = await supabaseAdmin(c)
@@ -1222,7 +1287,10 @@ async function createdOrUpdated(
         sentToBento: true,
         user_id: org.id,
         groups: { organization: org.id },
-        tags: planChangeMetadata,
+        tags: {
+          ...planChangeMetadata,
+          ...(planChangeEventName === 'User Upgraded' ? await loadSignupAttributionTags() : {}),
+        },
       })
     }
 
@@ -1235,7 +1303,6 @@ async function createdOrUpdated(
     const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
     const subscriptionMetadata = buildSubscriptionEventMetadata(stripeData, plan, previousPlan)
     await syncBillingBentoTags(c, org, stripeData.data.customer_id, segment)
-    const isNewSubscription = status === 'created'
     await sendEventToTracking(c, {
       bento: {
         cron: '* * * * *',
@@ -1250,7 +1317,10 @@ async function createdOrUpdated(
       sentToBento: true,
       user_id: org.id,
       groups: { organization: org.id },
-      tags: subscriptionMetadata,
+      tags: {
+        ...subscriptionMetadata,
+        ...(isNewSubscription ? {} : await loadSignupAttributionTags()),
+      },
     })
 
     await backgroundTask(c, groupIdentifyPosthog(c, {
@@ -1336,7 +1406,7 @@ async function didCancel(c: Context, org: Org, customerId: string) {
 async function getOrgForCustomerId(c: Context, customerId: string): Promise<Org | null> {
   const { error: dbError, data: org } = await supabaseAdmin(c)
     .from('orgs')
-    .select('id, management_email, created_by, name, customer_id')
+    .select('id, management_email, created_by, name, customer_id, signup_plugin')
     .eq('customer_id', customerId)
     .maybeSingle()
 
@@ -1480,6 +1550,11 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     return c.json(BRES)
   }
 
+  if (stripeEvent.type === 'charge.refunded') {
+    await recordChargeRefunds(c, stripeEvent.data.object)
+    return c.json(BRES)
+  }
+
   // find email from user with customer_id
   const org = await getOrg(c, stripeData)
 
@@ -1517,6 +1592,9 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   else if (stripeEvent.type === 'invoice.created' || stripeEvent.type === 'invoice.updated') {
     return invoiceCreatedOrUpdated(c, stripeEvent)
   }
+  else if (stripeEvent.type === 'invoice.payment_action_required') {
+    return invoicePaymentActionRequired(c, org, stripeEvent, stripeData.data.customer_id)
+  }
   else if (stripeEvent.type === 'charge.succeeded') {
     // Canonical dunning exit. Do not also emit this from subscription.updated:
     // Stripe sends both, and a plan change is not proof of payment recovery.
@@ -1537,7 +1615,8 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
       cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment email because org has active usage credits', orgId: org.id })
     }
     else {
-      await trackBillingBentoEvent(c, org, stripeData.data.customer_id, BENTO_FAILED_PAYMENT_EVENT)
+      const openInvoice = await getLatestOpenSubscriptionInvoice(c, stripeData.data.customer_id)
+      await trackBillingBentoEvent(c, org, stripeData.data.customer_id, BENTO_FAILED_PAYMENT_EVENT, buildDunningInvoiceBentoData(openInvoice))
     }
     // Update the database with failed status
     await updateStripeInfo(c, stripeData)
@@ -1617,11 +1696,13 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
 export const stripeEventTestUtils = {
   BENTO_CHARGE_SUCCEEDED_EVENT,
   BENTO_FAILED_PAYMENT_EVENT,
+  BENTO_PAYMENT_ACTION_REQUIRED_EVENT,
   BENTO_DUNNING_EVENT_AUDIENCE,
   BENTO_TAG_AUDIENCE,
   TRANSFER_INVOICE_FOOTER,
   TRANSFER_INVOICE_FOOTER_MAX_LENGTH,
   buildBillingBentoTagUpdates,
+  buildDunningInvoiceBentoData,
   uniqueBillingEmails,
   buildSubscriptionEventMetadata,
   classifyRevenueMovement,

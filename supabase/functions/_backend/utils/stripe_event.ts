@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { StripeData } from './stripe.ts'
 import Stripe from 'stripe'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { getStripe, parsePriceIds } from './stripe.ts'
+import { getExtraMau, getStripe, isExtraMauItem, parsePriceIds } from './stripe.ts'
 import { getEnv } from './utils.ts'
 
 export function parseStripeEvent(c: Context, body: string, signature: string) {
@@ -17,8 +17,10 @@ export function parseStripeEvent(c: Context, body: string, signature: string) {
   )
 }
 
+// The plan item: extra MAU items are licensed too, so skip them.
 function getLicensedSubscriptionItem(items: Stripe.SubscriptionItem[] | undefined) {
-  return items?.find(item => item.plan.usage_type === 'licensed') ?? items?.[0]
+  const planItems = items?.filter(item => !isExtraMauItem(item))
+  return planItems?.find(item => item.plan.usage_type === 'licensed') ?? planItems?.[0]
 }
 
 function getSubscriptionInterval(item: Stripe.SubscriptionItem | undefined) {
@@ -87,6 +89,8 @@ function subscriptionUpdated(c: Context, event: Stripe.CustomerSubscriptionCreat
   }
   data.subscription_id = subscription.id
   data.customer_id = String(subscription.customer)
+  // A deleted subscription still lists its items: its extra MAU is gone.
+  data.extra_mau = event.type === 'customer.subscription.deleted' ? 0 : getExtraMau(subscription.items.data)
 
   // Only treat a billing cadence change from monthly to yearly as an upgrade.
   if (previousInterval === 'month' && currentInterval === 'year') {
@@ -188,7 +192,7 @@ function invoiceCreatedOrUpdated(event: Stripe.InvoiceCreatedEvent | Stripe.Invo
   return data
 }
 
-function getStripeCustomerId(
+export function getStripeCustomerId(
   customer: Stripe.Charge['customer'] | Stripe.Checkout.Session['customer'] | Stripe.Invoice['customer'],
 ): string {
   if (!customer)
@@ -240,11 +244,21 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
     data.status = 'succeeded'
     data.customer_id = getStripeCustomerId(charge.customer)
   }
+  else if (event.type === 'charge.refunded') {
+    const charge = event.data.object
+    data.status = 'updated'
+    data.customer_id = getStripeCustomerId(charge.customer)
+  }
   else if (event.type === 'invoice.upcoming') {
     data = invoiceUpcoming(event, data)
   }
   else if (event.type === 'invoice.created' || event.type === 'invoice.updated') {
     data = invoiceCreatedOrUpdated(event, data)
+  }
+  else if (event.type === 'invoice.payment_action_required') {
+    // 3DS / e-mandate confirmation needed: notify only, never touch stripe_info.
+    data.status = 'updated'
+    data.customer_id = getStripeCustomerId(event.data.object.customer)
   }
   else if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     const session = event.data.object as Stripe.Checkout.Session

@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
+import { TERMINAL_BUILD_STATUSES } from '../../utils/build_timeout.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
+import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 export async function cancelBuild(
@@ -92,9 +93,11 @@ export async function cancelBuild(
     status: builderResult.status,
   })
 
-  // Update build_requests status to cancelled
-  // Use authenticated client for data queries - RLS will enforce access
-  const { error: updateError } = await supabase
+  // Update build_requests status to cancelled so the concurrency slot is freed immediately.
+  // Use admin client: access was already verified above (RLS SELECT + checkPermission).
+  // build_requests has no UPDATE policy for anon/authenticated, so the API-key client
+  // would silently update 0 rows. Only non-terminal rows are moved to cancelled.
+  const { error: updateError } = await supabaseAdmin(c)
     .from('build_requests')
     .update({
       status: 'cancelled',
@@ -102,6 +105,7 @@ export async function cancelBuild(
     })
     .eq('builder_job_id', jobId)
     .eq('app_id', appId)
+    .not('status', 'in', `(${[...TERMINAL_BUILD_STATUSES].join(',')})`)
 
   if (updateError) {
     cloudlogErr({

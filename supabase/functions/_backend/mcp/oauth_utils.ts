@@ -191,3 +191,32 @@ export function isClientIdMetadataUrl(clientId: string): boolean {
     return false
   }
 }
+
+interface PinnedClientMetadata {
+  client_name: string
+  client_uri: string
+  logo_uri: string | null
+  redirect_uris: string[]
+}
+
+// Pinned copies of well-known Client ID Metadata Documents. chatgpt.com and connect.smithery.ai sit
+// behind protection that rejects server-side fetches from Workers, so their live documents cannot be
+// resolved there. Used only when the live fetch fails; keep in sync with the client_id URLs below.
+const PINNED_CLIENT_METADATA: Record<string, PinnedClientMetadata> = {
+  'https://chatgpt.com/oauth/client.json': {
+    client_name: 'ChatGPT',
+    client_uri: 'https://chatgpt.com/',
+    logo_uri: 'https://persistent.oaistatic.com/sonic/misc/openai-logo.png',
+    redirect_uris: ['https://chatgpt.com/connector_platform_oauth_redirect'],
+  },
+  'https://connect.smithery.ai/.well-known/oauth-client': {
+    client_name: 'Smithery Connect',
+    client_uri: 'https://smithery.ai',
+    logo_uri: 'https://smithery.ai/logos/profile.png',
+    redirect_uris: ['https://connect.smithery.ai/oauth/callback'],
+  },
+}
+
+export function getPinnedClientMetadata(clientId: string): PinnedClientMetadata | null {
+  return PINNED_CLIENT_METADATA[clientId] ?? null
+}

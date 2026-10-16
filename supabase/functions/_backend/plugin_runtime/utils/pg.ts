@@ -12,6 +12,7 @@ import { getChannelSelfOverride, isChannelSelfStoreEnabled } from './channelSelf
 import { getClientDbRegionSB } from './geolocation.ts'
 import { freshQueryArgs } from './hyperdriveFreshRead.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
+import { isReadOnlyPgConnectionRetryError } from './pg_errors.ts'
 import { serializePostgresError, serializePostgresLogValue } from './postgres_error.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
@@ -534,6 +535,89 @@ export function getDrizzleClient(db: PluginPgClient, options?: { logger?: boolea
   return drizzle({ client: db, logger: options?.logger ?? true })
 }
 
+export interface ReadOnlyPgSession {
+  drizzle: ReturnType<typeof getDrizzleClient>
+  pgClient: PluginPgClient
+  cleanup: () => Promise<void>
+  /** When true, the caller owns closing the client after a successful run (lazy /updates edge cache). */
+  keepOpenAfterSuccess?: boolean
+}
+
+/**
+ * Run read-only plugin work once, retrying on a fresh Hyperdrive client when the
+ * first attempt hits a connection-class error matched by isReadOnlyPgConnectionRetryError.
+ * Shared isTransientDatabaseError is unchanged (not-queryable still maps to 500 after
+ * retry exhaustion). A dead pg.Client poisons every later query in the same request
+ * unless we reconnect.
+ */
+function readOnlyPgRetryBackoffMs(): number {
+  const jitter = new Uint8Array(1)
+  crypto.getRandomValues(jitter)
+  return 25 + (jitter[0] % 26)
+}
+
+async function closeReadOnlyPgSession(
+  c: Context,
+  context: string,
+  session: ReadOnlyPgSession,
+  succeeded: boolean,
+  preserveError?: unknown,
+): Promise<void> {
+  if (succeeded && session.keepOpenAfterSuccess)
+    return
+  try {
+    await session.cleanup()
+  }
+  catch (cleanupError) {
+    if (preserveError !== undefined) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'read_only_pg_cleanup_failed',
+        context,
+        error: serializePostgresError(cleanupError),
+        databaseSource: c.get('databaseSource') ?? c.res.headers.get('X-Database-Source') ?? null,
+      })
+      return
+    }
+    throw cleanupError
+  }
+}
+
+export async function withReadOnlyPgTransientRetry<T>(
+  c: Context,
+  context: string,
+  createSession: () => Promise<ReadOnlyPgSession>,
+  run: (session: ReadOnlyPgSession) => Promise<T>,
+): Promise<T> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let session: ReadOnlyPgSession | undefined
+    try {
+      session = await createSession()
+      const result = await run(session)
+      await closeReadOnlyPgSession(c, context, session, true)
+      return result
+    }
+    catch (error) {
+      const willRetry = attempt === 0 && isReadOnlyPgConnectionRetryError(error)
+      if (session)
+        await closeReadOnlyPgSession(c, context, session, false, error)
+      if (willRetry) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'read_only_pg_transient_retry',
+          context,
+          databaseSource: c.get('databaseSource') ?? c.res.headers.get('X-Database-Source') ?? null,
+        })
+        await new Promise(resolve => setTimeout(resolve, readOnlyPgRetryBackoffMs()))
+        continue
+      }
+      throw error
+    }
+  }
+
+  throw new Error('unreachable read_only_pg_transient_retry')
+}
+
 export function logPgError(
   c: Context,
   functionName: string,
@@ -916,6 +1000,34 @@ export function requestInfosChannelPostgres(
   return channel
 }
 
+/**
+ * Read replicas cancel queries that block WAL replay ("canceling statement due
+ * to conflict with recovery", SQLSTATE 40001). The statement only lost a race
+ * with replay, so running it again on the same connection normally succeeds.
+ */
+export function isRecoveryConflictError(error: unknown): boolean {
+  let current: unknown = error
+  for (let depth = 0; current && typeof current === 'object' && depth < 5; depth++) {
+    const { message } = current as { message?: unknown }
+    if (typeof message === 'string' && message.includes('canceling statement due to conflict with recovery'))
+      return true
+    current = (current as { cause?: unknown }).cause
+  }
+  return false
+}
+
+export async function retryOnRecoveryConflict<T>(c: Context, queryName: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run()
+  }
+  catch (error) {
+    if (!isRecoveryConflictError(error))
+      throw error
+    cloudlog({ requestId: c.get('requestId'), message: 'replica_recovery_conflict_retry', queryName })
+    return await run()
+  }
+}
+
 const MANIFEST_ROWS_CACHE_PATH = '/.manifest-rows-v1'
 // manifest_persist inserts a version's rows once, in the same transaction that
 // sets manifest_count, and never rewrites them. A non-empty row set is final and
@@ -937,7 +1049,7 @@ export async function requestManifestEntriesPostgres(
   if (cached)
     return cached
 
-  const rows = await drizzleClient
+  const rows = await retryOnRecoveryConflict(c, 'manifest_entries', () => drizzleClient
     .select({
       file_name: schema.manifest.file_name,
       file_hash: schema.manifest.file_hash,
@@ -945,6 +1057,7 @@ export async function requestManifestEntriesPostgres(
     })
     .from(schema.manifest)
     .where(eq(schema.manifest.app_version_id, versionId))
+    .execute())
 
   // Cache API size limits may reject huge manifests; the put fails open.
   // With the /updates edge cache on, the rows also carry the app's purge tag.
@@ -1336,7 +1449,7 @@ export async function getAppOwnerPostgres(
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: PlanAction[] = [],
-  options: { includeTrialAt?: boolean } = {},
+  options: { includeTrialAt?: boolean, rethrowReadOnlyConnectionErrors?: boolean } = {},
 ): Promise<AppOwnerPostgresResult | null> {
   try {
     return await queryAppOwnerPostgres(c, appId, drizzleClient, actions, options)
@@ -1346,6 +1459,8 @@ export async function getAppOwnerPostgres(
       appId,
       planActions: actions,
     })
+    if (options?.rethrowReadOnlyConnectionErrors && isReadOnlyPgConnectionRetryError(e))
+      throw e
     return null
   }
 }
@@ -1706,8 +1821,10 @@ export async function getAppByIdPg(
     return app
   }
   catch (e: unknown) {
+    // Rethrow: a null here means "app missing" and returns a publicly cached
+    // on_premise_app 429. Database failures must surface as 503 via onError.
     logPgError(c, 'getAppByIdPg', e)
-    return null
+    throw e
   }
 }
 

@@ -14,13 +14,14 @@ import CreditsOnlyTip from '~/components/CreditsOnlyTip.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { useBillingPaidAt } from '~/composables/useBillingPaidAt'
 import { invokeCapgoApi } from '~/services/capgoApi'
-import { ENTERPRISE_MAU_STOPS, quoteEnterpriseScale } from '~/services/enterpriseScale'
+import { ENTERPRISE_MAU_STOPS, formatMau, getOrgExtraMau, quoteEnterpriseScale } from '~/services/enterpriseScale'
 import { formatNumber, formatNumberValue } from '~/services/formatLocale'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { shouldShowExpiredTrialPlansState, shouldShowPlanFailureBanner } from '~/services/paymentRequired'
 import { checkPermissions } from '~/services/permissions'
 import { createPlansVisitTracker } from '~/services/plansVisitTracking'
-import { getAffonsoReferral, getDatafastAttribution, openCheckout } from '~/services/stripe'
+import { getSignupAttributionEventTags } from '~/services/signupAttribution'
+import { getAffonsoReferral, getDatafastAttribution, openCheckout, openPortal } from '~/services/stripe'
 import { getCreditPricingSteps, getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
@@ -148,8 +149,7 @@ const isCreditsOnly = computed(() => isCreditsOnlyOrg(currentOrganization?.value
 const ENTERPRISE_PLAN_NAME = 'Enterprise'
 const pricingSteps = ref<CreditPricingStep[]>([])
 const enterpriseMauIndex = ref(2)
-// MAU the org currently runs on Enterprise, null when not on Enterprise.
-// Until the recurring credit line is stored on the subscription, this is the plan allowance.
+// MAU the org currently runs on Enterprise (allowance + recurring credits), null when not on Enterprise.
 const currentEnterpriseMau = ref<number | null>(null)
 let enterpriseScaleLoadSeq = 0
 
@@ -165,13 +165,6 @@ const enterpriseQuote = computed(() => {
     return null
   return quoteEnterpriseScale(pricingSteps.value, plan.mau, plan.price_m, ENTERPRISE_MAU_STOPS[enterpriseMauIndex.value])
 })
-
-// "3M" reads like a plan name; locale compact notation can render "3m" or "3 Mio".
-function formatMau(value: number) {
-  if (value >= 1_000_000)
-    return `${formatNumberValue(value / 1_000_000, { maximumFractionDigits: 1 })}M`
-  return formatNumberValue(value)
-}
 
 function formatUsd(value: number) {
   return formatNumber(value, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 })
@@ -194,13 +187,19 @@ const currentPlanLabel = computed(() => {
 
 async function loadEnterpriseScale(orgId: string) {
   const loadSeq = ++enterpriseScaleLoadSeq
-  const steps = await getCreditPricingSteps(orgId)
+  const [steps, extraMau] = await Promise.all([
+    // Global tiers: checkout prices the extra MAU item from them too.
+    getCreditPricingSteps(),
+    getOrgExtraMau(orgId).catch(() => 0),
+  ])
   // An org switch during the fetch must not leave the previous org's rates behind.
   if (loadSeq !== enterpriseScaleLoadSeq || currentOrganization.value?.gid !== orgId)
     return
   pricingSteps.value = steps
   const plan = enterprisePlan.value
-  currentEnterpriseMau.value = plan && currentPlan.value?.name === plan.name ? plan.mau : null
+  currentEnterpriseMau.value = plan && currentPlan.value?.name === plan.name
+    ? plan.mau + extraMau
+    : null
   const index = ENTERPRISE_MAU_STOPS.indexOf(currentEnterpriseMau.value as typeof ENTERPRISE_MAU_STOPS[number])
   if (index >= 0)
     enterpriseMauIndex.value = index
@@ -230,6 +229,10 @@ async function prefetchStripeCheckoutUrl(plan: Database['public']['Tables']['pla
         datafastVisitorId: datafastAttribution.visitorId,
         datafastSessionId: datafastAttribution.sessionId,
         affonsoReferral,
+        // Enterprise only: MAU added to the plan quota, billed on the same subscription.
+        ...(isEnterprisePlan(plan) && enterpriseQuote.value?.extraMau
+          ? { extraMau: enterpriseQuote.value.extraMau }
+          : {}),
       }),
     })
 
@@ -261,6 +264,7 @@ function trackPlanCheckoutStarted(plan: Database['public']['Tables']['plans']['R
       plan_price: isYear ? plan.price_y : plan.price_m,
       plan_price_monthly: plan.price_m,
       plan_price_yearly: plan.price_y,
+      ...getSignupAttributionEventTags(mainStore.auth),
     },
   }).catch()
 }
@@ -298,6 +302,17 @@ async function openWebStripeCheckout(plan: Database['public']['Tables']['plans']
   return !dismissedByCancel
 }
 
+const canCancelPlan = computed(() => !!currentOrganization.value?.paying && !isCreditsOnly.value)
+
+async function openCancelPlan() {
+  const orgId = currentOrganization.value?.gid
+  if (!orgId || !(await checkPermissions('org.update_billing', { orgId }))) {
+    showAdminModal.value = true
+    return
+  }
+  await openPortal(orgId, t, 'cancel_subscription')
+}
+
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
   // Show the permission modal instead of blocking when the user can't manage billing.
   const orgId = currentOrganization.value?.gid
@@ -306,12 +321,9 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
     return
   }
 
-  // Recurring Enterprise credits are not provisioned by checkout yet: tiers above
-  // the plan allowance go through support so nobody pays for credits they don't get.
-  if (isEnterprisePlan(plan) && (enterpriseQuote.value?.monthlyCredits ?? 0) > 0) {
-    openSupport()
+  // Above the allowance the quote must be loaded, or checkout would skip the credits.
+  if (isEnterprisePlan(plan) && enterpriseMauIndex.value > 0 && !enterpriseQuote.value)
     return
-  }
 
   // get the current url
   isSubscribeLoading.value[index] = true
@@ -528,8 +540,6 @@ function buttonName(p: Database['public']['Tables']['plans']['Row']) {
   if (isEnterprisePlan(p) && enterpriseQuote.value) {
     if (isCurrentEnterpriseScale(p) && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value)
       return t('Current')
-    if (enterpriseQuote.value.monthlyCredits > 0)
-      return t('enterprise-scale-request', { mau: formatMau(enterpriseQuote.value.targetMau) })
     if (currentEnterpriseMau.value)
       return t('enterprise-scale-change', { mau: formatMau(enterpriseQuote.value.targetMau) })
     return t('enterprise-scale-get', { mau: formatMau(enterpriseQuote.value.targetMau) })
@@ -547,6 +557,9 @@ function buttonName(p: Database['public']['Tables']['plans']['Row']) {
 
 function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
   // Disabled if: current plan (already subscribed) or mobile
+  // Above the allowance, checkout needs the MAU price to add the extra MAU item.
+  if (isEnterprisePlan(plan) && enterpriseMauIndex.value > 0 && !enterpriseQuote.value)
+    return true
   if (isEnterprisePlan(plan) && !isCurrentEnterpriseScale(plan))
     return isMobile
   return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) || isMobile
@@ -569,7 +582,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
 </script>
 
 <template>
-  <div class="flex flex-col bg-white border shadow-sm md:p-8 md:rounded-xl dark:bg-slate-800/60 border-slate-200 dark:border-white/10" :class="thankYouPage ? 'pb-0' : 'pb-8'">
+  <div class="flex flex-col px-4 pt-4 bg-white border shadow-sm md:p-8 md:rounded-xl dark:bg-slate-800/60 border-slate-200 dark:border-white/10" :class="thankYouPage ? 'pb-0' : 'pb-8'">
     <div v-if="!thankYouPage" class="flex flex-col w-full h-full">
       <!-- Header Section -->
       <div class="flex flex-col items-center justify-between gap-4 mb-6 sm:flex-row shrink-0">
@@ -678,17 +691,17 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <div v-if="isEnterprisePlan(p) && enterpriseQuote" class="mb-6 shrink-0" data-test="enterprise-scale">
             <div class="flex items-baseline">
               <span class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                {{ formatUsd(getPrice(p, segmentVal) + enterpriseQuote.monthlyCredits) }}
+                {{ formatUsd(getPrice(p, segmentVal) + enterpriseQuote.extraMauPriceMonthly) }}
               </span>
               <span class="ml-1 text-sm font-medium text-gray-500 dark:text-gray-400">/{{ t('mo') }}</span>
             </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              <template v-if="enterpriseQuote.monthlyCredits > 0">
+              <template v-if="enterpriseQuote.extraMau > 0">
                 <template v-if="isYearlyPlan(p, segmentVal) && hasYearlyDiscount(p)">
-                  {{ t('enterprise-scale-breakdown-yearly', { base: formatUsd(p.price_y), credits: formatUsd(enterpriseQuote.monthlyCredits) }) }}
+                  {{ t('enterprise-scale-breakdown-yearly', { base: formatUsd(p.price_y), extra: formatUsd(enterpriseQuote.extraMauPriceMonthly * 12), mau: formatMau(enterpriseQuote.extraMau) }) }}
                 </template>
                 <template v-else>
-                  {{ t('enterprise-scale-breakdown', { base: formatUsd(getPrice(p, segmentVal)), credits: formatUsd(enterpriseQuote.monthlyCredits) }) }}
+                  {{ t('enterprise-scale-breakdown', { base: formatUsd(getPrice(p, segmentVal)), extra: formatUsd(enterpriseQuote.extraMauPriceMonthly), mau: formatMau(enterpriseQuote.extraMau) }) }}
                 </template>
               </template>
               <template v-else-if="isYearlyPlan(p, segmentVal)">
@@ -722,8 +735,8 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
                 <span>{{ formatMau(ENTERPRISE_MAU_STOPS[ENTERPRISE_MAU_STOPS.length - 1]) }}+</span>
               </div>
               <p class="mt-2 text-[11px] leading-4 text-gray-500 dark:text-gray-400">
-                {{ enterpriseQuote.monthlyCredits > 0
-                  ? t('enterprise-scale-credits-note', { credits: formatUsd(enterpriseQuote.monthlyCredits), extra: formatMau(enterpriseQuote.targetMau - enterpriseQuote.includedMau) })
+                {{ enterpriseQuote.extraMau > 0
+                  ? t('enterprise-scale-extra-note', { mau: formatMau(enterpriseQuote.targetMau), extra: formatMau(enterpriseQuote.extraMau) })
                   : t('enterprise-scale-included-note') }}
               </p>
             </div>
@@ -785,6 +798,18 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       <div v-if="!isMobile" class="mt-4 text-xs text-center text-gray-500 dark:text-gray-400 shrink-0">
         {{ t('plan-page-warn').replace('%ORG_NAME%', currentOrganization?.name ?? '') }}
         <a class="text-blue-600 hover:underline dark:text-blue-300" href="https://capgo.app/docs/docs/webapp/payment/">{{ t('plan-page-warn-2') }}</a>
+      </div>
+
+      <div v-if="!isMobile && canCancelPlan" class="flex flex-wrap items-center justify-center gap-3 mt-3 text-sm text-gray-600 shrink-0 dark:text-gray-300">
+        <span>{{ t('cancel-plan-prompt') }}</span>
+        <button
+          type="button"
+          data-test="cancel-plan-button"
+          class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg transition-colors hover:text-red-600 hover:border-red-300 hover:bg-red-50 dark:text-gray-200 dark:bg-transparent dark:border-gray-600 dark:hover:text-red-400 dark:hover:border-red-500/50 dark:hover:bg-red-500/10"
+          @click="openCancelPlan"
+        >
+          {{ t('cancel-plan') }}
+        </button>
       </div>
 
       <!-- Credits CTA: under prices so plan cards stay visible without scrolling -->

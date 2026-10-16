@@ -65,8 +65,8 @@ describe('production read-replica release gate', () => {
       expect(workflow).toContain(
         'sync_schema_types:\n    needs: [changes, read_replica_schema, supabase_deploy]',
       )
-      expect(workflow).toContain("needs.read_replica_schema.result == 'success'")
-      expect(workflow).toContain("needs.supabase_deploy.result == 'success'")
+      expect(workflow).toContain('needs.read_replica_schema.result == \'success\'')
+      expect(workflow).toContain('needs.supabase_deploy.result == \'success\'')
       expect(syncScript).toContain('planReadReplicaSchemaSync')
       expect(syncScript).toContain('preflightCompatibilityIssues')
       expect(syncScript).toContain('applyReadReplicaSchemaPlan')
@@ -114,12 +114,13 @@ describe('production read-replica release gate', () => {
       for (const job of [
         'deploy_webapp',
         'deploy_api',
+        'deploy_r2_inventory',
         'deploy_translation_worker',
         'deploy_files',
         'deploy_plugin_regions',
       ]) {
-        expect(workflow).toContain(
-          `  ${job}:\n    needs: [changes, supabase_deploy, read_replica_schema]`,
+        expect(workflow).toMatch(
+          new RegExp(`\\n  ${job}:\\n    needs: \\[changes, (?:build_webapp, )?supabase_deploy, read_replica_schema\\]`),
         )
       }
     },

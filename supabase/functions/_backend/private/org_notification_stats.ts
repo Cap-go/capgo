@@ -19,9 +19,9 @@ export const app = createHono('private/org_notification_stats', version)
 app.use('*', useCors)
 
 async function readOrgNotificationOverview(c: Parameters<typeof getPgClient>[0], orgId: string) {
-  let pgClient: ReturnType<typeof getPgClient> | undefined
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
   try {
-    pgClient = getPgClient(c, true)
+    pgClient = await getPgClient(c, true)
     const drizzleClient = getDrizzleClient(pgClient)
     const result = await drizzleClient.execute(sql`
       SELECT
