@@ -228,6 +228,9 @@ describe('auth guard MFA assurance', () => {
     })
   })
 
+  // Platform-admin impersonation is not special-cased in the guard; verify_mfa RPC
+  // checks platform_impersonation_sessions (see jwt-mfa-assurance.unit.test.ts and
+  // supabase/tests/58_test_mfa_session_otp_split.sql).
   it.concurrent('allows aal1 when verify_mfa returns true', async () => {
     await withTestContext(async (context) => {
       context.mockRpc.mockImplementation(async (name: string) => {
@@ -254,9 +257,11 @@ describe('auth guard MFA assurance', () => {
 
   it.concurrent('redirects to login when getAuthenticatorAssuranceLevel fails', async () => {
     await withTestContext(async (context) => {
+      const aalLookupError = { message: 'AAL lookup failed' }
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
       context.mockGetAuthenticatorAssuranceLevel.mockResolvedValue({
         data: null,
-        error: { message: 'AAL lookup failed' },
+        error: aalLookupError,
       })
 
       const guard = await getGuard()
@@ -268,6 +273,7 @@ describe('auth guard MFA assurance', () => {
         next,
       )
 
+      expect(consoleError).toHaveBeenCalledWith('Cannot guard auth', aalLookupError)
       expect(context.mockRpc).not.toHaveBeenCalledWith('verify_mfa')
       expect(next).toHaveBeenCalledWith({
         path: '/login',
@@ -275,6 +281,7 @@ describe('auth guard MFA assurance', () => {
           to: '/dashboard',
         },
       })
+      consoleError.mockRestore()
     })
   })
 
