@@ -5,6 +5,7 @@
     "": {
       "name": "capgo-app",
       "dependencies": {
+        "@aws-sdk/xml-builder": "3.972.36",
         "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6",
         "@capacitor/action-sheet": "^8.1.1",
         "@capacitor/android": "^8.5.2",
@@ -59,7 +60,7 @@
         "@capgo/capacitor-document-scanner": "^8.4.6",
         "@capgo/capacitor-downloader": "^8.3.7",
         "@capgo/capacitor-env": "^8.1.42",
-        "@capgo/capacitor-fast-sql": "^8.2.8",
+        "@capgo/capacitor-fast-sql": "8.2.13",
         "@capgo/capacitor-file": "^8.0.19",
         "@capgo/capacitor-file-compressor": "^8.1.8",
         "@capgo/capacitor-file-picker": "^8.2.2",
@@ -549,7 +550,7 @@
 
     "@capgo/capacitor-env": ["@capgo/capacitor-env@8.1.42", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-7SetqYe4B76/MbFsQid0tEe8wjFslk8PsosecriGtJ/3CB+iqc3meH04XRdlKRXibQs7xleQgTND2S0WsgUSag=="],
 
-    "@capgo/capacitor-fast-sql": ["@capgo/capacitor-fast-sql@8.2.8", "", { "dependencies": { "@sqlite.org/sqlite-wasm": "3.53.0-build1" }, "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-l1S41HSoJYWcvJlKlt4nEHyxuL0DpCSh9ywac9JgLRCDCGop5Sv7oOOggYvyp6wiRsVbvaL0wg0m2jkzzDsZuA=="],
+    "@capgo/capacitor-fast-sql": ["@capgo/capacitor-fast-sql@8.2.13", "", { "dependencies": { "@sqlite.org/sqlite-wasm": "3.53.0-build1" }, "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-f/6HFrIdQ/wq1x4JVTvjdPlmhZPCNMI8NwLxXZZE7R7eGGm4bAY4KxXd7FZFXrwGKqRPiN8EkG2MtY8oxXi/ng=="],
 
     "@capgo/capacitor-file": ["@capgo/capacitor-file@8.0.19", "", { "peerDependencies": { "@capacitor/core": ">=8.0.0" } }, "sha512-mOCCHGH82b4cFW/5V8TJprLJA3y3LGVfaURmBdEwXOKEY72UpA29tzwpF/rG2GZT0TiEvf96pt33QZ+0Kxn/JQ=="],
 

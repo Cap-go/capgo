@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "17.0.0",
+  "version": "18.1.0",
   "private": true,
   "workspaces": [
     "cli",
@@ -217,6 +217,7 @@
     "plugin:schemas:compile": "bunx zod-compiler generate supabase/functions/_backend/plugin_runtime/utils/plugin_schemas/update_request.zod.ts -o scripts/bench/validation/update_request.zod.compiled.ts --emit bag && bunx zod-compiler generate scripts/bench/validation/plugin_schemas.zod.ts -o scripts/bench/validation/plugin_schemas.zod.compiled.ts --emit bag"
   },
   "dependencies": {
+    "@aws-sdk/xml-builder": "3.972.36",
     "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6",
     "@capacitor/action-sheet": "^8.1.1",
     "@capacitor/android": "^8.5.2",
@@ -271,7 +272,7 @@
     "@capgo/capacitor-document-scanner": "^8.4.6",
     "@capgo/capacitor-downloader": "^8.3.7",
     "@capgo/capacitor-env": "^8.1.42",
-    "@capgo/capacitor-fast-sql": "^8.2.8",
+    "@capgo/capacitor-fast-sql": "8.2.13",
     "@capgo/capacitor-file": "^8.0.19",
     "@capgo/capacitor-file-compressor": "^8.1.8",
     "@capgo/capacitor-file-picker": "^8.2.2",

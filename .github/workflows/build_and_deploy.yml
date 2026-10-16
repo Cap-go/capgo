@@ -79,6 +79,7 @@ jobs:
         with:
           ref: ${{ needs.changes.outputs.deploy_sha }}
           fetch-depth: 0
+          filter: blob:none
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -154,6 +155,7 @@ jobs:
         with:
           ref: ${{ needs.changes.outputs.deploy_sha }}
           fetch-depth: 0
+          filter: blob:none
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -280,6 +282,7 @@ jobs:
         with:
           ref: ${{ needs.changes.outputs.deploy_sha }}
           fetch-depth: 0
+          filter: blob:none
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -346,6 +349,7 @@ jobs:
         with:
           ref: ${{ needs.changes.outputs.deploy_sha }}
           fetch-depth: 0
+          filter: blob:none
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -384,6 +388,7 @@ jobs:
         with:
           ref: ${{ needs.changes.outputs.deploy_sha }}
           fetch-depth: 0
+          filter: blob:none
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -420,6 +425,7 @@ jobs:
         with:
           ref: ${{ needs.changes.outputs.deploy_sha }}
           fetch-depth: 0
+          filter: blob:none
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -489,6 +495,7 @@ jobs:
         with:
           ref: ${{ needs.changes.outputs.deploy_sha }}
           fetch-depth: 0
+          filter: blob:none
       - uses: actions/setup-node@v6
         with:
           node-version: 24
@@ -532,6 +539,7 @@ jobs:
         with:
           ref: ${{ needs.changes.outputs.deploy_sha }}
           fetch-depth: 0
+          filter: blob:none
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -584,6 +592,7 @@ jobs:
         with:
           ref: ${{ needs.changes.outputs.deploy_sha }}
           fetch-depth: 0
+          filter: blob:none
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:

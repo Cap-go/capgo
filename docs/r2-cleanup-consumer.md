@@ -48,7 +48,7 @@ lease expires is accepted and documented beside the consumer reference check;
 shared transactional coordination is deferred to the planned inventory move into
 Supabase. Older v1/receiptless finalization retains its existing retirement checks.
 
-The consumer accepts the original v1 and upstream v2 `cleanup_health` schemas,
+The consumer accepts the original v1, upstream v2 and replication-only v3 `cleanup_health` schemas,
 and reads only a valid `observedAt` and
 `manifestReplicationHealthy=true`. Evidence must not be future-dated and must be
 at most 300 seconds old, independently of producer-only `maxAgeSeconds`. It is read again for each group and its remaining life
@@ -80,6 +80,19 @@ copy followed by failed DELETE recovers against the existing backup; DELETE
 followed by a crash before acknowledgement recovers through definitive absence.
 Permanent retirement plus the separately reviewed legacy-write/replication
 activation requirements remain essential; this is not a new restore workflow.
+
+The inventory Worker aliases `@aws-sdk/xml-builder` to its pure JavaScript
+parser. The SDK's browser parser requires `DOMParser`, which Workers do not
+provide: R2 can complete COPY with HTTP 200 while SDK deserialization fails.
+Keep the alias and explicit dependency together. The browser-build regression
+test verifies successful COPY parsing, embedded errors, incomplete responses,
+and existing-backup recovery without DOM APIs.
+
+Storage failures emit up to three distinct, sanitized diagnostic events per
+batch, immediately when observed. They report the storage stage, allowlisted
+error type, HTTP status, timings and copy-response field presence. They never
+include object keys, raw provider errors or credentials, and do not change
+acknowledgement, retries or deletion decisions.
 
 After confirmed DELETE/absence, acknowledge each corresponding source message
 **immediately, before any completion database connection/query**. Then perform
