@@ -1,8 +1,8 @@
-import { Capacitor } from '@capacitor/core'
 import type { ConsoleClient, Session, User } from './consoleClient'
+import { Capacitor } from '@capacitor/core'
 import { defaultApiHost } from './console'
 
-type NativeAppleAuthClient = {
+interface NativeAppleAuthClient {
   auth: Pick<ConsoleClient['auth'], 'setSession' | 'getSession'>
 }
 

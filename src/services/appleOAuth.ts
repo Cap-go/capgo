@@ -1,10 +1,10 @@
+import type { ConsoleClient, User } from './consoleClient'
 import { Capacitor } from '@capacitor/core'
 import { base64url } from 'jose'
 import { parseSignupAttributionRecord } from '../../supabase/functions/shared/signup-attribution'
 import { defaultApiHost } from './console'
-import type { ConsoleClient, User } from './consoleClient'
 
-export type AppleAuthSessionClient = {
+export interface AppleAuthSessionClient {
   auth: Pick<ConsoleClient['auth'], 'setSession'>
 }
 

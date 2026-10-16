@@ -24,7 +24,7 @@ beforeEach(() => {
   vi.stubGlobal('window', { opener: { postMessage: message } })
   vi.stubGlobal('history', { replaceState: vi.fn() })
   vi.stubGlobal('fetch', exchange)
-  setSession.mockResolvedValue({ data: { user, session }, error: null })
+  setSession.mockResolvedValue({ data: { session: { user, ...session } }, error: null })
   exchange.mockImplementation(async () => Response.json({ user, session, is_new_user: true, name_status: 'unavailable' }))
 })
 afterEach(() => vi.unstubAllGlobals())
