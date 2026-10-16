@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import type { Json } from './supabase.types.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv } from './utils.ts'
 
@@ -31,7 +32,7 @@ export interface ProfileInput {
   email: string
   first_name: string
   last_name: string
-  onboarding?: Record<string, unknown>
+  onboarding?: Json
   opt_for_newsletters?: boolean
 }
 

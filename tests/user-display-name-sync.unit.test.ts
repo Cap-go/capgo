@@ -1,10 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { PostHogDeliveryResult } from '../supabase/functions/_backend/utils/posthog_delivery.ts'
 
 const {
   deliverPosthogEventMock,
   importBentoSubscriberProfileMock,
 } = vi.hoisted(() => ({
-  deliverPosthogEventMock: vi.fn(async () => ({ outcome: 'delivered' as const })),
+  deliverPosthogEventMock: vi.fn(async (): Promise<PostHogDeliveryResult> => ({
+    outcome: 'delivered',
+    duration_ms: 1,
+    http_status: 200,
+    legacy_success: true,
+  })),
   importBentoSubscriberProfileMock: vi.fn(async () => true),
 }))
 
@@ -31,7 +37,12 @@ describe('user display name sync', () => {
   })
 
   it('syncs PostHog before Bento and fails when PostHog delivery fails', async () => {
-    deliverPosthogEventMock.mockResolvedValueOnce({ outcome: 'retryable' })
+    deliverPosthogEventMock.mockResolvedValueOnce({
+      outcome: 'retryable',
+      duration_ms: 1,
+      http_status: 503,
+      legacy_success: false,
+    } satisfies PostHogDeliveryResult)
     const ok = await syncUserDisplayNameIntegrations({} as never, {
       id: 'user-id',
       email: 'user@example.com',
