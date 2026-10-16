@@ -79,7 +79,10 @@ describe('file_read_cache deleted lookup', () => {
     ])
 
     expect(getPgClientMock).toHaveBeenCalledTimes(1)
-    expect(queryMock).toHaveBeenCalledTimes(2)
+    expect(queryMock).toHaveBeenCalledTimes(4)
+    expect(queryMock.mock.calls[0]?.[0]).toBe('BEGIN')
+    expect(queryMock.mock.calls[1]?.[0]).toContain('set_config')
+    expect(queryMock.mock.calls[3]?.[0]).toBe('COMMIT')
   })
 
   it('re-checks the deleted marker on every call within the same request', async () => {

@@ -16,6 +16,7 @@ const FILE_READ_PATH_PREFIXES = [
 
 /** Fail-open quickly on primary blips; full zip download must not wait on 10s pool connect. */
 const DELETED_LOOKUP_TIMEOUT_MS = 2000
+const DELETED_LOOKUP_STATEMENT_TIMEOUT = `${DELETED_LOOKUP_TIMEOUT_MS}ms`
 const DELETED_LOOKUP_TIMEOUT_ERROR = 'deleted lookup timeout'
 
 export function isVersionDeleted(row: { deleted?: boolean | null, deleted_at?: string | Date | null } | null | undefined): boolean {
@@ -177,17 +178,16 @@ export async function purgeFileReadCache(fileId: string, checksum?: string | nul
 
 const attachmentDeletedLookupByRequest = new WeakMap<Context, Map<string, Promise<boolean>>>()
 
-function rejectAfter(ms: number): Promise<never> {
-  return new Promise((_, reject) => {
-    setTimeout(() => reject(new Error(DELETED_LOOKUP_TIMEOUT_ERROR)), ms)
-  })
-}
-
 function raceWithDeadline<T>(deadlineMs: number, operation: Promise<T>): Promise<T> {
-  const remaining = deadlineMs - Date.now()
-  if (remaining <= 0)
-    return rejectAfter(0)
-  return Promise.race([operation, rejectAfter(remaining)])
+  const remaining = Math.max(0, deadlineMs - Date.now())
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(DELETED_LOOKUP_TIMEOUT_ERROR)), remaining)
+  })
+  return Promise.race([operation, timeout]).finally(() => {
+    if (timer !== undefined)
+      clearTimeout(timer)
+  })
 }
 
 function closeLatePgClient(c: Context, clientPromise: Promise<Awaited<ReturnType<typeof getPgClient>>>) {
@@ -205,17 +205,29 @@ async function lookupAttachmentVersionDeletedFromPrimary(c: Context, fileId: str
   try {
     pgClient = await raceWithDeadline(deadlineMs, clientPromise)
     const result = await raceWithDeadline(deadlineMs, (async () => {
-      await pgClient!.query(`SET statement_timeout TO '${DELETED_LOOKUP_TIMEOUT_MS}ms'`)
-      return pgClient!.query<{ deleted: boolean | null, deleted_at: string | null }>(
-        `
-        SELECT deleted, deleted_at
-        FROM public.app_versions
-        WHERE r2_path = $1
-          AND (COALESCE(deleted, false) = true OR deleted_at IS NOT NULL)
-        LIMIT 1
-      `,
-        [fileId],
-      )
+      await pgClient!.query('BEGIN')
+      try {
+        await pgClient!.query(
+          `SELECT pg_catalog.set_config('statement_timeout', $1, true)`,
+          [DELETED_LOOKUP_STATEMENT_TIMEOUT],
+        )
+        const queryResult = await pgClient!.query<{ deleted: boolean | null, deleted_at: string | null }>(
+          `
+          SELECT deleted, deleted_at
+          FROM public.app_versions
+          WHERE r2_path = $1
+            AND (COALESCE(deleted, false) = true OR deleted_at IS NOT NULL)
+          LIMIT 1
+        `,
+          [fileId],
+        )
+        await pgClient!.query('COMMIT')
+        return queryResult
+      }
+      catch (error) {
+        await pgClient!.query('ROLLBACK').catch(() => {})
+        throw error
+      }
     })())
     return result.rows.length > 0
   }
