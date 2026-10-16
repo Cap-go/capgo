@@ -282,6 +282,23 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       const fieldset = page.locator('[data-test="device-data-collection"]')
       try {
         await fieldset.waitFor({ state: 'visible', timeout: 5000 })
+        await fieldset.scrollIntoViewIfNeeded()
+      }
+      catch (error) {
+        if (error instanceof Error && error.name === 'TimeoutError')
+          return
+        throw error
+      }
+    },
+  },
+  {
+    slug: 'app-settings-device-data-collection',
+    path: '/app/com.demo.app/settings',
+    auth: true,
+    prepare: async (page) => {
+      const fieldset = page.locator('[data-test="device-data-collection"]')
+      try {
+        await fieldset.waitFor({ state: 'visible', timeout: 5000 })
         await fieldset.locator('summary').click()
         await fieldset.scrollIntoViewIfNeeded()
       }
