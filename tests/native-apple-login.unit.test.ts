@@ -19,7 +19,7 @@ function client() {
     signInWithIdToken: vi.fn(() => { throw new Error('Direct Apple exchange forbidden') }),
     updateUser: vi.fn(),
     getSession: vi.fn().mockResolvedValue({ data: { session: { user, access_token: 'current-access' } } }),
-    setSession: vi.fn().mockResolvedValue({ data: { user, session }, error: null }),
+    setSession: vi.fn().mockResolvedValue({ data: { session: { user, ...session } }, error: null }),
   } }
 }
 function login(supabase: ReturnType<typeof client>, reauthenticate = false) {
