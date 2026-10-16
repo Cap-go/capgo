@@ -170,6 +170,11 @@ jobs:
           CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
         run: bun run test:e2e-tui:harness
 
+      - name: Verify build-log-view Ink golden (android)
+        env:
+          CAPGO_CLI_ROOT: ${{ github.workspace }}/cli
+        run: bun run --cwd cli test:build-log-view-golden
+
       - name: Run keychain helper signature tests
         working-directory: ${{ env.PRIVATE_SUITE_DIR }}
         env:
