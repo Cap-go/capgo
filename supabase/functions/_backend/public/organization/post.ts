@@ -2,12 +2,12 @@ import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod'
-import { safeParseSchema } from '../../utils/schema_validation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { closeClient, getPgClient } from '../../utils/pg.ts'
 import { assertJwtMfaAssurance } from '../../utils/jwt_mfa_assurance.ts'
-import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { parseOrgOnboardingDevelopmentEnvironment, parseOrgOnboardingIntent } from '../../utils/org_onboarding_intent.ts'
+import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from '../../utils/pg.ts'
+import { safeParseSchema } from '../../utils/schema_validation.ts'
+import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
 const MAX_ESTIMATED_MAU = 1_000_000
@@ -27,10 +27,8 @@ const bodySchema = z.object({
   developmentEnvironment: z.enum(['hosted_builder', 'ai_assistant', 'hand_coded', 'other', 'local_project', 'exploring', 'skipped']).optional(),
 })
 
-
 interface PgTransactionClient {
   query: <T = unknown>(text: string, params?: unknown[]) => Promise<{ rows: T[], rowCount?: number | null }>
-  release: () => void
 }
 
 async function getInitialPlanForMau(c: Context<MiddlewareKeyVariables>, estimatedMau: number) {
@@ -90,7 +88,7 @@ async function getOwnerEmail(c: Context<MiddlewareKeyVariables>, auth: AuthInfo)
 
   let pgClient
   try {
-    pgClient = getPgClient(c)
+    pgClient = await getPgClient(c)
     const result = await pgClient.query<{ email: string }>(
       'SELECT email FROM public.users WHERE id = $1::uuid LIMIT 1',
       [auth.userId],
@@ -121,7 +119,7 @@ async function ensureApiKeyCanCreateOrganization(c: Context<MiddlewareKeyVariabl
 
   let pgClient
   try {
-    pgClient = getPgClient(c)
+    pgClient = await getPgClient(c)
     const result = await pgClient.query<{ allowed: boolean }>(
       'SELECT public.apikey_has_global_permission($1::text, public.rbac_perm_org_create()) AS allowed',
       [apikeyString],
@@ -160,12 +158,12 @@ async function insertOrgForApiKey(
   }
 
   // API-key Supabase clients run as anon, so this checked endpoint owns the write path instead of reopening direct anon RLS inserts.
-  let pgPool: ReturnType<typeof getPgClient> | null = null
+  let pgPool: Awaited<ReturnType<typeof getPgClient>> | null = null
   let dbClient: PgTransactionClient | null = null
   let transactionStarted = false
   try {
-    pgPool = getPgClient(c)
-    dbClient = await pgPool.connect() as PgTransactionClient
+    pgPool = await getPgClient(c)
+    dbClient = await checkoutPgClient(pgPool) as PgTransactionClient
     const capabilityResult = await dbClient.query<{ allowed: boolean }>(
       'SELECT public.apikey_has_current_org_create_capability($1::uuid) AS allowed',
       [apikeyRbacId],
@@ -243,7 +241,7 @@ async function insertOrgForApiKey(
     throw error
   }
   finally {
-    dbClient?.release()
+    releasePgClient(pgPool, dbClient)
     if (pgPool) {
       closeClient(c, pgPool)
     }

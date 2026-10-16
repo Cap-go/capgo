@@ -1,15 +1,15 @@
 import type { Context } from 'hono'
+import type { PgAuthLookupResult } from './pg_auth_lookup.ts'
 import type { APIKeyRateLimitScope } from './rate_limit.ts'
 import type { Database } from './supabase.types.ts'
 import { and, eq, isNull, or, sql } from 'drizzle-orm'
 import { honoFactory, quickError, simpleRateLimit } from './hono.ts'
 import { getClaimsFromJWT } from './hono_jwt.ts'
 import { cloudlog } from './logging.ts'
-import type { PgAuthLookupResult } from './pg_auth_lookup.ts'
+import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import { throwDatabaseUnavailable } from './pg_auth_lookup.ts'
 import { waitAuthPgRetryJitter } from './pg_auth_retry.ts'
 import { isTransientPgError } from './pg_errors.ts'
-import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { isAPIKeyRateLimited, isIPRateLimited, recordAPIKeyUsage, recordFailedAuth } from './rate_limit.ts'
 import { buildRateLimitInfo } from './rateLimitInfo.ts'
@@ -242,9 +242,9 @@ async function hasLimitedRbacSubkeyScope(
   if (!subkey.rbac_id)
     return false
 
-  let pgClient: ReturnType<typeof getPgClient> | null = null
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | null = null
   try {
-    pgClient = getPgClient(c)
+    pgClient = await getPgClient(c)
     const result = await pgClient.query<{ is_limited: boolean }>(
       `
       WITH user_orgs AS (
@@ -396,9 +396,9 @@ async function parentCanDelegateToSubkey(
     return true
   }
 
-  let pgClient: ReturnType<typeof getPgClient> | null = null
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | null = null
   try {
-    pgClient = getPgClient(c)
+    pgClient = await getPgClient(c)
     const result = await pgClient.query<{ can_delegate: boolean }>(
       `
       WITH RECURSIVE child_direct_bindings AS (
@@ -661,9 +661,9 @@ async function resolveApiKey(
     error: new Error('resolveApiKey exhausted retries'),
   }
   for (let attempt = 0; attempt < 2; attempt++) {
-    let pgClient: ReturnType<typeof getPgClient> | undefined
+    let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
     try {
-      pgClient = getPgClient(c, readOnly)
+      pgClient = await getPgClient(c, readOnly)
       const drizzleClient = getDrizzleClient(pgClient)
       const outcome = await checkKeyPg(c, key, drizzleClient)
       lastOutcome = outcome
@@ -721,9 +721,9 @@ async function resolveSubkey(
     error: new Error('resolveSubkey exhausted retries'),
   }
   for (let attempt = 0; attempt < 2; attempt++) {
-    let subkeyPgClient: ReturnType<typeof getPgClient> | undefined
+    let subkeyPgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
     try {
-      subkeyPgClient = getPgClient(c, readOnly)
+      subkeyPgClient = await getPgClient(c, readOnly)
       const drizzleClient = getDrizzleClient(subkeyPgClient)
       const outcome = await checkKeyByIdPg(c, subkeyId, drizzleClient, expectedUserId)
       lastOutcome = outcome

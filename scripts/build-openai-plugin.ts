@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 /**
- * Validate and package the Capgo OpenAI plugin (integrations/openai-plugin) as a submission ZIP.
+ * Validate and package the Capgo plugin as a submission ZIP. The plugin lives at the repo root
+ * (plugin.json, mcp.json, skills/, assets/plugin/) so Open Plugins scanners detect it.
  * Limits come from https://developers.openai.com/plugins/deploy/submission.
  *
  *   bun scripts/build-openai-plugin.ts
@@ -11,9 +12,10 @@ import { dirname, join, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
-export const PLUGIN_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../integrations/openai-plugin')
-/** Everything else in the plugin folder (README, review notes) stays out of the ZIP. */
-export const PACKAGE_ENTRIES = ['plugin.json', 'mcp.json', 'skills', 'assets']
+export const PLUGIN_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+export const PLUGIN_ASSETS_DIR = 'assets/plugin'
+/** Only these entries are packaged; the rest of the repo stays out of the ZIP. */
+export const PACKAGE_ENTRIES = ['plugin.json', 'mcp.json', 'skills', PLUGIN_ASSETS_DIR]
 
 const MAX_ASSET_BYTES = 5 * 1024 * 1024
 const HEX_COLOR = /^#[0-9a-f]{6}$/i
@@ -65,9 +67,9 @@ function checkAsset(errors: string[], dir: string, field: string, value: unknown
   }
   // Resolve first so ./assets/../README.md or hidden files cannot slip past the packaged set.
   const path = resolve(dir, value)
-  const packaged = path.startsWith(resolve(dir, 'assets') + sep) && !relative(dir, path).split(sep).some(part => part.startsWith('.'))
+  const packaged = path.startsWith(resolve(dir, PLUGIN_ASSETS_DIR) + sep) && !relative(dir, path).split(sep).some(part => part.startsWith('.'))
   if (!packaged) {
-    errors.push(`${field} must point to a non-hidden file under ./assets/ so it is packaged`)
+    errors.push(`${field} must point to a non-hidden file under ./${PLUGIN_ASSETS_DIR}/ so it is packaged`)
     return
   }
   if (!existsSync(path)) {
@@ -191,7 +193,7 @@ async function main() {
     process.exit(1)
   }
   const { version } = JSON.parse(readFileSync(join(PLUGIN_DIR, 'plugin.json'), 'utf8')) as { version: string }
-  const outDir = resolve(PLUGIN_DIR, '../../dist/openai-plugin')
+  const outDir = resolve(PLUGIN_DIR, 'dist/openai-plugin')
   const outFile = join(outDir, `capgo-${version}.zip`)
   mkdirSync(outDir, { recursive: true })
   rmSync(outFile, { force: true })

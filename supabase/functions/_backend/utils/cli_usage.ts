@@ -54,7 +54,7 @@ export function trackCliUsage(c: Context, event: CliUsageEvent) {
     }
 
     backgroundTask(c, (async () => {
-      const pgClient = getPgClient(c, false)
+      const pgClient = await getPgClient(c, false)
       try {
         await pgClient.query(
           `INSERT INTO public.cli_usage

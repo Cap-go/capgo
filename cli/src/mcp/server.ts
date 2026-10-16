@@ -210,7 +210,7 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
   server.registerTool(
     'capgo_upload_bundle',
     {
-      description: 'Upload a new app bundle to Capgo Cloud for distribution',
+      description: 'Upload a new app bundle to Capgo Cloud for distribution. Set delta=true to also upload the per-file manifest for delta updates.',
       inputSchema: mcpUploadBundleInputSchema,
     },
     async ({
@@ -229,6 +229,10 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
       autoBump,
       encrypt,
       acceptIncompatible,
+      delta,
+      deltaOnly,
+      encryptDelta,
+      apikey,
       capacitorConfig,
     }) => {
       const result = await sdk.uploadBundle({
@@ -247,6 +251,10 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
         autoBump,
         encrypt,
         acceptIncompatible,
+        delta,
+        deltaOnly,
+        encryptDelta,
+        apikey,
         capacitorConfig,
       })
       if (!result.success) {

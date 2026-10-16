@@ -18,11 +18,11 @@ import { getOrgAdminMemberEmailsForTags } from '../utils/org_email_notifications
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { groupIdentifyPosthog } from '../utils/posthog.ts'
+import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
 import { ensureCustomerMetadata, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isSubscriptionInvoice, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
 import { buildTransferInvoiceFooter, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
 import { recordChargeRefunds } from '../utils/stripe_refunds.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
-import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask, isStripeConfigured } from '../utils/utils.ts'
 
@@ -362,7 +362,7 @@ async function getBillingBentoEmails(
   audience: NotificationAudience = BENTO_TAG_AUDIENCE,
 ) {
   const emails: Array<string | null | undefined> = [org.management_email]
-  const pgClient = getPgClient(c, true)
+  const pgClient = await getPgClient(c, true)
 
   try {
     const drizzleClient = getDrizzleClient(pgClient)
@@ -656,7 +656,7 @@ async function persistStripeInfoAndRevenueMovement(
   if (Object.keys(transactionUpdateData).length === 0 && !shouldRecordMovement)
     return 'applied'
 
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
 
   try {
     await pgClient.query('BEGIN')
@@ -798,7 +798,7 @@ async function persistStripeInfoAndRevenueMovement(
 }
 
 async function writePaidAtAtomically(c: Context, customerId: string, eventOccurredAtIso: string) {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {
@@ -817,7 +817,7 @@ async function writePaidAtAtomically(c: Context, customerId: string, eventOccurr
 }
 
 async function getCreditTopUpProductIdFromCustomer(c: Context, customerId: string): Promise<string> {
-  const pgClient = getPgClient(c, true)
+  const pgClient = await getPgClient(c, true)
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {

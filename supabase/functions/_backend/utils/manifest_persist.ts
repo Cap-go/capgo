@@ -88,12 +88,19 @@ export async function persistVersionManifestEntries(
     return { inserted: 0, alreadyPresent: false }
   }
 
-  const pgPool = getPgClient(c, false)
+  const pgPool = await getPgClient(c, false)
   let alreadyPresent = false
   try {
     alreadyPresent = await getDrizzleClient(pgPool).transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_catalog.set_config('capgo.manifest_queue_managed', 'on', true)`)
       await tx.execute(sql`SELECT pg_catalog.pg_advisory_xact_lock(${record.id})`)
+      const version = await tx.execute<{ deleted: boolean, deleted_at: string | null }>(sql`
+        SELECT deleted, deleted_at FROM public.app_versions WHERE id = ${record.id} FOR UPDATE
+      `)
+      // An upload may have passed its route check before deletion started.
+      // Serialize with cleanup and recheck before inserting any references.
+      if (!version.rows[0] || version.rows[0].deleted || version.rows[0].deleted_at)
+        throw new Error('Deleted versions cannot receive manifest entries')
       const existing = await tx.execute<{ id: number }>(sql`SELECT id FROM public.manifest WHERE app_version_id = ${record.id} LIMIT 1`)
       const alreadyPresent = existing.rows.length > 0
 
@@ -103,11 +110,12 @@ export async function persistVersionManifestEntries(
           SELECT ${record.id}::bigint, entry.file_name, entry.s3_path, entry.file_hash, entry.file_size FROM jsonb_to_recordset(${rowsJson}::jsonb)
           AS entry(file_name text, s3_path text, file_hash text, file_size bigint)`)
 
-        if (!options.trustFileSizes)
+        if (!options.trustFileSizes) {
           await tx.execute(sql`WITH queued AS MATERIALIZED (SELECT pgmq.send('on_manifest_create', pg_catalog.jsonb_build_object(
             'function_name', 'on_manifest_create', 'function_type', 'cloudflare', 'payload', pg_catalog.jsonb_build_object('old_record', NULL,
             'record', pg_catalog.to_jsonb(manifest), 'type', 'INSERT', 'table', 'manifest', 'schema', 'public'))) AS msg_id
             FROM public.manifest WHERE app_version_id = ${record.id}) SELECT count(*) FROM queued`)
+        }
 
         await tx.execute(sql`UPDATE public.app_versions SET manifest_count = ${validEntries.length}, updated_at = now()
           ${sql.raw(options.clearAppVersionsManifest ? ', manifest = NULL' : '')} WHERE id = ${record.id}`)

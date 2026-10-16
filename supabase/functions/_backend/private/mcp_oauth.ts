@@ -43,8 +43,8 @@ function requireUserSession(c: Context<MiddlewareKeyVariables>): AuthInfo {
   return auth
 }
 
-async function withPg<T>(c: Context<MiddlewareKeyVariables>, fn: (pg: ReturnType<typeof getPgClient>) => Promise<T>): Promise<T> {
-  const pg = getPgClient(c)
+async function withPg<T>(c: Context<MiddlewareKeyVariables>, fn: (pg: Awaited<ReturnType<typeof getPgClient>>) => Promise<T>): Promise<T> {
+  const pg = await getPgClient(c)
   try {
     return await fn(pg)
   }

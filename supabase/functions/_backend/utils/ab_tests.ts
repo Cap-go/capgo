@@ -6,7 +6,7 @@ import rawABTestsConfig from './ab_tests.json' with { type: 'json' }
 import { syncBentoSubscriberTags } from './bento.ts'
 import { quickError } from './hono.ts'
 import { cloudlogErr } from './logging.ts'
-import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
+import { checkoutPgClient, closeClient, getDrizzleClient, getPgClient, releasePgClient } from './pg.ts'
 import { backgroundTask } from './utils.ts'
 
 export type ABTestAudience = 'all' | 'self_signup'
@@ -253,9 +253,9 @@ async function readAssignmentUser(
   c: Context<MiddlewareKeyVariables>,
   userId: string,
 ): Promise<AssignmentUser | undefined> {
-  const pgPool = getPgClient(c, true)
+  const pgPool = await getPgClient(c, true)
   try {
-    const pgClient = await pgPool.connect()
+    const pgClient = await checkoutPgClient(pgPool)
     try {
       const result = await pgClient.query<AssignmentUser>(
         `SELECT created_via_invite,
@@ -271,7 +271,7 @@ async function readAssignmentUser(
       return result.rows[0]
     }
     finally {
-      pgClient.release(true)
+      releasePgClient(pgPool, pgClient, true)
     }
   }
   finally {
@@ -284,10 +284,10 @@ async function persistABTestAssignments(
   userId: string,
   candidates: Record<string, ABTestAssignment>,
 ) {
-  const pgPool = getPgClient(c)
+  const pgPool = await getPgClient(c)
   let persisted: unknown
   try {
-    const pgClient = await pgPool.connect()
+    const pgClient = await checkoutPgClient(pgPool)
     try {
       const result = await pgClient.query<{ abtests: unknown }>(
         `UPDATE public.users
@@ -307,7 +307,7 @@ async function persistABTestAssignments(
       persisted = result.rows[0]?.abtests
     }
     finally {
-      pgClient.release(true)
+      releasePgClient(pgPool, pgClient, true)
     }
   }
   finally {
@@ -514,7 +514,7 @@ export async function getOrCreateUserABTests(
       return existing.assignments
   }
 
-  const pgPool = getPgClient(c, false)
+  const pgPool = await getPgClient(c, false)
   let closeInFinally = true
   let result: {
     assignments: Record<string, ABTestAssignment>
@@ -542,12 +542,13 @@ export async function getOrCreateUserABTests(
       const existing = readExistingAssignments(user.abtests, testNames)
       const revoked = ineligibleAssignedTestNames(user.abtests, user)
       const bentoSyncState = readBentoSyncState(user.abtests_bento_sync)
-      if (existing.missing.length === 0 && revoked.length === 0)
+      if (existing.missing.length === 0 && revoked.length === 0) {
         return {
           assignments: existing.assignments,
           bentoSyncState,
           needsBentoSync: needsBentoSync(user, bentoSyncState),
         }
+      }
 
       const candidates = createABTestAssignments(user, configForTests(existing.missing))
       const retainedAssignments = isRecord(user.abtests) ? { ...user.abtests } : {}

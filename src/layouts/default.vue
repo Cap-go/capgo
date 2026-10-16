@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core'
 import { useLocalStorage, useMediaQuery } from '@vueuse/core'
 import { computed, ref, useTemplateRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import AssistantChat from '~/components/assistant/AssistantChat.vue'
 import OnboardingExploreBanner from '~/components/dashboard/OnboardingExploreBanner.vue'
 import OnboardingExploreReminder from '~/components/dashboard/OnboardingExploreReminder.vue'
 import PastDueBanner from '~/components/dashboard/PastDueBanner.vue'
@@ -150,5 +151,6 @@ useEdgeSwipeBack(contentShell, {
         </main>
       </div>
     </div>
+    <AssistantChat />
   </div>
 </template>

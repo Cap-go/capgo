@@ -1,13 +1,16 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { ManifestPersistEntry } from '../utils/manifest_persist.ts'
+import type { ManifestSizeReceiptFacts } from '../utils/manifest_size_receipt.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { greaterOrEqual, parse, tryParse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { BRES, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { ManifestInventoryConflict, registerManifestInventory, usesManifestInventory, withManifestInventory } from '../utils/manifest_inventory.ts'
 import { MAX_FILE_HASH_LENGTH, MAX_FILE_NAME_LENGTH, MAX_MANIFEST_ENTRIES, MAX_S3_PATH_LENGTH } from '../utils/manifest_limits.ts'
 import { persistVersionManifestEntries } from '../utils/manifest_persist.ts'
-import { verifyManifestSizeReceipts } from '../utils/manifest_size_receipt.ts'
+import { getManifestReceiptBucket, verifyManifestSizeReceiptFacts } from '../utils/manifest_size_receipt.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -19,6 +22,8 @@ interface DataSetManifest {
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
+
+const MANIFEST_UPLOAD_CLI_VERSION = parse('8.74.0')
 
 app.post('/', middlewareKey(), async (c) => {
   const body = await parseBody<DataSetManifest>(c)
@@ -86,13 +91,14 @@ app.post('/', middlewareKey(), async (c) => {
 
   const receiptMode = body.manifest.some(entry => entry.file_size_receipt != null)
   let trustFileSizes = false
+  let receiptFacts: ManifestSizeReceiptFacts[] | null = null
   if (receiptMode) {
     if (body.manifest.some(entry => typeof entry.file_size_receipt !== 'string' || entry.file_size_receipt.length > 128))
       return quickError(400, 'error_manifest_size_receipt_invalid', 'Every manifest entry must include a valid size receipt')
-    const sizes = await verifyManifestSizeReceipts(getEnv(c, 'MANIFEST_SIZE_RECEIPT_SECRET'), body.manifest.map(entry => ({ path: entry.s3_path!, receipt: entry.file_size_receipt! })))
-    if (!sizes)
+    receiptFacts = await verifyManifestSizeReceiptFacts(getEnv(c, 'MANIFEST_SIZE_RECEIPT_SECRET'), getManifestReceiptBucket(getEnv(c, 'ENV_NAME')), body.manifest.map(entry => ({ path: entry.s3_path!, receipt: entry.file_size_receipt! })))
+    if (!receiptFacts)
       return quickError(400, 'error_manifest_size_receipt_invalid', 'Manifest size receipt verification failed')
-    body.manifest = body.manifest.map((entry, index) => ({ ...entry, file_size: sizes[index] }))
+    body.manifest = body.manifest.map((entry, index) => ({ ...entry, file_size: receiptFacts![index].size }))
     trustFileSizes = true
   }
 
@@ -120,6 +126,14 @@ app.post('/', middlewareKey(), async (c) => {
   }
 
   try {
+    // Older clients upload directly without reserving inventory paths first.
+    const cliVersion = tryParse(c.req.header('x-cli-version') ?? '')
+    if (usesManifestInventory(c) && cliVersion && greaterOrEqual(cliVersion, MANIFEST_UPLOAD_CLI_VERSION)) {
+      await withManifestInventory(c, db => registerManifestInventory(db, getManifestReceiptBucket(getEnv(c, 'ENV_NAME')), body.manifest!.map((entry, index) => ({
+        path: entry.s3_path!,
+        facts: receiptFacts?.[index],
+      }))))
+    }
     const result = await persistVersionManifestEntries(
       c,
       { id: version.id, app_id: version.app_id },
@@ -143,6 +157,8 @@ app.post('/', middlewareKey(), async (c) => {
     })
   }
   catch (error) {
+    if (error instanceof ManifestInventoryConflict)
+      return quickError(409, 'error_manifest_inventory_conflict', error.message, { entries: error.paths })
     throw simpleError('error_set_manifest', 'Failed to set manifest', { error })
   }
 })
