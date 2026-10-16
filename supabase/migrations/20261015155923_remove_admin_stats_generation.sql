@@ -1,10 +1,8 @@
 -- Capgo no longer generates admin statistics. The admin dashboard
 -- (Cap-go/capgo_admin_dashboard) reads Capgo Postgres read-only and builds its
 -- own daily snapshots. Remove the generation crons, queues, triggers and
--- functions.
---
--- Keep public.global_stats and public.app_fame with their data: the admin
--- dashboard copies their history.
+-- functions, then the admin-only tables. Their history was copied to the admin
+-- dashboard's D1 database before this migration (verified day by day).
 SET LOCAL lock_timeout = '2s';
 
 -- Cron rows. Without them process_all_cron_tasks never touches the removed
@@ -127,8 +125,7 @@ BEGIN
 END;
 $$;
 
-COMMENT ON TABLE public.global_stats IS
-'Historical admin daily statistics. No longer written by Capgo; kept for the admin dashboard history copy.';
-
-COMMENT ON TABLE public.app_fame IS
-'Historical AI-assessed app reputation. No longer written by Capgo; kept for the admin dashboard history copy.';
+-- Admin-only tables. Nothing else reads them; the functions that wrote them
+-- are dropped above. app_fame's FK to apps goes with it.
+DROP TABLE IF EXISTS public.global_stats;
+DROP TABLE IF EXISTS public.app_fame;
