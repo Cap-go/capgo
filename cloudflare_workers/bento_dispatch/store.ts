@@ -193,7 +193,11 @@ export class DispatchStore {
       if (!result.rows.length) {
         const state = await client.query<{ status: string, attempt_count: number }>(`SELECT status, attempt_count FROM public.bento_event_dispatches
           WHERE flow_key = $1 AND context_key = $2 AND recipient_key = $3 AND tag = $4`, identity(user))
-        const reason = state.rows[0]?.status === 'accepted' ? 'event_already_accepted' : state.rows[0]?.attempt_count >= 5 ? 'event_attempts_exhausted' : 'event_claim_busy'
+        let reason = 'event_claim_busy'
+        if (state.rows[0]?.attempt_count >= 5)
+          reason = 'event_attempts_exhausted'
+        if (state.rows[0]?.status === 'accepted')
+          reason = 'event_already_accepted'
         await this.appendRunAudit(client, run, user, reason)
       }
       return result.rows[0] ?? null

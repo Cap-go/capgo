@@ -93,7 +93,10 @@ export function findInvitationUsers(ctx: ReadOnlyContext, kind: InvitationKind, 
 }
 
 export async function resolveInvitation(ctx: ReadOnlyContext, user: EligibleUser, kind: InvitationKind, stage: 1 | 2, webappUrl: string): Promise<ResolvedAction> {
-  const [current] = await findInvitationUsers(ctx, kind, stage, String(user.metadata.startId))
+  const startId = user.metadata.startId
+  if (typeof startId !== 'string' || !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(startId))
+    return { action: 'skip', reason: 'invalid_start_id' }
+  const [current] = await findInvitationUsers(ctx, kind, stage, startId)
   if (!current)
     return { action: 'skip', reason: 'selection_stale_or_not_due' }
   if (current.action === 'end')
@@ -115,10 +118,10 @@ export async function resolveInvitation(ctx: ReadOnlyContext, user: EligibleUser
   return { action: 'send', buildEvent: id => buildInvitationEvent({ id, tag: user.tag }, invitation, webappUrl) }
 }
 
-export function invitationEvaluation(kind: InvitationKind, stage: 1 | 2, options = { everyMinutes: 1 }): Evaluation {
+export function invitationEvaluation(kind: InvitationKind, stage: 1 | 2, options?: { everyMinutes: number }): Evaluation {
   return {
     key: `org:invite_${kind}_user_reminder_${stage}`,
-    everyMinutes: options.everyMinutes,
+    everyMinutes: options?.everyMinutes ?? 1,
     findEligibleUsers: ctx => findInvitationUsers(ctx, kind, stage),
     handleEligibleUsers: async (ctx, users) => {
       const resolve = (user: EligibleUser, read: ReadOnlyContext) => resolveInvitation(read, user, kind, stage, ctx.settings.WEBAPP_URL)

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { buildEligibilityAudit } from '../cloudflare_workers/bento_dispatch/audit.ts'
 import { bentoFlows } from '../cloudflare_workers/bento_dispatch/bentoFlows.ts'
 import { processDispatchJob } from '../cloudflare_workers/bento_dispatch/consumer.ts'
+import { invitationEvaluation, resolveInvitation } from '../cloudflare_workers/bento_dispatch/flows/invitations.ts'
 import { buildInvitationEvent, parseDispatchJob } from '../cloudflare_workers/bento_dispatch/operations.ts'
 import { publishDispatchJobs } from '../cloudflare_workers/bento_dispatch/scheduler.ts'
 import { messageBytes, parsePostHogMessage, POSTHOG_MESSAGE_MAX_BYTES } from '../supabase/functions/_backend/utils/posthog_queue.ts'
@@ -160,4 +161,32 @@ describe('invitation reminder payloads', () => {
   it.each(['http://console.example.com', 'javascript:alert(1)', 'https://user:password@console.example.com', 'https://console.example.com/?secret=1'])('rejects unsafe webapp URL %s', (url) => {
     expect(() => buildInvitationEvent({ id: 'id', tag: key }, invitation, url)).toThrow('Invalid webapp URL')
   })
+})
+
+describe('invitation source identity validation', () => {
+  it.each([null, 42, false, {}, [], '', 'not-a-uuid'])('skips invalid source identity %j before querying', async (startId) => {
+    const ctx = { query: vi.fn().mockResolvedValue([]) }
+    const selected = { ...user, metadata: { startId } }
+    expect(await resolveInvitation(ctx, selected, 'new', 1, 'https://console.example.com')).toEqual({ action: 'skip', reason: 'invalid_start_id' })
+    expect(ctx.query).not.toHaveBeenCalled()
+  })
+  it('defaults omitted cadence options and accepts an explicit registry cadence', () => {
+    expect(invitationEvaluation('new', 1).everyMinutes).toBe(1)
+    expect(invitationEvaluation('new', 1, { everyMinutes: 5 }).everyMinutes).toBe(5)
+  })
+})
+
+it('preserves native-recipient and fragmented-recipient ordering across multipart reports', () => {
+  const first = { ...user, contextKey: 'first' }
+  const large = { ...user, contextKey: 'large', metadata: { note: '😀漢字'.repeat(50000) } }
+  const last = { ...user, contextKey: 'last' }
+  const reports = buildEligibilityAudit(job.runId, key, [first, large, last])
+  expect(reports.every(report => parsePostHogMessage(report))).toBe(true)
+  expect(reports[0]!.payload.nonPersonTags!.eligible_users).toEqual([first])
+  expect(reports.at(-1)!.payload.nonPersonTags!.eligible_users).toEqual([last])
+  const middle = reports.slice(1, -1)
+  expect(middle.every(report => report.payload.nonPersonTags!.encoding === 'json-fragment')).toBe(true)
+  expect(JSON.parse(middle.map(report => report.payload.nonPersonTags!.eligible_user_json).join(''))).toEqual(large)
+  expect(reports.map(report => report.payload.nonPersonTags!.part)).toEqual(reports.map((_, index) => index + 1))
+  expect(reports.every(report => report.payload.nonPersonTags!.parts === reports.length)).toBe(true)
 })

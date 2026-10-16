@@ -11,7 +11,7 @@ export const INVITATION_OPERATIONS = [
 
 export function parseDispatchJob(body: unknown, registry: Readonly<Record<string, unknown>> = Object.fromEntries(INVITATION_OPERATIONS.map(key => [key, true]))): DispatchJob {
   const value = body as Partial<DispatchJob> | null
-  if (!value || Array.isArray(value) || Object.keys(value).sort().join(',') !== 'evaluationKey,runId,version'
+  if (!value || Array.isArray(value) || Object.keys(value).sort((left, right) => left.localeCompare(right)).join(',') !== 'evaluationKey,runId,version'
     || value.version !== 1 || typeof value.evaluationKey !== 'string' || !Object.hasOwn(registry, value.evaluationKey)
     || typeof value.runId !== 'string' || !/^[\da-f]{8}-[\da-f]{4}-[1-8][\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(value.runId)) {
     throw new Error('Invalid dispatch job')
