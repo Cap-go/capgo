@@ -26,6 +26,7 @@ import { buildTransferInvoiceFooter, getTransferInvoiceFooterUpdate, isTransferI
 import { recordChargeRefunds } from '../utils/stripe_refunds.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
+import { trackUsChargeRefunded, trackUsChargeSucceeded } from '../utils/us_revenue_tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
 function getWebhookBillingAccount(c: Context): BillingAccount {
@@ -1813,6 +1814,8 @@ async function stripeEventHandler(c: Context<MiddlewareKeyVariablesStripe>) {
 
   if (stripeEvent.type === 'charge.refunded') {
     await recordChargeRefunds(c, stripeEvent.data.object, getWebhookBillingAccount(c))
+    if (getWebhookBillingAccount(c) === 'us')
+      await backgroundTask(c, trackUsChargeRefunded(c, stripeEvent.data.object))
     return c.json(BRES)
   }
 
@@ -1840,6 +1843,8 @@ async function stripeEventHandler(c: Context<MiddlewareKeyVariablesStripe>) {
     return invoiceResponse
 
   if (stripeEvent.type === 'charge.succeeded') {
+    if (getWebhookBillingAccount(c) === 'us')
+      await backgroundTask(c, trackUsChargeSucceeded(c, stripeEvent.data.object))
     return handleChargeSucceededStripeEvent(c, org, stripeData)
   }
 
