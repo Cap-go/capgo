@@ -17,6 +17,7 @@ jobs:
     if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     permissions:
       contents: read
+      actions: read
     runs-on: ubuntu-latest
     outputs:
       run_capgo: ${{ steps.capgo.outputs.should_release }}
@@ -26,6 +27,10 @@ jobs:
       run_notifications: ${{ steps.notifications.outputs.should_release }}
       notifications_release_as: ${{ steps.notifications.outputs.release_as }}
       run_any: ${{ steps.capgo.outputs.should_release == 'true' || steps.cli.outputs.should_release == 'true' || steps.notifications.outputs.should_release == 'true' }}
+      test_capgo: ${{ steps.reuse.outputs.test_capgo }}
+      test_cli: ${{ steps.reuse.outputs.test_cli }}
+      test_notifications: ${{ steps.reuse.outputs.test_notifications }}
+      test_any: ${{ steps.reuse.outputs.test_any }}
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -78,15 +83,64 @@ jobs:
       - name: Resolve notifications plugin release scope
         id: notifications
         run: bun scripts/release-scope.ts notifications "${{ steps.release_environment.outputs.scope_mode }}" "${{ github.sha }}" >> "$GITHUB_OUTPUT"
-  # Run only the relevant test scope before creating tags
+      # A same-repo PR run records each scope that passed for its merge commit, keyed by a
+      # fingerprint that ignores release-bot files. When the pushed commit has the same
+      # fingerprint, that scope already passed on this exact source, so skip re-running it.
+      - name: Reuse PR test results for identical source
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEED_CAPGO: ${{ steps.capgo.outputs.should_release }}
+          NEED_CLI: ${{ steps.cli.outputs.should_release }}
+          NEED_NOTIFICATIONS: ${{ steps.notifications.outputs.should_release }}
+          FORCE_TESTS: ${{ github.run_attempt > 1 }}
+        run: |
+          set -euo pipefail
+
+          fingerprint="$(bun scripts/release-test-fingerprint.ts "$GITHUB_SHA")"
+          repository_id="$(gh api "repos/$GITHUB_REPOSITORY" --jq '.id')"
+          echo "Release test fingerprint: $fingerprint"
+
+          scope_passed() {
+            local name="release-tests-$1-$fingerprint"
+            local run_ids
+            run_ids="$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/artifacts" -f name="$name" -f per_page=20 \
+              --jq ".artifacts[] | select(.expired == false and .workflow_run.repository_id == $repository_id and .workflow_run.head_repository_id == $repository_id) | .workflow_run.id" || true)"
+            for run_id in $run_ids; do
+              if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" \
+                --jq 'select(.path == ".github/workflows/tests.yml" and .event == "pull_request") | .id' | grep -q .; then
+                echo "$1 tests already passed for this source in run $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id"
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          test_any=false
+          for scope in capgo cli notifications; do
+            need_var="NEED_${scope^^}"
+            run_tests=false
+            if [ "${!need_var}" = "true" ]; then
+              run_tests=true
+              if [ "$FORCE_TESTS" != "true" ] && scope_passed "$scope"; then
+                run_tests=false
+              fi
+            fi
+            if [ "$run_tests" = "true" ]; then
+              test_any=true
+            fi
+            echo "test_$scope=$run_tests" >> "$GITHUB_OUTPUT"
+          done
+          echo "test_any=$test_any" >> "$GITHUB_OUTPUT"
+  # Run only the relevant test scope not already proven by an identical PR run
   test:
     needs: changes
-    if: ${{ needs.changes.outputs.run_any == 'true' }}
+    if: ${{ needs.changes.outputs.run_any == 'true' && needs.changes.outputs.test_any == 'true' }}
     uses: ./.github/workflows/tests.yml
     with:
-      run_capgo: ${{ needs.changes.outputs.run_capgo == 'true' }}
-      run_cli: ${{ needs.changes.outputs.run_cli == 'true' }}
-      run_notifications: ${{ needs.changes.outputs.run_notifications == 'true' }}
+      run_capgo: ${{ needs.changes.outputs.test_capgo == 'true' }}
+      run_cli: ${{ needs.changes.outputs.test_cli == 'true' }}
+      run_notifications: ${{ needs.changes.outputs.test_notifications == 'true' }}
     permissions:
       contents: read
       actions: write
@@ -96,7 +150,7 @@ jobs:
   # Only bump the changed release scopes and create matching tags after tests pass
   bump-version:
     needs: [changes, test]
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') && needs.changes.outputs.run_any == 'true' && needs.test.result == 'success' }}
+    if: ${{ always() && !startsWith(github.event.head_commit.message, 'chore(release):') && needs.changes.result == 'success' && needs.changes.outputs.run_any == 'true' && (needs.test.result == 'success' || (needs.test.result == 'skipped' && needs.changes.outputs.test_any == 'false')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     name: Bump versions and create tags
@@ -106,6 +160,7 @@ jobs:
       published: ${{ steps.publish.outputs.published }}
       native_build: ${{ steps.capgo_version.outputs.native_build }}
       capgo_tag: ${{ steps.capgo_tag.outputs.tag }}
+      graphify: ${{ needs.changes.outputs.run_capgo == 'true' || needs.changes.outputs.run_cli == 'true' }}
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -201,8 +256,6 @@ jobs:
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Install Graphify
-        run: python3 -m pip install --user graphifyy==0.8.31
       - name: Generate CLI docs
         if: ${{ needs.changes.outputs.run_cli == 'true' }}
         run: |
@@ -224,20 +277,6 @@ jobs:
         run: |
           set -e
 
-          refresh_graphify_graph() {
-            bun run graphify:generate
-            git add graphify-out
-
-            if ! git diff --cached --quiet; then
-              CURRENT_TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
-              git commit --amend --no-edit
-
-              if [ -n "$CURRENT_TAG" ]; then
-                git tag -f "$CURRENT_TAG"
-              fi
-            fi
-          }
-
           if [ "$RUN_CAPGO" = "true" ]; then
             if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
               bunx standard-version --skip.changelog --release-as "$CAPGO_RELEASE_AS" --tag-prefix capgo-
@@ -254,8 +293,6 @@ jobs:
                 git tag -f "$CURRENT_TAG"
               fi
             fi
-
-            refresh_graphify_graph
           fi
 
           if [ "$RUN_CLI" = "true" ]; then
@@ -264,8 +301,6 @@ jobs:
             else
               bunx standard-version --skip.changelog --release-as "$CLI_RELEASE_AS" --prerelease alpha --tag-prefix cli- --packageFiles cli/package.json --bumpFiles cli/package.json
             fi
-
-            refresh_graphify_graph
           fi
 
           if [ "$RUN_NOTIFICATIONS" = "true" ]; then
@@ -308,6 +343,49 @@ jobs:
           else
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
+  # The Graphify graph is an agent aid, not release content. Refresh it after the
+  # tags are published so its ~90s generation never delays a release.
+  graphify:
+    needs: bump-version
+    if: ${{ needs.bump-version.outputs.published == 'true' && needs.bump-version.outputs.graphify == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    name: Refresh Graphify code graph
+    concurrency:
+      group: graphify-${{ github.ref }}
+      cancel-in-progress: true
+    permissions:
+      contents: read
+    steps:
+      - name: Check out
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+      - name: Install Graphify
+        run: python3 -m pip install --user graphifyy==0.8.31
+      - name: Commit refreshed graph
+        run: |
+          set -euo pipefail
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+
+          for attempt in 1 2 3; do
+            git fetch --depth 1 origin "$GITHUB_REF_NAME"
+            git reset --hard FETCH_HEAD
+            python3 scripts/generate_graphify_graph.py
+            git add graphify-out
+            if git diff --cached --quiet; then
+              echo "Graphify graph already up to date."
+              exit 0
+            fi
+            git commit -m "chore(auto-sync): refresh Graphify code graph"
+            if git push origin "HEAD:$GITHUB_REF_NAME"; then
+              exit 0
+            fi
+            echo "$GITHUB_REF_NAME advanced during generation; retrying ($attempt/3)."
+          done
+          echo "::warning::Could not push the refreshed Graphify graph."
   # A native change needs a new store binary: build both platforms from the new
   # tag and submit them for store review without manual dispatch.
   native-store-release:
