@@ -276,6 +276,62 @@ test.describe('Registration', () => {
     await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveCount(0)
   })
 
+  for (const mobile of [false, true]) {
+    test(`should restore name drafts after refresh before selecting a goal on ${mobile ? 'mobile' : 'desktop'}`, async ({ page }) => {
+      if (mobile)
+        await page.setViewportSize({ width: 390, height: 844 })
+      const email = `draft-profile-e2e-${Date.now()}-${mobile}@example.com`
+      const password = 'Password123!'
+      await page.fill('[data-test="email"]', email)
+      await page.fill('[data-test="password"]', password)
+      await page.fill('[data-test="confirm-password"]', password)
+      await page.click('[data-test="submit"]')
+      await page.waitForURL(/\/onboarding\/app/)
+      if (!mobile)
+        await continuePastWelcome(page)
+
+      const draftSaved = page.waitForResponse((response) => {
+        if (!response.url().includes('/rest/v1/users?') || response.request().method() !== 'PATCH' || !response.ok())
+          return false
+        const draft = response.request().postDataJSON()?.onboarding?.profile_draft
+        return draft?.first_name === 'Draft' && draft?.last_name === 'User'
+      })
+      await page.fill('[data-test="onboarding-first-name"]', 'Draft')
+      await page.fill('[data-test="onboarding-last-name"]', 'User')
+      await draftSaved
+
+      const supabase = createClient(localSupabaseUrl, localSupabaseAnonKey)
+      const { data: session, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      expect(signInError).toBeNull()
+      const { data: profile, error } = await supabase.from('users')
+        .select('first_name, last_name, onboarding')
+        .eq('id', session.user!.id)
+        .single()
+      expect(error).toBeNull()
+      expect(profile?.first_name || '').toBe('')
+      expect(profile?.last_name || '').toBe('')
+      expect(profile?.onboarding).toMatchObject({ version: 6, profile_draft: { first_name: 'Draft', last_name: 'User' } })
+      await supabase.auth.signOut()
+
+      await page.reload()
+      const resume = page.locator('[data-test="onboarding-resume-continue"]')
+      const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
+      const firstName = page.locator('[data-test="onboarding-first-name"]')
+      await expect(resume.or(welcome).or(firstName)).toBeVisible()
+      if (await resume.isVisible())
+        await resume.click()
+      else if (await welcome.isVisible())
+        await welcome.click()
+      await expect(firstName).toHaveValue('Draft')
+      await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('User')
+      await expect(page.locator('[data-test="app-onboarding-continue-intent"]')).toBeDisabled()
+      await page.click('[data-test="onboarding-intent-ota"]')
+      await page.click('[data-test="app-onboarding-continue-intent"]')
+      await continuePastDevelopmentEnvironmentIfShown(page)
+      await expect(page.locator('[data-test="app-onboarding-name"]')).toBeVisible()
+    })
+  }
+
   test('should save an incomplete profile before creating a standalone organization', async ({ page }) => {
     const email = `standalone-profile-e2e-${Date.now()}@example.com`
     const password = 'Password123!'

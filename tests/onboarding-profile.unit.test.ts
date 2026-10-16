@@ -1,12 +1,14 @@
+import type { Json } from '../src/types/supabase.types'
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createApp, nextTick, reactive } from 'vue'
+import { createApp, nextTick, shallowReactive } from 'vue'
 import OnboardingProfile from '../src/components/OnboardingProfile.vue'
+import { mergeUserOnboardingProgress, serializeUserOnboardingWrite } from '../src/services/userOnboardingWriteQueue'
 import { hasProfileOnboarding, resolveOnboardingAnalyticsVersion } from '../src/utils/onboardingABTests'
 import { createOnboardingDetailsFieldDebouncer } from '../src/utils/onboardingProgressAnalytics'
 
-const mocks = vi.hoisted(() => ({ single: vi.fn(), update: vi.fn(), setUser: vi.fn(), toast: vi.fn() }))
-const state = reactive({ user: { id: 'profile-user', email: 'profile@example.com', first_name: '', last_name: '', onboarding: { version: 6 }, image_url: null } })
+const mocks = vi.hoisted(() => ({ single: vi.fn(), update: vi.fn(), draftWrite: vi.fn(), latest: vi.fn(), setUser: vi.fn(), toast: vi.fn() }))
+const state = shallowReactive({ authGeneration: 0, user: { id: 'profile-user', email: 'profile@example.com', first_name: '', last_name: '', onboarding: { version: 6 } as Json, image_url: null } })
 vi.mock('~/stores/main', () => ({ useMainStore: () => state }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('vue-sonner', () => ({ toast: { error: mocks.toast } }))
@@ -14,10 +16,18 @@ vi.mock('~/services/posthog', () => ({ setUser: mocks.setUser }))
 vi.mock('~/services/supabase', () => ({
   getLocalConfig: () => ({ supaHost: 'https://example.supabase.co' }),
   isLocal: () => false,
-  useSupabase: () => ({ from: () => ({ update: (...args: unknown[]) => {
-    mocks.update(...args)
-    return { eq: () => ({ select: () => ({ single: mocks.single }) }) }
-  } }) }),
+  useSupabase: () => ({ from: () => ({
+    update: (payload: { onboarding?: Json }) => {
+      mocks.update(payload)
+      return { eq: () => ({
+        select: () => ({ single: mocks.single }),
+        filter: (_column: string, _operator: string, expected: string) => ({
+          select: () => ({ maybeSingle: () => mocks.draftWrite(payload.onboarding, JSON.parse(expected)) }),
+        }),
+      }) }
+    },
+    select: () => ({ eq: () => ({ maybeSingle: mocks.latest }) }),
+  }) }),
 }))
 
 let app: ReturnType<typeof createApp> | undefined
@@ -37,11 +47,14 @@ async function enter(container: HTMLElement, field: string, value: string) {
 beforeEach(() => {
   vi.clearAllMocks()
   state.user = { id: 'profile-user', email: 'profile@example.com', first_name: '', last_name: '', onboarding: { version: 6 }, image_url: null }
+  mocks.draftWrite.mockImplementation(async (onboarding: Json) => ({ data: { onboarding }, error: null }))
   mocks.single.mockResolvedValue({ data: { id: 'profile-user', first_name: 'Example', last_name: 'User' }, error: null })
 })
-afterEach(() => {
+afterEach(async () => {
+  state.authGeneration++
   app?.unmount()
   app = undefined
+  await Promise.resolve()
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })
@@ -59,6 +72,104 @@ describe('profile onboarding V6', () => {
     const { container, profile } = mount()
     expect(container.querySelector('input')).toBeNull()
     expect(profile.isValid).toBe(true)
+  })
+
+  it('autosaves both draft fields after 500 ms and restores them after remounting', async () => {
+    vi.useFakeTimers()
+    state.user.onboarding = { version: 6, intent: 'ota', abtests: { retained: true } }
+    const { container } = mount()
+    await enter(container, 'first-name', ' Ex ')
+    await vi.advanceTimersByTimeAsync(300)
+    await enter(container, 'last-name', ' User ')
+    await vi.advanceTimersByTimeAsync(499)
+    expect(mocks.draftWrite).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(state.user.onboarding).toEqual({
+      version: 6,
+      intent: 'ota',
+      abtests: { retained: true },
+      profile_draft: { first_name: ' Ex ', last_name: ' User ' },
+    })
+    expect(state.user.first_name).toBe('')
+    expect(state.user.last_name).toBe('')
+    expect(mocks.setUser).not.toHaveBeenCalled()
+    app?.unmount()
+    const restored = mount().container
+    expect(restored.querySelector<HTMLInputElement>('[data-test="onboarding-first-name"]')?.value).toBe(' Ex ')
+    expect(restored.querySelector<HTMLInputElement>('[data-test="onboarding-last-name"]')?.value).toBe(' User ')
+    expect(mergeUserOnboardingProgress({ step: 'details' }, state.user.onboarding)).toMatchObject({
+      profile_draft: { first_name: ' Ex ', last_name: ' User ' },
+    })
+  })
+
+  it('restores partial drafts and preserves an explicitly cleared prefilled name', async () => {
+    vi.useFakeTimers()
+    state.user.first_name = 'Existing'
+    state.user.onboarding = { version: 6, profile_draft: { last_name: 'Draft' } }
+    const { container, profile } = mount()
+    expect(container.querySelector<HTMLInputElement>('[data-test="onboarding-first-name"]')?.value).toBe('Existing')
+    await enter(container, 'first-name', '')
+    await vi.advanceTimersByTimeAsync(500)
+    expect(container.querySelector<HTMLInputElement>('[data-test="onboarding-first-name"]')?.value).toBe('')
+    expect(profile.isValid).toBe(false)
+    app?.unmount()
+    const restored = mount().container
+    expect(restored.querySelector<HTMLInputElement>('[data-test="onboarding-first-name"]')?.value).toBe('')
+    expect(restored.querySelector<HTMLInputElement>('[data-test="onboarding-last-name"]')?.value).toBe('Draft')
+  })
+
+  it('retries conflicts against the latest onboarding JSON without overwriting newer typing', async () => {
+    vi.useFakeTimers()
+    let finishWrite!: (value: unknown) => void
+    mocks.draftWrite.mockResolvedValueOnce({ data: null, error: null })
+      .mockImplementationOnce(() => new Promise((resolve) => { finishWrite = resolve }))
+    const latest = { version: 6, step: 'intent', abtests: { concurrent: true } }
+    mocks.latest.mockResolvedValue({ data: { onboarding: latest }, error: null })
+    const { container } = mount()
+    await enter(container, 'first-name', 'Old')
+    await vi.advanceTimersByTimeAsync(500)
+    expect(mocks.draftWrite).toHaveBeenNthCalledWith(2, {
+      ...latest,
+      profile_draft: { first_name: 'Old', last_name: '' },
+    }, latest)
+    await enter(container, 'first-name', 'New')
+    finishWrite({ data: { onboarding: { ...latest, profile_draft: { first_name: 'Old', last_name: '' } } }, error: null })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(container.querySelector<HTMLInputElement>('[data-test="onboarding-first-name"]')?.value).toBe('New')
+    await vi.advanceTimersByTimeAsync(500)
+    expect(state.user.onboarding).toMatchObject({ ...latest, profile_draft: { first_name: 'New' } })
+  })
+
+  it('retries failed autosaves on the next edit and flushes pending edits on unmount', async () => {
+    vi.useFakeTimers()
+    mocks.draftWrite.mockResolvedValueOnce({ data: null, error: new Error('offline') })
+    const { container } = mount()
+    await enter(container, 'first-name', 'Example')
+    await vi.advanceTimersByTimeAsync(500)
+    expect(state.user.onboarding).toEqual({ version: 6 })
+    await enter(container, 'last-name', 'User')
+    app?.unmount()
+    app = undefined
+    await vi.advanceTimersByTimeAsync(0)
+    expect(state.user.onboarding).toMatchObject({ profile_draft: { first_name: 'Example', last_name: 'User' } })
+    expect(mocks.setUser).not.toHaveBeenCalled()
+  })
+
+  it('does not write a queued draft after the authentication generation changes', async () => {
+    vi.useFakeTimers()
+    let release!: () => void
+    const blocked = serializeUserOnboardingWrite(state.user.id, () => new Promise<void>((resolve) => {
+      release = resolve
+    }))
+    const { container } = mount()
+    await enter(container, 'first-name', 'Old user')
+    await vi.advanceTimersByTimeAsync(500)
+    state.authGeneration++
+    release()
+    await blocked
+    await vi.advanceTimersByTimeAsync(0)
+    expect(mocks.draftWrite).not.toHaveBeenCalled()
+    expect(state.user.onboarding).toEqual({ version: 6 })
   })
 
   it('updates PostHog person names only after the profile is saved', async () => {

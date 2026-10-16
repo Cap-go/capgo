@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import type { Json } from '~/types/supabase.types'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { setUser } from '~/services/posthog'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
+import { MAX_USER_ONBOARDING_WRITE_ATTEMPTS, replaceUserOnboardingIfUnchanged, serializeUserOnboardingWrite } from '~/services/userOnboardingWriteQueue'
 import { useMainStore } from '~/stores/main'
 import { hasProfileOnboarding } from '~/utils/onboardingABTests'
 
@@ -21,12 +23,86 @@ const firstName = ref(main.user?.first_name ?? '')
 const lastName = ref(main.user?.last_name ?? '')
 const needsProfileName = computed(() => hasProfileOnboarding(main.user?.onboarding) && (!main.user?.first_name?.trim() || !main.user?.last_name?.trim()))
 const isValid = computed(() => !!main.user?.id && (!needsProfileName.value || (!!firstName.value.trim() && !!lastName.value.trim())))
+let draftTimer: ReturnType<typeof setTimeout> | undefined
+let draftUserId = main.user?.id
+let draftAuthGeneration = main.authGeneration
+const edited = { first_name: false, last_name: false }
 
-watch(() => main.user, (user) => {
-  if (!firstName.value.trim())
-    firstName.value = user?.first_name ?? ''
-  if (!lastName.value.trim())
-    lastName.value = user?.last_name ?? ''
+function onboardingObject(value: Json): { [key: string]: Json | undefined } {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+}
+
+watch(() => [main.user, main.authGeneration] as const, ([user, authGeneration]) => {
+  if (draftUserId !== user?.id || draftAuthGeneration !== authGeneration) {
+    clearTimeout(draftTimer)
+    draftTimer = undefined
+    edited.first_name = edited.last_name = false
+    draftUserId = user?.id
+    draftAuthGeneration = authGeneration
+  }
+  const draft = onboardingObject(onboardingObject(user?.onboarding ?? {}).profile_draft ?? {})
+  if (!edited.first_name)
+    firstName.value = typeof draft.first_name === 'string' ? draft.first_name : user?.first_name ?? ''
+  if (!edited.last_name)
+    lastName.value = typeof draft.last_name === 'string' ? draft.last_name : user?.last_name ?? ''
+}, { immediate: true })
+
+async function persistDraft() {
+  const userId = draftUserId
+  const authGeneration = draftAuthGeneration
+  if (!userId || main.user?.id !== userId || main.authGeneration !== authGeneration || !needsProfileName.value)
+    return
+  const profileDraft = { first_name: firstName.value, last_name: lastName.value }
+  const isCurrentUser = () => main.user?.id === userId && main.authGeneration === authGeneration
+  try {
+    await serializeUserOnboardingWrite(userId, async () => {
+      if (!isCurrentUser() || !needsProfileName.value)
+        return
+      let currentOnboarding = main.user!.onboarding
+      for (let attempt = 0; attempt < MAX_USER_ONBOARDING_WRITE_ATTEMPTS; attempt++) {
+        if (!isCurrentUser() || !needsProfileName.value)
+          return
+        const onboarding = { ...onboardingObject(currentOnboarding), profile_draft: profileDraft }
+        const { data, error } = await replaceUserOnboardingIfUnchanged(userId, currentOnboarding, onboarding)
+        if (error)
+          throw error
+        if (data) {
+          if (isCurrentUser())
+            main.user = { ...main.user!, onboarding: data.onboarding }
+          return
+        }
+        const { data: latest, error: latestError } = await supabase.from('users').select('onboarding').eq('id', userId).maybeSingle()
+        if (latestError || !latest)
+          throw latestError ?? new Error('onboarding_profile_draft_missing_user')
+        currentOnboarding = latest.onboarding
+      }
+      throw new Error('onboarding_profile_draft_conflict')
+    })
+  }
+  catch {
+    console.warn('Cannot persist onboarding profile draft')
+  }
+}
+
+function fieldInput(field: 'first_name' | 'last_name', value: string) {
+  edited[field] = true
+  if (field === 'first_name')
+    firstName.value = value
+  else
+    lastName.value = value
+  emit('fieldInput', field, value)
+  clearTimeout(draftTimer)
+  draftTimer = setTimeout(() => {
+    draftTimer = undefined
+    void persistDraft()
+  }, 500)
+}
+
+onBeforeUnmount(() => {
+  if (draftTimer !== undefined) {
+    clearTimeout(draftTimer)
+    void persistDraft()
+  }
 })
 
 async function save() {
@@ -37,6 +113,7 @@ async function save() {
 
   try {
     const userId = main.user.id
+    const authGeneration = main.authGeneration
     const { data, error } = await supabase
       .from('users')
       .update({ first_name: firstName.value.trim(), last_name: lastName.value.trim() })
@@ -44,7 +121,7 @@ async function save() {
       .select('id, first_name, last_name')
       .single()
 
-    if (error || !data || main.user?.id !== userId)
+    if (error || !data || main.user?.id !== userId || main.authGeneration !== authGeneration)
       throw error ?? new Error('onboarding_profile_save_failed')
 
     main.user = { ...main.user, ...data }
@@ -82,14 +159,14 @@ defineExpose({ isValid, save })
       </label>
       <input
         id="onboarding-first-name"
-        v-model="firstName"
+        :value="firstName"
         type="text"
         autocomplete="given-name"
         required
         :disabled="disabled"
         data-test="onboarding-first-name"
         class="d-input mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-950 dark:border-white/20 dark:bg-slate-950/90 dark:text-white"
-        @input="emit('fieldInput', 'first_name', ($event.target as HTMLInputElement).value)"
+        @input="fieldInput('first_name', ($event.target as HTMLInputElement).value)"
       >
     </div>
     <div>
@@ -98,14 +175,14 @@ defineExpose({ isValid, save })
       </label>
       <input
         id="onboarding-last-name"
-        v-model="lastName"
+        :value="lastName"
         type="text"
         autocomplete="family-name"
         required
         :disabled="disabled"
         data-test="onboarding-last-name"
         class="d-input mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-950 dark:border-white/20 dark:bg-slate-950/90 dark:text-white"
-        @input="emit('fieldInput', 'last_name', ($event.target as HTMLInputElement).value)"
+        @input="fieldInput('last_name', ($event.target as HTMLInputElement).value)"
       >
     </div>
   </div>
