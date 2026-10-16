@@ -42,7 +42,7 @@ Try it free: YOUR_AFFILIATE_LINK
 
 If you ship Capacitor apps, store review is the slowest part of the loop.
 
-Capgo gives teams live OTA updates, native cloud builds, channels, and one-click rollback — so a JS fix can go out in minutes, not days.
+Capgo gives teams live OTA updates, native cloud builds, channels, and one-click rollback, so a JS fix can go out in minutes, not days.
 
 14-day unlimited trial: YOUR_AFFILIATE_LINK
 
@@ -52,7 +52,7 @@ Need to ship a Capacitor fix today instead of waiting on App Store or Play revie
 
 ## Newsletter blurb
 
-Capgo — the AI-ready live update platform for Capacitor. Push OTA updates, run native builds, and roll back in one click natively from your CLI or through your AI agent (Cursor/Claude via MCP). The perfect alternative to Ionic Appflow! Free trial: YOUR_AFFILIATE_LINK
+Capgo is the AI-ready live update platform for Capacitor. Push OTA updates, run native builds, and roll back in one click natively from your CLI or through your AI agent (Cursor/Claude via MCP). The perfect alternative to Ionic Appflow! Free trial: YOUR_AFFILIATE_LINK
 
 ## YouTube / video description
 
@@ -101,7 +101,7 @@ You can use these exact URLs to access the banners directly from Capgo's domain:
 
 ```html
 <a href="YOUR_AFFILIATE_LINK" target="_blank" rel="noopener sponsored">
-  <img src="https://capgo.app/affiliate/banner-300x250-medium-rectangle.png" width="300" height="250" alt="Capgo — live updates for Capacitor apps">
+  <img src="https://capgo.app/affiliate/banner-300x250-medium-rectangle.png" width="300" height="250" alt="Capgo: live updates for Capacitor apps">
 </a>
 ```
 
@@ -128,7 +128,7 @@ You can grab the image files directly from the "Assets" tab here in your hub. Ne
 
 Thanks for partnering with us to help developers ship Capacitor apps faster without the App Store wait.
 
-— The Capgo Team
+The Capgo Team
 
 **Categories:**
 Marketing Assets, Product Update
