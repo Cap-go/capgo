@@ -1,5 +1,6 @@
 import type { ClientBase, QueryConfig } from 'pg'
 import type { CleanupLease, CleanupMessage, CleanupQueue } from '../cloudflare_workers/r2_inventory/cleanup.ts'
+import type { CleanupHealth } from '../cloudflare_workers/r2_inventory/health.ts'
 import { Client } from 'pg'
 import { describe, expect, it, vi } from 'vitest'
 import { acquireCleanupLease, CLEANUP_CONFIG, discoverCleanupPage, releaseCleanupLease, retireCleanupRange, runCleanupProducer } from '../cloudflare_workers/r2_inventory/cleanup.ts'
@@ -13,10 +14,6 @@ async function fixture(run: (db: Client, peer: Client, bucket: string, prefix: s
   const prefix = `orgs/${bucket}/apps/com.test.cleanup/delta/`
   await Promise.all([db.connect(), peer.connect()])
   try {
-    await db.query(`INSERT INTO public.r2_inventory_checkpoints(bucket_name,job_name,checkpoint)
-      VALUES ($1,'cleanup_health',jsonb_build_object('schemaVersion',1,'observedAt',clock_timestamp(),
-        'notificationsHealthy',true,'repairsHealthy',true,'manifestReplicationHealthy',true,
-        'deletionConsumerHealthy',true,'deletionBacklog',0))`, [bucket])
     await run(db, peer, bucket, prefix)
   }
   finally {
@@ -60,13 +57,24 @@ async function lease(db: Client, bucket: string): Promise<CleanupLease> {
   expect(result).not.toBeNull()
   return result!
 }
+const directHealth = (): CleanupHealth => ({ schemaVersion: 3, healthy: true, checkedAt: Date.now(), observedAt: new Date().toISOString(), maxAgeSeconds: 120, manifestReplicationHealthy: true, reasons: [] })
 const queue = () => ({ sendBatch: vi.fn().mockResolvedValue(undefined) })
-const retire = (db: ClientBase, bucket: string, run: CleanupLease, keys: string[], cursor: string, q: CleanupQueue) => retireCleanupRange(db, bucket, run, keys, cursor, q, Date.now() + CLEANUP_CONFIG.runMs)
+const retire = (db: ClientBase, bucket: string, run: CleanupLease, keys: string[], cursor: string, q: CleanupQueue) => retireCleanupRange(db, bucket, run, keys, cursor, q, Date.now() + CLEANUP_CONFIG.runMs, directHealth())
 async function checkpoint(db: Client, bucket: string) {
   return (await db.query(`SELECT checkpoint FROM public.r2_inventory_checkpoints WHERE bucket_name=$1 AND job_name='cleanup_producer'`, [bucket])).rows[0].checkpoint
 }
 
 describe('cleanup producer Postgres transactions', () => {
+  it.concurrent('keeps producing without a cleanup backlog cap', () => fixture(async (db, peer, bucket, prefix) => {
+    const key = `${prefix}file`
+    await seed(db, bucket, [key])
+    const q = queue()
+    const health = { ...directHealth(), deletionBacklog: 1_000_000 }
+    expect(await runCleanupProducer(db, bucket, q, health)).toBe(1)
+    expect(q.sendBatch).toHaveBeenCalledOnce()
+    expect((await peer.query('SELECT r2_state FROM public.r2_objects WHERE bucket_name=$1', [bucket])).rows[0].r2_state).toBe('to_be_deleted')
+  }))
+
   it.concurrent('bounds discovery to examined keys and rejects leases, references, unknown/recent age, non-delta/trash/ZIP and retired rows', () => fixture(async (db, _peer, bucket, prefix) => {
     const names = ['eligible', 'expired', 'leased', 'referenced', 'unknown', 'recent-event', 'recent-modified', 'recent-first', 'retired', 'trash/file', 'file.zip', '../file', 'double//file']
     await seed(db, bucket, [...names.map(n => prefix + n), `${prefix.replace('/delta/', '/bundles/')}bundle.zip`])
@@ -131,7 +139,7 @@ describe('cleanup producer Postgres transactions', () => {
     await db.query(`UPDATE public.r2_objects SET r2_state='deleted',tombstone_expires_at=now()+interval '7 days' WHERE bucket_name=$1 AND r2_key=$2`, [bucket, key])
     await expect(db.query(`UPDATE public.r2_objects SET r2_state='present',tombstone_expires_at=NULL WHERE bucket_name=$1 AND r2_key=$2`, [bucket, key])).rejects.toThrow('cannot be reversed')
     const q = queue()
-    await runCleanupProducer(db, bucket, q)
+    await runCleanupProducer(db, bucket, q, directHealth())
     expect(q.sendBatch).not.toHaveBeenCalled()
   }))
 
@@ -209,11 +217,11 @@ describe('cleanup producer Postgres transactions', () => {
     await seed(db, bucket, Array.from({ length: 205 }, (_, i) => prefix + String(i).padStart(4, '0')))
     const q = queue()
     q.sendBatch.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('Second batch unavailable'))
-    await expect(runCleanupProducer(db, bucket, q)).rejects.toThrow('Second batch unavailable')
+    await expect(runCleanupProducer(db, bucket, q, directHealth())).rejects.toThrow('Second batch unavailable')
     expect((await checkpoint(db, bucket)).cursor).toBe(`${prefix}0099`)
     expect((await db.query(`SELECT count(*)::int n FROM public.r2_objects WHERE bucket_name=$1 AND r2_state='to_be_deleted'`, [bucket])).rows[0].n).toBe(100)
     const retry = queue()
-    expect(await runCleanupProducer(db, bucket, retry)).toBe(105)
+    expect(await runCleanupProducer(db, bucket, retry, directHealth())).toBe(105)
     expect(retry.sendBatch.mock.calls.flatMap(call => call[0].map((item: MessageSendRequest<CleanupMessage>) => item.body.key))).not.toContain(`${prefix}0099`)
     expect((await checkpoint(db, bucket)).cursor).toBe('')
   }))
@@ -247,10 +255,10 @@ describe('cleanup producer Postgres transactions', () => {
       return result
     } }
     const q = queue()
-    await expect(runCleanupProducer(wrapped as unknown as ClientBase, bucket, q)).rejects.toMatchObject({ cause: expect.objectContaining({ message: 'Synthetic lost commit response' }) })
+    await expect(runCleanupProducer(wrapped as unknown as ClientBase, bucket, q, directHealth())).rejects.toMatchObject({ cause: expect.objectContaining({ message: 'Synthetic lost commit response' }) })
     expect(q.sendBatch).toHaveBeenCalledTimes(1)
     expect((await checkpoint(db, bucket)).cursor).toBe(`${prefix}0099`)
-    expect(await runCleanupProducer(db, bucket, queue())).toBe(1)
+    expect(await runCleanupProducer(db, bucket, queue(), directHealth())).toBe(1)
   }))
 
   it.concurrent('advances a full zero-result page, wraps, and revisits behind-cursor/previously leased keys', () => fixture(async (db, _peer, bucket, prefix) => {
@@ -265,15 +273,15 @@ describe('cleanup producer Postgres transactions', () => {
         throw new Error('Synthetic interrupted zero-result scan')
       return db.query(statement as string, values)
     } }
-    await expect(runCleanupProducer(interrupted as unknown as ClientBase, bucket, q)).rejects.toThrow('interrupted zero-result scan')
+    await expect(runCleanupProducer(interrupted as unknown as ClientBase, bucket, q, directHealth())).rejects.toThrow('interrupted zero-result scan')
     // This is the last examined key of the first page, despite zero retirements.
     expect((await checkpoint(db, bucket)).cursor).toBe(keys[9999])
-    expect(await runCleanupProducer(db, bucket, q)).toBe(0)
+    expect(await runCleanupProducer(db, bucket, q, directHealth())).toBe(0)
     expect(q.sendBatch).not.toHaveBeenCalled()
     expect((await checkpoint(db, bucket)).cursor).toBe('')
     await seed(db, bucket, [`${prefix}!behind`])
     await db.query(`UPDATE public.r2_objects SET manifest_lease_expires_at=now()-interval '1 second' WHERE bucket_name=$1 AND r2_key=$2`, [bucket, keys[0]])
-    expect(await runCleanupProducer(db, bucket, q)).toBe(2)
+    expect(await runCleanupProducer(db, bucket, q, directHealth())).toBe(2)
   }))
 
   it.concurrent('stops before publication when budget or health becomes unsafe without advancing unfinished work', () => fixture(async (db, _peer, bucket, prefix) => {
@@ -281,9 +289,8 @@ describe('cleanup producer Postgres transactions', () => {
     await seed(db, bucket, [key])
     const run = await lease(db, bucket)
     const q = queue()
-    await expect(retireCleanupRange(db, bucket, run, [key], key, q, Date.now())).rejects.toThrow('budget exhausted')
-    await db.query(`UPDATE public.r2_inventory_checkpoints SET checkpoint=checkpoint||'{"deletionBacklog":10001}'::jsonb WHERE bucket_name=$1 AND job_name='cleanup_health'`, [bucket])
-    await expect(retire(db, bucket, run, [key], key, q)).rejects.toThrow('health evidence')
+    await expect(retireCleanupRange(db, bucket, run, [key], key, q, Date.now(), directHealth())).rejects.toThrow('budget exhausted')
+    await expect(retireCleanupRange(db, bucket, run, [key], key, q, Date.now() + CLEANUP_CONFIG.runMs, { ...directHealth(), healthy: false })).rejects.toThrow('health check')
     expect(q.sendBatch).not.toHaveBeenCalled()
     expect((await checkpoint(db, bucket)).cursor).toBe('')
   }))

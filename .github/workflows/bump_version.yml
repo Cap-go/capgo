@@ -104,6 +104,8 @@ jobs:
       contents: write
     outputs:
       published: ${{ steps.publish.outputs.published }}
+      native_build: ${{ steps.capgo_version.outputs.native_build }}
+      capgo_tag: ${{ steps.capgo_tag.outputs.tag }}
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -168,6 +170,7 @@ jobs:
 
           if [ "$exit_code" -eq 0 ]; then
             echo "release_as=$DEFAULT_RELEASE_AS" >> "$GITHUB_OUTPUT"
+            echo "native_build=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -193,6 +196,7 @@ jobs:
           fi
 
           echo "release_as=major" >> "$GITHUB_OUTPUT"
+          echo "native_build=true" >> "$GITHUB_OUTPUT"
       - name: Git config
         run: |
           git config --local user.name "github-actions[bot]"
@@ -282,6 +286,12 @@ jobs:
               fi
             fi
           fi
+      - name: Resolve new Capgo tag
+        id: capgo_tag
+        if: ${{ needs.changes.outputs.run_capgo == 'true' }}
+        run: |
+          tag="$(git tag --list | sort | comm -13 "$RUNNER_TEMP/release-tags-before" - | grep '^capgo-[0-9]' | grep -v -- '-alpha\.' | head -n 1 || true)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Publish release atomically
         id: publish
         env:
@@ -298,3 +308,21 @@ jobs:
           else
             echo "published=false" >> "$GITHUB_OUTPUT"
           fi
+  # A native change needs a new store binary: build both platforms from the new
+  # tag and submit them for store review without manual dispatch.
+  native-store-release:
+    needs: bump-version
+    if: ${{ github.ref == 'refs/heads/main' && needs.bump-version.outputs.published == 'true' && needs.bump-version.outputs.native_build == 'true' && needs.bump-version.outputs.capgo_tag != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    name: Trigger native store builds
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch iOS and Android store builds
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.bump-version.outputs.capgo_tag }}
+        run: |
+          gh workflow run build_mobile_ios.yml --repo "$GITHUB_REPOSITORY" --ref main -f tag="$TAG" -f submit_to_store_review=true
+          gh workflow run build_mobile_android.yml --repo "$GITHUB_REPOSITORY" --ref main -f tag="$TAG" -f submit_to_store_review=true

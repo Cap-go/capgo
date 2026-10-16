@@ -55,4 +55,4 @@ Code: `supabase/functions/_backend/mcp/` (transport, protocol, tools and OAuth) 
 
 ## ChatGPT / Codex plugin
 
-The OpenAI plugin package for this server lives in `integrations/openai-plugin/`. Build the submission ZIP with `bun scripts/build-openai-plugin.ts`. OpenAI domain verification is served from `/.well-known/openai-apps-challenge` using the `OPENAI_APPS_CHALLENGE_TOKEN` worker secret.
+The OpenAI plugin package for this server lives at the repo root (`plugin.json`, `mcp.json`, `skills/`, `assets/plugin/`); its notes are in `integrations/openai-plugin/`. Build the submission ZIP with `bun scripts/build-openai-plugin.ts`. OpenAI domain verification is served from `/.well-known/openai-apps-challenge` using the `OPENAI_APPS_CHALLENGE_TOKEN` worker secret.
