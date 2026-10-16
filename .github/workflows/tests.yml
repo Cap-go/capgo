@@ -277,25 +277,33 @@ jobs:
           fetch-depth: 2
       - name: Setup bun
         run: bash scripts/setup-bun.sh
-      - name: Validate migration timestamps
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-        run: bash scripts/check-supabase-migration-order.sh
-      - name: Check for typos
-        uses: crate-ci/typos@v1 # v1.45.1
-      - name: Check for console statements
-        run: |
-          if grep -r --exclude="logging.ts" --exclude=".env" --exclude=".env.*" "console\." supabase/functions/; then
-            echo "Found console statements in supabase/functions directory, use cloudlog instead"
-            exit 1
-          else
-            echo "No console statements found in supabase/functions directory"
-          fi
-      - name: Install dependencies
-        run: bun install
-      - name: Lint
-        run: bun lint && bun lint:backend
-      - name: Typecheck
-        run: bun typecheck
+      - parallel:
+          - name: Validate migration timestamps
+            if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+            run: bash scripts/check-supabase-migration-order.sh
+          - name: Check for typos
+            uses: crate-ci/typos@v1 # v1.45.1
+          - name: Check for console statements
+            run: |
+              if grep -r --exclude="logging.ts" --exclude=".env" --exclude=".env.*" "console\." supabase/functions/; then
+                echo "Found console statements in supabase/functions directory, use cloudlog instead"
+                exit 1
+              else
+                echo "No console statements found in supabase/functions directory"
+              fi
+          - name: Install dependencies
+            run: bun install
+      - parallel:
+          - name: Lint frontend
+            run: bun lint
+          - name: Lint backend
+            run: bun lint:backend
+          - name: Typecheck CLI
+            run: bun run cli:typecheck
+          - name: Typecheck backend
+            run: bun run typecheck:backend
+          - name: Typecheck frontend
+            run: bun run typecheck:frontend
 
   test_unit:
     needs: changes
@@ -396,24 +404,35 @@ jobs:
         uses: actions/checkout@v6 # v6
         with:
           fetch-depth: 2
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2 # v2.0.0
+        with:
+          version: 2.109.1
+      - name: Pre-pull Supabase images
+        # Start pulling while the runner sets up; supabase start reuses in-flight layers.
+        background: true
+        continue-on-error: true
+        run: |
+          supabase services --workdir . -o json \
+            | jq -r '.[] | select(.name | test("/(postgres|gotrue|postgrest|storage-api|edge-runtime)$")) | "ghcr.io/supabase/\(.name | split("/") | last):\(.local)"' \
+            | xargs -P 5 -n 1 docker pull -q
       - name: Setup Node.js
         uses: actions/setup-node@v6 # v6
         with:
           node-version: 24.x
       - name: Setup bun
         run: bash scripts/setup-bun.sh
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v2 # v2.0.0
-        with:
-          version: 2.109.1
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - name: Install dependencies
-        run: bun install
-      - name: Run Supabase Start
-        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      - parallel:
+          - name: Install dependencies
+            run: bun install
+          - name: Run Supabase Start
+            env:
+              SUPABASE_CLI_BIN: supabase
+            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated Supabase endpoints
         run: |
           bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)' >> "$GITHUB_ENV"
@@ -538,24 +557,35 @@ jobs:
         uses: actions/checkout@v6 # v6
         with:
           fetch-depth: 2
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2 # v2.0.0
+        with:
+          version: 2.109.1
+      - name: Pre-pull Supabase images
+        # Start pulling while the runner sets up; supabase start reuses in-flight layers.
+        background: true
+        continue-on-error: true
+        run: |
+          supabase services --workdir . -o json \
+            | jq -r '.[] | select(.name | test("/(postgres|gotrue|postgrest|storage-api|edge-runtime)$")) | "ghcr.io/supabase/\(.name | split("/") | last):\(.local)"' \
+            | xargs -P 5 -n 1 docker pull -q
       - name: Setup Node.js
         uses: actions/setup-node@v6 # v6
         with:
           node-version: 24.x
       - name: Setup bun
         run: bash scripts/setup-bun.sh
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v2 # v2.0.0
-        with:
-          version: 2.109.1
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - name: Install dependencies
-        run: bun install
-      - name: Run Supabase Start
-        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      - parallel:
+          - name: Install dependencies
+            run: bun install
+          - name: Run Supabase Start
+            env:
+              SUPABASE_CLI_BIN: supabase
+            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated Supabase endpoints
         run: |
           bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)' >> "$GITHUB_ENV"
@@ -649,16 +679,24 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 2
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.109.1
+      - name: Pre-pull Supabase images
+        # Start pulling while the runner sets up; supabase start reuses in-flight layers.
+        background: true
+        continue-on-error: true
+        run: |
+          supabase services --workdir . -o json \
+            | jq -r '.[] | select(.name | test("/(postgres|gotrue|postgrest|storage-api|edge-runtime)$")) | "ghcr.io/supabase/\(.name | split("/") | last):\(.local)"' \
+            | xargs -P 5 -n 1 docker pull -q
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24.x
       - name: Setup bun
         run: bash scripts/setup-bun.sh
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v2
-        with:
-          version: 2.109.1
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
@@ -719,24 +757,35 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 2
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.109.1
+      - name: Pre-pull Supabase images
+        # Start pulling while the runner sets up; supabase start reuses in-flight layers.
+        background: true
+        continue-on-error: true
+        run: |
+          supabase services --workdir . -o json \
+            | jq -r '.[] | select(.name | test("/(postgres|gotrue|postgrest|storage-api|edge-runtime)$")) | "ghcr.io/supabase/\(.name | split("/") | last):\(.local)"' \
+            | xargs -P 5 -n 1 docker pull -q
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24.x
       - name: Setup bun
         run: bash scripts/setup-bun.sh
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v2
-        with:
-          version: 2.109.1
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - name: Install dependencies
-        run: bun install
-      - name: Run Supabase Start
-        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      - parallel:
+          - name: Install dependencies
+            run: bun install
+          - name: Run Supabase Start
+            env:
+              SUPABASE_CLI_BIN: supabase
+            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated Supabase endpoints
         run: |
           bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)' >> "$GITHUB_ENV"
@@ -827,24 +876,35 @@ jobs:
         uses: actions/checkout@v6 # v6
         with:
           fetch-depth: 2
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2 # v2.0.0
+        with:
+          version: 2.109.1
+      - name: Pre-pull Supabase images
+        # Start pulling while the runner sets up; supabase start reuses in-flight layers.
+        background: true
+        continue-on-error: true
+        run: |
+          supabase services --workdir . -o json \
+            | jq -r '.[] | select(.name | test("/(postgres|gotrue|postgrest|storage-api|edge-runtime)$")) | "ghcr.io/supabase/\(.name | split("/") | last):\(.local)"' \
+            | xargs -P 5 -n 1 docker pull -q
       - name: Setup Node.js
         uses: actions/setup-node@v6 # v6
         with:
           node-version: 24.x
       - name: Setup bun
         run: bash scripts/setup-bun.sh
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v2 # v2.0.0
-        with:
-          version: 2.109.1
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - name: Install dependencies
-        run: bun install
-      - name: Run Supabase Start
-        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      - parallel:
+          - name: Install dependencies
+            run: bun install
+          - name: Run Supabase Start
+            env:
+              SUPABASE_CLI_BIN: supabase
+            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated test endpoints
         run: |
           {
@@ -936,24 +996,35 @@ jobs:
         uses: actions/checkout@v6 # v6
         with:
           fetch-depth: 2
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2 # v2.0.0
+        with:
+          version: 2.109.1
+      - name: Pre-pull Supabase images
+        # Start pulling while the runner sets up; supabase start reuses in-flight layers.
+        background: true
+        continue-on-error: true
+        run: |
+          supabase services --workdir . -o json \
+            | jq -r '.[] | select(.name | test("/(postgres|gotrue|postgrest|storage-api|edge-runtime)$")) | "ghcr.io/supabase/\(.name | split("/") | last):\(.local)"' \
+            | xargs -P 5 -n 1 docker pull -q
       - name: Setup Node.js
         uses: actions/setup-node@v6 # v6
         with:
           node-version: 24.x
       - name: Setup bun
         run: bash scripts/setup-bun.sh
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v2 # v2.0.0
-        with:
-          version: 2.109.1
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - name: Install dependencies
-        run: bun install
-      - name: Run Supabase Start
-        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      - parallel:
+          - name: Install dependencies
+            run: bun install
+          - name: Run Supabase Start
+            env:
+              SUPABASE_CLI_BIN: supabase
+            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated test endpoints
         run: |
           {
@@ -1071,6 +1142,18 @@ jobs:
         uses: actions/checkout@v6 # v6
         with:
           fetch-depth: 2
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2 # v2.0.0
+        with:
+          version: 2.109.1
+      - name: Pre-pull Supabase images
+        # Start pulling while the runner sets up; supabase start reuses in-flight layers.
+        background: true
+        continue-on-error: true
+        run: |
+          supabase services --workdir . -o json \
+            | jq -r '.[] | select(.name | test("/(postgres|gotrue|postgrest|storage-api|edge-runtime)$")) | "ghcr.io/supabase/\(.name | split("/") | last):\(.local)"' \
+            | xargs -P 5 -n 1 docker pull -q
       - name: Setup bun
         run: bash scripts/setup-bun.sh
       - name: Install dependencies
@@ -1090,10 +1173,6 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: playwright-browsers-shell-${{ runner.os }}-${{ steps.playwright_version.outputs.version }}
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v2 # v2.0.0
-        with:
-          version: 2.109.1
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - id: start_playwright_services
@@ -1528,22 +1607,33 @@ jobs:
         uses: actions/checkout@v6 # v6
         with:
           fetch-depth: 2
-      - name: Setup bun
-        run: bash scripts/setup-bun.sh
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
           version: 2.109.1
+      - name: Pre-pull Supabase images
+        # Start pulling while the runner sets up; supabase start reuses in-flight layers.
+        background: true
+        continue-on-error: true
+        run: |
+          supabase services --workdir . -o json \
+            | jq -r '.[] | select(.name | test("/(postgres|gotrue|postgrest|storage-api|edge-runtime)$")) | "ghcr.io/supabase/\(.name | split("/") | last):\(.local)"' \
+            | xargs -P 5 -n 1 docker pull -q
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - name: Install dependencies and build CLI
-        run: |
-          bun install
-          bun run cli:build
-      - name: Run Supabase Start
-        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      - parallel:
+          - name: Install dependencies and build CLI
+            run: |
+              bun install
+              bun run cli:build
+          - name: Run Supabase Start
+            env:
+              SUPABASE_CLI_BIN: supabase
+            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated Supabase endpoints
         run: |
           bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)' >> "$GITHUB_ENV"
@@ -1613,6 +1703,18 @@ jobs:
         uses: actions/checkout@v6
       # Full history took ~3.5 minutes. The contract only needs the cli-* tags and
       # their cli/src blobs, which git fetches lazily from this blob-less tag fetch.
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.109.1
+      - name: Pre-pull Supabase images
+        # Start pulling while the runner sets up; supabase start reuses in-flight layers.
+        background: true
+        continue-on-error: true
+        run: |
+          supabase services --workdir . -o json \
+            | jq -r '.[] | select(.name | test("/(postgres|gotrue|postgrest|storage-api|edge-runtime)$")) | "ghcr.io/supabase/\(.name | split("/") | last):\(.local)"' \
+            | xargs -P 5 -n 1 docker pull -q
       - name: Fetch published CLI tags
         run: git fetch --no-tags --depth=1 --filter=blob:none origin '+refs/tags/cli-*:refs/tags/cli-*'
       - name: Cache Deno dependencies
@@ -1624,10 +1726,6 @@ jobs:
             deno-${{ runner.os }}-
       - name: Setup bun
         run: bash scripts/setup-bun.sh
-      - name: Install Supabase CLI
-        uses: supabase/setup-cli@v2
-        with:
-          version: 2.109.1
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
