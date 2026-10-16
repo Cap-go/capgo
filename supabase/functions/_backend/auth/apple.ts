@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { parseSignupAttributionRecord } from '../../shared/signup-attribution.ts'
 import { checkRegistrationEmail, getCaptchaSecret, isAuthRateLimitError, isCaptchaFailedError, provisionUserProfile } from '../utils/accountProvisioning.ts'
 import { appleHash, appleQuery, appleRandom, openAppleCredential, rememberAppleName, sealAppleCredential } from '../utils/appleAuthStore.ts'
-import { isAppleRolloutEnabled, isAppleSignInConfigured, isNativeAppleLoginConfigured, verifyAppleIdentity } from '../utils/appleSignIn.ts'
+import { isAppleLoginApiEnabled, isAppleRolloutEnabled, isAppleSignInConfigured, verifyAppleIdentity } from '../utils/appleSignIn.ts'
 import { CacheHelper } from '../utils/cache.ts'
 import { simpleErrorWithStatus, useCors } from '../utils/hono.ts'
 import { getClientIP } from '../utils/rate_limit.ts'
@@ -140,8 +140,6 @@ type AppleName = Awaited<ReturnType<typeof rememberAppleName>>
 type AuthClient = ReturnType<typeof emptySupabaseWithClientIP>
 
 async function verifyCredential(c: Context, body: AppleCredential, web: boolean, expectedSubject: string | null) {
-  if (!web && !body.reauthenticate && !await isNativeAppleLoginConfigured(c))
-    throw new AppleAuthError(503, 'apple_login_unavailable')
   if (getCaptchaSecret(c) && !body.captcha_token)
     throw new AppleAuthError(422, 'captcha_failed')
   let identity
@@ -208,6 +206,8 @@ async function saveProfile(c: Context, client: AuthClient, user: User & { email:
 }
 
 async function complete(c: Context, body: AppleCredential, web = false, expectedId: string | null = null, expectedSubject: string | null = null) {
+  if (!body.reauthenticate && !expectedId && !await isAppleLoginApiEnabled(c))
+    throw new AppleAuthError(503, 'apple_login_unavailable')
   const { identity, caller } = await verifyCredential(c, body, web, expectedSubject)
   expectedId = caller?.id ?? expectedId
   await checkEmail(c, identity.email)
@@ -308,7 +308,7 @@ app.post('/start', async (c) => {
   const subject = caller?.identities?.find(identity => identity.provider === 'apple')?.identity_data?.sub
   if (caller && (typeof subject !== 'string' || !subject))
     throw new AppleAuthError(403, 'reauth_user_mismatch')
-  if (!caller && !await isAppleRolloutEnabled(c, 'WEB_APPLE_LOGIN_ENABLED'))
+  if (!caller && !await isAppleLoginApiEnabled(c))
     throw new AppleAuthError(503, 'apple_login_unavailable')
   const state = appleRandom()
   const nonce = appleRandom()
@@ -386,31 +386,46 @@ app.post('/exchange', async (c) => {
   const body = parsed.data
   if (getCaptchaSecret(c) && !body.captcha_token)
     throw new AppleAuthError(422, 'captcha_failed')
-  // Atomic consumption also checks the verifier: a wrong verifier cannot burn a code.
+  const apiEnabled = await isAppleLoginApiEnabled(c)
+  // Atomic consumption checks the verifier and availability before consuming a new
+  // login. A stored, authenticated same-account reauthentication stays usable.
   const [attempt] = await appleQuery<AppleAttempt>(c, `DELETE FROM public.apple_auth_attempts
-    WHERE exchange_hash = $1 AND code_challenge = $2 AND expires_at > now() RETURNING *`, [await appleHash(body.code), await appleHash(body.code_verifier)])
+    WHERE exchange_hash = $1 AND code_challenge = $2 AND expires_at > now()
+      AND ($3::boolean OR expected_user_id IS NOT NULL) RETURNING *`, [await appleHash(body.code), await appleHash(body.code_verifier), apiEnabled])
   if (!attempt?.credential)
-    throw new AppleAuthError(400, 'invalid_exchange')
+    throw new AppleAuthError(apiEnabled ? 400 : 503, apiEnabled ? 'invalid_exchange' : 'apple_login_unavailable')
   const credential = await openAppleCredential<{ id_token: string, authorization_code: string }>(c, attempt.credential)
   const response = await complete(c, { id_token: credential.id_token, nonce: attempt.nonce, captcha_token: body.captcha_token, registration_metadata: attempt.registration_metadata as z.infer<typeof registrationMetadataSchema> }, true, attempt.expected_user_id, attempt.expected_subject)
   return c.json({ ...response, authorization_code: credential.authorization_code })
 })
 
 app.get('/capabilities', async (c) => {
+  const disabled = { native: { enabled: false, api_enabled: false }, web: { enabled: false, api_enabled: false, redirect_uris: [] as string[] } }
   try {
-    const config = oauthConfig(c)
-    if (!isAppleSignInConfigured(c) || !await isAppleRolloutEnabled(c, 'WEB_APPLE_LOGIN_ENABLED'))
-      return c.json({ web: { enabled: false, redirect_uris: [] } })
+    if (!await isAppleLoginApiEnabled(c))
+      return c.json(disabled)
     const response = await fetch(`${getEnv(c, 'SUPABASE_URL')}/auth/v1/settings`, {
       headers: { apikey: getEnv(c, 'SUPABASE_ANON_KEY') },
       signal: AbortSignal.timeout(5000),
     })
     const settings = await response.json() as { external?: { apple?: boolean } }
     if (!response.ok || settings.external?.apple !== true)
-      return c.json({ web: { enabled: false, redirect_uris: [] } })
-    return c.json({ web: { enabled: true, redirect_uris: config.redirects } })
+      return c.json(disabled)
+    const [nativeVisible, webVisible] = await Promise.all([
+      isAppleRolloutEnabled(c, 'NATIVE_APPLE_LOGIN_ENABLED'),
+      isAppleRolloutEnabled(c, 'WEB_APPLE_LOGIN_ENABLED'),
+    ])
+    let redirects: string[] = []
+    try {
+      redirects = oauthConfig(c).redirects
+    }
+    catch {}
+    return c.json({
+      native: { enabled: nativeVisible, api_enabled: true },
+      web: { enabled: webVisible && redirects.length > 0, api_enabled: redirects.length > 0, redirect_uris: redirects },
+    })
   }
   catch {
-    return c.json({ web: { enabled: false, redirect_uris: [] } })
+    return c.json(disabled)
   }
 })

@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
   setSession: vi.fn(),
   fullPath: '/login',
+  assign: vi.fn(),
 }))
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => mocks.available } }))
 vi.mock('vue-router', () => ({
@@ -73,6 +74,8 @@ beforeEach(() => {
   mocks.available = true
   mocks.fullPath = '/login'
   sessionStorage.clear()
+  vi.stubEnv('DEV', true)
+  vi.stubEnv('VITE_DEV_APPLE_LOGIN_ENABLED', '')
   mocks.signIn.mockResolvedValue({ user: { id: 'apple-user', email: 'apple@example.com' } })
   mocks.rpc.mockResolvedValue({ data: true, error: null })
   mocks.signOut.mockResolvedValue({ error: null })
@@ -87,6 +90,7 @@ afterEach(() => {
   app = undefined
   document.body.innerHTML = ''
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
 })
 
 describe('native Apple login page', () => {
@@ -121,6 +125,27 @@ describe('native Apple login page', () => {
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
     expect(mocks.replace).not.toHaveBeenCalled()
     expect(mocks.error).toHaveBeenCalledWith(messages['apple-login-failed'])
+  })
+
+  it.each([true, false])('shows the browser opt-in only in development: DEV=%s', async (development) => {
+    mocks.available = false
+    vi.stubEnv('DEV', development)
+    vi.stubEnv('VITE_DEV_APPLE_LOGIN_ENABLED', 'true')
+    vi.stubGlobal('location', { origin: 'https://localhost:5173', protocol: 'https:', href: 'https://localhost:5173/login', assign: mocks.assign })
+    vi.mocked(fetch).mockImplementation(async url => String(url).endsWith('/capabilities')
+      ? Response.json({ web: { enabled: false, api_enabled: true, redirect_uris: ['https://localhost:5173/login'] } })
+      : Response.json({ authorization_url: 'https://appleid.apple.com/auth/authorize' }))
+    const root = await mount()
+    const button = root.querySelector('[data-test="apple-sign-in"]') as HTMLButtonElement | null
+    if (!development) {
+      expect(button).toBeNull()
+      return
+    }
+    expect(button).not.toBeNull()
+    button!.click()
+    await settle()
+    await vi.waitFor(() => expect(mocks.assign).toHaveBeenCalledWith('https://appleid.apple.com/auth/authorize'))
+    expect(mocks.signIn).not.toHaveBeenCalled()
   })
 
   it('hides the Apple button when the native availability gate is false', async () => {

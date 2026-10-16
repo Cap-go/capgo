@@ -23,6 +23,7 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 function context() {
+  vi.stubEnv('APPLE_LOGIN_API_ENABLED', 'true')
   vi.stubEnv('NATIVE_APPLE_LOGIN_ENABLED', 'true')
   vi.stubEnv('APPLE_SIGN_IN_CLIENT_ID', 'com.example.capgo')
   vi.stubEnv('APPLE_SIGN_IN_TEAM_ID', 'EXAMPLETEAM')
@@ -55,6 +56,24 @@ describe('apple token exchange and revocation', () => {
     vi.stubEnv('NATIVE_APPLE_LOGIN_ENABLED', 'false')
     expect(await isNativeAppleLoginConfigured(c)).toBe(false)
   })
+  it('never advertises public native UI merely because the backend API is ready', async () => {
+    const c = context()
+    vi.stubEnv('NATIVE_APPLE_LOGIN_ENABLED', 'false')
+    expect(await isNativeAppleLoginConfigured(c)).toBe(false)
+    vi.stubEnv('NATIVE_APPLE_LOGIN_ENABLED', 'true')
+    vi.stubEnv('APPLE_LOGIN_API_ENABLED', 'false')
+    expect(await isNativeAppleLoginConfigured(c)).toBe(false)
+  })
+  it('reads the independent API switch from Vault and fails closed on lookup errors', async () => {
+    const c = context()
+    vi.stubEnv('APPLE_LOGIN_API_ENABLED', undefined)
+    pg.query.mockResolvedValue({ rows: [{ decrypted_secret: 'true' }] })
+    expect(await isNativeAppleLoginConfigured(c)).toBe(true)
+    expect(pg.query).toHaveBeenCalledWith(expect.stringContaining('WHERE name = $1 LIMIT 1'), ['APPLE_LOGIN_API_ENABLED'])
+    pg.query.mockRejectedValue(new Error('Database unavailable'))
+    expect(await isNativeAppleLoginConfigured(c)).toBe(false)
+  })
+
   it('reads the runtime rollout switch from Vault and fails closed on database errors', async () => {
     const c = context()
     vi.stubEnv('NATIVE_APPLE_LOGIN_ENABLED', undefined)
@@ -67,6 +86,8 @@ describe('apple token exchange and revocation', () => {
 
   it('verifies Apple identity before revoking the exchanged access token', async () => {
     const c = context()
+    vi.stubEnv('NATIVE_APPLE_LOGIN_ENABLED', 'false')
+    vi.stubEnv('APPLE_LOGIN_API_ENABLED', 'false')
     const fetchMock = mockApple()
     await revokeAppleAuthorization(c, 'fresh-code', 'apple-subject')
     const revokeCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith('/auth/revoke')) as unknown as [string, RequestInit]

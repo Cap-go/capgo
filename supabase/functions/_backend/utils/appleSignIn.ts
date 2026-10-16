@@ -36,13 +36,17 @@ export function isAppleSignInConfigured(c: Context) {
   return requiredSettings.every(key => getEnv(c, key).trim().length > 0)
 }
 
+export async function isAppleLoginApiEnabled(c: Context) {
+  return isAppleSignInConfigured(c) && isAppleRolloutEnabled(c, 'APPLE_LOGIN_API_ENABLED')
+}
+
 export async function isNativeAppleLoginConfigured(c: Context) {
-  if (!isAppleSignInConfigured(c))
+  if (!await isAppleLoginApiEnabled(c))
     return false
   return isAppleRolloutEnabled(c, 'NATIVE_APPLE_LOGIN_ENABLED')
 }
 
-export async function isAppleRolloutEnabled(c: Context, setting: 'NATIVE_APPLE_LOGIN_ENABLED' | 'WEB_APPLE_LOGIN_ENABLED') {
+export async function isAppleRolloutEnabled(c: Context, setting: 'APPLE_LOGIN_API_ENABLED' | 'NATIVE_APPLE_LOGIN_ENABLED' | 'WEB_APPLE_LOGIN_ENABLED') {
   // Environment values are deployment-time overrides; Vault owns runtime rollout.
   const override = getEnv(c, setting)
   if (override)

@@ -1,4 +1,5 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js'
+import { Capacitor } from '@capacitor/core'
 import { base64url } from 'jose'
 import { parseSignupAttributionRecord } from '../../supabase/functions/shared/signup-attribution'
 import { defaultApiHost } from './supabase'
@@ -26,11 +27,36 @@ function readAttempt(): PendingAppleOAuth | null {
   return null
 }
 
+interface AppleWebCapability {
+  enabled?: boolean
+  api_enabled?: boolean
+  redirect_uris?: string[]
+}
+
+function developmentAppleOAuthEnabled() {
+  return import.meta.env.DEV && import.meta.env.VITE_DEV_APPLE_LOGIN_ENABLED === 'true'
+    && !Capacitor.isNativePlatform() && location.protocol === 'https:'
+}
+
+export async function loadDevelopmentAppleOAuthAvailability() {
+  if (!developmentAppleOAuthEnabled())
+    return false
+  try {
+    const response = await fetch(`${defaultApiHost}/auth/apple/capabilities`, { signal: AbortSignal.timeout(5000) })
+    const capabilities = await response.json() as { web?: AppleWebCapability }
+    return response.ok && capabilities.web?.api_enabled === true
+      && capabilities.web.redirect_uris?.includes(`${location.origin}/login`) === true
+  }
+  catch { return false }
+}
+
 export async function startAppleOAuth(url: URL) {
   const redirectUri = `${location.origin}/login`
   const capabilityResponse = await fetch(`${defaultApiHost}/auth/apple/capabilities`)
-  const capabilities = await capabilityResponse.json() as { web?: { enabled: boolean, redirect_uris: string[] } }
-  if (!capabilityResponse.ok || capabilities.web?.enabled !== true || !capabilities.web.redirect_uris?.includes(redirectUri))
+  const capabilities = await capabilityResponse.json() as { web?: AppleWebCapability }
+  const visible = capabilities.web?.enabled === true
+    || (developmentAppleOAuthEnabled() && capabilities.web?.api_enabled === true)
+  if (!capabilityResponse.ok || !visible || !capabilities.web?.redirect_uris?.includes(redirectUri))
     throw new Error('Apple login is unavailable')
   const verifier = base64url.encode(crypto.getRandomValues(new Uint8Array(32)))
   const state = base64url.encode(crypto.getRandomValues(new Uint8Array(32)))

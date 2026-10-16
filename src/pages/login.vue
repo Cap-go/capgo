@@ -18,7 +18,7 @@ import IconScanQrCode from '~icons/lucide/scan-qr-code'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
-import { captureAppleOAuthCallback, completeAppleOAuth, consumeAppleOAuthLandingError, hasPendingAppleOAuth, startAppleOAuth } from '~/services/appleOAuth'
+import { captureAppleOAuthCallback, completeAppleOAuth, consumeAppleOAuthLandingError, hasPendingAppleOAuth, loadDevelopmentAppleOAuthAvailability, startAppleOAuth } from '~/services/appleOAuth'
 import { hideLoader } from '~/services/loader'
 import { isNativeAppleLoginAvailable, signInWithApple } from '~/services/nativeAppleLogin'
 import { autoAuth, defaultApiHost, hashEmail, useSupabase } from '~/services/supabase'
@@ -32,7 +32,8 @@ const route = useRoute('/login')
 const supabase = useSupabase()
 const isLoading = ref(false)
 const isAppleLoading = ref(false)
-const appleLoginAvailable = computed(() => isNativeAppleLoginAvailable())
+const developmentAppleLoginAvailable = ref(false)
+const appleLoginAvailable = computed(() => isNativeAppleLoginAvailable() || developmentAppleLoginAvailable.value)
 const isMobile = ref(Capacitor.isNativePlatform())
 const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
@@ -348,13 +349,17 @@ async function login(form: { email: string, password: string }) {
 }
 
 async function handleAppleLogin() {
-  if (isLoading.value || !isNativeAppleLoginAvailable())
+  if (isLoading.value || !appleLoginAvailable.value)
     return
 
   isLoading.value = true
   isAppleLoading.value = true
   let hasAppleSession = false
   try {
+    if (!isNativeAppleLoginAvailable()) {
+      await startAppleOAuth(new URL(location.href))
+      return
+    }
     const result = await signInWithApple(supabase, turnstileToken.value || undefined)
     if (!result)
       return
@@ -899,6 +904,9 @@ async function goback() {
   focusLoginEmailInput()
 }
 onMounted(checkLogin)
+onMounted(async () => {
+  developmentAppleLoginAvailable.value = await loadDevelopmentAppleOAuthAvailability()
+})
 </script>
 
 <template>
