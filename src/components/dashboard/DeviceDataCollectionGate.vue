@@ -14,7 +14,7 @@ const { t } = useI18n()
 
 const missing = computed(() => props.requires.filter(key => !props.collection[key]))
 const missingLabels = computed(() => missing.value.map(key => t(`collect-${key.replaceAll('_', '-')}`)).join(', '))
-const settingsLink = computed(() => `/app/${encodeURIComponent(props.appId)}/settings`)
+const settingsLink = computed(() => `/app/${encodeURIComponent(props.appId)}/settings#device-data-collection`)
 </script>
 
 <template>

@@ -282,6 +282,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       const fieldset = page.locator('[data-test="device-data-collection"]')
       try {
         await fieldset.waitFor({ state: 'visible', timeout: 5000 })
+        await fieldset.locator('summary').click()
         await fieldset.scrollIntoViewIfNeeded()
       }
       catch (error) {

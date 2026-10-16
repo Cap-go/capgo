@@ -276,6 +276,8 @@ async function deleteApp() {
 }
 
 const deviceDataCollection = computed(() => parseAppRowDeviceDataCollection(appRef.value as unknown))
+const deviceDataCollectedCount = computed(() => DEVICE_DATA_COLLECTION_KEYS.filter(key => deviceDataCollection.value[key]).length)
+const deviceDataCollectionOpen = ref(useRoute().hash === '#device-data-collection')
 
 async function submit(form: {
   app_name: string
@@ -1616,11 +1618,30 @@ async function transferAppOwnership() {
                 :label="t('block-provider-infra-requests')"
                 :help="t('block-provider-infra-requests-help')"
               />
-              <fieldset class="pt-2" data-test="device-data-collection">
-                <legend class="mb-1 text-sm font-medium text-slate-800 dark:text-slate-100">
-                  {{ t('device-data-collection') }}
-                </legend>
-                <p class="mb-3 text-sm text-neutral-700 dark:text-neutral-300">
+              <details
+                id="device-data-collection"
+                class="pt-2 group"
+                data-test="device-data-collection"
+                :open="deviceDataCollectionOpen"
+                @toggle="deviceDataCollectionOpen = ($event.target as HTMLDetailsElement).open"
+              >
+                <summary class="flex items-center justify-between gap-3 py-2 list-none cursor-pointer select-none [&::-webkit-details-marker]:hidden">
+                  <span>
+                    <span class="block text-sm font-medium text-slate-800 dark:text-slate-100">
+                      {{ t('device-data-collection') }}
+                    </span>
+                    <span class="block text-sm text-neutral-600 dark:text-neutral-400" data-test="device-data-collection-summary">
+                      {{ deviceDataCollectedCount === DEVICE_DATA_COLLECTION_KEYS.length
+                        ? t('device-data-collection-summary-all')
+                        : t('device-data-collection-summary-custom', { count: deviceDataCollectedCount, total: DEVICE_DATA_COLLECTION_KEYS.length }) }}
+                    </span>
+                  </span>
+                  <span class="text-sm font-medium text-sky-600 dark:text-sky-400 shrink-0">
+                    <span class="group-open:hidden">{{ t('device-data-collection-customize') }}</span>
+                    <span class="hidden group-open:inline">{{ t('device-data-collection-hide') }}</span>
+                  </span>
+                </summary>
+                <p class="mt-2 mb-3 text-sm text-neutral-700 dark:text-neutral-300">
                   {{ t('device-data-collection-help') }}
                 </p>
                 <FormKit
@@ -1687,7 +1708,7 @@ async function transferAppOwnership() {
                   :label="t('collect-install-source')"
                   :help="t('collect-install-source-help')"
                 />
-              </fieldset>
+              </details>
               <FormKit
                 type="button"
                 :label="t('transfer-app-ownership')"
