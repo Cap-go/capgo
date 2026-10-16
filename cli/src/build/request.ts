@@ -950,6 +950,20 @@ async function extractNativeDependencies(
 }
 
 /**
+ * Detect the iOS dependency manager the same way the Capacitor CLI does:
+ * a Podfile in the native App folder means CocoaPods, otherwise a CapApp-SPM
+ * package means Swift Package Manager. Reported to Capgo for build analytics.
+ */
+export function detectIosDependencyManager(projectDir: string, platformDir: string): 'cocoapods' | 'spm' | undefined {
+  const appDir = join(projectDir, platformDir, 'App')
+  if (existsSync(join(appDir, 'Podfile')))
+    return 'cocoapods'
+  if (existsSync(join(appDir, 'CapApp-SPM', 'Package.swift')))
+    return 'spm'
+  return undefined
+}
+
+/**
  * Check if a file path should be included in the zip
  */
 export function shouldIncludeFile(filePath: string, platform: 'ios' | 'android', nativeDeps: NativeDependencies, platformDir: string): boolean {
@@ -1908,12 +1922,18 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       pack.version,
     )
 
+    const iosDependencyManager = platform === 'ios'
+      ? detectIosDependencyManager(projectDir, nativeProjectDir)
+      : undefined
+    if (iosDependencyManager === 'cocoapods')
+      log.warn('⚠️  This iOS project uses CocoaPods. The CocoaPods trunk becomes read-only on December 2, 2026: your pods will stop getting updates and security fixes. Capgo iOS 27 SDK builds are Swift Package Manager only and become the default on January 1, 2027. Moving to Swift Package Manager takes a few minutes: https://capacitorjs.com/docs/ios/spm')
     const requestPayload = {
       app_id: appId,
       platform,
       build_mode: options.buildMode || 'release',
       build_options: buildOptionsPayload,
       build_credentials: buildCredentialsPayload,
+      ...(iosDependencyManager ? { ios_dependency_manager: iosDependencyManager } : {}),
       ...buildJobCachePayload({ cache: options.cache, cacheKey: options.cacheKey }),
     }
 

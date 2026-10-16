@@ -77,9 +77,9 @@ function validateReplayBody(body: CliReplayBody): ValidatedReplayPayload {
 }
 
 async function getAuthenticatedUserEmail(c: Context<MiddlewareKeyVariables>, userId: string) {
-  let pgClient: ReturnType<typeof getPgClient> | null = null
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | null = null
   try {
-    pgClient = getPgClient(c, true)
+    pgClient = await getPgClient(c, true)
     const drizzle = getDrizzleClient(pgClient)
     const rows = await drizzle
       .select({ email: schema.users.email })

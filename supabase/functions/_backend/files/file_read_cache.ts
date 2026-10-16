@@ -194,7 +194,7 @@ export async function isAttachmentVersionDeleted(c: Context, fileId: string): Pr
     return false
 
   try {
-    const pgClient = getDeletedLookupPgClient(c)
+    const pgClient = await getDeletedLookupPgClient(c)
     const result = await pgClient.query<{ deleted: boolean | null, deleted_at: string | null }>(
       `
         SELECT deleted, deleted_at

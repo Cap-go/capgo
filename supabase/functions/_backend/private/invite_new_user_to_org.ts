@@ -1,17 +1,15 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { Database } from '../utils/supabase.types.ts'
-import { z } from 'zod'
 import dayjs from 'dayjs'
 import { Hono } from 'hono/tiny'
+import { z } from 'zod'
 import { containsDomainName } from '../../shared/invite-name.ts'
-import { safeParseSchema } from '../utils/schema_validation.ts'
-import { trackBentoEvent } from '../utils/bento.ts'
 import { verifyCaptchaToken } from '../utils/captcha.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_jwt.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { canCallerAssignOrgRole, checkPermission } from '../utils/rbac.ts'
+import { safeParseSchema } from '../utils/schema_validation.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
@@ -128,17 +126,7 @@ async function validateInvite(c: Context, rawBody: any) {
     return { message: 'Failed to get current user', error: 'Not authorized', status: 500 }
   }
 
-  // Get user details
-  const { data: inviteCreatorUser, error: inviteCreatorUserError } = await supabase
-    .from('users')
-    .select('*')
-    .eq('id', authContext.userId)
-    .single()
-
-  if (inviteCreatorUserError) {
-    return { message: 'Failed to invite user', error: inviteCreatorUserError.message, status: 500 }
-  }
-  return { inviteCreatorUser, org, body, authorization, rbacRoleName }
+  return { org, body, authorization, rbacRoleName }
 }
 
 app.post('/', middlewareAuth, async (c) => {
@@ -146,7 +134,7 @@ app.post('/', middlewareAuth, async (c) => {
   cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org raw body', rawBody })
 
   const res = await validateInvite(c, rawBody)
-  if (!res.inviteCreatorUser) {
+  if (!res.body) {
     throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, res.error ?? 'Failed to invite user')
   }
   if (!res.org) {
@@ -154,8 +142,6 @@ app.post('/', middlewareAuth, async (c) => {
   }
   const body = res.body
   const rbacRoleName = res.rbacRoleName
-  const inviteCreatorUser = res.inviteCreatorUser
-  const org = res.org
   const authContext = c.get('auth')
   if (!authContext?.userId) {
     throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, 'Not authorized')
@@ -175,7 +161,6 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, existingInvitationError.message)
   }
 
-  let newInvitation: Database['public']['Tables']['tmp_users']['Row'] | null = null
   if (existingInvitation) {
     const nowMinusThreeHours = dayjs().subtract(3, 'hours')
     if (existingInvitation.cancelled_at && !dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
@@ -196,7 +181,7 @@ app.post('/', middlewareAuth, async (c) => {
       }
     }
 
-    const { error: updateInvitationError, data: updatedInvitationData } = await supabaseAdminClient
+    const { error: updateInvitationError } = await supabaseAdminClient
       .from('tmp_users')
       .update({
         cancelled_at: null,
@@ -212,13 +197,17 @@ app.post('/', middlewareAuth, async (c) => {
       .single()
 
     if (updateInvitationError) {
+      if (updateInvitationError.code === 'P0001' && updateInvitationError.message.includes('INVITE_EMAIL_COOLDOWN')) {
+        throw simpleError('user_already_invited', 'User already invited recently. Please wait before resending.', {
+          reason: 'invite_recently_sent',
+          cooldown_minutes: INVITE_RESEND_COOLDOWN_MINUTES,
+        })
+      }
       throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, updateInvitationError.message)
     }
-
-    newInvitation = updatedInvitationData
   }
   else {
-    const { error: createUserError, data: newInvitationData } = await supabaseAdminClient.from('tmp_users').insert({
+    const { error: createUserError } = await supabaseAdminClient.from('tmp_users').insert({
       email: body.email,
       org_id: body.org_id,
       rbac_role_name: rbacRoleName,
@@ -230,19 +219,7 @@ app.post('/', middlewareAuth, async (c) => {
     if (createUserError) {
       throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, createUserError.message)
     }
-
-    newInvitation = newInvitationData
   }
 
-  const bentoEvent = await trackBentoEvent(c, body.email, {
-    org_admin_name: `${inviteCreatorUser.first_name} ${inviteCreatorUser.last_name}`,
-    org_name: org.name,
-    invite_link: `${getEnv(c, 'WEBAPP_URL')}/invitation?invite_magic_string=${newInvitation?.invite_magic_string}`,
-    invited_first_name: `${newInvitation?.first_name ?? body.first_name}`,
-    invited_last_name: `${newInvitation?.last_name ?? body.last_name}`,
-  }, 'org:invite_new_capgo_user_to_org')
-  if (bentoEvent === false) {
-    cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org bento', message: 'Failed to track bento event' })
-  }
   return c.json(BRES)
 })

@@ -617,7 +617,7 @@ async function reserveGlobalStatsRetry(c: Context, retryCount: number, dateId?: 
   const nextRetryCount = retryCount + 1
   const delaySeconds = GLOBAL_STATS_RETRY_DELAY_SECONDS * nextRetryCount
   const retryMessage = buildGlobalStatsRetryMessage(nextRetryCount, dateId)
-  const db = getPgClient(c)
+  const db = await getPgClient(c)
 
   try {
     const retryMsgId = await queueGlobalStatsMessage(db, retryMessage, delaySeconds)
@@ -643,7 +643,7 @@ async function reserveGlobalStatsShardRetry(c: Context, shard: GlobalStatsShard,
   const nextRetryCount = retryCount + 1
   const delaySeconds = GLOBAL_STATS_RETRY_DELAY_SECONDS * nextRetryCount
   const retryMessage = buildGlobalStatsShardMessage(shard, dateId, nextRetryCount)
-  const db = getPgClient(c)
+  const db = await getPgClient(c)
 
   try {
     const retryMsgId = await queueGlobalStatsMessage(db, retryMessage, delaySeconds)
@@ -664,7 +664,7 @@ async function reserveGlobalStatsShardRetry(c: Context, shard: GlobalStatsShard,
 }
 
 async function cancelGlobalStatsRetry(c: Context, retryMsgId: number): Promise<void> {
-  const db = getPgClient(c)
+  const db = await getPgClient(c)
 
   try {
     await db.query('SELECT pgmq.delete($1, $2::bigint[])', [
@@ -953,7 +953,7 @@ function isMissingRefundsColumnError(error: unknown): boolean {
 }
 
 async function calculateRevenue(c: Context, referenceDate?: Date): Promise<PlanRevenue> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {
@@ -988,7 +988,8 @@ async function calculateRevenue(c: Context, referenceDate?: Date): Promise<PlanR
         AND si.paid_at < ${snapshotExclusiveEndIso}::timestamptz
         AND si.trial_at <= ${snapshotExclusiveEndIso}::timestamptz
         AND (
-          ${referenceDate ? sql`
+          ${referenceDate
+            ? sql`
             si.created_at < ${snapshotExclusiveEndIso}::timestamptz
             AND si.status IN (
               'succeeded'::public.stripe_status,
@@ -997,7 +998,8 @@ async function calculateRevenue(c: Context, referenceDate?: Date): Promise<PlanR
             )
             AND (si.canceled_at IS NULL OR si.canceled_at >= ${snapshotExclusiveEndIso}::timestamptz)
             AND si.subscription_anchor_end > ${snapshotExclusiveEndIso}::timestamptz
-          ` : sql`
+          `
+            : sql`
             si.status = 'succeeded'::public.stripe_status
           `}
         )
@@ -1181,7 +1183,7 @@ async function getBuildStats(c: Context, window?: DailyWindow): Promise<BuildSta
 }
 
 async function getPaidProductActivityStats(c: Context, window: CurrentDayWindow): Promise<PaidProductActivityStats> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const dayStart = window.dayStart
   const nextDayStart = window.nextDayStart
@@ -1256,7 +1258,7 @@ async function getPaidProductActivityStats(c: Context, window: CurrentDayWindow)
 }
 
 async function getLtvStats(c: Context, window: CurrentDayWindow): Promise<LtvStats> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const snapshotExclusiveEnd = window.nextDayStart.toISOString()
   const monthSeconds = (365.2425 / 12) * 24 * 60 * 60
@@ -1337,7 +1339,7 @@ async function getLtvStats(c: Context, window: CurrentDayWindow): Promise<LtvSta
 }
 
 async function getRevenueRetentionMetrics(c: Context, dateId: string): Promise<RevenueRetentionMetrics> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const previousDateId = getPreviousDateId(dateId)
 
@@ -1442,7 +1444,7 @@ async function aggregateDailyBuildStats(
   counts: Record<'ios' | 'android', number>
 } | null> {
   // Read from primary so the daily rollup is not permanently undercounted by replica lag.
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const totalSecondsByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
   const avgSecondsByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
@@ -1481,6 +1483,56 @@ async function aggregateDailyBuildStats(
   return { totalSeconds: totalSecondsByPlatform, avgSeconds: avgSecondsByPlatform, counts: countsByPlatform }
 }
 
+interface IosBuildRequestBreakdown {
+  dependencyManager: {
+    cocoapods: number
+    spm: number
+    unknown: number
+  }
+  /** Builds per iOS SDK (Xcode major), plus "unknown" for builds without a reported Xcode. */
+  sdk: Record<string, number>
+}
+
+function summarizeIosBuildRequestRows(rows: Array<{ ios_dependency_manager: string | null, xcode_major: string | null, total_builds: number | string }>): IosBuildRequestBreakdown {
+  const breakdown: IosBuildRequestBreakdown = { dependencyManager: { cocoapods: 0, spm: 0, unknown: 0 }, sdk: {} }
+  for (const row of rows) {
+    const total = Number(row.total_builds) || 0
+    if (row.ios_dependency_manager === 'cocoapods')
+      breakdown.dependencyManager.cocoapods += total
+    else if (row.ios_dependency_manager === 'spm')
+      breakdown.dependencyManager.spm += total
+    else
+      breakdown.dependencyManager.unknown += total
+    const sdkKey = row.xcode_major && /^\d+$/.test(row.xcode_major) ? row.xcode_major : 'unknown'
+    breakdown.sdk[sdkKey] = (breakdown.sdk[sdkKey] ?? 0) + total
+  }
+  return breakdown
+}
+
+async function getDailyIosBuildRequestBreakdown(c: Context, start: Date, end: Date): Promise<IosBuildRequestBreakdown> {
+  // Read from primary so the daily rollup is not permanently undercounted by replica lag.
+  const pgClient = await getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+
+  try {
+    const result = await drizzleClient.execute<{ ios_dependency_manager: string | null, xcode_major: string | null, total_builds: number | string }>(sql`
+      SELECT
+        ios_dependency_manager,
+        NULLIF(split_part(xcode_version, '.', 1), '') AS xcode_major,
+        COUNT(*)::int AS total_builds
+      FROM public.build_requests
+      WHERE created_at >= ${start}
+        AND created_at < ${end}
+        AND platform = 'ios'
+      GROUP BY 1, 2
+    `)
+    return summarizeIosBuildRequestRows(result.rows ?? [])
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 function getCompletedAppBuildOnboardingWindow(window: DailyWindow): DailyWindow {
   const prevDayStart = new Date(window.prevDayStart.getTime() - DAY_IN_MS)
   const prevDayEnd = new Date(window.prevDayStart)
@@ -1492,7 +1544,7 @@ function getCompletedAppBuildOnboardingWindow(window: DailyWindow): DailyWindow 
 }
 
 async function getAppBuildOnboardingMetrics(c: Context, window: DailyWindow): Promise<AppBuildOnboardingMetrics> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const dayStartIso = window.prevDayStart.toISOString()
   const dayEndIso = window.prevDayEnd.toISOString()
@@ -1535,7 +1587,7 @@ async function getAppBuildOnboardingMetrics(c: Context, window: DailyWindow): Pr
 }
 
 async function countDemoSeededApps(c: Context, createdAfterIso: string, createdBeforeIso: string): Promise<number> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {
@@ -1567,7 +1619,7 @@ async function countDemoSeededApps(c: Context, createdAfterIso: string, createdB
 }
 
 async function countAppsWithPreview(c: Context, snapshotEnd: Date): Promise<number> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {
@@ -1590,7 +1642,7 @@ async function countAppsWithPreview(c: Context, snapshotEnd: Date): Promise<numb
 }
 
 async function countUsersWith2fa(c: Context, snapshotEnd: Date): Promise<number> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const snapshotEndIso = snapshotEnd.toISOString()
 
   try {
@@ -1622,7 +1674,7 @@ async function countUsersWith2fa(c: Context, snapshotEnd: Date): Promise<number>
 }
 
 async function countAppsWithStoreUrl(c: Context, snapshotEnd: Date): Promise<number> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {
@@ -1648,7 +1700,7 @@ async function countAppsWithStoreUrl(c: Context, snapshotEnd: Date): Promise<num
 }
 
 async function getTrialExtensionStats(c: Context, window: CurrentDayWindow): Promise<TrialExtensionStats> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const dayStartIso = window.dayStart.toISOString()
   const nextDayStartIso = window.nextDayStart.toISOString()
@@ -1706,7 +1758,7 @@ async function ensureGlobalStatsSnapshotRows(c: Context, dateIds: readonly strin
   if (dateIds.length === 0)
     return
 
-  const db = getPgClient(c)
+  const db = await getPgClient(c)
 
   try {
     await db.query(
@@ -1780,7 +1832,7 @@ async function updateGlobalStatsSnapshot(c: Context, dateId: string, patch: Glob
 }
 
 async function updateGlobalStatsSnapshotOrgCount(c: Context, dateId: string, orgs: number): Promise<void> {
-  const db = getPgClient(c)
+  const db = await getPgClient(c)
 
   try {
     const result = await db.query(
@@ -1946,7 +1998,7 @@ function getGlobalStatsNotificationStepAction(
 }
 
 async function readCompletedGlobalStatsShards(c: Context, dateId: string): Promise<Set<GlobalStatsCompletionMarker>> {
-  const db = getPgClient(c)
+  const db = await getPgClient(c)
 
   try {
     const result = await db.query<{ completed_shards: unknown }>(
@@ -1964,8 +2016,8 @@ async function readCompletedGlobalStatsShards(c: Context, dateId: string): Promi
   }
 }
 
-async function claimGlobalStatsNotificationDelivery(c: Context, dateId: string): Promise<ReturnType<typeof getPgClient> | null> {
-  const db = getPgClient(c)
+async function claimGlobalStatsNotificationDelivery(c: Context, dateId: string): Promise<Awaited<ReturnType<typeof getPgClient>> | null> {
+  const db = await getPgClient(c)
 
   try {
     const result = await db.query<{ claimed: boolean }>(
@@ -1984,7 +2036,7 @@ async function claimGlobalStatsNotificationDelivery(c: Context, dateId: string):
   }
 }
 
-async function releaseGlobalStatsNotificationDeliveryClaim(c: Context, db: ReturnType<typeof getPgClient>, dateId: string): Promise<void> {
+async function releaseGlobalStatsNotificationDeliveryClaim(c: Context, db: Awaited<ReturnType<typeof getPgClient>>, dateId: string): Promise<void> {
   try {
     await db.query('SELECT pg_advisory_unlock(hashtext($1), hashtext($2))', [GLOBAL_STATS_NOTIFICATION_LOCK_NAMESPACE, dateId])
   }
@@ -2029,7 +2081,7 @@ async function shouldSkipCompletedGlobalStatsRetryDispatch(c: Context, dateId: s
 }
 
 async function markGlobalStatsShardComplete(c: Context, dateId: string, shard: GlobalStatsCompletionMarker): Promise<void> {
-  const db = getPgClient(c)
+  const db = await getPgClient(c)
 
   try {
     const result = await db.query(
@@ -2057,7 +2109,7 @@ async function markGlobalStatsShardComplete(c: Context, dateId: string, shard: G
 }
 
 async function removeGlobalStatsShardMarker(c: Context, dateId: string, shard: GlobalStatsCompletionMarker): Promise<void> {
-  const db = getPgClient(c)
+  const db = await getPgClient(c)
 
   try {
     const result = await db.query(
@@ -2128,7 +2180,7 @@ function getGlobalStatsShardDelaySeconds(shard: GlobalStatsShard): number {
 }
 
 async function queueGlobalStatsMessage(
-  db: ReturnType<typeof getPgClient>,
+  db: Awaited<ReturnType<typeof getPgClient>>,
   message: ReturnType<typeof buildGlobalStatsRetryMessage> | ReturnType<typeof buildGlobalStatsShardMessage>,
   delaySeconds: number,
 ): Promise<number> {
@@ -2144,7 +2196,7 @@ async function queueGlobalStatsMessage(
 }
 
 async function queueGlobalStatsShard(c: Context, shard: GlobalStatsShard, dateId: string): Promise<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }> {
-  const db = getPgClient(c)
+  const db = await getPgClient(c)
 
   try {
     const delaySeconds = getGlobalStatsShardDelaySeconds(shard)
@@ -2164,7 +2216,7 @@ async function queueGlobalStatsShards(
   if (shards.length === 0)
     return []
 
-  const db = getPgClient(c)
+  const db = await getPgClient(c)
   const queued: Array<{ shard: GlobalStatsShard, msgId: number, delaySeconds: number }> = []
 
   try {
@@ -2200,7 +2252,7 @@ async function readQueuedGlobalStatsShardKeys(c: Context, dateIds: readonly stri
   if (dateIds.length === 0)
     return new Set()
 
-  const db = getPgClient(c)
+  const db = await getPgClient(c)
   const functionNames = GLOBAL_STATS_SHARDS.map(shard => getGlobalStatsShardFunctionName(shard))
 
   try {
@@ -2229,7 +2281,7 @@ async function readGlobalStatsRepairRows(c: Context, dateIds: readonly string[])
   if (dateIds.length === 0)
     return new Map()
 
-  const db = getPgClient(c)
+  const db = await getPgClient(c)
 
   try {
     const result = await db.query<GlobalStatsRepairSqlRow>(
@@ -2268,7 +2320,7 @@ async function readDailyBuildStatsByDate(c: Context, dateIds: readonly string[])
   const end = new Date(`${uniqueDateIds.at(-1)}T00:00:00.000Z`)
   end.setUTCDate(end.getUTCDate() + 1)
 
-  const db = getPgClient(c, false)
+  const db = await getPgClient(c, false)
 
   try {
     const result = await db.query<{ date_id: string, platform: string, total_seconds: number | string | null, avg_seconds: number | string | null, total_builds: number | string | null }>(
@@ -2450,7 +2502,7 @@ function remainingCreditsAtSnapshotSql(snapshotExclusiveEndIso: string) {
 }
 
 async function getBillingSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Promise<BillingSnapshotCounts> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const snapshotExclusiveEndIso = snapshotExclusiveEnd.toISOString()
 
@@ -2558,7 +2610,7 @@ async function getBillingSnapshotCounts(c: Context, snapshotExclusiveEnd: Date):
 }
 
 async function getSubscriptionAccessSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Promise<SubscriptionAccessSnapshotCounts> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const snapshotExclusiveEndIso = snapshotExclusiveEnd.toISOString()
 
@@ -2608,7 +2660,7 @@ async function getSubscriptionAccessSnapshotCounts(c: Context, snapshotExclusive
   }
 }
 async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Promise<CoreSnapshotCounts> {
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const snapshotExclusiveEndIso = snapshotExclusiveEnd.toISOString()
 
@@ -2736,7 +2788,7 @@ async function getCoreSnapshotCounts(c: Context, snapshotExclusiveEnd: Date): Pr
 }
 
 async function countRegisteredUsersForSnapshot(c: Context, snapshotExclusiveEnd: Date): Promise<number> {
-  const db = getPgClient(c, false)
+  const db = await getPgClient(c, false)
   const snapshotExclusiveEndIso = snapshotExclusiveEnd.toISOString()
 
   try {
@@ -2762,7 +2814,7 @@ async function countActiveUsersForSnapshot(c: Context, appIds: string[], window:
   if (appIds.length === 0)
     return 0
 
-  const db = getPgClient(c, false)
+  const db = await getPgClient(c, false)
   const activeWindowStartIso = getLastMonthAnalyticsWindowStart(window.prevDayEnd).toISOString()
 
   try {
@@ -3049,7 +3101,7 @@ async function getUpgradeRate12m(
   // chart after each daily run. Add today's freshly counted upgrades because
   // today's global_stats row is not written yet.
   const nextDayStart = getMetricWindowFromDailyWindow(window).nextDayStart
-  const pgClient = getPgClient(c, false)
+  const pgClient = await getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const snapshotEndIso = nextDayStart.toISOString()
   const trailingStartDateId = getTrailing12mStart(nextDayStart).toISOString().slice(0, 10)
@@ -3303,9 +3355,16 @@ async function runPluginsGlobalStatsShard(c: Context, window: DailyWindow): Prom
 }
 
 async function runBuildsGlobalStatsShard(c: Context, window: DailyWindow): Promise<void> {
-  const build_stats = await getBuildStats(c, window)
+  const [build_stats, iosBuildRequests] = await Promise.all([
+    getBuildStats(c, window),
+    getDailyIosBuildRequestBreakdown(c, window.prevDayStart, window.prevDayEnd),
+  ])
 
   await updateGlobalStatsSnapshot(c, window.prevDayDateId, {
+    build_requests_day_ios_cocoapods: iosBuildRequests.dependencyManager.cocoapods,
+    build_requests_day_ios_spm: iosBuildRequests.dependencyManager.spm,
+    build_requests_day_ios_unknown: iosBuildRequests.dependencyManager.unknown,
+    build_requests_day_ios_sdk: iosBuildRequests.sdk,
     builds_android: build_stats.android,
     builds_ios: build_stats.ios,
     builds_last_month: build_stats.last_month,
@@ -3447,9 +3506,9 @@ async function getNativeNotificationGlobalStats(c: Context, window: DailyWindow)
   const dayEndIso = window.prevDayEnd.toISOString()
   const lastMonthStart = new Date(window.prevDayEnd.getTime() - 30 * 24 * 60 * 60 * 1000)
 
-  let pgClient: ReturnType<typeof getPgClient> | undefined
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
   try {
-    pgClient = getPgClient(c)
+    pgClient = await getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
     const result = await drizzleClient.execute<{
       apps: number
@@ -3644,6 +3703,7 @@ function scheduleGlobalStatsUpdate(
 
 export const globalStatsTestUtils = {
   buildGlobalStatsRetryMessage,
+  summarizeIosBuildRequestRows,
   buildGlobalStatsShardMessage,
   readGlobalStatsPayload,
   REVENUE_ACTIVE_STRIPE_STATUSES,

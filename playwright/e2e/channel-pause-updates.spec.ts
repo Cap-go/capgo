@@ -24,6 +24,7 @@ test.describe('channel bundle actions (change, pause, revert)', () => {
     const pauseButton = bundleRow.locator('[data-test="channel-pause-toggle"]')
     await expect(pauseButton).toHaveText('Pause')
     await expect(pauseButton).toBeEnabled({ timeout: 60000 })
+    await dismissSupportPrompt(page)
     await pauseButton.click()
     await expect(page.locator('h3').filter({ hasText: 'Pause updates on this channel?' })).toBeVisible({ timeout: 15000 })
     await expect(page.getByText('Devices keep the bundle they already run and nothing is rolled back.', { exact: false })).toBeVisible()

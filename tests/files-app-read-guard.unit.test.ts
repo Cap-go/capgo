@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
-const getAppByAppIdPgMock = vi.fn(async () => null)
+const getAppPlanStatePgMock = vi.fn(async () => null)
 const getPgClientMock = vi.fn(() => ({
   query: async () => ({ rows: [] }),
 }))
@@ -32,7 +32,8 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
 }))
 
 vi.mock('../supabase/functions/_backend/utils/pg_files.ts', () => ({
-  getAppByAppIdPg: getAppByAppIdPgMock,
+  getAppPlanStatePg: getAppPlanStatePgMock,
+  withFreshPgRetry: vi.fn(),
   getUserIdFromApikey: vi.fn(),
 }))
 
@@ -88,7 +89,7 @@ describe('files app-scoped cached reads', () => {
     expect(response.status).toBe(200)
     expect(await response.text()).toBe('cached orphan bytes')
     expect(bucketPut).not.toHaveBeenCalled()
-    expect(getAppByAppIdPgMock).not.toHaveBeenCalled()
+    expect(getAppPlanStatePgMock).not.toHaveBeenCalled()
   })
 
   it.concurrent('serves malformed app-scoped paths from cache when no deleted version row exists', async () => {
@@ -106,6 +107,6 @@ describe('files app-scoped cached reads', () => {
     expect(response.status).toBe(200)
     expect(await response.text()).toBe('cached malformed bytes')
     expect(bucketPut).not.toHaveBeenCalled()
-    expect(getAppByAppIdPgMock).not.toHaveBeenCalled()
+    expect(getAppPlanStatePgMock).not.toHaveBeenCalled()
   })
 })

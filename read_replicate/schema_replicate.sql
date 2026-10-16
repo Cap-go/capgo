@@ -407,6 +407,7 @@ CREATE TABLE public.orgs (
     support_channel_url text,
     support_channel_set_at timestamp with time zone,
     auto_top_up_monthly_limit numeric(18,6) DEFAULT 0 NOT NULL,
+    signup_plugin text,
     CONSTRAINT orgs_max_apikey_expiration_days_valid CHECK (((max_apikey_expiration_days IS NULL) OR ((max_apikey_expiration_days >= 1) AND (max_apikey_expiration_days <= 365)))),
     CONSTRAINT orgs_password_policy_config_min_length_check CHECK (((password_policy_config IS NULL) OR ((jsonb_typeof(password_policy_config) = 'object'::text) AND ((NOT (password_policy_config ? 'min_length'::text)) OR ((jsonb_typeof((password_policy_config -> 'min_length'::text)) = 'number'::text) AND (((password_policy_config ->> 'min_length'::text))::numeric = trunc(((password_policy_config ->> 'min_length'::text))::numeric)) AND ((((password_policy_config ->> 'min_length'::text))::numeric >= (6)::numeric) AND (((password_policy_config ->> 'min_length'::text))::numeric <= (72)::numeric))))))),
     CONSTRAINT orgs_required_encryption_key_valid CHECK (((required_encryption_key IS NULL) OR (length((required_encryption_key)::text) = ANY (ARRAY[20, 21])))),
@@ -836,6 +837,13 @@ CREATE INDEX idx_app_versions_deleted_at ON public.app_versions USING btree (del
 --
 
 CREATE INDEX idx_app_versions_deleted_at_id ON public.app_versions USING btree (deleted_at, id) WHERE (deleted = true);
+
+
+--
+-- Name: idx_app_versions_deleted_manifest_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_versions_deleted_manifest_pending ON public.app_versions USING btree (updated_at NULLS FIRST, id) WHERE ((deleted = true) AND ((manifest_count > 0) OR (manifest IS NOT NULL)));
 
 
 --

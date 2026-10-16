@@ -60,7 +60,7 @@ describe('files R2 error handling', () => {
     ;(handler as any).ctx = { storage }
     const context = { get: () => 'request-id', req: { param: () => 'bundle.zip' } } as any
 
-    retryHeadMock.mockResolvedValueOnce(null).mockResolvedValueOnce({ size: 4 }).mockResolvedValueOnce({ size: 5 })
+    retryHeadMock.mockResolvedValueOnce(null).mockResolvedValueOnce({ size: 4 }).mockResolvedValueOnce({ key: 'bundle.zip', size: 5, uploaded: new Date(Date.now() - 1000), etag: 'etag', version: 'version' })
     expect((await handler.head(context)).headers.get('x-capgo-manifest-size-receipt')).toBeNull()
     expect((await handler.head(context)).headers.get('x-capgo-manifest-size-receipt')).toBeNull()
     expect((await handler.head(context)).headers.get('x-capgo-manifest-size-receipt')).not.toBeNull()

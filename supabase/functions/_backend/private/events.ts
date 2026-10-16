@@ -573,9 +573,12 @@ function logAcceptedEvent(c: Context, identity: AcceptedEventIdentity, acceptedA
   })
 }
 
+/** Accepts authenticated client events while reserving creation evidence for database handlers. */
 app.post('/', middlewareAuth(), async (c) => {
   const acceptedAt = Date.now()
   const body = await parseBody<TrackEventBody>(c)
+  if (body.event === 'Org Created')
+    throw quickError(400, 'server_owned_event', 'This event is recorded from committed database changes')
   if (body.client_event_id !== undefined && !isValidClientEventId(body.client_event_id))
     throw quickError(400, 'invalid_client_event_id', 'client_event_id must be a UUID')
   const {

@@ -5,10 +5,12 @@ import { setupLayouts } from 'virtual:generated-layouts'
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
+import { prepareAppleOAuthLanding } from '~/services/appleOAuth'
 import { installDeepLinkHandler } from '~/services/deepLinks'
 import { isDocumentNavigationPending, replaceDocument } from '~/services/documentNavigation'
 import { getNativeExternalPurchaseRedirect, isNativeAppStoreContext, isNativeExternalPurchaseRestrictedPath } from '~/services/nativeCompliance'
 import { posthogLoader } from '~/services/posthog'
+import { captureConsoleAttributionFromLocation } from '~/services/signupAttribution'
 import { getErrorMessage, isComponentResolutionErrorMessage, isKnownCrawlerNoiseErrorMessage, isStaleAssetErrorMessage } from '~/services/staleAssetErrors'
 import { getLocalConfig } from '~/services/supabase'
 import { getAllowedConfirmationHosts, resolveConfirmationUrl } from '~/utils/safeRedirect'
@@ -16,6 +18,8 @@ import App from './App.vue'
 import { getRemoteConfig } from './services/supabase'
 // your custom styles here
 import './styles/style.css'
+
+prepareAppleOAuthLanding()
 
 // Handle chunk load errors (stale chunks after deployment)
 // When a new version is deployed, old chunk URLs return 404/HTML instead of JS
@@ -304,6 +308,7 @@ router.beforeEach((to, from, next) => {
 
 const config = getLocalConfig()
 posthogLoader(config.supaHost)
+captureConsoleAttributionFromLocation()
 
 // install all modules under `modules/`
 type UserModule = (ctx: { app: typeof app, router: Router }) => void
