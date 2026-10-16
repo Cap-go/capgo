@@ -343,8 +343,7 @@ export async function requestManifestUpload(
       ;({ data, error } = await invoke<unknown>('private/request_manifest_upload', {
         apikey,
         body: request,
-        supaHost: options.supaHost,
-        supaAnon: options.supaAnon,
+        apiHost: options.apiHost,
       }))
     }
     if (error)
