@@ -332,7 +332,10 @@ export function shouldShowOnboardingExplorationReminder(options: {
 }) {
   if (options.navigationType !== 'reload' || explorationGrantedThisPage || explorationReminderShownThisPage)
     return false
-  if (getOnboardingResumeAppId(options.userId) !== options.appId)
+  const resumeAppId = getOnboardingResumeAppId(options.userId)
+  const pendingAppId = getPendingFirstUploadAppId(options.userId)
+  // Post-create explore from setup sets pending-first-upload only; reminder still applies.
+  if (resumeAppId !== options.appId && pendingAppId !== options.appId)
     return false
   try {
     return window.localStorage.getItem(`${EXPLORATION_REMINDER_DISMISSED_KEY}:${options.userId}`) !== 'true'

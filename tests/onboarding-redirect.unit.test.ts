@@ -393,6 +393,18 @@ describe('exploration refresh reminder and v3 setup routing', () => {
     window.localStorage.clear()
   })
 
+  it('shows on refresh when only pending-first-upload is set (post-create explore)', async () => {
+    const initial = await import('../src/utils/onboardingRedirect')
+    initial.setPendingFirstUploadAppId('user-1', 'com.example.app')
+    vi.resetModules()
+    const refreshed = await import('../src/utils/onboardingRedirect')
+    expect(refreshed.shouldShowOnboardingExplorationReminder({
+      userId: 'user-1',
+      appId: 'com.example.app',
+      navigationType: 'reload',
+    })).toBe(true)
+  })
+
   it('shows only on refresh of a saved exploration, once per page', async () => {
     const initial = await import('../src/utils/onboardingRedirect')
     initial.allowOnboardingDashboardExploration('user-1', 'com.example.app')

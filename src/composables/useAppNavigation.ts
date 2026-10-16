@@ -17,17 +17,13 @@ import IconApiKey from '~icons/mdi/shield-key'
 import IconAppStore from '~icons/simple-icons/appstore'
 import { ADMIN_DASHBOARD_URL } from '~/constants/adminDashboard'
 import { logAsUser } from '~/services/logAs'
+import {
+  confirmOnboardingDashboardExplorationNavigation,
+  resolveOnboardingHardGateResumeAppId,
+} from '~/services/onboardingDashboardExplorationConfirm'
 import { isSpoofed, unspoofUser } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
-import {
-  allowOnboardingDashboardExploration,
-  getAppGettingStartedPath,
-  getOnboardingResumeAppId,
-  ONBOARDING_DASHBOARD_EXPLORED_EVENT,
-  shouldConfirmOnboardingDashboardExploration,
-} from '~/utils/onboardingRedirect'
 
 // Shared across every consumer (web sidebar and native chrome) so the log-as
 // dialog input and spoof state stay in sync whichever surface opened them.
@@ -78,7 +74,6 @@ export function isSpoofTab(tab: Tab) {
  */
 export function useAppNavigation(options: { onNavigate?: () => void } = {}) {
   const main = useMainStore()
-  const organizationStore = useOrganizationStore()
   const dialogStore = useDialogV2Store()
   const router = useRouter()
   const route = useRoute()
@@ -165,44 +160,27 @@ export function useAppNavigation(options: { onNavigate?: () => void } = {}) {
       return
 
     const onboardingUserId = main.user?.id ?? main.auth?.id
-    const gettingStartedAppId = route.name === '/app/[app].getting-started' && typeof route.params.app === 'string'
-      ? route.params.app
-      : null
-    const isPendingOnboardingResume = !!gettingStartedAppId
-      && organizationStore.getAppByAppId(gettingStartedAppId)?.need_onboarding === true
-    const onboardingResumeAppId = isPendingOnboardingResume
-      ? gettingStartedAppId
-      : getOnboardingResumeAppId(onboardingUserId)
-    const requiresOnboardingExplorationConfirmation = shouldConfirmOnboardingDashboardExploration({
+    const currentSource = typeof route.query.source === 'string' ? route.query.source : null
+    const onboardingResumeAppId = resolveOnboardingHardGateResumeAppId(
+      route.path,
+      typeof route.query.resume === 'string' ? route.query.resume : null,
+      onboardingUserId,
+    )
+    const confirmationResult = await confirmOnboardingDashboardExplorationNavigation({
+      currentPath: route.path,
+      currentSource,
+      currentStep: typeof route.query.step === 'string' ? route.query.step : null,
       destination: tab.key,
       resumeAppId: onboardingResumeAppId,
       userId: onboardingUserId,
+      t,
+      dialogStore,
+      router,
     })
 
-    if (tab.key === '/apikeys' && isPendingOnboardingResume)
-      allowOnboardingDashboardExploration(onboardingUserId, onboardingResumeAppId)
-
-    if (requiresOnboardingExplorationConfirmation) {
+    if (confirmationResult === 'cancelled' || confirmationResult === 'handled') {
       options.onNavigate?.()
-      dialogStore.openDialog({
-        title: t('app-onboarding-explore-dashboard-confirm-title'),
-        description: t('app-onboarding-explore-dashboard-confirm-description'),
-        buttons: [
-          { text: t('app-onboarding-continue-setup'), role: 'secondary' },
-          { text: t('app-onboarding-explore-dashboard'), role: 'primary' },
-        ],
-      })
-      const wasCanceled = await dialogStore.onDialogDismiss()
-      if (wasCanceled)
-        return
-      if (dialogStore.lastButtonRole === 'secondary' && onboardingResumeAppId) {
-        return router.push(getAppGettingStartedPath(onboardingResumeAppId))
-      }
-      if (dialogStore.lastButtonRole !== 'primary')
-        return
-
-      window.dispatchEvent(new Event(ONBOARDING_DASHBOARD_EXPLORED_EVENT))
-      allowOnboardingDashboardExploration(onboardingUserId, onboardingResumeAppId)
+      return
     }
 
     if (tab.onClick)
