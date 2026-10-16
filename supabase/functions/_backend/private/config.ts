@@ -1,6 +1,5 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { isNativeAppleLoginConfigured } from '../utils/appleSignIn.ts'
 import { resolveCliUsageIdentity, trackCliUsage } from '../utils/cli_usage.ts'
 import { MIN_CLI_VERSION, MIN_CLI_VERSION_REASON } from '../utils/cliMinVersion.ts'
 import { useCors } from '../utils/hono.ts'
@@ -39,7 +38,8 @@ app.get('/', async (c) => {
     supbaseId: getEnv(c, 'SUPABASE_URL')?.split('//')[1]?.split('.')[0]?.split(':')[0] ?? '',
     supaKey: getEnv(c, 'SUPABASE_ANON_KEY'),
     stripeEnabled: isStripeConfigured(c),
-    nativeAppleLoginEnabled: await isNativeAppleLoginConfigured(c),
+    // Deprecated response-shape compatibility for released clients; current UI uses build-time flags.
+    nativeAppleLoginEnabled: false,
     minCliVersion: MIN_CLI_VERSION,
     minCliVersionReason: MIN_CLI_VERSION_REASON,
     useNewFinalizeBundleUpload: USE_NEW_FINALIZE_BUNDLE_UPLOAD,

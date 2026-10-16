@@ -7,7 +7,7 @@ import { supabaseClient } from '../utils/supabase.ts'
 import { version } from '../utils/version.ts'
 
 export const app = createHono('', version)
-const bodySchema = z.object({ code: z.string().min(1).max(4096) })
+const bodySchema = z.object({ code: z.string().min(1).max(4096), client: z.enum(['native', 'web']).optional() })
 app.use('/', useCors)
 app.post('/', middlewareAuth, async (c) => {
   const auth = c.get('auth')
@@ -40,7 +40,7 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(403, 'email_not_verified', 'Verify your email before deleting your account')
 
   try {
-    await revokeAppleAuthorization(c, body.data.code, subject)
+    await revokeAppleAuthorization(c, body.data.code, subject, body.data.client === 'web')
   }
   catch {
     return quickError(502, 'apple_revocation_failed', 'Could not revoke Apple authorization. Please try again')

@@ -56,7 +56,7 @@ describe('apple authorization revocation', () => {
   })
   it('binds the code to the server-verified Apple identity, ignoring client identity fields', async () => {
     expect((await request({ code: 'fresh-code', subject: 'different-subject', userId: 'another-user' })).status).toBe(200)
-    expect(mocks.revoke).toHaveBeenCalledWith(expect.anything(), 'fresh-code', 'apple-subject')
+    expect(mocks.revoke).toHaveBeenCalledWith(expect.anything(), 'fresh-code', 'apple-subject', false)
     expect(mocks.getUser).toHaveBeenCalledWith('verified-session')
     expect(mocks.from).toHaveBeenCalledWith('user_security')
   })

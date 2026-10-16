@@ -18,6 +18,7 @@ import IconScanQrCode from '~icons/lucide/scan-qr-code'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
+import { captureAppleOAuthCallback, completeAppleOAuth, consumeAppleOAuthLandingError, hasPendingAppleOAuth, isWebAppleLoginAvailable, startAppleOAuth } from '~/services/appleOAuth'
 import { hideLoader } from '~/services/loader'
 import { isNativeAppleLoginAvailable, signInWithApple } from '~/services/nativeAppleLogin'
 import { autoAuth, defaultApiHost, hashEmail, useSupabase } from '~/services/supabase'
@@ -31,7 +32,7 @@ const route = useRoute('/login')
 const supabase = useSupabase()
 const isLoading = ref(false)
 const isAppleLoading = ref(false)
-const appleLoginAvailable = computed(() => isNativeAppleLoginAvailable())
+const appleLoginAvailable = computed(() => isNativeAppleLoginAvailable() || isWebAppleLoginAvailable())
 const isMobile = ref(Capacitor.isNativePlatform())
 const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
@@ -347,13 +348,17 @@ async function login(form: { email: string, password: string }) {
 }
 
 async function handleAppleLogin() {
-  if (isLoading.value || !isNativeAppleLoginAvailable())
+  if (isLoading.value || !appleLoginAvailable.value)
     return
 
   isLoading.value = true
   isAppleLoading.value = true
   let hasAppleSession = false
   try {
+    if (!isNativeAppleLoginAvailable()) {
+      await startAppleOAuth(new URL(location.href))
+      return
+    }
     const result = await signInWithApple(supabase, turnstileToken.value || undefined)
     if (!result)
       return
@@ -759,9 +764,42 @@ async function handleQuerySessionHandoff(accessToken: string, refreshToken: stri
   hideLoader()
 }
 
+async function handleAppleOAuthLanding(parsedUrl: URL) {
+  if (consumeAppleOAuthLandingError()) {
+    toast.error(t('apple-login-failed'))
+    return false
+  }
+  if (parsedUrl.searchParams.get('apple_oauth') === '1' && !Capacitor.isNativePlatform()) {
+    // Console owns the verifier and resulting session across the Apple round trip.
+    const entry = new URL(parsedUrl)
+    parsedUrl.searchParams.delete('apple_oauth')
+    parsedUrl.searchParams.delete('apple_website_state')
+    globalThis.history.replaceState({}, '', parsedUrl)
+    try {
+      await startAppleOAuth(entry)
+      return true
+    }
+    catch {
+      toast.error(t('apple-login-failed'))
+      return false
+    }
+  }
+  captureAppleOAuthCallback(parsedUrl)
+  if (hasPendingAppleOAuth()) {
+    isLoading.value = false
+    hideLoader()
+    if (!captchaKey.value || turnstileToken.value)
+      await finishAppleOAuth()
+    return true
+  }
+  return false
+}
+
 async function checkLogin() {
   try {
     const parsedUrl = new URL(route.fullPath, globalThis.location.origin)
+    if (await handleAppleOAuthLanding(parsedUrl))
+      return
     const params = new URLSearchParams(parsedUrl.search)
 
     if (params.get('message') === 'sso_account_linked') {
@@ -813,6 +851,36 @@ async function checkLogin() {
     isCheckingSavedSession.value = false
   }
 }
+
+async function finishAppleOAuth() {
+  if (isAppleLoading.value || !hasPendingAppleOAuth())
+    return
+  isAppleLoading.value = true
+  isLoading.value = true
+  let hasAppleSession = false
+  try {
+    await completeAppleOAuth(supabase, turnstileToken.value || undefined)
+    hasAppleSession = true
+    if (!await checkMfa())
+      throw new Error('Apple login could not complete MFA setup')
+  }
+  catch {
+    if (hasAppleSession)
+      await supabase.auth.signOut({ scope: 'local' })
+    turnstileToken.value = ''
+    safeResetTurnstile(captchaComponent.value)
+    toast.error(t('apple-login-failed'))
+  }
+  finally {
+    isAppleLoading.value = false
+    isLoading.value = false
+  }
+}
+
+watch(turnstileToken, (token) => {
+  if (token && hasPendingAppleOAuth())
+    void finishAppleOAuth()
+})
 
 function declineQuerySession() {
   hasQuerySession.value = false
