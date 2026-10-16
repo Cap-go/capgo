@@ -20390,77 +20390,29 @@ CREATE OR REPLACE FUNCTION "public"."sweep_deleted_version_manifests"("p_batch_s
     SET "search_path" TO ''
     AS $$
 DECLARE
-  stale_fixed bigint := 0;
   requeued bigint := 0;
 BEGIN
   IF p_batch_size IS NULL OR p_batch_size < 1 THEN
     p_batch_size := 100;
   END IF;
 
-  -- Fix stale counters: deleted versions with manifest_count > 0 but no rows.
-  WITH stale AS (
-    SELECT av.id, av.app_id
-    FROM public.app_versions AS av
-    WHERE av.deleted = true
-      AND av.manifest_count > 0
-      AND NOT EXISTS (
-        SELECT 1
-        FROM public.manifest AS m
-        WHERE m.app_version_id = av.id
-      )
-    ORDER BY av.deleted_at NULLS LAST, av.id
-    LIMIT p_batch_size
-  ),
-  cleared AS (
-    UPDATE public.app_versions AS av
-    SET manifest_count = 0,
-        manifest = NULL,
-        updated_at = now()
-    FROM stale
-    WHERE av.id = stale.id
-    RETURNING stale.app_id
-  ),
-  app_counts AS (
-    SELECT app_id, COUNT(*)::int AS cleared_count
-    FROM cleared
-    GROUP BY app_id
-  )
-  UPDATE public.apps AS a
-  SET manifest_bundle_count = GREATEST(a.manifest_bundle_count - app_counts.cleared_count, 0),
-      updated_at = now()
-  FROM app_counts
-  WHERE a.app_id = app_counts.app_id;
-
-  GET DIAGNOSTICS stale_fixed = ROW_COUNT;
-
-  -- Re-queue deleted versions that still have manifest rows by touching them.
-  -- on_version_update trigger enqueues cleanup when deleted_at is unchanged and
-  -- manifest_count > 0.
-  -- Start from deleted versions (bounded) and probe manifest via app_version_id index.
-  WITH candidates AS (
+  -- Finished versions leave this partial index. No historical-version scans
+  -- or per-version manifest probes belong in steady-state sweeps.
+  WITH candidates AS MATERIALIZED (
     SELECT av.id
     FROM public.app_versions AS av
     WHERE av.deleted = true
-      AND EXISTS (
-        SELECT 1
-        FROM public.manifest AS m
-        WHERE m.app_version_id = av.id
+      AND (
+        av.manifest_count > 0 OR av.manifest IS NOT NULL
       )
-    ORDER BY av.deleted_at NULLS LAST, av.id
+    ORDER BY av.updated_at ASC NULLS FIRST, av.id
     LIMIT p_batch_size
   )
   UPDATE public.app_versions AS av
-  SET manifest_count = GREATEST(av.manifest_count, 1),
-      updated_at = now()
-  FROM candidates
-  WHERE av.id = candidates.id;
+  SET updated_at = pg_catalog.now()
+  WHERE av.id = ANY(ARRAY(SELECT id FROM candidates));
 
   GET DIAGNOSTICS requeued = ROW_COUNT;
-
-  IF stale_fixed > 0 OR requeued > 0 THEN
-    RAISE NOTICE 'sweep_deleted_version_manifests: stale_counters=% requeued=%', stale_fixed, requeued;
-  END IF;
-
   RETURN requeued;
 END;
 $$;
@@ -20469,7 +20421,7 @@ $$;
 ALTER FUNCTION "public"."sweep_deleted_version_manifests"("p_batch_size" integer) OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."sweep_deleted_version_manifests"("p_batch_size" integer) IS 'Bounded sweeper for soft-deleted versions with leftover manifest rows or stale manifest_count. Re-touches rows so on_version_update runs cleanup_manifest (DB delete + R2 trash).';
+COMMENT ON FUNCTION "public"."sweep_deleted_version_manifests"("p_batch_size" integer) IS 'Requeue bounded database-only cleanup; delta objects stay in R2.';
 
 
 
@@ -23995,16 +23947,6 @@ COMMENT ON COLUMN "public"."manifest_per_version"."size_receipts_provided" IS 'T
 
 
 
-CREATE TABLE IF NOT EXISTS "public"."manifest_trash_restore_pending" (
-    "s3_path" "text" NOT NULL,
-    "app_version_id" bigint NOT NULL,
-    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL
-);
-
-
-ALTER TABLE "public"."manifest_trash_restore_pending" OWNER TO "postgres";
-
-
 CREATE TABLE IF NOT EXISTS "public"."mcp_oauth_clients" (
     "client_id" "text" NOT NULL,
     "client_name" "text" NOT NULL,
@@ -25769,11 +25711,6 @@ ALTER TABLE ONLY "public"."manifest"
 
 
 
-ALTER TABLE ONLY "public"."manifest_trash_restore_pending"
-    ADD CONSTRAINT "manifest_trash_restore_pending_pkey" PRIMARY KEY ("app_version_id", "s3_path");
-
-
-
 ALTER TABLE ONLY "public"."mcp_oauth_clients"
     ADD CONSTRAINT "mcp_oauth_clients_pkey" PRIMARY KEY ("client_id");
 
@@ -26322,6 +26259,10 @@ CREATE INDEX "idx_app_versions_deleted_at" ON "public"."app_versions" USING "btr
 
 
 CREATE INDEX "idx_app_versions_deleted_at_id" ON "public"."app_versions" USING "btree" ("deleted_at", "id") WHERE ("deleted" = true);
+
+
+
+CREATE INDEX "idx_app_versions_deleted_manifest_pending" ON "public"."app_versions" USING "btree" ("updated_at" NULLS FIRST, "id") WHERE (("deleted" = true) AND (("manifest_count" > 0) OR ("manifest" IS NOT NULL)));
 
 
 
@@ -27620,11 +27561,6 @@ ALTER TABLE ONLY "public"."manifest_per_version"
 
 
 
-ALTER TABLE ONLY "public"."manifest_trash_restore_pending"
-    ADD CONSTRAINT "manifest_trash_restore_pending_app_version_id_fkey" FOREIGN KEY ("app_version_id") REFERENCES "public"."app_versions"("id") ON DELETE CASCADE;
-
-
-
 ALTER TABLE ONLY "public"."mcp_oauth_requests"
     ADD CONSTRAINT "mcp_oauth_requests_apikey_id_fkey" FOREIGN KEY ("apikey_id") REFERENCES "public"."apikeys"("id") ON DELETE SET NULL;
 
@@ -28266,10 +28202,6 @@ CREATE POLICY "Deny all direct access" ON "public"."manifest_per_version" AS RES
 
 
 
-CREATE POLICY "Deny all direct access" ON "public"."manifest_trash_restore_pending" AS RESTRICTIVE USING (false) WITH CHECK (false);
-
-
-
 CREATE POLICY "Deny all direct access" ON "public"."mcp_oauth_clients" AS RESTRICTIVE USING (false) WITH CHECK (false);
 
 
@@ -28879,9 +28811,6 @@ ALTER TABLE "public"."manifest" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."manifest_per_version" ENABLE ROW LEVEL SECURITY;
-
-
-ALTER TABLE "public"."manifest_trash_restore_pending" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."mcp_oauth_clients" ENABLE ROW LEVEL SECURITY;
@@ -32681,10 +32610,6 @@ GRANT ALL ON SEQUENCE "public"."manifest_id_seq" TO "service_role";
 
 
 GRANT ALL ON TABLE "public"."manifest_per_version" TO "service_role";
-
-
-
-GRANT ALL ON TABLE "public"."manifest_trash_restore_pending" TO "service_role";
 
 
 

@@ -183,6 +183,41 @@ describe('manifest upload response contract', () => {
     expect(resolved.entries).toHaveLength(3)
   })
 
+  it('retries 503 authorization responses using Retry-After', async () => {
+    const delays: number[] = []
+    let calls = 0
+    const resolved = await requestManifestUpload('api-key', request, {}, async () => {
+      calls++
+      if (calls === 1)
+        return { data: null, error: Object.assign(new Error('unavailable'), { context: new Response('{}', { status: 503, headers: { 'Retry-After': '3' } }) }) }
+      return { data: response(), error: null }
+    }, async (ms) => {
+      delays.push(ms)
+    })
+
+    expect(resolved.entries).toHaveLength(3)
+    expect(calls).toBe(2)
+    expect(delays).toEqual([3000])
+  })
+
+  it('stops retrying after the retry budget and does not retry other errors', async () => {
+    let calls = 0
+    const unavailable = requestManifestUpload('api-key', request, {}, async () => {
+      calls++
+      return { data: null, error: Object.assign(new Error('unavailable'), { context: new Response('{}', { status: 503 }) }) }
+    }, async () => {})
+    await expect(unavailable).rejects.toThrow('Cannot request manifest upload')
+    expect(calls).toBe(3)
+
+    calls = 0
+    const forbidden = requestManifestUpload('api-key', request, {}, async () => {
+      calls++
+      return { data: null, error: Object.assign(new Error('forbidden'), { context: new Response('{}', { status: 403 }) }) }
+    }, async () => {})
+    await expect(forbidden).rejects.toThrow('Cannot request manifest upload')
+    expect(calls).toBe(1)
+  })
+
   it('only shows the authorization spinner when the request takes longer than 500 ms', async () => {
     const fastEvents: string[] = []
     await runWithUploadReporter(recordingReporter(fastEvents), async () => requestManifestUpload('api-key', request, {}, async () => ({
@@ -353,12 +388,199 @@ describe('manifest upload existence probe', () => {
     try {
       globalThis.fetch = (async () => new Response('', { status: 404 })) as typeof fetch
       await expect(fileExistsAtUploadTarget('https://files.example.test/read/', 'orgs/org/apps/app/delta/file')).resolves.toEqual({ exists: false })
-
-      globalThis.fetch = (async () => new Response('temporary failure', { status: 503 })) as typeof fetch
-      await expect(fileExistsAtUploadTarget('https://files.example.test/read/', 'orgs/org/apps/app/delta/file')).rejects.toThrow('HTTP 503')
     }
     finally {
       globalThis.fetch = originalFetch
+    }
+  })
+
+  it('retries retryable HTTP status codes and succeeds when the probe recovers', async () => {
+    const originalFetch = globalThis.fetch
+    let attempts = 0
+    globalThis.fetch = (async () => {
+      attempts++
+      if (attempts === 1)
+        return new Response('bad gateway', { status: 502 })
+      return new Response('', {
+        status: 200,
+        headers: { 'X-Capgo-Manifest-Size-Receipt': 'signed-size' },
+      })
+    }) as typeof fetch
+    try {
+      await expect(fileExistsAtUploadTarget('https://files.example.test/read/', 'orgs/org/apps/app/delta/file')).resolves.toEqual({
+        exists: true,
+        receipt: 'signed-size',
+      })
+      expect(attempts).toBe(2)
+    }
+    finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('fails after exhausting retries for persistent retryable HTTP status codes', async () => {
+    const originalFetch = globalThis.fetch
+    let attempts = 0
+    globalThis.fetch = (async () => {
+      attempts++
+      return new Response('temporary failure', { status: 503 })
+    }) as typeof fetch
+    try {
+      await expect(fileExistsAtUploadTarget('https://files.example.test/read/', 'orgs/org/apps/app/delta/file')).rejects.toThrow('HTTP 503')
+      expect(attempts).toBe(4)
+    }
+    finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('does not retry 404 responses', async () => {
+    const originalFetch = globalThis.fetch
+    let attempts = 0
+    globalThis.fetch = (async () => {
+      attempts++
+      return new Response('', { status: 404 })
+    }) as typeof fetch
+    try {
+      await expect(fileExistsAtUploadTarget('https://files.example.test/read/', 'orgs/org/apps/app/delta/file')).resolves.toEqual({ exists: false })
+      expect(attempts).toBe(1)
+    }
+    finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('caps a large Retry-After seconds value on 429', async () => {
+    const originalFetch = globalThis.fetch
+    const originalSetTimeout = globalThis.setTimeout
+    let attempts = 0
+    const delays: number[] = []
+    globalThis.fetch = (async () => {
+      attempts++
+      if (attempts === 1) {
+        return new Response('rate limited', {
+          status: 429,
+          headers: { 'Retry-After': '86400' },
+        })
+      }
+      return new Response('', { status: 404 })
+    }) as typeof fetch
+    globalThis.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+      if (typeof timeout === 'number')
+        delays.push(timeout)
+      if (typeof handler === 'function')
+        handler(...args)
+      return 0 as unknown as ReturnType<typeof setTimeout>
+    }) as typeof setTimeout
+    try {
+      await expect(fileExistsAtUploadTarget('https://files.example.test/read/', 'orgs/org/apps/app/delta/file')).resolves.toEqual({ exists: false })
+      expect(attempts).toBe(2)
+      expect(delays).toContain(30_000)
+      expect(delays).not.toContain(86_400_000)
+    }
+    finally {
+      globalThis.fetch = originalFetch
+      globalThis.setTimeout = originalSetTimeout
+    }
+  })
+
+  it('caps a far-future Retry-After HTTP-date on 429', async () => {
+    const originalFetch = globalThis.fetch
+    const originalSetTimeout = globalThis.setTimeout
+    let attempts = 0
+    const delays: number[] = []
+    const farFuture = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toUTCString()
+    globalThis.fetch = (async () => {
+      attempts++
+      if (attempts === 1) {
+        return new Response('rate limited', {
+          status: 429,
+          headers: { 'Retry-After': farFuture },
+        })
+      }
+      return new Response('', { status: 404 })
+    }) as typeof fetch
+    globalThis.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+      if (typeof timeout === 'number')
+        delays.push(timeout)
+      if (typeof handler === 'function')
+        handler(...args)
+      return 0 as unknown as ReturnType<typeof setTimeout>
+    }) as typeof setTimeout
+    try {
+      await expect(fileExistsAtUploadTarget('https://files.example.test/read/', 'orgs/org/apps/app/delta/file')).resolves.toEqual({ exists: false })
+      expect(attempts).toBe(2)
+      expect(delays.every(delay => delay <= 30_000)).toBe(true)
+      expect(delays.some(delay => delay > 0)).toBe(true)
+    }
+    finally {
+      globalThis.fetch = originalFetch
+      globalThis.setTimeout = originalSetTimeout
+    }
+  })
+
+  it('does not retry HTTP 500 responses', async () => {
+    const originalFetch = globalThis.fetch
+    let attempts = 0
+    globalThis.fetch = (async () => {
+      attempts++
+      return new Response('internal error', { status: 500 })
+    }) as typeof fetch
+    try {
+      await expect(fileExistsAtUploadTarget('https://files.example.test/read/', 'orgs/org/apps/app/delta/file')).rejects.toThrow('HTTP 500')
+      expect(attempts).toBe(1)
+    }
+    finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('does not retry HTTP 400 responses', async () => {
+    const originalFetch = globalThis.fetch
+    let attempts = 0
+    globalThis.fetch = (async () => {
+      attempts++
+      return new Response('bad request', { status: 400 })
+    }) as typeof fetch
+    try {
+      await expect(fileExistsAtUploadTarget('https://files.example.test/read/', 'orgs/org/apps/app/delta/file')).rejects.toThrow('HTTP 400')
+      expect(attempts).toBe(1)
+    }
+    finally {
+      globalThis.fetch = originalFetch
+    }
+  })
+
+  it('honours Retry-After on 429 before retrying the existence probe', async () => {
+    const originalFetch = globalThis.fetch
+    const originalSetTimeout = globalThis.setTimeout
+    let attempts = 0
+    const delays: number[] = []
+    globalThis.fetch = (async () => {
+      attempts++
+      if (attempts === 1) {
+        return new Response('rate limited', {
+          status: 429,
+          headers: { 'Retry-After': '2' },
+        })
+      }
+      return new Response('', { status: 404 })
+    }) as typeof fetch
+    globalThis.setTimeout = ((handler: TimerHandler, timeout?: number, ...args: unknown[]) => {
+      if (typeof timeout === 'number')
+        delays.push(timeout)
+      if (typeof handler === 'function')
+        handler(...args)
+      return 0 as unknown as ReturnType<typeof setTimeout>
+    }) as typeof setTimeout
+    try {
+      await expect(fileExistsAtUploadTarget('https://files.example.test/read/', 'orgs/org/apps/app/delta/file')).resolves.toEqual({ exists: false })
+      expect(attempts).toBe(2)
+      expect(delays).toContain(2000)
+    }
+    finally {
+      globalThis.fetch = originalFetch
+      globalThis.setTimeout = originalSetTimeout
     }
   })
 

@@ -50,7 +50,7 @@ const REPLICATION_LAG_CACHE_TTL_MS = REPLICATION_LAG_CACHE_TTL_SECONDS * 1000
 
 type ReplicationStatus = 'ok' | 'lagging' | 'unknown'
 interface ChannelLookupResult { id: number, name: string, allow_device_self_set: boolean, public: boolean, owner_org: string }
-type PlanAction = 'mau' | 'storage' | 'bandwidth'
+export type PlanAction = 'mau' | 'storage' | 'bandwidth'
 type ReadReplicaHyperdriveBinding
   = | 'HYPERDRIVE_CAPGO_READ_AS_JAPAN'
     | 'HYPERDRIVE_CAPGO_READ_AS_INDIA'
@@ -1485,33 +1485,6 @@ export async function getChannelsPg(
   catch (e: unknown) {
     logPgError(c, 'getChannelsPg', e)
     return []
-  }
-}
-
-export async function getAppByIdPg(
-  c: Context,
-  appId: string,
-  drizzleClient: ReturnType<typeof getDrizzleClient>,
-  actions: PlanAction[] = [],
-): Promise<{ owner_org: string, plan_valid: boolean } | null> {
-  try {
-    if (actions.length === 0)
-      return null
-    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
-    const app = await drizzleClient
-      .select({
-        owner_org: schema.apps.owner_org,
-        plan_valid: planExpression,
-      })
-      .from(schema.apps)
-      .where(eq(schema.apps.app_id, appId))
-      .limit(1)
-      .then(data => data[0])
-    return app
-  }
-  catch (e: unknown) {
-    logPgError(c, 'getAppByIdPg', e)
-    return null
   }
 }
 

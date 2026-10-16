@@ -5,6 +5,7 @@ import { setupLayouts } from 'virtual:generated-layouts'
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
+import { prepareAppleOAuthLanding } from '~/services/appleOAuth'
 import { getLocalConfig } from '~/services/console'
 import { installDeepLinkHandler } from '~/services/deepLinks'
 import { isDocumentNavigationPending, replaceDocument } from '~/services/documentNavigation'
@@ -17,6 +18,8 @@ import App from './App.vue'
 import { getRemoteConfig } from './services/console'
 // your custom styles here
 import './styles/style.css'
+
+prepareAppleOAuthLanding()
 
 // Handle chunk load errors (stale chunks after deployment)
 // When a new version is deployed, old chunk URLs return 404/HTML instead of JS
