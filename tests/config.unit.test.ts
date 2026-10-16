@@ -27,7 +27,23 @@ describe('get /private/config', () => {
     expect(String(body.minCliVersionReason).length).toBeGreaterThan(0)
     expect(body.supbaseId).toBe('testproject')
     expect(body.useNewFinalizeBundleUpload).toBe(false)
-    expect(body).not.toHaveProperty('nativeAppleLoginEnabled')
     expect(connect).not.toHaveBeenCalled()
+  })
+
+  it('preserves the deprecated Apple response field as false without backend discovery', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('No provider readiness request expected'))
+    try {
+      const response = await app.request('http://local/', { method: 'GET' })
+
+      expect(response.status).toBe(200)
+      const body = await response.json() as Record<string, unknown>
+      expect(body).toHaveProperty('nativeAppleLoginEnabled', false)
+      expect(typeof body.nativeAppleLoginEnabled).toBe('boolean')
+      expect(connect).not.toHaveBeenCalled()
+      expect(fetch).not.toHaveBeenCalled()
+    }
+    finally {
+      fetch.mockRestore()
+    }
   })
 })
