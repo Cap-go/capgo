@@ -4,8 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isNativeAppleLoginAvailable, signInWithApple } from '../src/services/nativeAppleLogin'
 
 const native = vi.hoisted(() => ({ platform: 'ios', available: true, isNative: true }))
-const enabled = vi.hoisted(() => ({ value: true }))
-vi.mock('~/services/supabase', () => ({ nativeAppleLoginEnabled: enabled, defaultApiHost: 'https://api.example.com' }))
+vi.mock('~/services/supabase', () => ({ nativeAppleLoginEnabled: { value: true }, defaultApiHost: 'https://api.example.com' }))
 const plugin = vi.hoisted(() => ({ initialize: vi.fn(), login: vi.fn() }))
 vi.mock('@capacitor/core', () => ({ Capacitor: {
   isNativePlatform: () => native.isNative,
@@ -34,7 +33,7 @@ beforeEach(() => {
   native.platform = 'ios'
   native.available = true
   native.isNative = true
-  enabled.value = true
+  vi.stubEnv('VITE_NATIVE_APPLE_LOGIN_ENABLED', 'true')
   plugin.login.mockResolvedValue({ provider: 'apple', result: {
     idToken: 'apple-id-token',
     authorizationCode: 'apple-code',
@@ -42,8 +41,16 @@ beforeEach(() => {
   } })
   fetchMock.mockResolvedValue(Response.json({ user, session, name_status: 'saved' }))
 })
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+})
 describe('native Apple backend exchange', () => {
+  it.each([undefined, '', 'false'])('keeps native UI off by default (%s) despite a remote true value, with no discovery request', (value) => {
+    vi.stubEnv('VITE_NATIVE_APPLE_LOGIN_ENABLED', value)
+    expect(isNativeAppleLoginAvailable()).toBe(false)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
   it('hashes a fresh nonce for Apple and sends the raw nonce and cached name only to our backend', async () => {
     const supabase = client()
     const result = await login(supabase)
@@ -63,7 +70,7 @@ describe('native Apple backend exchange', () => {
   })
   it('uses the same endpoint with authenticated same-account reauthentication for deletion', async () => {
     const supabase = client()
-    enabled.value = false
+    vi.stubEnv('VITE_NATIVE_APPLE_LOGIN_ENABLED', 'false')
     await login(supabase, true)
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe('Bearer current-access')
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).reauthenticate).toBe(true)
@@ -84,7 +91,7 @@ describe('native Apple backend exchange', () => {
   })
   it('retains iOS-only button availability and allows gated-off deletion reauth', () => {
     expect(isNativeAppleLoginAvailable()).toBe(true)
-    enabled.value = false
+    vi.stubEnv('VITE_NATIVE_APPLE_LOGIN_ENABLED', 'false')
     expect(isNativeAppleLoginAvailable()).toBe(false)
     expect(isNativeAppleLoginAvailable(true)).toBe(true)
     native.platform = 'android'

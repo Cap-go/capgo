@@ -31,11 +31,17 @@ test('web callback exchanges the retained verifier without keeping callback cred
   expect(await page.evaluate(() => sessionStorage.getItem('capgo.apple-oauth.v1'))).toBeNull()
 })
 
-test('web login never offers Apple even when the server enables native Apple login', async ({ page }) => {
+test('default web build hides Apple and makes no visibility discovery request', async ({ page }) => {
+  let discoveryRequests = 0
+  await page.route(/\/auth\/apple\/capabilities$|\/auth\/v1\/settings$/, (route) => {
+    discoveryRequests++
+    return route.fulfill({ json: { enabled: true } })
+  })
   await page.route('**/private/config', route => route.fulfill({ json: { nativeAppleLoginEnabled: true } }))
   await page.goto('/login/')
   await expect(page.locator('[data-test="login-form"]')).toBeVisible()
   await expect(page.locator('[data-test="apple-sign-in"]')).toHaveCount(0)
+  expect(discoveryRequests).toBe(0)
   await expect(page.locator('[data-test="email"]')).toBeVisible()
   await page.route('**/private/sso/check-domain', route => route.fulfill({ json: { has_sso: false } }))
   await page.locator('[data-test="email"]').fill('preview@example.com')

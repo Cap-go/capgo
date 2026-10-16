@@ -27,37 +27,15 @@ function readAttempt(): PendingAppleOAuth | null {
   return null
 }
 
-interface AppleWebCapability {
-  enabled?: boolean
-  api_enabled?: boolean
-  redirect_uris?: string[]
-}
-
-function developmentAppleOAuthEnabled() {
-  return import.meta.env.DEV && import.meta.env.VITE_DEV_APPLE_LOGIN_ENABLED === 'true'
+export function isWebAppleLoginAvailable() {
+  return import.meta.env.VITE_WEB_APPLE_LOGIN_ENABLED === 'true'
     && !Capacitor.isNativePlatform() && location.protocol === 'https:'
 }
 
-export async function loadDevelopmentAppleOAuthAvailability() {
-  if (!developmentAppleOAuthEnabled())
-    return false
-  try {
-    const response = await fetch(`${defaultApiHost}/auth/apple/capabilities`, { signal: AbortSignal.timeout(5000) })
-    const capabilities = await response.json() as { web?: AppleWebCapability }
-    return response.ok && capabilities.web?.api_enabled === true
-      && capabilities.web.redirect_uris?.includes(`${location.origin}/login`) === true
-  }
-  catch { return false }
-}
-
 export async function startAppleOAuth(url: URL) {
-  const redirectUri = `${location.origin}/login`
-  const capabilityResponse = await fetch(`${defaultApiHost}/auth/apple/capabilities`)
-  const capabilities = await capabilityResponse.json() as { web?: AppleWebCapability }
-  const visible = capabilities.web?.enabled === true
-    || (developmentAppleOAuthEnabled() && capabilities.web?.api_enabled === true)
-  if (!capabilityResponse.ok || !visible || !capabilities.web?.redirect_uris?.includes(redirectUri))
+  if (!isWebAppleLoginAvailable())
     throw new Error('Apple login is unavailable')
+  const redirectUri = `${location.origin}/login`
   const verifier = base64url.encode(crypto.getRandomValues(new Uint8Array(32)))
   const state = base64url.encode(crypto.getRandomValues(new Uint8Array(32)))
   const challenge = base64url.encode(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))))

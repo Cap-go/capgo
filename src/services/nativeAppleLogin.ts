@@ -1,9 +1,9 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import { Capacitor } from '@capacitor/core'
-import { defaultApiHost, nativeAppleLoginEnabled } from './supabase'
+import { defaultApiHost } from './supabase'
 
 export function isNativeAppleLoginAvailable(reauthenticate = false) {
-  return (reauthenticate || nativeAppleLoginEnabled.value)
+  return (reauthenticate || import.meta.env.VITE_NATIVE_APPLE_LOGIN_ENABLED === 'true')
     && Capacitor.isNativePlatform()
     && Capacitor.getPlatform() === 'ios'
     && Capacitor.isPluginAvailable('SocialLogin')

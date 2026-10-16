@@ -92,7 +92,7 @@ beforeEach(() => {
   profile = null
   profileFailure = false
   newInserts = 0
-  for (const [name, value] of Object.entries({ APPLE_LOGIN_API_ENABLED: 'true', NATIVE_APPLE_LOGIN_ENABLED: 'true', APPLE_SIGN_IN_CLIENT_ID: 'com.example.native', APPLE_SIGN_IN_WEB_CLIENT_ID: 'com.example.web', APPLE_SIGN_IN_TEAM_ID: 'EXAMPLETEAM', APPLE_SIGN_IN_KEY_ID: 'EXAMPLEKEY', APPLE_SIGN_IN_PRIVATE_KEY: 'server-only-example-key', APPLE_SIGN_IN_OAUTH_CALLBACK_URL: 'https://api.example.com/auth/apple/callback', APPLE_SIGN_IN_REDIRECT_URLS: '["https://console.example.com/login","capgo://apple-callback"]', WEB_APPLE_LOGIN_ENABLED: 'true', CAPTCHA_SECRET_KEY: 'secret', SUPABASE_URL: 'https://auth.example.com' }))
+  for (const [name, value] of Object.entries({ APPLE_SIGN_IN_CLIENT_ID: 'com.example.native', APPLE_SIGN_IN_WEB_CLIENT_ID: 'com.example.web', APPLE_SIGN_IN_TEAM_ID: 'EXAMPLETEAM', APPLE_SIGN_IN_KEY_ID: 'EXAMPLEKEY', APPLE_SIGN_IN_PRIVATE_KEY: 'server-only-example-key', APPLE_SIGN_IN_OAUTH_CALLBACK_URL: 'https://api.example.com/auth/apple/callback', APPLE_SIGN_IN_REDIRECT_URLS: '["https://console.example.com/login","capgo://apple-callback"]', CAPTCHA_SECRET_KEY: 'secret', SUPABASE_URL: 'https://auth.example.com' }))
     vi.stubEnv(name, value)
   vi.stubGlobal('fetch', vi.fn(async (url: string | URL) => {
     if (String(url).endsWith('/auth/keys'))
@@ -149,25 +149,6 @@ describe('shared Apple endpoint', () => {
     expect((await request('/start', { redirect_uri: 'https://console.example.com/login', code_challenge: 'c'.repeat(43), client_state: 's'.repeat(43) })).status).toBe(500)
     expect(mocks.connect).toHaveBeenCalledOnce()
     expect(mocks.close).toHaveBeenCalledOnce()
-  })
-
-  it.each([true, false])('caches provider readiness (%s) without caching API/UI enablement', async (providerReady) => {
-    const stored = new Map<string, Response>()
-    vi.stubGlobal('caches', { open: async () => ({
-      match: async (key: Request) => stored.get(key.url)?.clone(),
-      put: async (key: Request, value: Response) => { stored.set(key.url, value.clone()) },
-    }) })
-    const provider = vi.mocked(fetch).mockImplementation(async () => Response.json({ external: { apple: providerReady } }))
-    const first = await app.request('/capabilities')
-    expect(await first.json()).toMatchObject({ web: { api_enabled: providerReady } })
-    expect(await (await app.request('/capabilities')).json()).toMatchObject({ web: { api_enabled: providerReady } })
-    expect(provider).toHaveBeenCalledOnce()
-    expect([...stored.values()][0].headers.get('cache-control')).toBe('public, s-maxage=60')
-    vi.stubEnv('WEB_APPLE_LOGIN_ENABLED', 'false')
-    expect(await (await app.request('/capabilities')).json()).toMatchObject({ web: { enabled: false } })
-    vi.stubEnv('APPLE_LOGIN_API_ENABLED', 'false')
-    expect(await (await app.request('/capabilities')).json()).toMatchObject({ web: { api_enabled: false } })
-    expect(provider).toHaveBeenCalledOnce()
   })
 
   it('verifies credentials, provisions the actual profile with opted-out consent and keeps MFA factors', async () => {
@@ -229,8 +210,7 @@ describe('shared Apple endpoint', () => {
     expect(await response.json()).toMatchObject({ account_status: 'disabled', is_new_user: false })
     expect(newInserts).toBe(0)
   })
-  it('requires an authenticated same Apple identity for deletion reauthentication with native UI off', async () => {
-    vi.stubEnv('NATIVE_APPLE_LOGIN_ENABLED', 'false')
+  it('requires an authenticated same Apple identity for deletion reauthentication without any rollout setting', async () => {
     const body = { id_token: await token(), nonce: 'n'.repeat(64), captcha_token: 'captcha', reauthenticate: true }
     expect((await request('/', body)).status).toBe(401)
     const foreign = await token('n'.repeat(64), 'com.example.native', { subject: 'foreign-subject' })
@@ -265,8 +245,7 @@ async function oauth(redirect = 'https://console.example.com/login', reauthentic
   return { verifier, authUrl, attempt, callback }
 }
 describe('android/browser OAuth backend transport', () => {
-  it('allows authenticated same-account deletion reauthentication while web signup rollout is off', async () => {
-    vi.stubEnv('WEB_APPLE_LOGIN_ENABLED', 'false')
+  it('allows authenticated same-account deletion reauthentication without any rollout setting', async () => {
     const flow = await oauth('capgo://apple-callback', true)
     expect(flow.attempt.expected_user_id).toBe(user.id)
     expect(flow.attempt.expected_subject).toBe('verified-subject')
@@ -304,52 +283,29 @@ describe('android/browser OAuth backend transport', () => {
     expect(callback.status).toBe(400)
     expect(names.size).toBe(0)
   })
-  it('keeps public visibility off while independently enabling the browser API', async () => {
-    vi.stubEnv('NATIVE_APPLE_LOGIN_ENABLED', 'false')
-    vi.stubEnv('WEB_APPLE_LOGIN_ENABLED', 'false')
-    expect(await (await app.request('/capabilities')).json()).toEqual({
-      native: { enabled: false, api_enabled: true },
-      web: { enabled: false, api_enabled: true, redirect_uris: ['https://console.example.com/login', 'capgo://apple-callback'] },
-    })
-    const flow = await oauth()
-    const callback = await flow.callback()
-    const code = new URLSearchParams(new URL(callback.headers.get('location')!).hash.slice(1)).get('apple_code')
-    expect((await request('/exchange', { code, code_verifier: flow.verifier, captcha_token: 'captcha' })).status).toBe(200)
-  })
-  it('accepts valid native credentials while the public native UI is off', async () => {
-    vi.stubEnv('NATIVE_APPLE_LOGIN_ENABLED', 'false')
-    vi.stubEnv('WEB_APPLE_LOGIN_ENABLED', 'false')
+  it('authenticates valid native credentials with no rollout configuration or Vault lookup', async () => {
     const response = await request('/', { id_token: await token(), nonce: 'n'.repeat(64), captcha_token: 'captcha' })
     expect(response.status).toBe(200)
     expect(mocks.exchange).toHaveBeenCalledOnce()
+    expect(mocks.pg.mock.calls.some(([sql]) => sql.includes('vault.'))).toBe(false)
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('/auth/v1/settings'))).toBe(false)
   })
-  it.each(['false', ''])('fails closed when backend availability is disabled or absent: %s', async (value) => {
-    vi.stubEnv('APPLE_LOGIN_API_ENABLED', value)
-    const body = { id_token: await token(), nonce: 'n'.repeat(64), captcha_token: 'captcha' }
-    expect((await request('/', body)).status).toBe(503)
-    expect((await request('/start', { redirect_uri: 'https://console.example.com/login', code_challenge: 'x'.repeat(43), client_state: 's'.repeat(43) })).status).toBe(503)
-    expect((await request('/exchange', { code: 'c'.repeat(43), code_verifier: 'v'.repeat(43), captcha_token: 'captcha' })).status).toBe(503)
-    expect(await (await app.request('/capabilities')).json()).toEqual({ native: { enabled: false, api_enabled: false }, web: { enabled: false, api_enabled: false, redirect_uris: [] } })
-    expect(mocks.exchange).not.toHaveBeenCalled()
-  })
-  it('blocks an already-started completion if the backend is subsequently disabled', async () => {
+  it('completes browser OAuth with no rollout configuration or discovery request', async () => {
     const flow = await oauth()
-    vi.stubEnv('APPLE_LOGIN_API_ENABLED', 'false')
     const response = await flow.callback()
-    expect(response.status).toBe(303)
-    expect(names.get('verified-subject')?.first_name).toBe('Browser')
     const code = new URLSearchParams(new URL(response.headers.get('location')!).hash.slice(1)).get('apple_code')
-    expect((await request('/exchange', { code, code_verifier: flow.verifier, captcha_token: 'captcha' })).status).toBe(503)
-    expect(attempts.size).toBe(1)
-    expect(mocks.exchange).not.toHaveBeenCalled()
-    vi.stubEnv('APPLE_LOGIN_API_ENABLED', 'true')
     expect((await request('/exchange', { code, code_verifier: flow.verifier, captcha_token: 'captcha' })).status).toBe(200)
     expect(profile.first_name).toBe('Browser')
+    expect(mocks.pg.mock.calls.some(([sql]) => sql.includes('vault.'))).toBe(false)
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('/auth/v1/settings'))).toBe(false)
   })
-  it('keeps native and browser same-account deletion reauthentication when API and UI signup switches are off', async () => {
-    vi.stubEnv('APPLE_LOGIN_API_ENABLED', 'false')
-    vi.stubEnv('NATIVE_APPLE_LOGIN_ENABLED', 'false')
-    vi.stubEnv('WEB_APPLE_LOGIN_ENABLED', 'false')
+  it('requires normal Apple credentials without substituting an enablement flag', async () => {
+    vi.stubEnv('APPLE_SIGN_IN_PRIVATE_KEY', '')
+    expect((await request('/', { id_token: await token(), nonce: 'n'.repeat(64), captcha_token: 'captcha' })).status).toBe(503)
+    expect(mocks.exchange).not.toHaveBeenCalled()
+    expect(mocks.connect).not.toHaveBeenCalled()
+  })
+  it('keeps native and browser same-account deletion reauthentication without rollout settings', async () => {
     const body = { id_token: await token(), nonce: 'n'.repeat(64), captcha_token: 'captcha', reauthenticate: true }
     expect((await request('/', body)).status).toBe(401)
     expect((await request('/', body, { Authorization: 'Bearer current-session' })).status).toBe(200)

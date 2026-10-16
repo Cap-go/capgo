@@ -79,7 +79,7 @@ beforeEach(() => {
   mocks.fullPath = '/login'
   sessionStorage.clear()
   vi.stubEnv('DEV', true)
-  vi.stubEnv('VITE_DEV_APPLE_LOGIN_ENABLED', '')
+  vi.stubEnv('VITE_WEB_APPLE_LOGIN_ENABLED', 'false')
   mocks.signIn.mockResolvedValue({ user: { id: 'apple-user', email: 'apple@example.com' } })
   mocks.rpc.mockResolvedValue({ data: true, error: null })
   mocks.signOut.mockResolvedValue({ error: null })
@@ -150,31 +150,28 @@ describe('native Apple login page', () => {
     expect(mocks.error).toHaveBeenCalledWith(messages['apple-login-failed'])
   })
 
-  it.each([true, false])('shows the browser opt-in only in development: DEV=%s', async (development) => {
+  it.each([true, false])('uses the browser build flag without discovery: DEV=%s', async (development) => {
     mocks.available = false
     vi.stubEnv('DEV', development)
-    vi.stubEnv('VITE_DEV_APPLE_LOGIN_ENABLED', 'true')
+    vi.stubEnv('VITE_WEB_APPLE_LOGIN_ENABLED', 'true')
     vi.stubGlobal('location', { origin: 'https://localhost:5173', protocol: 'https:', href: 'https://localhost:5173/login', assign: mocks.assign })
-    vi.mocked(fetch).mockImplementation(async url => String(url).endsWith('/capabilities')
-      ? Response.json({ web: { enabled: false, api_enabled: true, redirect_uris: ['https://localhost:5173/login'] } })
-      : Response.json({ authorization_url: 'https://appleid.apple.com/auth/authorize' }))
+    vi.mocked(fetch).mockImplementation(async () => Response.json({ authorization_url: 'https://appleid.apple.com/auth/authorize' }))
     const root = await mount()
     const button = root.querySelector('[data-test="apple-sign-in"]') as HTMLButtonElement | null
-    if (!development) {
-      expect(button).toBeNull()
-      return
-    }
     expect(button).not.toBeNull()
     button!.click()
     await settle()
     await vi.waitFor(() => expect(mocks.assign).toHaveBeenCalledWith('https://appleid.apple.com/auth/authorize'))
     expect(mocks.signIn).not.toHaveBeenCalled()
+    expect(vi.mocked(fetch).mock.calls.filter(([url]) => String(url).endsWith('/auth/apple/start'))).toHaveLength(1)
+    expect(vi.mocked(fetch).mock.calls.some(([url]) => /capabilities|auth\/v1\/settings/.test(String(url)))).toBe(false)
   })
 
   it('hides the Apple button when the native availability gate is false', async () => {
     mocks.available = false
     const root = await mount()
     expect(root.querySelector('[data-test="apple-sign-in"]')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
   })
   it('signs in without requiring email/password fields and preserves the destination', async () => {
     const root = await mount()

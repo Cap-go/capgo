@@ -1,6 +1,6 @@
 # Shared Apple authentication contract
 
-Branch: `wolny/shared-apple-auth`. PR: https://github.com/Cap-go/capgo.app/pull/3715. This is the shared native/browser API and frontend-discovery contract.
+Branch: `wolny/shared-apple-auth`. PR: https://github.com/Cap-go/capgo.app/pull/3715. This is the shared native/browser API and build-time UI contract.
 
 All paths are relative to the existing API host (including `/functions/v1` when required by that host). JSON POST requests and responses use `Cache-Control: no-store`. No direct client Supabase Apple exchange or fallback is permitted. Supabase remains the session engine; clients install returned tokens with `supabase.auth.setSession(session)` and run their normal MFA/onboarding flow.
 
@@ -27,7 +27,7 @@ Errors use existing `{ error: string, message: string }` JSON shape: 400 `invali
 
 ## Configuration / rollout
 
-Existing server-only `APPLE_SIGN_IN_CLIENT_ID` is the native bundle audience. Additional `APPLE_SIGN_IN_WEB_CLIENT_ID` is the Apple Services ID for Android/browser. Supabase Apple provider must accept both configured IDs and preserve normal automatic identity linking; group the Services ID with the native app in Apple Developer Portal. Existing team/key/private-key settings stay server-only. `APPLE_SIGN_IN_OAUTH_CALLBACK_URL` must be the exact HTTPS API `/auth/apple/callback` URL. `APPLE_SIGN_IN_REDIRECT_URLS` is a JSON array of exact permitted consumer redirect URLs (HTTPS website URLs or explicitly registered native app links). Never wildcard this list. No production credentials, rollout flags, Apple portal settings, or Supabase configuration are changed by this PR. Backend availability and public visibility use separate default-off switches, described below. Native UI still requires a real supported iOS binary and SocialLogin plugin.
+Existing server-only `APPLE_SIGN_IN_CLIENT_ID` is the native bundle audience. Additional `APPLE_SIGN_IN_WEB_CLIENT_ID` is the Apple Services ID for Android/browser. Supabase Apple provider must accept both configured IDs and preserve normal automatic identity linking; group the Services ID with the native app in Apple Developer Portal. Existing team/key/private-key settings stay server-only. `APPLE_SIGN_IN_OAUTH_CALLBACK_URL` must be the exact HTTPS API `/auth/apple/callback` URL. `APPLE_SIGN_IN_REDIRECT_URLS` is a JSON array of exact permitted consumer redirect URLs (HTTPS website URLs or explicitly registered native app links). Never wildcard this list. No production credentials, Apple portal settings, or Supabase configuration are changed by this PR. The backend accepts valid authentication whenever its normal Apple credentials and OAuth configuration are present. It has no rollout enable/disable flag or constant. Public button visibility is controlled only by the frontend build flags below. Native UI still requires a real supported iOS binary and SocialLogin plugin.
 
 OAuth pending attempts expire after 10 minutes, are single-use and verifier-bound, and use restricted server storage. First names survive interrupted completion in restricted server storage bound to verified Apple subject, then fill only empty actual Capgo profile fields. No account is deleted as rollback for Apple failure. Existing email registration password rules and response remain compatible.
 
@@ -37,28 +37,22 @@ Consumers must wait for the backend migration/deployment and external Apple/Supa
 
 Use a **console-owned authorization round trip** for website entry. Do not exchange on the website origin and then attempt to transfer a session across origins. The website button navigates to `https://console.capgo.app/login?apple_oauth=1` and may add the allowlisted attribution/device/experiment fields below as ordinary query parameters (no credentials). The console creates and retains the verifier/state in its own sessionStorage, calls `/start` with `redirect_uri: 'https://console.capgo.app/login'`, navigates to Apple, consumes and immediately strips the returned fragment, completes `/exchange` with its CAPTCHA, installs the session and runs existing MFA/onboarding. This PR owns that minimal console bootstrap/completion handler. It adds no website or Android Apple button. The canonical website `/register/apple/callback/` is **not needed** by this flow. Native Android clients use their own app-link callback and retain their own verifier as described above.
 
-`GET /auth/apple/capabilities` returns HTTP 200, no-store, without credentials:
+## Build-time button visibility
 
-```ts
-{
-  native: { enabled: boolean, api_enabled: boolean }
-  web: { enabled: boolean, api_enabled: boolean, redirect_uris: string[] }
-}
-```
+The tracked Vite configuration explicitly defaults both public UI flags to the string `false`:
 
-`api_enabled` reports new-login backend readiness; `enabled` additionally requires the corresponding explicit public-visibility switch. Native readiness requires backend credentials and an enabled Supabase Apple provider; web readiness also requires the Services ID, HTTPS callback and exact redirect allowlist. Missing settings or failed readiness lookups return false. With API on and both public switches off, both `enabled` values stay false while valid API calls can complete. The website and Android UI must continue requiring `enabled` and their exact configured redirect; they must never treat `api_enabled` alone as permission to show a public button. The redirect list remains available when the web API is ready and public visibility is off so an explicitly opted-in development frontend can verify its exact redirect. No secrets are exposed by that list.
-
-| Vault runtime setting | Default | Controls |
+| Frontend build flag | Default | Controls |
 | --- | --- | --- |
-| `APPLE_LOGIN_API_ENABLED` | Off | New native login and new browser `/start` and `/exchange` session issuance |
-| `NATIVE_APPLE_LOGIN_ENABLED` | Off | Public native button discovery through `/private/config.nativeAppleLoginEnabled` and native capabilities |
-| `WEB_APPLE_LOGIN_ENABLED` | Off | Public browser/Android/website discovery through `web.enabled` |
+| `VITE_NATIVE_APPLE_LOGIN_ENABLED` | `false` | The native Apple button, additionally requiring actual iOS and the SocialLogin plugin |
+| `VITE_WEB_APPLE_LOGIN_ENABLED` | `false` | The browser Apple button, additionally requiring HTTPS and a browser runtime |
 
-Each setting supports the existing same-name deployment environment override; remove an override to control it through Vault. Runtime values are cached for up to 60 seconds. Provider readiness is cached separately for 60 seconds; API and UI decisions are still evaluated on each capability request. After deployment and Apple/Supabase setup, an operator can enable **only `APPLE_LOGIN_API_ENABLED=true`**, leaving **`NATIVE_APPLE_LOGIN_ENABLED=false` and `WEB_APPLE_LOGIN_ENABLED=false`**. That enables API testing without publishing any Apple button. Merging this code does not enable any flag or provider and does not prove that the production provider is configured. A failed/403 production capability request does not establish flag values.
+An explicit `true` in a local `.env.local` or build environment changes that frontend build only. These are public build settings, not secrets or backend runtime configuration. A normal production build keeps both buttons hidden. There is no third development-only flag. Production builds can expose a button only if that build deliberately opts in.
 
-Disabling the API switch rejects new logins even if they began earlier: `/exchange` checks availability in its atomic verifier-bound consume operation and leaves a new-login completion intact while disabled. A valid already-started `/callback` still verifies the Apple credential, nonce/code binding and state, and securely retains Apple's one-time name. It cannot issue a session. A later enabled exchange or fresh authorization can reuse the retained verified name.
+Button availability is decided synchronously on the client. It performs no capability, provider-settings, private-config or Supabase discovery request. The backend exposes no Apple visibility field or readiness-discovery endpoint. Actual authentication uses the existing primary Cloudflare API origin through `defaultApiHost`; ordinary Supabase session/account operations remain unchanged.
 
-**Deletion reauthentication is deliberately independent of all signup/visibility switches.** Native `reauthenticate: true` still requires the existing Bearer session, its verified Apple subject and the same resulting Supabase user. Browser reauthentication must be created with that authenticated session and stores the expected user/subject; exchange remains bound to that attempt and client verifier. These authenticated same-account paths and private authorization-code revocation remain available with signup switches off, provided credentials are configured. CAPTCHA, rate limits, email OTP, fresh-auth and MFA checks remain. No unauthenticated reauthentication flag bypasses these requirements.
+Website and Android consumers must control their own UI through their own build settings and call the shared API directly. Consumers must not depend on removed backend visibility fields or readiness discovery. For the console-owned website flow above, the console frontend handling `apple_oauth=1` must itself be built with `VITE_WEB_APPLE_LOGIN_ENABLED=true`. The actual `/start` validates the consumer's exact redirect against the configured allowlist before creating an attempt. No UI flag is checked by the backend.
+
+**Deletion reauthentication remains an authenticated same-account operation.** Native `reauthenticate: true` requires the existing Bearer session, its verified Apple subject and the same resulting Supabase user. Browser reauthentication stores those verified identities at authenticated `/start` and checks them at `/exchange`. Native deletion reauthentication remains usable with its public button flag off. CAPTCHA, rate limits, email OTP, fresh-auth, MFA and revocation checks remain unchanged.
 
 Successful native and OAuth session responses additionally return `is_new_user: boolean`: true only when this request inserted the actual Capgo public profile, false for a returning/linked account or a concurrent duplicate. Signup conversion events must use this value. Existing server `on_user_create` provisioning hooks still run once from that insert. Clients must never infer newness from the Apple name, email, or token issuance.
 
@@ -74,26 +68,26 @@ The new tables are server-only (RLS enabled; explicit service-role policy/grants
 
 The account checks are existing RPCs, called once per verified email/identity per console authentication request, never in a per-row policy or plugin path. `get_sso_enforcement_by_domain` uses unique `sso_providers_domain_key` then `orgs_pkey`; `is_account_disabled` uses unique `to_delete_accounts_account_id_key`; profile lookups/conditional updates use `users_pkey`. `is_not_deleted` retains the existing registration/deletion-policy lookup on `deleted_account.email` (the existing small deleted-account dataset); no broad app/org resource scan or new SQL function is introduced. Production credential smoke tests and production-scale execution evidence require operator access and are rollout dependencies; local tests exercise signed Apple assertions, state/nonce/code-hash validation, replay, database privileges/constraints, and iOS deletion/MFA safeguards.
 
-Rollout and deletion: ordinary native and browser signup/login requires `APPLE_LOGIN_API_ENABLED`; it does not require either public UI switch. Native deletion reauthentication requires the existing Bearer session and matching Apple subject/user, and browser deletion reauthentication stores those verified identities at `/start` and checks both at `/exchange`. These authenticated paths remain usable when the API/signup and UI switches are off. Clients must not gate deletion reauthentication on a signup capability boolean. Configuration and signing secrets must remain available until the last Apple account is deleted.
+Normal Apple credentials and configuration are the only backend availability requirements. Hiding a frontend button does not disable authentication or remove the server's signature, identity, deletion or session protections. Configuration and signing secrets must remain available until the last Apple account is deleted.
 
 Console startup captures and strips callback fragments before router and analytics initialization, and analytics URL sanitization also removes Apple callbacks from initial person properties. Completion keeps the opaque code and verifier together only in memory after removing the pre-redirect storage entry. Reloading during CAPTCHA/completion requires a fresh authorization; the verified first name remains on the backend. Names containing markup delimiters are discarded as optional display data, and control/format characters are removed from accepted names. Browser/Android revocation exchanges include the same configured HTTPS callback URI as the original authorization request.
 
 
 ## Local development against a production backend
 
-Use the actual browser Services-ID OAuth flow. Do not fake iOS or SocialLogin availability. The local opt-in is `VITE_DEV_APPLE_LOGIN_ENABLED=true`, and is honored only by a Vite development server, in a browser, on HTTPS, with `web.api_enabled === true` and an exact `${location.origin}/login` entry in the backend redirect allowlist. Production web builds ignore the opt-in even if the variable is set; native/mobile builds never use this browser override. The ordinary native button still requires the public native flag and actual iOS/plugin support.
-
-For an internal development session using the existing production-backed dev-server configuration:
+Use the actual browser Services-ID OAuth flow. Do not fake iOS or SocialLogin availability. Set `VITE_WEB_APPLE_LOGIN_ENABLED=true` in your local `.env.local`, or pass it explicitly when starting the production-backed development server:
 
 ```sh
-VITE_DEV_APPLE_LOGIN_ENABLED=true bun run serve:prod-no-cors -- --host 127.0.0.1
+VITE_WEB_APPLE_LOGIN_ENABLED=true bun run serve:prod-no-cors -- --host 127.0.0.1
 ```
+
+The flag belongs to that local frontend only; production frontend defaults remain false. The browser button is available only on HTTPS. There is no backend rollout switch to enable and no visibility discovery call.
 
 Serve that local frontend through your approved HTTPS setup and browse its **HTTPS** origin. The command by itself starts a local HTTP server; it does not register an HTTPS origin, expose a port, change backend/provider settings, or bypass network policy. If an HTTPS tunnel is needed, arrange it separately. Before testing, the operator must:
 
 1. Deploy the migration/backend, configure Apple native/Services-ID audiences, signing credentials and Supabase Apple with nonce verification enabled.
 2. Register the fixed production API HTTPS `/auth/apple/callback` as the Apple Services-ID return URL. Apple still posts to the backend; do not register the local frontend as Apple's credential callback.
 3. Add the **exact** development `https://<approved-host>/login` URL, without a trailing slash, to `APPLE_SIGN_IN_REDIRECT_URLS`. No wildcard, suffix matching, automatic localhost entry or HTTP redirect exception is added. For a non-local HTTPS host, allow that exact origin using the existing `CORS_ALLOWED_ORIGINS` configuration and any applicable network policy; the code does not relax CORS or a production 403 policy.
-4. Enable only `APPLE_LOGIN_API_ENABLED`, with both public UI switches explicitly false. Verify capability readiness and the exact redirect from the local browser before clicking.
+4. Keep the production frontend build flags at their false defaults. Opt in only the local frontend with `VITE_WEB_APPLE_LOGIN_ENABLED=true`. The actual `/start` enforces the configured exact redirect; provider smoke testing requires a configured Apple/Supabase provider.
 
 The development button starts the same backend state/nonce/PKCE flow and installs the returned Supabase session on the local frontend. It retains normal CAPTCHA, MFA, SSO, disabled-account and onboarding guards. Keep the production popup receipt pinned to `https://capgo.app` and console origin `https://console.capgo.app`; local testing does not receive or fabricate website conversion receipts. Local testing here covers authentication in that frontend, not cross-origin production website tracking. No live credentials are needed for mocked automated tests, but a real provider smoke test requires the separately configured credentials and approved exact HTTPS origin.
