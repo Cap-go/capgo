@@ -35,6 +35,12 @@ oversized or deeply nested candidate uses numbered JSON fragments with a shared 
 concatenate those fragments by part before parsing. The full list is preserved.
 No handler runs until all selection parts have been handed off.
 
+The approved analytics contract for this runner intentionally includes the full
+eligible identity and email list, with context, reasons and safe metadata, in
+private PostHog reports and private run snapshots. This authorization does not
+permit publishing real recipient data in this public repository, fixtures,
+commits, PRs or issues. Tokens, credentials and provider payloads remain excluded.
+
 The handler receives shared `sendBentoEvent`, `sendBentoEvents`, `recordFlowEvent`
 and `endFlow` capabilities, read-only access, and runtime settings. It receives
 no unrestricted SQL write client. Invitation handlers pass a current-source
@@ -135,6 +141,18 @@ Credentials and origin use the existing exact Vault keys `BENTO_PUBLISHABLE_KEY`
 `BENTO_SECRET_KEY`, `BENTO_SITE_UUID`, and `WEBAPP_URL`. Explicit Worker environment
 values override runtime Vault settings. Keep credentials and site in the same
 Bento environment as the four replacement flows.
+
+Retention cleanup is deferred to future work, with a one-month follow-up to
+revisit the policy. A 365-day retention window is a candidate for that discussion,
+not an adopted policy. Four minutely evaluations can create 5,760 run rows per
+day; no automatic cleanup is currently implemented.
+
+Any future purge must use approved flow-specific lifetimes and bounded, indexed
+batches restricted to terminal, audit-drained history. It must preserve active
+contexts, live claims, each flow's required deduplication/history, and the enqueue
+history required for cadence. Deleting accepted events generically can weaken
+future flow deduplication; this feature does not define a universal deletion
+period. This follow-up does not block activation.
 
 Live Bento editing/publication is deferred. After the four recreation flows have
 been prepared, reviewed and manually published, enable the Vault setting through

@@ -36,7 +36,7 @@
 - [x] Run lint before validation, then targeted feature tests and real database tests/pgTAP; inspect indexed plans. Run full UTC unit suite, typecheck, and production Worker dry-run.
 - [ ] Obtain separate specification and quality reviews, address findings, commit/push, update PR description, pass CI, undraft for automatic review, and establish stable-green twice 300 seconds apart. Preserve unrelated `codedb.snapshot` and exclude generated Graphify changes.
 
-Local verification: 3,950 UTC unit tests, 31 real PostgreSQL integration tests,
+Local verification: 3,954 UTC unit tests, 31 real PostgreSQL integration tests,
 24 pgTAP checks, frontend/backend lint, full typecheck and production Worker
 dry-run pass. Independent specification and code-quality reviews are clear.
 Remote CI, automatic review and stable-green verification remain the final PR

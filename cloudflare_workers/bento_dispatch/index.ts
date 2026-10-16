@@ -122,6 +122,8 @@ export async function consumeDispatch(batch: MessageBatch<unknown>, env: Dispatc
     message.ack()
     return
   }
+  // Keep the global ceiling if a replay or queue reconfiguration exceeds
+  // the normal five configured deliveries; never open the database on six.
   if (message.attempts > 5) {
     console.error(JSON.stringify({ event: 'bento_dispatch_delivery_exhausted', runId: job.runId, evaluationKey: job.evaluationKey }))
     message.ack()

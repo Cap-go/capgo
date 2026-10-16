@@ -5,11 +5,12 @@ import { messageBytes, parsePostHogMessage, POSTHOG_MESSAGE_MAX_BYTES } from '..
 
 type AuditFactory = (properties: Record<string, unknown>) => PostHogQueueMessage
 
-function fitsNativeGroup(make: AuditFactory, users: EligibleUser[]) {
-  // Start with a valid empty envelope, then validate the full native list.
-  const probe = make({ eligible_users: [] })
-  probe.payload.nonPersonTags!.eligible_users = users
-  return messageBytes(probe) <= POSTHOG_MESSAGE_MAX_BYTES && !!parsePostHogMessage(probe)
+function isNativeCandidate(empty: PostHogQueueMessage, user: EligibleUser) {
+  const probe = {
+    ...empty,
+    payload: { ...empty.payload, nonPersonTags: { ...empty.payload.nonPersonTags, eligible_users: [user] } },
+  }
+  return !!parsePostHogMessage(probe)
 }
 
 function fragmentLength(make: AuditFactory, serialized: string, offset: number, fragmentId: string) {
@@ -30,8 +31,7 @@ function fragmentLength(make: AuditFactory, serialized: string, offset: number, 
   return lo
 }
 
-function buildUserFragments(make: AuditFactory, user: EligibleUser): PostHogQueueMessage[] {
-  const serialized = JSON.stringify(user)
+function buildUserFragments(make: AuditFactory, serialized: string): PostHogQueueMessage[] {
   const fragmentId = crypto.randomUUID()
   const events: PostHogQueueMessage[] = []
   let offset = 0
@@ -47,22 +47,35 @@ export function buildEligibilityAudit(runId: string, evaluationKey: string, user
   const safe = safeFlowMetadata(users) as EligibleUser[]
   const make: AuditFactory = properties => flowAudit('bento:evaluation_eligible', runId, { evaluation_key: evaluationKey, eligible_count: users.length, part: 999999999, parts: 999999999, ...properties })
   const events: PostHogQueueMessage[] = []
+  const empty = make({ eligible_users: [] })
+  const emptyBytes = messageBytes(empty)
+  const encoder = new TextEncoder()
   let group: EligibleUser[] = []
+  let groupBytes = emptyBytes
   for (const user of safe) {
-    if (fitsNativeGroup(make, [...group, user])) {
+    const serialized = JSON.stringify(user)
+    const userBytes = encoder.encode(serialized).byteLength
+    const native = isNativeCandidate(empty, user)
+    const separatorBytes = group.length ? 1 : 0
+    // The empty envelope already includes brackets. Add each serialized user
+    // and its comma once; schema validity is independent of other recipients.
+    if (native && groupBytes + separatorBytes + userBytes <= POSTHOG_MESSAGE_MAX_BYTES) {
       group.push(user)
+      groupBytes += separatorBytes + userBytes
       continue
     }
     if (group.length) {
       events.push(make({ eligible_users: group }))
       group = []
+      groupBytes = emptyBytes
     }
-    if (fitsNativeGroup(make, [user])) {
+    if (native) {
       group.push(user)
+      groupBytes += userBytes
       continue
     }
     // Preserve one recipient that is too large or too deep for native arrays.
-    events.push(...buildUserFragments(make, user))
+    events.push(...buildUserFragments(make, serialized))
   }
   if (group.length || events.length === 0)
     events.push(make({ eligible_users: group }))

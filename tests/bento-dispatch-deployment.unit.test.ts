@@ -16,6 +16,16 @@ describe('bento dispatcher infrastructure', () => {
     expect(config.env.prod.routes).toBeUndefined()
   })
 
+  it('keeps checkout credentials out of the Bento deployment and passes the tag through quoted environment data', () => {
+    const workflow = readFileSync('.github/workflows/build_and_deploy.yml', 'utf8')
+    const job = workflow.split('  deploy_bento_dispatch:')[1]!.split('  deploy_r2_inventory:')[0]!
+    expect(job).toContain('persist-credentials: false')
+    const deployTagExpression = ['$', '{{ needs.changes.outputs.deploy_tag }}'].join('')
+    expect(job).toContain(`BENTO_DEPLOY_TAG: ${deployTagExpression}`)
+    expect(job).toContain('resolve-deploy-tag.ts --assert-current "$BENTO_DEPLOY_TAG"')
+    expect(job).not.toContain('--assert-current "${{')
+  })
+
   it('keeps every recreation flow aligned with a new registered event and an independent email node', () => {
     const manifest = JSON.parse(readFileSync('cloudflare_workers/bento_dispatch/bento/flows.json', 'utf8')) as { flows: Array<{ event: string, subject: string, html: string, transactional: boolean, steps: string[] }> }
     expect(manifest.flows.map(flow => flow.event).sort()).toEqual([...INVITATION_OPERATIONS].sort())

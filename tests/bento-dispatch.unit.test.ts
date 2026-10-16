@@ -190,3 +190,37 @@ it('preserves native-recipient and fragmented-recipient ordering across multipar
   expect(reports.map(report => report.payload.nonPersonTags!.part)).toEqual(reports.map((_, index) => index + 1))
   expect(reports.every(report => report.payload.nonPersonTags!.parts === reports.length)).toBe(true)
 })
+
+it('packs native lists up to the reserved byte boundary and starts a new part for one extra byte', () => {
+  const first = { ...user, contextKey: 'first' }
+  const second = { ...user, contextKey: 'second', metadata: { note: '' } }
+  const empty = buildEligibilityAudit(job.runId, key, [])[0]!
+  Object.assign(empty.payload.nonPersonTags!, { eligible_count: 2, part: 999999999, parts: 999999999 })
+  const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
+  const padding = POSTHOG_MESSAGE_MAX_BYTES - messageBytes(empty) - bytes(first) - bytes(second) - 1
+  second.metadata.note = 'a'.repeat(padding)
+  const packed = buildEligibilityAudit(job.runId, key, [first, second])
+  expect(packed).toHaveLength(1)
+  expect(packed[0]!.payload.nonPersonTags!.eligible_users).toEqual([first, second])
+  second.metadata.note += 'a'
+  const split = buildEligibilityAudit(job.runId, key, [first, second])
+  expect(split).toHaveLength(2)
+  expect(split.flatMap(part => part.payload.nonPersonTags!.eligible_users)).toEqual([first, second])
+  expect(split.every(part => parsePostHogMessage(part))).toBe(true)
+})
+
+it('counts UTF-8 and escaped JSON bytes when crossing the native-list boundary', () => {
+  const first = { ...user, metadata: { note: '漢字😀\n"'.repeat(100) } }
+  const second = { ...user, contextKey: 'second', metadata: { note: '' } }
+  const empty = buildEligibilityAudit(job.runId, key, [])[0]!
+  Object.assign(empty.payload.nonPersonTags!, { eligible_count: 2, part: 999999999, parts: 999999999 })
+  const bytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length
+  const padding = POSTHOG_MESSAGE_MAX_BYTES - messageBytes(empty) - bytes(first) - bytes(second) - 1
+  second.metadata.note = 'a'.repeat(padding)
+  expect(buildEligibilityAudit(job.runId, key, [first, second])).toHaveLength(1)
+  second.metadata.note = `😀${second.metadata.note.slice(1)}`
+  const parts = buildEligibilityAudit(job.runId, key, [first, second])
+  expect(parts).toHaveLength(2)
+  expect(parts.flatMap(part => part.payload.nonPersonTags!.eligible_users)).toEqual([first, second])
+  expect(parts.every(part => messageBytes(part) <= POSTHOG_MESSAGE_MAX_BYTES && parsePostHogMessage(part))).toBe(true)
+})

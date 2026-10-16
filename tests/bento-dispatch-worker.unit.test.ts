@@ -79,6 +79,14 @@ describe('dedicated evaluation Worker', () => {
     expect(attempts < 5 ? msg.retry : msg.ack).toHaveBeenCalledOnce()
     expect(attempts < 5 ? msg.ack : msg.retry).not.toHaveBeenCalled()
   })
+  it('defensively acknowledges delivery six without another database attempt', async () => {
+    const msg = message(job, 6)
+    await consumeDispatch(batch([msg]), environment())
+    expect(msg.ack).toHaveBeenCalledOnce()
+    expect(msg.retry).not.toHaveBeenCalled()
+    expect(db.connect).not.toHaveBeenCalled()
+    expect(process).not.toHaveBeenCalled()
+  })
   it('rejects malformed payloads without exposing their contents', async () => {
     const msg = message({ secret: 'private-message' })
     await consumeDispatch(batch([msg]), environment())

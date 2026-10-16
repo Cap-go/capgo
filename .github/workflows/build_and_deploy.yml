@@ -321,6 +321,7 @@ jobs:
         with:
           ref: ${{ needs.changes.outputs.deploy_sha }}
           fetch-depth: 0
+          persist-credentials: false
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -328,10 +329,11 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Provision queue and deploy Worker
         env:
+          BENTO_DEPLOY_TAG: ${{ needs.changes.outputs.deploy_tag }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          bun scripts/resolve-deploy-tag.ts --assert-current "${{ needs.changes.outputs.deploy_tag }}"
+          bun scripts/resolve-deploy-tag.ts --assert-current "$BENTO_DEPLOY_TAG"
           bun scripts/ensure-bento-dispatch-queue.ts prod
           bunx wrangler deploy --config cloudflare_workers/bento_dispatch/wrangler.jsonc --env=prod --minify
 
