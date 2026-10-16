@@ -996,6 +996,7 @@
   "cancel": "Used in Capgo web console areas: components, components/dashboard, components/modals, components/organization, components/organizations. Role: button or action label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "cancel-plan": "Used in Capgo web console areas: pages/settings/organization, services. Role: button label and dialog title. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "cancel-plan-portal-desc": "Used in Capgo web console areas: services. Role: helper or description text. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "cancel-plan-prompt": "Used in Capgo web console areas: pages/settings/organization. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "cancel-subscriptions-and-continue": "Used in Capgo web console areas: pages/settings/account. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "canceled-delete": "Used in Capgo web console areas: components/tables, pages/app. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "canceled-photo-selection": "Used in Capgo web console areas: components/dashboard. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",

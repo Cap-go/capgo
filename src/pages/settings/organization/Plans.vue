@@ -800,11 +800,12 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
         <a class="text-blue-600 hover:underline dark:text-blue-300" href="https://capgo.app/docs/docs/webapp/payment/">{{ t('plan-page-warn-2') }}</a>
       </div>
 
-      <div v-if="!isMobile && canCancelPlan" class="mt-2 text-xs text-center shrink-0">
+      <div v-if="!isMobile && canCancelPlan" class="flex flex-wrap items-center justify-center gap-3 mt-3 text-sm text-gray-600 shrink-0 dark:text-gray-300">
+        <span>{{ t('cancel-plan-prompt') }}</span>
         <button
           type="button"
           data-test="cancel-plan-button"
-          class="font-medium text-gray-500 underline hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400"
+          class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg transition-colors hover:text-red-600 hover:border-red-300 hover:bg-red-50 dark:text-gray-200 dark:bg-transparent dark:border-gray-600 dark:hover:text-red-400 dark:hover:border-red-500/50 dark:hover:bg-red-500/10"
           @click="openCancelPlan"
         >
           {{ t('cancel-plan') }}

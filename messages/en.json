@@ -945,6 +945,7 @@
   "cancel": "cancel",
   "cancel-plan": "Cancel plan",
   "cancel-plan-portal-desc": "The Stripe billing portal will open in a new tab to cancel your subscription. Your plan stays active until the end of the current billing period.",
+  "cancel-plan-prompt": "Want to stop your subscription?",
   "cancel-subscriptions-and-continue": "Cancel subscriptions and continue",
   "canceled-delete": "Canceled bundle deletion, cannot delete a linked bundle",
   "canceled-photo-selection": "You canceled the picture selection",
