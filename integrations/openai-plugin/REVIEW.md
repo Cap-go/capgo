@@ -5,36 +5,40 @@ Paste into the submission dashboard. Not included in the ZIP.
 ## Reviewer access
 
 - Login URL: https://console.capgo.app/login
-- Account: dedicated reviewer account with email + password, no MFA, owner of one demo organization.
-  Credentials go only in the dashboard's secure reviewer form, never in this repository.
-- Workspace: organization "Capgo Review Demo" with the demo app `app.capgo.review.demo`, bundles `1.0.0`, `1.1.0`, `1.2.0`,
-  channels `production` (serving `1.1.0`) and `beta`, a few test devices, and one finished native build.
-- Sign-in: connect the plugin, sign in with the reviewer account on the Capgo consent page, keep the demo organization selected, click Approve.
+- Account: `demo@capgo.app`, email + password, no MFA, owner of the demo organization "Acme Mobile".
+  The password goes only in the dashboard's secure reviewer form, never in this repository.
+- Workspace: the same fake customer as the local seed (`supabase/seed.sql`, "Acme Mobile"):
+  - apps `com.acme.shop`, `com.acme.driver`, `com.acme.internal`;
+  - `com.acme.shop` channel `production` serves `2.4.0` with a 25% progressive rollout of `2.4.1` and auto-pause;
+  - channels `beta` and `internal`, test devices, Observe data, an audit trail.
+- Sign-in: connect the plugin, sign in with the reviewer account on the Capgo consent page, keep "Acme Mobile" selected, click Approve.
 
-Before submitting, check that the reviewer org has no MFA or password-expiry policy, so login works without email or SMS codes.
+Before submitting:
+- The production `demo@capgo.app` organization must hold this data. Each test case below depends on it.
+- The organization has no MFA or password-expiry policy, so login works without email or SMS codes.
 
 ## Positive test cases
 
 1. **See what is live**
-   - Prompt: "Which bundle is live on the production channel of app.capgo.review.demo?"
+   - Prompt: "Which bundle is live on the production channel of com.acme.shop, and is a rollout running?"
    - Tools: `capgo_get_channel`
-   - Expected: names bundle `1.1.0` on `production` and says no rollout is running.
+   - Expected: names bundle `2.4.0` on `production` and reports the 25% rollout of `2.4.1`.
 2. **List releases**
-   - Prompt: "List the bundles of app.capgo.review.demo, newest first."
+   - Prompt: "List the five newest bundles of com.acme.shop."
    - Tools: `capgo_list_bundles`
-   - Expected: shows `1.2.0`, `1.1.0`, `1.0.0` with their upload dates.
-3. **Start a progressive rollout**
-   - Prompt: "Roll out 1.2.0 to 10% of production devices on app.capgo.review.demo with auto-pause on failures."
+   - Expected: shows `2.5.0-beta.1`, `2.4.1`, `2.4.0`, `2.3.1`, `2.3.0` with their upload dates.
+3. **Change a progressive rollout**
+   - Prompt: "Increase the 2.4.1 rollout on production of com.acme.shop to 50%."
    - Tools: `capgo_get_channel`, `capgo_update_channel_rollout`
-   - Expected: asks for confirmation, then starts the rollout at 10% with auto-pause enabled and reports the new channel state.
+   - Expected: asks for confirmation, then sets the rollout to 50% and reports the new channel state.
 4. **Check update health**
-   - Prompt: "Is the latest update of app.capgo.review.demo healthy?"
+   - Prompt: "Is the latest update of com.acme.shop healthy?"
    - Tools: `capgo_observe`, `capgo_get_bundle_usage`
-   - Expected: summarizes update success and failures from Observe for the last 7 days and the adoption per bundle.
-5. **Native build logs**
-   - Prompt: "Show the status and the last log lines of my latest build for app.capgo.review.demo."
-   - Tools: `capgo_get_build_status`, `capgo_get_build_logs`
-   - Expected: reports the build status and an excerpt of the logs.
+   - Expected: summarizes update success, failures and launch time from Observe for the last 7 days, and the adoption per bundle.
+5. **Audit trail**
+   - Prompt: "Who changed the channels of com.acme.shop recently?"
+   - Tools: `capgo_list_organizations`, `capgo_list_audit_logs`
+   - Expected: lists recent channel changes with who made them and when.
 
 ## Negative test cases
 

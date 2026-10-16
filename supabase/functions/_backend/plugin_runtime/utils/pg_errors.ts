@@ -23,9 +23,10 @@ const TRANSIENT_PG_SQLSTATES = new Set([
   '53300',
   '53400',
   '57014',
+  '40P01',
 ])
 
-const TRANSIENT_ERROR_MESSAGE_RE = /connection (?:terminated|ended|closed|refused|reset)|timeout exceeded when trying to connect|connect(?:ion)? timed? ?out|canceling statement due to (?:(?:statement|lock) timeout|conflict with recovery)|network(?: |_)?error|socket hang up|hyperdrive|too many clients already/i
+const TRANSIENT_ERROR_MESSAGE_RE = /connection (?:terminated|ended|closed|refused|reset)|timeout exceeded when trying to connect|connect(?:ion)? timed? ?out|canceling statement due to (?:(?:statement|lock) timeout|conflict with recovery)|network(?: |_)?error|socket hang up|not queryable|hyperdrive|too many clients already/i
 
 const DRIZZLE_ERROR_NAMES = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
 

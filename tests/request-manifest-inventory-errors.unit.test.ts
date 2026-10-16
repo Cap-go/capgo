@@ -15,12 +15,12 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
   getPgClient: async () => ({}),
   closeClient: mocks.close,
   logPgError: mocks.log,
-  getAppByIdPg: async () => ({ owner_org: 'fake-org', plan_valid: true }),
   getDrizzleClient: () => {
     const chain = { select: () => chain, from: () => chain, where: () => chain, limit: async () => [{ id: 1, appId: 'com.example.fake', deleted: false, deletedAt: null, storageProvider: 'r2-direct', sessionKey: null }] }
     return chain
   },
 }))
+vi.mock('../supabase/functions/_backend/utils/pg_files.ts', () => ({ getAppPlanStatePg: async () => ({ kind: 'ok', value: { owner_org: 'fake-org', plan_valid: true } }) }))
 vi.mock('../supabase/functions/_backend/utils/manifest_inventory.ts', async original => ({ ...await original<object>(), usesManifestInventory: () => true, withManifestInventory: async (_c: unknown, run: (db: unknown) => Promise<unknown>) => run({}), reserveManifestPaths: mocks.reserve }))
 beforeEach(() => {
   vi.clearAllMocks()
