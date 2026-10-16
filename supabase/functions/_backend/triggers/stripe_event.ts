@@ -1814,7 +1814,8 @@ async function stripeEventHandler(c: Context<MiddlewareKeyVariablesStripe>) {
 
   if (stripeEvent.type === 'charge.refunded') {
     await recordChargeRefunds(c, stripeEvent.data.object, getWebhookBillingAccount(c))
-    if (getWebhookBillingAccount(c) === 'us')
+    // The US Stripe account also bills other products: only report Capgo customers.
+    if (getWebhookBillingAccount(c) === 'us' && stripeData.data.customer_id && await getOrgForCustomerId(c, stripeData.data.customer_id))
       await backgroundTask(c, trackUsChargeRefunded(c, stripeEvent.data.object))
     return c.json(BRES)
   }
