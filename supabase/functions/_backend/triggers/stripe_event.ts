@@ -1672,9 +1672,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   }
 
   if (stripeEvent.type === 'payment_intent.succeeded') {
-    const handledAutoTopUp = await handleAutoTopUpPaymentIntent(c, stripeEvent, org.id)
-    if (handledAutoTopUp)
-      return c.json(BRES)
+    await handleAutoTopUpPaymentIntent(c, stripeEvent, org.id)
     return c.json(BRES)
   }
 
@@ -1742,19 +1740,34 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
 
   if (stripeEvent.type === 'invoice.payment_failed') {
     const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
-    if (isStaleStripeEvent(customer, eventOccurredAtIso))
-      return c.json(BRES)
 
     if (!shouldApplyInvoiceToStoredSubscription(customer.subscription_id, stripeData.data.subscription_id))
       return c.json(BRES)
 
-    if (await orgHasActiveUsageCredits(c, org.id)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment email because org has active usage credits', orgId: org.id })
+    const updateData = toStripeInfoUpdate(stripeData.data)
+    const revenuePlans = await getRevenuePlans(c)
+    const revenueMovement = classifyRevenueMovement(customer, updateData, revenuePlans)
+    const didPersist = await persistStripeInfoAndRevenueMovement(
+      c,
+      stripeData.data.customer_id,
+      stripeEvent.id,
+      updateData,
+      eventOccurredAtIso,
+      revenueMovement,
+    )
+    if (didPersist === 'missing')
+      return quickError(404, 'canceled_customer_id_not_found', `canceled: customer_id not found`, { stripeData })
+    if (didPersist === 'stale' || didPersist === 'duplicate')
+      return c.json(BRES)
+
+    if (didPersist === 'applied') {
+      if (await orgHasActiveUsageCredits(c, org.id)) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment email because org has active usage credits', orgId: org.id })
+      }
+      else {
+        await trackBillingBentoEvent(c, org, stripeData.data.customer_id, BENTO_FAILED_PAYMENT_EVENT)
+      }
     }
-    else {
-      await trackBillingBentoEvent(c, org, stripeData.data.customer_id, BENTO_FAILED_PAYMENT_EVENT)
-    }
-    await updateStripeInfo(c, stripeData)
     return c.json(BRES)
   }
 
