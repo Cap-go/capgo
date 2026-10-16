@@ -11,6 +11,14 @@ import { CliUserError } from '../src/shared/cli-user-error.ts'
 
 const originalFetch = globalThis.fetch
 const originalCwd = cwd()
+const savedEnv = {
+  CAPGO_API_HOST: process.env.CAPGO_API_HOST,
+  CAPGO_FILES_HOST: process.env.CAPGO_FILES_HOST,
+  CAPGO_TOKEN: process.env.CAPGO_TOKEN,
+}
+delete process.env.CAPGO_API_HOST
+delete process.env.CAPGO_FILES_HOST
+delete process.env.CAPGO_TOKEN
 
 const isolatedDir = mkdtempSync(join(tmpdir(), 'capgo-create-capgo-client-'))
 
@@ -167,5 +175,18 @@ try {
 finally {
   chdir(originalCwd)
   globalThis.fetch = originalFetch
+  setCapgoHostOverride({})
+  if (savedEnv.CAPGO_API_HOST === undefined)
+    delete process.env.CAPGO_API_HOST
+  else
+    process.env.CAPGO_API_HOST = savedEnv.CAPGO_API_HOST
+  if (savedEnv.CAPGO_FILES_HOST === undefined)
+    delete process.env.CAPGO_FILES_HOST
+  else
+    process.env.CAPGO_FILES_HOST = savedEnv.CAPGO_FILES_HOST
+  if (savedEnv.CAPGO_TOKEN === undefined)
+    delete process.env.CAPGO_TOKEN
+  else
+    process.env.CAPGO_TOKEN = savedEnv.CAPGO_TOKEN
   rmSync(isolatedDir, { recursive: true, force: true })
 }
