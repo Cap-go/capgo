@@ -265,10 +265,12 @@ export function isPreCreateOnboardingPath(
 ) {
   if (!path)
     return false
-  if (path === '/app/new')
+  if (path === '/app/new') {
     return options?.firstAppCreate === true
-  if (path === '/onboarding/app')
+  }
+  if (path === '/onboarding/app') {
     return true
+  }
   // /onboarding/organization is shared: first-app create hard-gates, but
   // org-switcher / add-another-org should not. Other /onboarding/* routes
   // (invitation, set_password, …) are not first-app create.
@@ -287,8 +289,9 @@ export function getOnboardingContinueSetupRoute(options: {
   if (isPreCreateOnboardingPath(options.currentPath, {
     source: options.currentSource,
     firstAppCreate: options.firstAppCreate,
-  }))
+  })) {
     return null
+  }
   if (!options.resumeAppId)
     return null
 
