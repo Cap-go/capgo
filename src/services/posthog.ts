@@ -112,6 +112,8 @@ export function pushEventForUser(nameEvent: string, uuid: string, supaHost: stri
 }
 
 export function setUser(uuid: string, data: {
+  first_name?: string
+  last_name?: string
   nickname?: string
   phone?: string
   email?: string
@@ -122,7 +124,7 @@ export function setUser(uuid: string, data: {
   // console.log('setUser')
   posthog.identify(
     uuid,
-    { email: data.email, name: data.nickname },
+    { email: data.email, name: data.nickname, ...(data.first_name ? { first_name: data.first_name } : {}), ...(data.last_name ? { last_name: data.last_name } : {}) },
   )
   posthog.setPersonProperties(
     { avatar: data.avatar },

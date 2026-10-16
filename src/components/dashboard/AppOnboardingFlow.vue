@@ -68,6 +68,7 @@ import { shouldSkipOnboardingResume } from '~/utils/appOnboardingProgress'
 import { useBeforeUnloadWarning } from '~/utils/beforeUnloadWarning'
 import {
   hasNewChannelTreatment,
+  hasProfileOnboarding,
   hasWebNativeDevelopmentEnvironmentTreatment,
   parseOnboardingABTestAssignments,
   reconcileOnboardingABTestAssignments,
@@ -242,6 +243,8 @@ const storeAppIdLookupFailed = ref(false)
 const selectedDevelopmentEnvironment = ref<OnboardingDevelopmentEnvironment | null>(null)
 const skippedPublishAppQuestion = ref(false)
 const selectedIntent = ref<OnboardingIntent | null>(null)
+const profileOnboarding = computed(() => hasProfileOnboarding(main.user?.onboarding))
+const intentStepLabel = computed(() => t(profileOnboarding.value ? 'unified-onboarding-step-about-you' : 'unified-onboarding-step-intent'))
 const onboardingAnalyticsVersion = () => resolveOnboardingAnalyticsVersion(onboardingForABTests.value, selectedIntent.value)
 const setupHandoff = props.setupAppId ? consumeSetupHandoff(props.setupAppId) : null
 const onboardingTelemetry = createOnboardingTelemetryIdentity({
@@ -549,7 +552,7 @@ const appOnboardingSteps = computed<Array<{ id: OnboardingFlowStep, label: strin
     : []
   if (props.preOrg) {
     return [
-      { id: 'intent', label: t('unified-onboarding-step-intent') },
+      { id: 'intent', label: intentStepLabel.value },
       { id: 'details', label: t('app-onboarding-step-details') },
       { id: 'organization', label: t('unified-onboarding-step-organization') },
       ...channelStep,
@@ -660,6 +663,24 @@ function trackChannelEvent(name: OnboardingChannelEvent, details: OnboardingChan
     existing_app: existingApp.value ?? undefined,
     intent: selectedIntent.value ?? undefined,
   })
+}
+
+const profileFieldTracker = createOnboardingDetailsFieldDebouncer((name, step, details) => {
+  progressTracker?.trackDetailsEvent(name, step, details)
+}, 500)
+
+function trackProfileFieldInput(field: 'first_name' | 'last_name', value: string) {
+  if (profileOnboarding.value)
+    profileFieldTracker.schedule(field === 'first_name' ? 'onboarding_first_name_entered' : 'onboarding_last_name_entered', field, 'intent', value)
+}
+
+function trackProfileSaveFailed() {
+  progressTracker?.trackStepEvent('onboarding_profile_save_failed', 'intent')
+}
+
+function trackProfileSave() {
+  profileFieldTracker.dispose()
+  progressTracker?.trackStepEvent('onboarding_profile_saved', 'intent')
 }
 
 const detailsFieldTracker = createOnboardingDetailsFieldDebouncer((name, step, details) => {
@@ -2754,6 +2775,7 @@ onBeforeUnmount(() => {
   window.removeEventListener(ONBOARDING_DASHBOARD_EXPLORED_EVENT, trackDashboardExplored)
   document.removeEventListener('visibilitychange', trackOnboardingVisibilityChange)
   detailsFieldTracker.dispose()
+  profileFieldTracker.dispose()
   if (!isHydratingOnboarding.value && !onboardingInitialPersistInFlight && !onboardingProgressPersistence.isBlocked() && !onboardingProgressPersistence.isAborted())
     void persistOnboardingProgress('in_progress', { allowDisposed: true })
 
@@ -2904,7 +2926,7 @@ defineExpose({
             <template v-if="showDevelopmentEnvironmentQuestion">
               <div class="onboarding-intent-heading">
                 <p class="onboarding-intent-eyebrow text-sm font-semibold text-primary-500 dark:text-slate-300">
-                  {{ t('unified-onboarding-step-intent') }}
+                  {{ intentStepLabel }}
                 </p>
                 <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
                   {{ t('organization-onboarding-development-environment-question') }}
@@ -2930,16 +2952,22 @@ defineExpose({
             </template>
 
             <template v-else>
-              <div>
+              <div v-if="profileOnboarding">
                 <h2 class="text-2xl font-semibold text-slate-950 dark:text-white">
-                  {{ t('unified-onboarding-step-intent') }}
+                  {{ intentStepLabel }}
                 </h2>
               </div>
-              <OnboardingProfile ref="profileForm" :disabled="isSubmitting" />
+              <OnboardingProfile
+                ref="profileForm"
+                :disabled="isSubmitting"
+                @field-input="trackProfileFieldInput"
+                @saved="trackProfileSave"
+                @save-failed="trackProfileSaveFailed"
+              />
 
               <div>
                 <h3 class="text-xl font-semibold text-slate-950 dark:text-white">
-                  {{ t('organization-onboarding-intent-question') }}
+                  {{ t(profileOnboarding ? 'unified-onboarding-profile-goal-question' : 'organization-onboarding-intent-question') }}
                 </h3>
                 <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
                   {{ t('organization-onboarding-intent-hint') }}

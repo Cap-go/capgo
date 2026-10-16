@@ -155,11 +155,9 @@ outside known provider outages. Retention is fourteen days, so resolve incidents
 and replay well before expiry. Use counts/ages in incident notes, not payloads.
 
 The batch timeout test runs ten captures concurrently and proves ten stalled
-fetches finish/retry at 5s, rather than taking 50s serially. Fetch is bounded to
-5s and successful body inspection to another 1s; provider bodies are capped at
+fetches retry together after 10s, with at most 1s more for response inspection. Bodies are capped at
 16 KiB. With two invocations there are at most twenty in-flight captures, giving
-a conservative capture capacity of about 200 events/minute at the worst-case
-six-second response duration before DLQ-send overhead. This is a timeout-bound
+a conservative capacity of about 109 events/minute at the 11-second bound. This is a timeout-bound
 capacity estimate, not a production throughput measurement. Watch measured
 backlog/drain rate and provider limits before changing concurrency. Successful
 siblings are explicitly acknowledged and are not replayed by a failed sibling.

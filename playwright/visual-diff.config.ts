@@ -15,7 +15,7 @@ async function prepareProfileGoalScreenshot(page: Page) {
       return route.fulfill({ json: [] })
     const response = await route.fetch()
     const json = await response.json()
-    const profile = (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: null })
+    const profile = (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: { version: 6 } })
     await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
   })
   await page.reload()
@@ -239,7 +239,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.route('**/rest/v1/users?*', async (route) => {
         const response = await route.fetch()
         const json = await response.json()
-        const profile = (row: any) => ({ ...row, first_name: '', last_name: '' })
+        const profile = (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: { ...row.onboarding, version: 6 } })
         await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
       })
       await page.reload()

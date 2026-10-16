@@ -131,6 +131,7 @@ describe('pOST /auth/register unit', () => {
       email: validBody.email,
       first_name: '',
       last_name: '',
+      onboarding: { version: 6 },
       enable_notifications: true,
       opt_for_newsletters: true,
     }, { onConflict: 'id' })

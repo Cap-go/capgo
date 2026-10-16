@@ -283,7 +283,7 @@ test.describe('Registration', () => {
     const { data: signedUp, error: signUpError } = await supabase.auth.signUp({ email, password })
     expect(signUpError).toBeNull()
     const { error: updateError } = await supabase.from('users')
-      .upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '' }, { onConflict: 'id' })
+      .upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '', onboarding: { version: 6 } }, { onConflict: 'id' })
     expect(updateError).toBeNull()
     await supabase.auth.signOut()
 
@@ -331,7 +331,7 @@ test.describe('Registration', () => {
     const { data: signedUp, error: signUpError } = await supabase.auth.signUp({ email, password })
     expect(signUpError).toBeNull()
     const { data: seededProfile, error: updateError } = await supabase.from('users')
-      .upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '' }, { onConflict: 'id' })
+      .upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '', onboarding: { version: 6 } }, { onConflict: 'id' })
       .select('first_name, last_name')
       .single()
     expect(updateError).toBeNull()
@@ -385,7 +385,7 @@ test.describe('Registration', () => {
     const { data: signedUp, error: signUpError } = await supabase.auth.signUp({ email, password })
     expect(signUpError).toBeNull()
     const { error: updateError } = await supabase.from('users')
-      .upsert({ id: signedUp.user!.id, email, first_name: '', last_name: 'Existing' }, { onConflict: 'id' })
+      .upsert({ id: signedUp.user!.id, email, first_name: '', last_name: 'Existing', onboarding: { version: 6 } }, { onConflict: 'id' })
     expect(updateError).toBeNull()
     await supabase.auth.signOut()
 

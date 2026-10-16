@@ -90,9 +90,9 @@ describe('pOST /auth/register', () => {
     createdUserIds.push(body.user.id)
 
     const admin = getSupabaseClient()
-    const { data: profile, error } = await admin.from('users').select('first_name, last_name').eq('id', body.user.id).single()
+    const { data: profile, error } = await admin.from('users').select('first_name, last_name, onboarding').eq('id', body.user.id).single()
     expect(error).toBeNull()
-    expect(profile).toEqual({ first_name: '', last_name: '' })
+    expect(profile).toMatchObject({ first_name: '', last_name: '', onboarding: { version: 6 } })
     const { data: authUser } = await admin.auth.admin.getUserById(body.user.id)
     expect(authUser.user?.user_metadata.ref).toBe('readme-example')
   })

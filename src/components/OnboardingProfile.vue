@@ -2,18 +2,25 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { useSupabase } from '~/services/supabase'
+import { setUser } from '~/services/posthog'
+import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
+import { hasProfileOnboarding } from '~/utils/onboardingABTests'
 
 defineProps<{ disabled?: boolean }>()
+const emit = defineEmits<{
+  fieldInput: [field: 'first_name' | 'last_name', value: string]
+  saved: []
+  saveFailed: []
+}>()
 
 const main = useMainStore()
 const supabase = useSupabase()
 const { t } = useI18n()
 const firstName = ref(main.user?.first_name ?? '')
 const lastName = ref(main.user?.last_name ?? '')
-const needsProfileName = computed(() => !main.user?.first_name?.trim() || !main.user?.last_name?.trim())
-const isValid = computed(() => !!main.user?.id && !!firstName.value.trim() && !!lastName.value.trim())
+const needsProfileName = computed(() => hasProfileOnboarding(main.user?.onboarding) && (!main.user?.first_name?.trim() || !main.user?.last_name?.trim()))
+const isValid = computed(() => !!main.user?.id && (!needsProfileName.value || (!!firstName.value.trim() && !!lastName.value.trim())))
 
 watch(() => main.user, (user) => {
   if (!firstName.value.trim())
@@ -41,10 +48,24 @@ async function save() {
       throw error ?? new Error('onboarding_profile_save_failed')
 
     main.user = { ...main.user, ...data }
+    try {
+      setUser(userId, {
+        email: main.user.email,
+        first_name: data.first_name ?? undefined,
+        last_name: data.last_name ?? undefined,
+        nickname: [data.first_name, data.last_name].join(' '),
+        avatar: main.user.image_url ?? undefined,
+      }, getLocalConfig().supaHost)
+    }
+    catch {
+      console.warn('Cannot update onboarding profile analytics')
+    }
+    emit('saved')
     return true
   }
   catch (error) {
     console.error('Failed to save profile name during onboarding', error)
+    emit('saveFailed')
     toast.error(t('account-error'))
     return false
   }
@@ -68,6 +89,7 @@ defineExpose({ isValid, save })
         :disabled="disabled"
         data-test="onboarding-first-name"
         class="d-input mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-950 dark:border-white/20 dark:bg-slate-950/90 dark:text-white"
+        @input="emit('fieldInput', 'first_name', ($event.target as HTMLInputElement).value)"
       >
     </div>
     <div>
@@ -83,6 +105,7 @@ defineExpose({ isValid, save })
         :disabled="disabled"
         data-test="onboarding-last-name"
         class="d-input mt-2 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-base text-slate-950 dark:border-white/20 dark:bg-slate-950/90 dark:text-white"
+        @input="emit('fieldInput', 'last_name', ($event.target as HTMLInputElement).value)"
       >
     </div>
   </div>
