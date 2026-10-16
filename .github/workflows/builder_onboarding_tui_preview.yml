@@ -38,6 +38,8 @@ on:
       - "cli/src/init/**"
       - "cli/test/**onboarding**"
       - "cli/test/**build**"
+      - "cli/package.json"
+      - "cli/test/helpers/vt-grid.mjs"
       - "tests/*onboarding*.test.ts"
       - "docs/superpowers/**builder**"
 

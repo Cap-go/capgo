@@ -22,10 +22,16 @@ vi.mock('~/stores/main', () => ({
   useMainStore: () => mainMocks,
 }))
 
+const organizationMocks = vi.hoisted(() => ({
+  appsByOrgId: [] as { app_id: string }[],
+  awaitInitialLoad: vi.fn(async () => true),
+}))
+
 vi.mock('~/stores/organization', () => ({
   useOrganizationStore: () => ({
     currentOrganization: { gid: 'org-1' },
-    getAppsByOrgId: () => [],
+    getAppsByOrgId: () => organizationMocks.appsByOrgId,
+    awaitInitialLoad: organizationMocks.awaitInitialLoad,
   }),
 }))
 
@@ -54,6 +60,8 @@ describe('onboarding hard-gate direct entry', () => {
     dialogMocks.onDialogDismiss.mockResolvedValue(false)
     mainMocks.auth = { id: 'user-1' }
     mainMocks.user = undefined
+    organizationMocks.appsByOrgId = []
+    organizationMocks.awaitInitialLoad.mockResolvedValue(true)
     window.sessionStorage.clear()
     window.localStorage.clear()
     vi.resetModules()
@@ -83,6 +91,18 @@ describe('onboarding hard-gate direct entry', () => {
 
     expect(dialogMocks.openDialog).toHaveBeenCalledOnce()
     expect(router.currentRoute.value.path).toBe('/app/new')
+  })
+
+  it('does not hard-gate /app/new when the org already has apps after initial load', async () => {
+    organizationMocks.appsByOrgId = [{ app_id: 'com.existing.app' }]
+    const { router, committed } = await createRouterWithHardGate()
+    await router.push('/app/new')
+    await router.push('/apps')
+
+    expect(organizationMocks.awaitInitialLoad).toHaveBeenCalled()
+    expect(dialogMocks.openDialog).not.toHaveBeenCalled()
+    expect(committed).toEqual(['/app/new', '/apps'])
+    expect(router.currentRoute.value.path).toBe('/apps')
   })
 
   it('allows /apps after explore-anyway was granted from the shared dialog flow', async () => {

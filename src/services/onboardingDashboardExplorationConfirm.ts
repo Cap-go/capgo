@@ -11,10 +11,11 @@ import {
 } from '~/utils/onboardingRedirect'
 
 /** `/app/new` is first-app create only when the current org has no apps yet. */
-export function resolveFirstAppCreateOnAppNew(path: string) {
+export async function resolveFirstAppCreateOnAppNew(path: string) {
   if (path !== '/app/new')
     return undefined
   const organizationStore = useOrganizationStore()
+  await organizationStore.awaitInitialLoad()
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId)
     return true
@@ -60,7 +61,7 @@ export async function confirmOnboardingDashboardExplorationNavigation(options: {
   dialogStore: ReturnType<typeof useDialogV2Store>
   router: Router
 }): Promise<OnboardingDashboardExplorationConfirmResult> {
-  const firstAppCreate = resolveFirstAppCreateOnAppNew(options.currentPath)
+  const firstAppCreate = await resolveFirstAppCreateOnAppNew(options.currentPath)
   if (!shouldConfirmOnboardingDashboardExploration({
     currentPath: options.currentPath,
     currentSource: options.currentSource,

@@ -50,7 +50,7 @@ export const install: UserModule = ({ router }) => {
       currentSource,
       currentStep,
       resumeAppId,
-      firstAppCreate: resolveFirstAppCreateOnAppNew(from.path),
+      firstAppCreate: await resolveFirstAppCreateOnAppNew(from.path),
     })
     if (continueRoute)
       return continueRoute
