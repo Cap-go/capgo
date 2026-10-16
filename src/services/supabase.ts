@@ -20,7 +20,6 @@ export interface CapgoConfig {
   host: string
   hostWeb: string
   stripeEnabled?: boolean
-  nativeAppleLoginEnabled?: boolean
 }
 
 export function isLocal(supaHost: string) {
@@ -37,13 +36,11 @@ export function getLocalConfig() {
     host: import.meta.env.VITE_APP_URL as string,
     hostWeb: import.meta.env.LANDING_URL as string,
     stripeEnabled: stripeEnabledEnv === undefined ? true : stripeEnabledEnv !== 'false',
-    nativeAppleLoginEnabled: false,
   } as CapgoConfig
 }
 
 let config: CapgoConfig = getLocalConfig()
 export const stripeEnabled = ref<boolean>(config.stripeEnabled ?? true)
-export const nativeAppleLoginEnabled = ref(false)
 
 interface SpoofedAdminSession {
   jwt: string
@@ -134,13 +131,11 @@ export function mergeRemoteConfig(localConfig: CapgoConfig, remoteConfig: Partia
     host: typeof remoteConfig?.host === 'string' ? remoteConfig.host : localConfig.host,
     hostWeb: typeof remoteConfig?.hostWeb === 'string' ? remoteConfig.hostWeb : localConfig.hostWeb,
     stripeEnabled: typeof remoteConfig?.stripeEnabled === 'boolean' ? remoteConfig.stripeEnabled : localConfig.stripeEnabled,
-    nativeAppleLoginEnabled: remoteConfig?.nativeAppleLoginEnabled === true,
   }
 }
 
 export async function getRemoteConfig() {
   const localConfig = getLocalConfig()
-  nativeAppleLoginEnabled.value = false
   if (import.meta.env.MODE === 'development')
     return localConfig
 
@@ -154,7 +149,6 @@ export async function getRemoteConfig() {
     const data = await response.json() as Partial<CapgoConfig>
     const merged = mergeRemoteConfig(localConfig, data)
     config = merged
-    nativeAppleLoginEnabled.value = merged.nativeAppleLoginEnabled === true
     stripeEnabled.value = merged.stripeEnabled ?? stripeEnabled.value
     return merged
   }

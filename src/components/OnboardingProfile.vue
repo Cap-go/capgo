@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { setUser } from '~/services/posthog'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
-import { MAX_USER_ONBOARDING_WRITE_ATTEMPTS, replaceUserOnboardingIfUnchanged, serializeUserOnboardingWrite } from '~/services/userOnboardingWriteQueue'
+import { replaceUserOnboardingWithRetry, serializeUserOnboardingWrite } from '~/services/userOnboardingWriteQueue'
 import { useMainStore } from '~/stores/main'
 import { hasProfileOnboarding } from '~/utils/onboardingABTests'
 
@@ -58,25 +58,18 @@ async function persistDraft() {
     await serializeUserOnboardingWrite(userId, async () => {
       if (!isCurrentUser() || !needsProfileName.value)
         return
-      let currentOnboarding = main.user!.onboarding
-      for (let attempt = 0; attempt < MAX_USER_ONBOARDING_WRITE_ATTEMPTS; attempt++) {
-        if (!isCurrentUser() || !needsProfileName.value)
-          return
-        const onboarding = { ...onboardingObject(currentOnboarding), profile_draft: profileDraft }
-        const { data, error } = await replaceUserOnboardingIfUnchanged(userId, currentOnboarding, onboarding)
-        if (error)
-          throw error
-        if (data) {
-          if (isCurrentUser())
-            main.user = { ...main.user!, onboarding: data.onboarding }
-          return
-        }
-        const { data: latest, error: latestError } = await supabase.from('users').select('onboarding').eq('id', userId).maybeSingle()
-        if (latestError || !latest)
-          throw latestError ?? new Error('onboarding_profile_draft_missing_user')
-        currentOnboarding = latest.onboarding
-      }
-      throw new Error('onboarding_profile_draft_conflict')
+      const result = await replaceUserOnboardingWithRetry(
+        userId,
+        main.user!.onboarding,
+        current => ({ ...onboardingObject(current), profile_draft: profileDraft }),
+        () => isCurrentUser() && needsProfileName.value,
+      )
+      if (result.status === 'persisted' && isCurrentUser())
+        main.user = { ...main.user!, onboarding: result.onboarding }
+      if (result.status === 'error')
+        throw result.error
+      if (result.status === 'conflict')
+        throw new Error('onboarding_profile_draft_conflict')
     })
   }
   catch {

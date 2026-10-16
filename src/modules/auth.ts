@@ -50,7 +50,7 @@ async function updateUser(
           ...(!main.auth.user_metadata?.first_name || !main.auth.user_metadata?.last_name ? { onboarding: { version: 6 } } : {}),
           country: null,
           enable_notifications: true,
-          opt_for_newsletters: true,
+          opt_for_newsletters: false,
         })
         .select()
         .single()

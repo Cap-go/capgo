@@ -13,7 +13,7 @@ permit; it must not be treated as a disabled deletion rollout.
 ## Delivery and safety
 
 `capgo-r2-inventory-prod-cleanup` delivers up to 100 messages after a ten-second
-batch timeout, with concurrency one, two retries (three deliveries total), a
+batch timeout, with at most five concurrent batches, two retries (three deliveries total), a
 30-second retry delay and dedicated `capgo-r2-inventory-prod-cleanup-dlq`.
 Existing notification/repair delivery settings remain unchanged. The existing
 release job runs the extended queue-provisioning script before Worker deployment;
@@ -105,12 +105,16 @@ retry acknowledged messages. Existing notifications are fallback recovery.
 
 ## Budgets and capacity
 
-Four workflows progress concurrently, at most one storage request each. There
-is no DB connection during storage and no per-file DB connection. Cleanup adds
-at most one active application DB connection to the existing notification and
-repair consumers' combined two. The independently scheduled upstream producer/health
-invocation can add one inventory and one source-database connection; Hyperdrive
-pools and API traffic have additional budgets. Transactions use two-second statements, 500ms locks and five-second
+Each batch runs four workflows concurrently, at most one storage request each.
+Five concurrent batches therefore allow up to 20 storage workflows across five
+independent invocations, each with its own six-connection limit. Each batch
+releases its DB connection before storage and never opens a per-file connection.
+Cleanup adds at most five active application DB connections to the existing
+notification and repair consumers' combined two. The independently scheduled
+upstream producer/health invocation can add one inventory and one source-database
+connection: at most eight inventory connections and one source connection across
+these paths. Hyperdrive pools and API traffic have additional budgets.
+Transactions use two-second statements, 500ms locks and five-second
 idle limits. Connection establishment is limited to three seconds.
 
 Each storage workflow has a 20-second deadline. A batch has ten minutes and
@@ -121,6 +125,11 @@ than 120 seconds. The simple worst-case storage budget is
 `100 / 4 * 20s = 500s`, leaving 100 seconds for database/publication/alert overhead;
 these are enforced starting bounds, **not measured latency or throughput guarantees**.
 A capped batch can leave unfinished messages for its configured retries/DLQ.
+Five batches can hold up to 500 delivered messages at once; the per-batch
+deadline, four-workflow limit, request budget and retry count do not increase.
+Measure net backlog change over several minutes against ongoing production,
+alongside batch issue counts and DLQ growth. A falling main queue alone does
+not prove successful cleanup if failures are instead exhausting into the DLQ.
 
 Current Cloudflare limits are 15 minutes wall time per queue invocation, default
 30 seconds CPU configurable to five minutes (this Worker requests 300,000ms),
