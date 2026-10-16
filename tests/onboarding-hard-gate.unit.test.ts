@@ -22,6 +22,13 @@ vi.mock('~/stores/main', () => ({
   useMainStore: () => mainMocks,
 }))
 
+vi.mock('~/stores/organization', () => ({
+  useOrganizationStore: () => ({
+    currentOrganization: { gid: 'org-1' },
+    getAppsByOrgId: () => [],
+  }),
+}))
+
 async function createRouterWithHardGate() {
   const component = { render: () => null }
   const router = createRouter({

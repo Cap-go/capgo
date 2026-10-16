@@ -2,6 +2,7 @@ import type { UserModule } from '~/types'
 import { i18n } from '~/modules/i18n'
 import {
   confirmOnboardingDashboardExplorationNavigation,
+  resolveFirstAppCreateOnAppNew,
   resolveOnboardingHardGateResumeAppId,
 } from '~/services/onboardingDashboardExplorationConfirm'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -49,6 +50,7 @@ export const install: UserModule = ({ router }) => {
       currentSource,
       currentStep,
       resumeAppId,
+      firstAppCreate: resolveFirstAppCreateOnAppNew(from.path),
     })
     if (continueRoute)
       return continueRoute

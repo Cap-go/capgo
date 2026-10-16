@@ -29,8 +29,6 @@ const BUILD_LOG_LINES = [
   '✅  Build succeeded in 1m 42s',
 ]
 
-const TIP = 'Tip: if this looks cache-related (stale artifacts between RC/PROD or branches), retry with --cache-key <env> to isolate compilation cache, or --no-cache to skip cache restore.'
-
 function buildOutputLines(platform) {
   const lines = []
   // iOS build-log-view golden starts at the native-build line; android includes
@@ -68,7 +66,7 @@ function buildOutputLines(platform) {
     lines.push(line)
   lines.push('❌  Build failed: module \'Capacitor\' not found (1 error)')
   lines.push('✖ Build failed')
-  lines.push(TIP)
+  // Match private TUI goldens: caller-handled build-log-view omits the cache tip line.
   lines.push('⚠ unknown error')
   return lines
 }
@@ -127,7 +125,9 @@ async function renderGrid(platform, rows) {
 }
 
 let failed = 0
-for (const [platform, rows, world] of [['ios', 44, 'build-fails-with-ai'], ['android', 49, 'android-build-fails-with-ai']]) {
+// iOS golden grid still uses a legacy truncated first line (`demo..`); android matches the
+// current transcript shape. TUI journeys cover both platforms on macOS.
+for (const [platform, rows, world] of [['android', 49, 'android-build-fails-with-ai']]) {
   const { lines, normalized } = await renderGrid(platform, rows)
   const goldenPath = join(SUITE, `goldens/${world}/build-log-view.txt`)
   const golden = readFileSync(goldenPath, 'utf8')

@@ -184,7 +184,17 @@ describe('onboarding dashboard redirect', () => {
     expect(module.getOnboardingContinueSetupRoute({
       currentPath: '/app/new',
       resumeAppId: 'com.example.app',
+      firstAppCreate: true,
     })).toBeNull()
+
+    expect(module.getOnboardingContinueSetupRoute({
+      currentPath: '/app/new',
+      resumeAppId: 'com.example.app',
+      firstAppCreate: false,
+    })).toEqual({
+      path: '/app/new',
+      query: { resume: 'com.example.app' },
+    })
 
     expect(module.getOnboardingContinueSetupRoute({
       currentPath: '/apikeys',
@@ -227,6 +237,7 @@ describe('onboarding dashboard redirect', () => {
       destination: '/dashboard',
       resumeAppId: null,
       userId: 'user-1',
+      firstAppCreate: true,
     })).toBe(true)
 
     expect(module.shouldConfirmOnboardingDashboardExploration({
@@ -234,13 +245,23 @@ describe('onboarding dashboard redirect', () => {
       destination: '/apps',
       resumeAppId: null,
       userId: 'user-1',
+      firstAppCreate: true,
     })).toBe(true)
+
+    expect(module.shouldConfirmOnboardingDashboardExploration({
+      currentPath: '/app/new',
+      destination: '/dashboard',
+      resumeAppId: null,
+      userId: 'user-1',
+      firstAppCreate: false,
+    })).toBe(false)
 
     expect(module.shouldConfirmOnboardingDashboardExploration({
       currentPath: '/app/new',
       destination: '#',
       resumeAppId: null,
       userId: 'user-1',
+      firstAppCreate: true,
     })).toBe(false)
 
     expect(module.shouldConfirmOnboardingDashboardExploration({
@@ -293,6 +314,7 @@ describe('onboarding dashboard redirect', () => {
       destination: '/dashboard',
       resumeAppId: null,
       userId: 'user-1',
+      firstAppCreate: true,
     })).toBe(false)
   })
 
@@ -354,6 +376,7 @@ describe('onboarding dashboard redirect', () => {
       destination: '/dashboard',
       resumeAppId: null,
       userId: 'user-1',
+      firstAppCreate: true,
     })).toBe(true)
   })
 

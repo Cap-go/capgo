@@ -2531,7 +2531,7 @@ async function copyAiInstructions() {
   }
 }
 
-async function openDashboard() {
+async function openDashboardFromSetup(options: { liftHardGate: boolean }) {
   if (!createdApp.value)
     return
 
@@ -2550,11 +2550,25 @@ async function openDashboard() {
   const source = reportedSetupSource.value ?? current.source
   if (source !== 'manual' && current.outcome === 'in_progress')
     await reportOnboardingPatch({ outcome: 'switched_to_manual' })
-  // Keep the post-create hard-gate sticky until App Uploaded / Builder build
-  // started, or the user confirms Explore anyway in the sidebar dialog.
-  setPendingFirstUploadAppId(onboardingUserId.value, createdApp.value.app_id)
+  if (options.liftHardGate) {
+    clearPendingFirstUploadAppId(onboardingUserId.value)
+    allowOnboardingDashboardExploration(onboardingUserId.value, createdApp.value.app_id)
+  }
+  else {
+    // Keep the post-create hard-gate sticky until App Uploaded / Builder build
+    // started, or the user confirms Explore anyway in the sidebar dialog.
+    setPendingFirstUploadAppId(onboardingUserId.value, createdApp.value.app_id)
+  }
   await persistOnboardingProgress('completed')
   router.push(`/app/${encodeURIComponent(createdApp.value.app_id)}`)
+}
+
+async function openDashboard() {
+  await openDashboardFromSetup({ liftHardGate: false })
+}
+
+async function openDashboardAfterSetupComplete() {
+  await openDashboardFromSetup({ liftHardGate: true })
 }
 
 async function skipOnboardingSplash() {
@@ -3499,7 +3513,7 @@ defineExpose({
           @copy-command="copyBuilderCliCommand"
           @hide="skipOnboardingSplash"
           @explore="openDashboard"
-          @complete="openDashboard"
+          @complete="openDashboardAfterSetupComplete"
         />
 
         <AppOnboardingSetupChecklist
@@ -3514,7 +3528,7 @@ defineExpose({
           @copy-ai="copyAiInstructions"
           @hide="skipOnboardingSplash"
           @explore="openDashboard"
-          @complete="openDashboard"
+          @complete="openDashboardAfterSetupComplete"
           @invite-opened="onTechnicalInviteOpened"
           @invite-succeeded="onTechnicalInviteSucceeded"
           @channel-analytics="trackChannelEvent"

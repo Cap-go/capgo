@@ -1,5 +1,6 @@
 import type { Router } from 'vue-router'
 import type { useDialogV2Store } from '~/stores/dialogv2'
+import { useOrganizationStore } from '~/stores/organization'
 import {
   allowOnboardingDashboardExploration,
   getOnboardingContinueSetupRoute,
@@ -8,6 +9,17 @@ import {
   ONBOARDING_DASHBOARD_EXPLORED_EVENT,
   shouldConfirmOnboardingDashboardExploration,
 } from '~/utils/onboardingRedirect'
+
+/** `/app/new` is first-app create only when the current org has no apps yet. */
+export function resolveFirstAppCreateOnAppNew(path: string) {
+  if (path !== '/app/new')
+    return undefined
+  const organizationStore = useOrganizationStore()
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return true
+  return organizationStore.getAppsByOrgId(orgId).length === 0
+}
 
 export function resolveOnboardingHardGateResumeAppId(
   path: string,
@@ -48,12 +60,14 @@ export async function confirmOnboardingDashboardExplorationNavigation(options: {
   dialogStore: ReturnType<typeof useDialogV2Store>
   router: Router
 }): Promise<OnboardingDashboardExplorationConfirmResult> {
+  const firstAppCreate = resolveFirstAppCreateOnAppNew(options.currentPath)
   if (!shouldConfirmOnboardingDashboardExploration({
     currentPath: options.currentPath,
     currentSource: options.currentSource,
     destination: options.destination,
     resumeAppId: options.resumeAppId,
     userId: options.userId,
+    firstAppCreate,
   })) {
     return 'proceed'
   }
@@ -87,6 +101,7 @@ export async function confirmOnboardingDashboardExplorationNavigation(options: {
       currentSource: options.currentSource,
       currentStep: options.currentStep,
       resumeAppId: options.resumeAppId,
+      firstAppCreate,
     })
     if (continueRoute) {
       await options.router.push(continueRoute)

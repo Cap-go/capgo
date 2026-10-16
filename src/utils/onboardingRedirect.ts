@@ -261,11 +261,13 @@ export function isOnboardingDirectEntryGuardPath(path: string) {
 
 export function isPreCreateOnboardingPath(
   path: string | null | undefined,
-  options?: { source?: string | null },
+  options?: { source?: string | null, firstAppCreate?: boolean },
 ) {
   if (!path)
     return false
-  if (path === '/app/new' || path === '/onboarding/app')
+  if (path === '/app/new')
+    return options?.firstAppCreate === true
+  if (path === '/onboarding/app')
     return true
   // /onboarding/organization is shared: first-app create hard-gates, but
   // org-switcher / add-another-org should not. Other /onboarding/* routes
@@ -280,8 +282,12 @@ export function getOnboardingContinueSetupRoute(options: {
   currentSource?: string | null
   currentStep?: string | null
   resumeAppId: string | null | undefined
+  firstAppCreate?: boolean
 }) {
-  if (isPreCreateOnboardingPath(options.currentPath, { source: options.currentSource }))
+  if (isPreCreateOnboardingPath(options.currentPath, {
+    source: options.currentSource,
+    firstAppCreate: options.firstAppCreate,
+  }))
     return null
   if (!options.resumeAppId)
     return null
@@ -299,6 +305,7 @@ export function shouldConfirmOnboardingDashboardExploration(options: {
   destination: string
   resumeAppId: string | null | undefined
   userId: string | null | undefined
+  firstAppCreate?: boolean
 }) {
   if (!ONBOARDING_CONSOLE_ESCAPE_DESTINATIONS.has(options.destination))
     return false
@@ -318,6 +325,7 @@ export function shouldConfirmOnboardingDashboardExploration(options: {
     || !!getPendingFirstUploadAppId(options.userId)
     || isPreCreateOnboardingPath(options.currentPath, {
       source: options.currentSource,
+      firstAppCreate: options.firstAppCreate,
     })
 }
 

@@ -17,12 +17,23 @@ RUN_DIR="$(mktemp -d)"
 LOG="${RUN_DIR}/tinbase.log"
 VITE_LOG="${RUN_DIR}/vite.log"
 WORKTREE="${RUN_DIR}/frontend-tree"
+TINBASE_PID=""
+VITE_PID=""
 
 cleanup() {
-  kill "$TINBASE_PID" 2>/dev/null || true
-  [ -n "${VITE_PID:-}" ] && kill "$VITE_PID" 2>/dev/null || true
+  if [ -n "${TINBASE_PID:-}" ]; then
+    kill "$TINBASE_PID" 2>/dev/null || true
+  fi
+  if [ -n "${VITE_PID:-}" ]; then
+    kill "$VITE_PID" 2>/dev/null || true
+  fi
+  if [ -n "${WORKTREE:-}" ] && [ -d "${WORKTREE}" ]; then
+    git -C "$ROOT" worktree remove -f "$WORKTREE" 2>/dev/null || rm -rf "$WORKTREE"
+  fi
   rm -rf "$ROOT/.tinbase" 2>/dev/null || true
-  rm -rf "$RUN_DIR"
+  if [ -n "${RUN_DIR:-}" ]; then
+    rm -rf "$RUN_DIR"
+  fi
 }
 trap cleanup EXIT
 
