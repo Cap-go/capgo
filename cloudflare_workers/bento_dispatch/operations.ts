@@ -1,7 +1,7 @@
-import type { DispatchRecord, InvitationDetails } from './store.ts'
+import type { DispatchJob, InvitationDetails } from './contracts.ts'
+
 import { escapeHtml } from '../api/email_templates/render.ts'
 
-export const PARTITIONS = 5
 export const INVITATION_OPERATIONS = [
   'org:invite_new_user_reminder_1',
   'org:invite_new_user_reminder_2',
@@ -9,25 +9,17 @@ export const INVITATION_OPERATIONS = [
   'org:invite_existing_user_reminder_2',
 ] as const
 
-export interface DispatchJob {
-  version: 1
-  operation: typeof INVITATION_OPERATIONS[number]
-  partition: number
-  runId: string
-}
-
-export function parseDispatchJob(body: unknown): DispatchJob {
+export function parseDispatchJob(body: unknown, registry: Readonly<Record<string, unknown>> = Object.fromEntries(INVITATION_OPERATIONS.map(key => [key, true]))): DispatchJob {
   const value = body as Partial<DispatchJob> | null
-  if (!value || Array.isArray(value) || value.version !== 1
-    || !INVITATION_OPERATIONS.includes(value.operation!)
-    || !Number.isInteger(value.partition) || value.partition! < 0 || value.partition! >= PARTITIONS
-    || typeof value.runId !== 'string' || !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(value.runId)) {
+  if (!value || Array.isArray(value) || Object.keys(value).sort().join(',') !== 'evaluationKey,runId,version'
+    || value.version !== 1 || typeof value.evaluationKey !== 'string' || !Object.hasOwn(registry, value.evaluationKey)
+    || typeof value.runId !== 'string' || !/^[\da-f]{8}-[\da-f]{4}-[1-8][\da-f]{3}-[89ab][\da-f]{3}-[\da-f]{12}$/i.test(value.runId)) {
     throw new Error('Invalid dispatch job')
   }
   return value as DispatchJob
 }
 
-export function buildInvitationEvent(record: DispatchRecord, invitation: InvitationDetails, webappUrl: string) {
+export function buildInvitationEvent(record: { id: string, tag: string }, invitation: InvitationDetails, webappUrl: string) {
   let url: URL
   try {
     url = new URL(webappUrl)

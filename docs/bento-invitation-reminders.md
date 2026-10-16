@@ -1,135 +1,167 @@
-# Invitation reminders through the Bento dispatcher
+# Bento evaluation runner and invitation reminders
 
-The initial invitation email is sent by the existing Cloudflare email sender.
-After that provider acceptance is saved, a database trigger schedules two
-reminders in `public.bento_event_dispatches`. This is the only new table.
+The dedicated `capgo-bento-dispatch-prod` Worker runs named evaluations declared
+in `cloudflare_workers/bento_dispatch/bentoFlows.ts`. The minutely cron checks
+durable enqueue history against each evaluation's `everyMinutes` cadence. All
+four invitation evaluations currently run every minute; a five-minute cadence
+uses the same scheduler without different infrastructure.
 
-The dedicated `capgo-bento-dispatch-prod` Worker has a minutely cron producer and
-a queue consumer. The cron publishes one message for each reminder operation and
-each of five portions. The single queue delivers one message per invocation
-(`max_batch_size = 1`), with at most five concurrent invocations.
+One evaluation queue delivers one `{ version: 1, evaluationKey, runId }` message
+per invocation. A pending publication retries the same durable UUID. Queue receipt also records
+a missing enqueue timestamp when publication succeeded before the publisher crashed. Publication
+and execution have separate fenced 120-second claims. One unfinished run per
+evaluation prevents overlapping execution; unrelated evaluations are independent.
+There are no recipient partitions, pre-scheduled reminder rows, or enrollment
+triggers.
 
-## Reminder schedule and replacement flows
+## Read, report, then handle
 
-There are four independent event → email → exit flows. Their definitions and
-unchanged source HTML are in
-[`cloudflare_workers/bento_dispatch/bento/`](../cloudflare_workers/bento_dispatch/bento/flows.json).
-The JSON is a recreation specification, not a native Bento import format.
+Every definition has two functions: `findEligibleUsers` and
+`handleEligibleUsers`. The finder sees the whole relevant active cohort in a
+PostgreSQL read-only transaction, with only a query capability. PostgreSQL rejects
+writes, including data-changing CTEs; the query interface also rejects transaction
+control and multiple statements. It returns identity, context, reason, action and
+safe JSON metadata. Invitation metadata includes the actual initial and prior
+reminder acknowledgement timestamps, expiry, eligible/evaluated times and the
+satisfied wait condition. Send candidates and terminal candidates are both included.
 
-| Event | Due time | Email subject |
-| --- | --- | --- |
-| `org:invite_new_user_reminder_1` | Initial email accepted + 2 days | Reminder: accept your … Capgo invite |
-| `org:invite_new_user_reminder_2` | Earlier of initial acceptance + 7 days or token expiry − 1 hour | Reminder: join … on Capgo |
-| `org:invite_existing_user_reminder_1` | Initial email accepted + 2 days | Last nudge: join … on Capgo |
-| `org:invite_existing_user_reminder_2` | Initial email accepted + 7 days | Last nudge: … is waiting on Capgo |
+The engine saves the original complete selection unchanged in the private run
+row so handler retries receive identical domain metadata. Only the analytics
+projection passes through the existing sanitizer. It queues the entire
+eligibility report through the existing `POSTHOG_QUEUE`. Normal reports contain
+native `eligible_users` arrays, split into numbered parts sharing the run UUID
+when needed to stay within the existing 96 KiB envelope limit. An individual
+oversized or deeply nested candidate uses numbered JSON fragments with a shared fragment UUID;
+concatenate those fragments by part before parsing. The full list is preserved.
+No handler runs until all selection parts have been handed off.
 
-These subjects and bodies reflect the inspected existing flow, including its
-existing first-reminder naming. New-user tokens expire seven days after their
-current creation/update time, so the final reminder intentionally precedes expiry.
-The initial email is never duplicated in these flows.
+The handler receives shared `sendBentoEvent`, `sendBentoEvents`, `recordFlowEvent`
+and `endFlow` capabilities, read-only access, and runtime settings. It receives
+no unrestricted SQL write client. Invitation handlers pass a current-source
+resolver to the shared helpers. Source generations, membership, cancellation,
+expiry and previous reminder acceptance are rechecked before and after claiming
+a send. Tokens, token-bearing URLs and provider payloads are never copied into
+the eligibility snapshot or audit metadata; current names and links are resolved
+separately immediately before the provider request.
 
-For each replacement flow:
+## Durable events and audit recovery
 
-1. Match its event type exactly.
-2. Send its specified email immediately, with `transactional = true` and the
-   existing `5_minutes` throttle.
-3. Exit the flow. Scheduling and invitation eligibility are handled by the Worker.
+Exactly two private, service-role-only tables are added:
 
-Use `event.details.org_name_subject` in the subject. The body fields `org_name`,
-`org_admin_name`, `invited_first_name`, and `invited_last_name` are already HTML
-escaped; the subject field is plain text with line breaks removed. The HTML files
-retain the existing Liquid body fields. `invite_link` is constructed from the
-configured HTTPS console origin and the current encoded invitation identity.
-`dispatch_id` and `unique.key` contain the stable dispatch UUID for inspection;
-correctness does not depend on Bento deduplicating it.
+- `bento_event_dispatches` records logical facts, sends and flow termination.
+  Events are unique by `(flow_key, context_key, recipient_key, tag)`. A `recorded`
+  fact is local history; `accepted` specifically means Bento acknowledgement.
+  `event_at` is absent before provider acceptance. The active-start partial index
+  excludes closed historical flows.
+- `bento_evaluation_runs` stores scheduling/execution history, claims, complete
+  eligibility snapshots and outcome summaries. Indexed latest enqueue history
+  controls cadence; a partial unique index allows one unfinished run per key.
 
-All four source emails were inspected using Bento Unofficial. Remote Bento edits
-and publication are deferred to the manual cutover; this PR does not alter the
-live invitation flow. In a local Bento editor, each Send Email node must retain
-or receive its own unique template ID. Copy source content, not another node's
-template assignment.
+Business mutations append a correlated PostHog intent in the same database
+transaction. This includes send claims/attempts, acknowledgement or unconfirmed
+provider outcomes, stale skips, terminal facts and evaluation completion/failure.
+Failures identify their safe phase (`finder`, `selection_persist`,
+`eligibility_queue`, `handler`, or `completion`), without raw exception content.
+External fact details are retained unchanged in the private ledger, including
+large/deep domain JSON and legitimate reserved-name fields. Fact audits carry a
+concise ledger UUID reference and flow/context/recipient/tag/reason, rather than
+copying the details into a bounded analytics envelope.
+Each table's `pending_audit` array holds its own unhanded intents, with stable
+PostHog `event_id` UUIDs. There is no third outbox table or extra analytics queue.
+Helpers promptly relay touched event audits; completion relays its run audit.
+The cron separately recovers pending intents with a 100-event/10-second budget,
+regardless of evaluation cadence or paused sending. A relay outage does not prevent scheduling
+independent evaluations. A saved Bento acceptance remains accepted when analytics
+handoff fails, so audit-only recovery does not send that event again.
 
-## Dispatch state and concurrency
+Each provider request has a ten-second timeout. Provider concurrency is five per
+invocation, and the soft handler budget is forty seconds. Unfinished recipients
+remain eligible on a subsequent scheduled evaluation. One pinned database client
+serializes short transactions; provider and queue I/O happen outside them. An
+indexed, shared rolling budget retains sixty send claims per minute, leaving
+headroom below the account limit for other producers. Budget deferral consumes
+no event attempt and records its reason. Logical event attempts, publication
+attempts, execution attempts and total queue deliveries are each capped at five.
 
-Each table row represents one logical event, uniquely identified by
-`(tag, recipient_key, context_key)`. The context is the existing initial-email
-request generation UUID. A resend replaces that generation, making previously
-scheduled reminders obsolete. Existing users use their user UUID as recipient
-identity; new users use normalized email.
+Bento acknowledgement is not inbox delivery. Remote acceptance followed by a
+crash before the database marker can still duplicate an event. The transport
+unique key is useful for inspection but correctness does not assume Bento
+implements deduplication. Provider delay can also outlive an invitation change.
 
-The table stores `due_at`, portion, attempts, the most recent attempt time, a
-claim token/expiry, `accepted_at`, cancellation time, and a fixed error code.
-An indexed due lookup atomically claims at most five rows. Claims expire after
-120 seconds, and acknowledgement/failure writes require the same claim token.
-The table is private to internal service-role operations with explicit RLS denial
-for user-facing roles.
+## Invitation lifecycle and timing
 
-Before each Bento call, the consumer reloads the current request generation,
-recipient, organization and invitation from primary keys. Accepted, deleted,
-cancelled, expired or superseded invitations are skipped. New invitation tokens
-and names are rebuilt from current data; tokens are not copied into queue jobs
-or the dispatch table.
+The existing Cloudflare initial sender and its shipped queue remain in place.
+After initial-provider acceptance it records `flow:started` in the same
+transaction as the exact saved `sent_at` timestamp. The context is that initial
+request's generation UUID. Details identify the source invitation, variant,
+organization and current token-generation timestamp, without the token itself.
+A resend creates a new context; the previous context becomes `superseded`.
+Already-sent invitations are not backfilled.
 
-At most five provider requests run concurrently within a job. Each has a
-10-second timeout; the Worker starts at most three groups and starts another
-group only while its 40-second soft budget has at least 20 seconds remaining.
-Database statements and connection attempts have five-second limits. The current
-group is awaited to completion before acknowledgement, and no provider request
-runs inside a database transaction. The claim lease covers the bounded group;
-the queue runtime permits substantially longer execution.
+A missing source is `removed` unless actual active organization membership proves
+acceptance. Terminal reasons distinguish `accepted`, `cancelled`, `expired`,
+`removed`, `superseded`, and `completed`. `endFlow` atomically closes the active
+start fact and writes one local terminal event. Final-reminder acceptance closes
+the flow as completed; it does not send an extra completion event to Bento.
 
-A short database transaction also caps all dispatcher claims at 60 per rolling
-minute. The indexed `last_attempt_at` window and a transaction advisory lock
-coordinate this budget across invocations without another table. Failed attempts
-wait at least one minute before another claim. This leaves room below Bento's
-documented default of 100 requests/minute, although other Bento producers still
-share that account limit and may cause transient rejection.
+| Event | Eligibility time |
+| --- | --- |
+| `org:invite_new_user_reminder_1` | Initial Cloudflare acknowledgement + 2 days |
+| `org:invite_existing_user_reminder_1` | Initial Cloudflare acknowledgement + 2 days |
+| `org:invite_existing_user_reminder_2` | First reminder Bento acknowledgement + 5 days |
+| `org:invite_new_user_reminder_2` | First reminder accepted, then current seven-day token expiry − 1 hour; before expiry |
 
-Application attempts are capped at five across every cron and queue delivery.
-Queue retries are four after the first delivery, also five total. A partial job
-retry skips already accepted rows. Remaining work after a bounded successful job
-stays due for the next cron rather than spending retries on pagination.
+Each evaluation checks both sends and lifecycle termination. The four preserved
+HTML files and `bento/flows.json` describe four independent event → email → exit
+replacement flows. They are a manual recreation specification, not executable
+runtime configuration or a native Bento import. Preserve transactional delivery,
+the existing `5_minutes` throttle and each email node's distinct template ID.
 
-`accepted_at` means Bento acknowledged the event, not that an email reached the
-inbox. A crash after remote acceptance but before saving the marker can still
-repeat an event. This is an accepted limitation; the four short reminder flows
-must tolerate occasional duplicate entry. Bento may also delay the email until
-after the invitation state changes.
+Body names are HTML escaped. Subjects use the separate plain
+`event.details.org_name_subject` value, with line breaks removed. Invitation URLs
+use the configured HTTPS origin and current encoded invitation identity. An
+origin with credentials, a path, query or hash is rejected.
 
-## Deployment and cutover
+## Deployment, activation and manual cutover
 
-The production release workflow provisions the one queue and deploys this Worker
-after database migrations succeed. The Worker has no public HTTP entrypoint.
-The default is inactive: a missing activation setting is treated as false.
+Deploy the rewritten feature migration before the API sender and evaluation
+Worker. The existing shipped initial-email migration is unchanged. Both workers
+import the shared fact/audit helper under `_backend/utils`, so deployment scope
+includes both when that helper changes. Provision only the evaluation queue;
+bind the existing `capgo-posthog-events-prod` queue for analytics.
 
-1. Deploy the migration and Worker through the normal release process. Existing
-   already-sent invitations are not backfilled. Newly acknowledged initial emails
-   begin accumulating scheduled records.
-2. Prepare and manually publish the four replacement Bento flows. Verify the
-   exact new event names, unique email-node assignments, subject field, current
-   link, transactional setting and throttle. Keep the old flow's existing sessions
-   separate from the new event roots during cutover.
-3. Supply `BENTO_PUBLISHABLE_KEY`, `BENTO_SECRET_KEY`, `BENTO_SITE_UUID` and
-   `WEBAPP_URL` in Vault-backed settings using those exact names. Existing Worker
-   environment secrets can instead provide explicit deployment-time overrides.
-   `WEBAPP_URL` must be an HTTPS origin without credentials, a path, query or hash.
-   Keep the credentials and site in the same Bento environment as the four flows.
-4. Set Vault-backed `BENTO_EVENT_DISPATCH_ENABLED` to `true` after the flows are
-   published. An explicit Worker environment value overrides that setting.
-5. Verify `bento_dispatch_job` logs and `accepted_at` on a controlled invitation
-   before broad activation. Monitor queue backlog, failed/exhausted table records,
-   cancellation counts, and the database/provider error events.
+The Worker is inactive when Vault has no `BENTO_EVENT_DISPATCH_ENABLED` setting.
+Credentials and origin use the existing exact Vault keys `BENTO_PUBLISHABLE_KEY`,
+`BENTO_SECRET_KEY`, `BENTO_SITE_UUID`, and `WEBAPP_URL`. Explicit Worker environment
+values override runtime Vault settings. Keep credentials and site in the same
+Bento environment as the four replacement flows.
 
-To pause or roll back, set activation to `false`; initial invitations continue
-through their existing sender. Queued scan jobs are harmlessly acknowledged while
-disabled; dispatch rows retain their state. Reactivation scans due rows again,
-including overdue reminders whose invitations remain eligible. Review backlog
-before resuming after an extended pause. Do not clear accepted markers or reset
-attempt counts to retry an exhausted dispatch.
+Live Bento editing/publication is deferred. After the four recreation flows have
+been prepared, reviewed and manually published, enable the Vault setting through
+the normal operational process. Verify controlled invitations and observe run
+summaries, accepted ledger events, pending audit age, provider budget deferrals,
+exhausted attempts and queue backlog before expanding use.
 
-## Extending the system
+To pause, set activation false. Initial Cloudflare emails continue. Queued
+evaluation messages are acknowledged while disabled; ledger history remains.
+Reactivation rechecks current state and overdue eligibility. Do not erase accepted
+markers or reset exhausted attempt counts.
 
-Add an operation to the registry, a producer for its scheduled dispatch rows,
-and an eligibility/payload builder. All operations reuse the same queue, claims,
-provider budget and acceptance markers. Use a new tag for a new email purpose,
-and a context key for a repeat occurrence; never use an email subject as identity.
+## Local plan evidence
+
+A local benchmark with 100,000 closed ledger rows and 25 live source-backed
+invitations of each variant used the active-start partial index and unique event
+history lookups. The new/existing cohort plans each returned 25 rows in about
+1.9 ms with cached buffers. A separate 100,000-row run-history benchmark used the
+enqueue index for cadence in 0.035 ms. These checks prove exclusion of closed
+history and bounded run-history lookups. Local source tables were small;
+production-cardinality membership/source-table performance is not established by
+this benchmark. No plugin endpoint or public PostgREST query uses these tables.
+
+## Adding an evaluation
+
+Add a hardcoded registry definition with a unique key, positive integer cadence,
+a whole-cohort read-only finder and a handler using the shared helpers. Choose
+stable flow/context/recipient/tag identities. Include safe decision metadata and
+termination candidates, and supply a fresh-source resolver for each send or end.
+No database enrollment trigger or recipient scheduling table is needed.

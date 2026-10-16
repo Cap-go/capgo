@@ -1,64 +1,38 @@
-import type { DispatchJob } from './operations.ts'
-import type { DispatchRecord, DispatchStore, InvitationDetails } from './store.ts'
-import { INVITATION_OPERATIONS, PARTITIONS } from './operations.ts'
+import type { PostHogQueueEnv } from '../../supabase/functions/_backend/utils/posthog_queue.ts'
+import type { DispatchJob, Evaluation, MutationContext, RunRecord } from './contracts.ts'
+import type { DispatchStore } from './store.ts'
+import { buildEligibilityAudit } from './audit.ts'
 
-export type DispatchRepository = Pick<DispatchStore, 'claim' | 'eligible' | 'complete' | 'fail' | 'cancel'>
-export type ReminderSender = (record: DispatchRecord, invitation: InvitationDetails) => Promise<boolean>
-export interface DispatchCounts { accepted: number, cancelled: number, failed: number }
-
-export async function publishDispatchJobs(queue: Pick<Queue<DispatchJob>, 'send'>, runId: string) {
-  // Publication errors are isolated: all independent operation/portion messages
-  // are attempted, and the cron invocation still reports partial failure.
-  const results = await Promise.allSettled(INVITATION_OPERATIONS.flatMap(operation =>
-    Array.from({ length: PARTITIONS }, (_, partition) => queue.send({ version: 1, operation, partition, runId })),
-  ))
-  if (results.some(result => result.status === 'rejected'))
-    throw new Error('Queue publication failed')
-}
-
-export async function processDispatchJob(job: DispatchJob, store: DispatchRepository, send: ReminderSender, now = Date.now): Promise<DispatchCounts> {
-  const counts: DispatchCounts = { accepted: 0, cancelled: 0, failed: 0 }
-  const deadline = now() + 40_000
-  // At most 15 events per message. Each group has five parallel 10-second
-  // provider calls, comfortably inside the 120-second claim lease. New groups
-  // only start with 20 seconds of the soft job budget remaining.
-  for (let group = 0; group < 3 && now() < deadline - 20_000; group++) {
-    const records = await store.claim(job.operation, job.partition, 5)
-    if (!records.length)
-      break
-    const outcomes = await Promise.allSettled(records.map(async (record) => {
-      let providerAccepted = false
-      try {
-        const invitation = await store.eligible(record)
-        if (!invitation) {
-          if (!await store.cancel(record))
-            throw new Error('Dispatch claim lost')
-          counts.cancelled++
-          return
-        }
-        providerAccepted = await send(record, invitation)
-        if (!providerAccepted) {
-          await store.fail(record, 'provider_rejected')
-          counts.failed++
-          return
-        }
-        if (!await store.complete(record))
-          throw new Error('Dispatch claim lost')
-        counts.accepted++
-      }
-      catch {
-        // Keep an uncertain acknowledgement claimed until its lease expires;
-        // immediately releasing it would increase duplicates during DB faults.
-        if (!providerAccepted)
-          await store.fail(record, 'dispatch_failed')
-        throw new Error('Dispatch processing failed')
-      }
-    }))
-    counts.failed += outcomes.filter(result => result.status === 'rejected').length
-    if (counts.failed)
-      break
+export async function processDispatchJob(job: DispatchJob, store: DispatchStore, helpers: MutationContext | ((run: RunRecord) => MutationContext), evaluation: Evaluation, queue?: PostHogQueueEnv['POSTHOG_QUEUE']) {
+  const run = await store.claimRun(job)
+  if (!run)
+    return { duplicate: true }
+  let phase = 'finder'
+  try {
+    let users = run.eligible_users
+    if (!run.evaluated_at) {
+      users = await store.readOnly(evaluation.findEligibleUsers)
+      phase = 'selection_persist'
+      await store.saveSelection(run, users, buildEligibilityAudit(run.id, evaluation.key, users))
+    }
+    // Every selection part must be handed off before business mutations. The
+    // saved snapshot and event UUIDs survive consumer/publication crashes.
+    phase = 'eligibility_queue'
+    await store.flushRunAudit(run.id, queue)
+    phase = 'handler'
+    const result = await evaluation.handleEligibleUsers(typeof helpers === 'function' ? helpers(run) : helpers, users ?? [])
+    phase = 'completion'
+    await store.completeRun(run, result)
+    // Completion is durable before this best-effort handoff. An analytics
+    // outage must never turn completed business work back into a retry.
+    try {
+      await store.flushRunAudit(run.id, queue)
+    }
+    catch { /* Cron relays pending intents independently. */ }
+    return result
   }
-  // Progress is persisted per event; remaining due rows are picked up by the
-  // next cron rather than spending queue retries as a pagination mechanism.
-  return counts
+  catch {
+    await store.failRun(run, phase)
+    throw new Error('Evaluation processing failed')
+  }
 }

@@ -1,114 +1,163 @@
+import type { EligibleUser, Evaluation } from '../cloudflare_workers/bento_dispatch/contracts.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { processDispatchJob, publishDispatchJobs } from '../cloudflare_workers/bento_dispatch/consumer.ts'
+import { buildEligibilityAudit } from '../cloudflare_workers/bento_dispatch/audit.ts'
+import { bentoFlows } from '../cloudflare_workers/bento_dispatch/bentoFlows.ts'
+import { processDispatchJob } from '../cloudflare_workers/bento_dispatch/consumer.ts'
 import { buildInvitationEvent, parseDispatchJob } from '../cloudflare_workers/bento_dispatch/operations.ts'
+import { publishDispatchJobs } from '../cloudflare_workers/bento_dispatch/scheduler.ts'
+import { messageBytes, parsePostHogMessage, POSTHOG_MESSAGE_MAX_BYTES } from '../supabase/functions/_backend/utils/posthog_queue.ts'
 
-const operation = 'org:invite_new_user_reminder_1'
-const job = { version: 1 as const, operation: operation as typeof operation, partition: 0, runId: '11111111-1111-4111-8111-111111111111' }
-const record = { id: '22222222-2222-4222-8222-222222222222', tag: operation, recipient_key: 'email:invitee@example.com', context_key: '33333333-3333-4333-8333-333333333333', email: 'invitee@example.com', claim_token: '44444444-4444-4444-8444-444444444444', attempt_count: 1 }
-const invitation = { email: 'invitee@example.com', org_id: '55555555-5555-4555-8555-555555555555', org_name: '<img src=x>', org_admin_name: 'Someone & Team', first_name: '<b>Invitee</b>', last_name: '', invite_magic_string: 'secret+token', is_new_user: true }
+const key = 'org:invite_new_user_reminder_1'
+const job = { version: 1 as const, evaluationKey: key, runId: '11111111-1111-4111-8111-111111111111' }
+const user: EligibleUser = { flowKey: 'org:invitation', contextKey: '33333333-3333-4333-8333-333333333333', recipientKey: 'email:invitee@example.com', email: 'invitee@example.com', tag: key, action: 'send', reason: 'first_reminder_due', metadata: { startId: '22222222-2222-4222-8222-222222222222' } }
+const invitation = { email: 'invitee@example.com', org_id: '55555555-5555-4555-8555-555555555555', org_name: '<img src=x>\nTeam', org_admin_name: 'Someone & Team', first_name: '<b>Invitee</b>', last_name: '', invite_magic_string: 'secret+token', is_new_user: true }
 
-function repository() {
-  return {
-    claim: vi.fn().mockResolvedValueOnce([record]).mockResolvedValue([]),
-    eligible: vi.fn().mockResolvedValue(invitation),
-    complete: vi.fn().mockResolvedValue(true),
-    fail: vi.fn().mockResolvedValue(true),
-    cancel: vi.fn().mockResolvedValue(true),
+function harness() {
+  const order: string[] = []
+  const run = { id: job.runId, evaluation_key: key, execution_claim_token: '44444444-4444-4444-8444-444444444444', eligible_users: null, evaluated_at: null, pending_audit: [], result: {} }
+  const store = {
+    claimRun: vi.fn().mockResolvedValue(run),
+    readOnly: vi.fn(async (fn: (ctx: unknown) => unknown) => fn(Object.freeze({ query: vi.fn() }))),
+    saveSelection: vi.fn(async () => { order.push('snapshot') }),
+    flushRunAudit: vi.fn(async () => { order.push('analytics') }),
+    completeRun: vi.fn(async () => { order.push('complete') }),
+    failRun: vi.fn(),
   }
+  const evaluation: Evaluation = { key, everyMinutes: 1, findEligibleUsers: vi.fn(async (ctx) => {
+    expect(Object.keys(ctx)).toEqual(['query'])
+    return [user]
+  }), handleEligibleUsers: vi.fn(async () => {
+    order.push('handler')
+    return { accepted: 1 }
+  }) }
+  return { store, evaluation, order }
 }
 
-describe('typed Bento dispatch jobs', () => {
-  it('publishes one independent message for each of four operations and five portions', async () => {
+describe('bento evaluation contracts', () => {
+  it('uses four independently registered minutely evaluations and identifier-only messages', () => {
+    expect(Object.values(bentoFlows).map(flow => flow.everyMinutes)).toEqual([1, 1, 1, 1])
+    expect(parseDispatchJob(job)).toEqual(job)
+    for (const input of [null, [], { ...job, partition: 0 }, { ...job, operation: key }, { ...job, evaluationKey: 'unknown' }, { ...job, runId: 'invalid' }])
+      expect(() => parseDispatchJob(input)).toThrow('Invalid dispatch job')
+  })
+
+  it('publishes only claimed due evaluations and preserves their durable run UUID on retry', async () => {
     const queue = { send: vi.fn().mockResolvedValue(undefined) }
-    await publishDispatchJobs(queue, job.runId)
-    expect(queue.send).toHaveBeenCalledTimes(20)
-    const jobs = queue.send.mock.calls.map(([body]) => parseDispatchJob(body))
-    expect(new Set(jobs.map(item => `${item.operation}:${item.partition}`)).size).toBe(20)
-    expect(jobs.every(item => item.runId === job.runId)).toBe(true)
+    const store = { schedule: vi.fn().mockResolvedValueOnce({ id: job.runId, enqueue_claim_token: 'claim' }).mockResolvedValue(null), markEnqueued: vi.fn(), publicationFailed: vi.fn() }
+    await publishDispatchJobs(queue, store, bentoFlows)
+    expect(queue.send).toHaveBeenCalledExactlyOnceWith(job)
+    expect(store.markEnqueued).toHaveBeenCalledWith(job.runId, 'claim')
   })
 
-  it('attempts the other jobs if one queue publication fails, then reports the failure', async () => {
+  it('attempts independent evaluations after a failed publication', async () => {
     const queue = { send: vi.fn().mockRejectedValueOnce(new Error('unavailable')).mockResolvedValue(undefined) }
-    await expect(publishDispatchJobs(queue, job.runId)).rejects.toThrow('Queue publication failed')
-    expect(queue.send).toHaveBeenCalledTimes(20)
-  })
-
-  it.each([null, {}, { ...job, operation: 'org:invite_new_capgo_user_to_org' }, { ...job, partition: 5 }, { ...job, partition: 0.5 }, { ...job, version: 2 }, { ...job, runId: 'invalid' }, [job]])('rejects invalid or legacy jobs: %j', (input) => {
-    expect(() => parseDispatchJob(input)).toThrow('Invalid dispatch job')
+    const store = { schedule: vi.fn().mockResolvedValue({ id: job.runId, enqueue_claim_token: 'claim' }), markEnqueued: vi.fn(), publicationFailed: vi.fn() }
+    await expect(publishDispatchJobs(queue, store, bentoFlows)).rejects.toThrow('Queue publication failed')
+    expect(queue.send).toHaveBeenCalledTimes(4)
+    expect(store.publicationFailed).toHaveBeenCalledOnce()
   })
 })
 
-describe('invitation reminder event details', () => {
-  it('escapes user-controlled template values and builds an encoded invitation URL on the configured host', () => {
-    const event = buildInvitationEvent(record, invitation, 'https://console.example.com/')
-    expect(event.event).toBe(operation)
-    expect(event.email).toBe('invitee@example.com')
-    expect(event.data).toMatchObject({ org_name: '&lt;img src=x&gt;', org_admin_name: 'Someone &amp; Team', invited_first_name: '&lt;b&gt;Invitee&lt;/b&gt;', invited_last_name: '', invite_link: 'https://console.example.com/invitation?invite_magic_string=secret%2Btoken', unique: { key: record.id } })
+describe('selection audit ordering and preservation', () => {
+  it('saves the whole snapshot and completes analytics handoff before invoking the handler', async () => {
+    const h = harness()
+    await processDispatchJob(job, h.store as never, {} as never, h.evaluation)
+    expect(h.order).toEqual(['snapshot', 'analytics', 'handler', 'complete', 'analytics'])
+    expect(h.store.saveSelection).toHaveBeenCalledWith(expect.anything(), [user], expect.any(Array))
   })
 
-  it('builds the existing-user link without a magic token', () => {
-    const event = buildInvitationEvent({ ...record, tag: 'org:invite_existing_user_reminder_2' }, { ...invitation, is_new_user: false, invite_magic_string: null }, 'https://console.example.com')
-    expect(event.data.invite_link).toBe(`https://console.example.com/dashboard?invite_org=${invitation.org_id}`)
+  it('never reaches mutation phase when eligibility analytics cannot be queued', async () => {
+    const h = harness()
+    h.store.flushRunAudit.mockRejectedValue(new Error('unavailable'))
+    await expect(processDispatchJob(job, h.store as never, {} as never, h.evaluation)).rejects.toThrow()
+    expect(h.store.saveSelection).toHaveBeenCalledOnce()
+    expect(h.evaluation.handleEligibleUsers).not.toHaveBeenCalled()
+    expect(h.store.failRun).toHaveBeenCalledOnce()
   })
 
-  it.each(['http://console.example.com', 'javascript:alert(1)', 'https://user:password@console.example.com', 'https://console.example.com/?secret=1'])('rejects unsafe webapp configuration %s', (url) => {
-    expect(() => buildInvitationEvent(record, invitation, url)).toThrow('Invalid webapp URL')
+  it('records a safe finder failure phase for diagnosis', async () => {
+    const h = harness()
+    vi.mocked(h.evaluation.findEligibleUsers).mockRejectedValue(new Error('private raw error'))
+    await expect(processDispatchJob(job, h.store as never, {} as never, h.evaluation)).rejects.toThrow()
+    expect(h.store.failRun).toHaveBeenCalledWith(expect.anything(), 'finder')
+  })
+
+  it('records handler failure without completing the run', async () => {
+    const h = harness()
+    vi.mocked(h.evaluation.handleEligibleUsers).mockRejectedValue(new Error('private raw error'))
+    await expect(processDispatchJob(job, h.store as never, {} as never, h.evaluation)).rejects.toThrow()
+    expect(h.store.failRun).toHaveBeenCalledWith(expect.anything(), 'handler')
+    expect(h.store.completeRun).not.toHaveBeenCalled()
+  })
+
+  it('reuses saved selection on a crashed run and does not rerun its finder', async () => {
+    const h = harness()
+    h.store.claimRun.mockResolvedValue({ id: job.runId, eligible_users: [user], evaluated_at: new Date().toISOString(), result: {} } as never)
+    await processDispatchJob(job, h.store as never, {} as never, h.evaluation)
+    expect(h.evaluation.findEligibleUsers).not.toHaveBeenCalled()
+    expect(h.store.saveSelection).not.toHaveBeenCalled()
+    expect(h.evaluation.handleEligibleUsers).toHaveBeenCalledWith(expect.anything(), [user])
+  })
+
+  it('does no finder or handler work for a duplicate with a live execution claim', async () => {
+    const h = harness()
+    h.store.claimRun.mockResolvedValue(null as never)
+    expect(await processDispatchJob(job, h.store as never, {} as never, h.evaluation)).toEqual({ duplicate: true })
+    expect(h.evaluation.findEligibleUsers).not.toHaveBeenCalled()
+    expect(h.evaluation.handleEligibleUsers).not.toHaveBeenCalled()
+  })
+
+  it('reports and completes even an empty cohort', async () => {
+    const h = harness()
+    vi.mocked(h.evaluation.findEligibleUsers).mockResolvedValue([])
+    await processDispatchJob(job, h.store as never, {} as never, h.evaluation)
+    expect(h.store.saveSelection).toHaveBeenCalledWith(expect.anything(), [], expect.arrayContaining([expect.any(Object)]))
+    expect(h.store.completeRun).toHaveBeenCalledOnce()
+  })
+
+  it('splits a large complete list into numbered valid events that reconstruct without truncation', () => {
+    const users = Array.from({ length: 2500 }, (_, i) => ({ ...user, recipientKey: `email:recipient-${i}@example.com`, metadata: { note: '漢字'.repeat(100) } }))
+    const events = buildEligibilityAudit(job.runId, key, users)
+    expect(events.length).toBeGreaterThan(1)
+    expect(events.every(event => messageBytes(event) <= POSTHOG_MESSAGE_MAX_BYTES && parsePostHogMessage(event))).toBe(true)
+    const reconstructed = JSON.parse(`[${events.map(event => JSON.stringify(event.payload.nonPersonTags!.eligible_users).slice(1, -1)).join(',')}]`)
+    expect(reconstructed).toEqual(users)
+    expect(events.map(event => event.payload.nonPersonTags!.part)).toEqual(events.map((_, i) => i + 1))
+    expect(events.every(event => event.payload.nonPersonTags!.parts === events.length)).toBe(true)
+    expect(new Set(events.map(event => event.event_id)).size).toBe(events.length)
   })
 })
 
-describe('bento dispatch consumer processing', () => {
-  it('persists provider acceptance before considering the job complete', async () => {
-    const store = repository()
-    const send = vi.fn().mockResolvedValue(true)
-    expect(await processDispatchJob(job, store, send)).toEqual({ accepted: 1, cancelled: 0, failed: 0 })
-    expect(store.complete).toHaveBeenCalledWith(record)
-    expect(store.fail).not.toHaveBeenCalled()
-  })
+it('preserves deeply nested metadata using a depth-safe analytics fragment', () => {
+  const nested = { child: { child: { child: { child: { child: { label: 'domain-value' } } } } } }
+  const selected = { ...user, metadata: { nested } }
+  const events = buildEligibilityAudit(job.runId, key, [selected])
+  expect(events.every(event => parsePostHogMessage(event))).toBe(true)
+  expect(events[0]!.payload.nonPersonTags!.encoding).toBe('json-fragment')
+  expect(JSON.parse(events.map(event => event.payload.nonPersonTags!.eligible_user_json).join(''))).toEqual(selected)
+})
 
-  it('does not send accepted records absent from the claim results', async () => {
-    const store = repository()
-    store.claim.mockReset().mockResolvedValue([])
-    const send = vi.fn()
-    await processDispatchJob(job, store, send)
-    expect(send).not.toHaveBeenCalled()
-  })
+it('rejects token-bearing URLs even inside deeply nested metadata', () => {
+  const selected = { ...user, metadata: { child: { child: { child: { child: { url: 'https://console.example.com/invitation?invite_magic_string=private-value' } } } } } }
+  expect(() => buildEligibilityAudit(job.runId, key, [selected])).toThrow('Unsafe flow metadata')
+})
 
-  it('cancels obsolete invitations without sending', async () => {
-    const store = repository()
-    store.eligible.mockResolvedValue(null)
-    const send = vi.fn()
-    expect(await processDispatchJob(job, store, send)).toMatchObject({ cancelled: 1 })
-    expect(store.cancel).toHaveBeenCalledWith(record)
-    expect(send).not.toHaveBeenCalled()
-  })
+it('preserves one oversized recipient through explicitly numbered JSON fragments', () => {
+  const large = { ...user, metadata: { note: '漢字'.repeat(100000) } }
+  const events = buildEligibilityAudit(job.runId, key, [large])
+  expect(events.length).toBeGreaterThan(1)
+  expect(events.every(event => parsePostHogMessage(event))).toBe(true)
+  const restored = JSON.parse(events.map(event => event.payload.nonPersonTags!.eligible_user_json).join(''))
+  expect(restored).toEqual(large)
+  expect(new Set(events.map(event => event.payload.nonPersonTags!.fragment_id)).size).toBe(1)
+})
 
-  it('records rejected sends and allows other records in the portion to finish', async () => {
-    const store = repository()
-    const second = { ...record, id: '66666666-6666-4666-8666-666666666666' }
-    store.claim.mockReset().mockResolvedValueOnce([record, second]).mockResolvedValue([])
-    const send = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
-    expect(await processDispatchJob(job, store, send)).toEqual({ accepted: 1, cancelled: 0, failed: 1 })
-    expect(store.fail).toHaveBeenCalledWith(record, 'provider_rejected')
-    expect(store.complete).toHaveBeenCalledWith(second)
+describe('invitation reminder payloads', () => {
+  it('escapes body values, keeps plain subject text and encodes the current token', () => {
+    const event = buildInvitationEvent({ id: '22222222-2222-4222-8222-222222222222', tag: key }, invitation, 'https://console.example.com/')
+    expect(event.data).toMatchObject({ org_name: '&lt;img src=x&gt;\nTeam', org_name_subject: '<img src=x> Team', org_admin_name: 'Someone &amp; Team', invited_first_name: '&lt;b&gt;Invitee&lt;/b&gt;', invite_link: 'https://console.example.com/invitation?invite_magic_string=secret%2Btoken' })
   })
-
-  it('does not silently accept a failed marker write or a lost claim', async () => {
-    const store = repository()
-    store.complete.mockResolvedValue(false)
-    expect(await processDispatchJob(job, store, vi.fn().mockResolvedValue(true))).toMatchObject({ failed: 1, accepted: 0 })
-  })
-
-  it('leaves provider-accepted records claimed when their marker write throws', async () => {
-    const store = repository()
-    store.complete.mockRejectedValue(new Error('private database failure'))
-    expect(await processDispatchJob(job, store, vi.fn().mockResolvedValue(true))).toMatchObject({ failed: 1 })
-    expect(store.fail).not.toHaveBeenCalled()
-  })
-
-  it('bounds a job and leaves remaining due work for the next cron', async () => {
-    const store = repository()
-    store.claim.mockReset().mockResolvedValue([record])
-    await processDispatchJob(job, store, vi.fn().mockResolvedValue(true))
-    expect(store.claim.mock.calls.length).toBeLessThanOrEqual(3)
+  it.each(['http://console.example.com', 'javascript:alert(1)', 'https://user:password@console.example.com', 'https://console.example.com/?secret=1'])('rejects unsafe webapp URL %s', (url) => {
+    expect(() => buildInvitationEvent({ id: 'id', tag: key }, invitation, url)).toThrow('Invalid webapp URL')
   })
 })

@@ -1,13 +1,17 @@
 import type { Context as HonoContext } from 'hono'
-import type { DispatchJob } from './operations.ts'
+import type { PostHogQueueEnv } from '../../supabase/functions/_backend/utils/posthog_queue.ts'
+import type { DispatchJob } from './contracts.ts'
 import { Context } from 'hono'
 import { Client } from 'pg'
 import { isBentoConfigured, trackBentoEvent } from '../../supabase/functions/_backend/utils/bento.ts'
-import { processDispatchJob, publishDispatchJobs } from './consumer.ts'
-import { buildInvitationEvent, parseDispatchJob } from './operations.ts'
+import { bentoFlows } from './bentoFlows.ts'
+import { processDispatchJob } from './consumer.ts'
+import { createMutationContext } from './helpers.ts'
+import { parseDispatchJob } from './operations.ts'
+import { publishDispatchJobs } from './scheduler.ts'
 import { DispatchStore } from './store.ts'
 
-export interface DispatchEnv {
+export interface DispatchEnv extends PostHogQueueEnv {
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive
   DISPATCH_QUEUE: Queue<DispatchJob>
   BENTO_EVENT_DISPATCH_ENABLED?: string
@@ -81,9 +85,14 @@ async function withDatabase<T>(env: DispatchEnv, operation: (db: Client) => Prom
 export async function scheduleDispatch(_controller: ScheduledController, env: DispatchEnv) {
   try {
     await withDatabase(env, async (db) => {
+      const store = new DispatchStore(db)
+      try {
+        await store.relayPendingAudit(env.POSTHOG_QUEUE)
+      }
+      catch { console.error(JSON.stringify({ event: 'bento_dispatch_audit_pending' })) }
       if (!await enabled(db, env))
         return
-      await publishDispatchJobs(env.DISPATCH_QUEUE, crypto.randomUUID())
+      await publishDispatchJobs(env.DISPATCH_QUEUE, store, bentoFlows)
     })
   }
   catch {
@@ -95,14 +104,18 @@ export async function scheduleDispatch(_controller: ScheduledController, env: Di
 export async function consumeDispatch(batch: MessageBatch<unknown>, env: DispatchEnv) {
   if (batch.messages.length !== 1) {
     console.error(JSON.stringify({ event: 'bento_dispatch_invalid_batch', count: batch.messages.length }))
-    for (const message of batch.messages)
-      message.retry({ delaySeconds: 60 })
+    for (const message of batch.messages) {
+      if (message.attempts < 5)
+        message.retry({ delaySeconds: 60 })
+      else
+        message.ack()
+    }
     return
   }
   const [message] = batch.messages
   let job: DispatchJob
   try {
-    job = parseDispatchJob(message.body)
+    job = parseDispatchJob(message.body, bentoFlows)
   }
   catch {
     console.error(JSON.stringify({ event: 'bento_dispatch_invalid_job' }))
@@ -110,7 +123,7 @@ export async function consumeDispatch(batch: MessageBatch<unknown>, env: Dispatc
     return
   }
   if (message.attempts > 5) {
-    console.error(JSON.stringify({ event: 'bento_dispatch_delivery_exhausted', runId: job.runId, operation: job.operation, partition: job.partition }))
+    console.error(JSON.stringify({ event: 'bento_dispatch_delivery_exhausted', runId: job.runId, evaluationKey: job.evaluationKey }))
     message.ack()
     return
   }
@@ -119,19 +132,21 @@ export async function consumeDispatch(batch: MessageBatch<unknown>, env: Dispatc
       if (!await enabled(db, env))
         return { accepted: 0, cancelled: 0, failed: 0 }
       const c = await senderContext(db, env, job.runId)
-      return processDispatchJob(job, new DispatchStore(db), async (record, invitation) => {
-        const event = buildInvitationEvent(record, invitation, c.env.WEBAPP_URL)
+      const store = new DispatchStore(db)
+      const result = await processDispatchJob(job, store, run => createMutationContext(store, run, async (event) => {
         return await trackBentoEvent(c, event.email, event.data, event.event, AbortSignal.timeout(10_000)) === true
-      })
+      }, { WEBAPP_URL: c.env.WEBAPP_URL }, Date.now, env.POSTHOG_QUEUE), bentoFlows[job.evaluationKey], env.POSTHOG_QUEUE)
+      try {
+        await store.relayPendingAudit(env.POSTHOG_QUEUE)
+      }
+      catch { console.error(JSON.stringify({ event: 'bento_dispatch_audit_pending', runId: job.runId })) }
+      return result
     })
-    console.log(JSON.stringify({ event: 'bento_dispatch_job', runId: job.runId, operation: job.operation, partition: job.partition, ...counts }))
-    if (counts.failed > 0 && message.attempts < 5)
-      message.retry({ delaySeconds: 60 })
-    else
-      message.ack()
+    console.log(JSON.stringify({ event: 'bento_dispatch_job', runId: job.runId, evaluationKey: job.evaluationKey, ...counts }))
+    message.ack()
   }
   catch {
-    console.error(JSON.stringify({ event: 'bento_dispatch_job_failed', runId: job.runId, operation: job.operation, partition: job.partition }))
+    console.error(JSON.stringify({ event: 'bento_dispatch_job_failed', runId: job.runId, evaluationKey: job.evaluationKey }))
     if (message.attempts < 5)
       message.retry({ delaySeconds: 60 })
     else

@@ -11,7 +11,7 @@ describe('bento dispatcher infrastructure', () => {
     expect(config.workers_dev).toBe(false)
     expect(config.preview_urls).toBe(false)
     expect(config.env.prod.triggers.crons).toEqual(['* * * * *'])
-    expect(config.env.prod.queues.producers).toEqual([{ binding: 'DISPATCH_QUEUE', queue: BENTO_QUEUE_NAME }])
+    expect(config.env.prod.queues.producers).toEqual([{ binding: 'DISPATCH_QUEUE', queue: BENTO_QUEUE_NAME }, { binding: 'POSTHOG_QUEUE', queue: 'capgo-posthog-events-prod' }])
     expect(config.env.prod.queues.consumers).toEqual([{ queue: BENTO_QUEUE_NAME, max_batch_size: 1, max_batch_timeout: 0, max_concurrency: 5, max_retries: 4, retry_delay: 60 }])
     expect(config.env.prod.routes).toBeUndefined()
   })
@@ -31,6 +31,13 @@ describe('bento dispatcher infrastructure', () => {
 
   it.each(['cloudflare_workers/bento_dispatch/index.ts', 'cloudflare_workers/bento_dispatch/store.ts', 'scripts/ensure-bento-dispatch-queue.ts', 'cloudflare_workers/api/email_templates/render.ts'])('includes %s in dispatcher releases', (file) => {
     expect(resolveDeployScopeFromFiles([file]).bento_dispatch).toBe(true)
+  })
+
+  it('redeploys both importing workers when the shared initial-fact helper changes', () => {
+    const scope = resolveDeployScopeFromFiles(['supabase/functions/_backend/utils/bento_flow_audit.ts'])
+    expect(scope.api).toBe(true)
+    expect(scope.bento_dispatch).toBe(true)
+    expect(resolveDeployScopeFromFiles(['cloudflare_workers/api/triggers/org_invitation_email.ts']).api).toBe(true)
   })
 
   it('creates and verifies just the one queue', async () => {
