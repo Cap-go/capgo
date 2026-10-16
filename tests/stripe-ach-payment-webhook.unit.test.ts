@@ -68,6 +68,18 @@ type StripeInfoState = {
   status: StripeStatus
   paid_at: string | null
   canceled_at: string | null
+  subscription_id?: string | null
+}
+
+function withStoredSubscriptionId(
+  state: StripeInfoState,
+  extracted: ReturnType<typeof extract>,
+  previous: StripeInfoState,
+): StripeInfoState {
+  const subscriptionId = extracted.subscription_id ?? previous.subscription_id
+  if (subscriptionId)
+    return { ...state, subscription_id: subscriptionId }
+  return state
 }
 
 function applyWebhookToStripeInfoState(
@@ -76,12 +88,22 @@ function applyWebhookToStripeInfoState(
   object: Record<string, unknown>,
   eventOccurredAtIso: string,
 ): StripeInfoState {
+  if (type === 'payment_intent.payment_failed' || type === 'payment_intent.succeeded')
+    return current
+
   const extracted = extract(type, object)
-  return stripeEventTestUtils.mergeStripeWebhookExtractIntoStripeInfoState(
+
+  if ((type === 'invoice.paid' || type === 'invoice.payment_succeeded' || type === 'invoice.payment_failed')
+    && !stripeEventTestUtils.shouldApplyInvoiceToStoredSubscription(current.subscription_id, extracted.subscription_id)) {
+    return current
+  }
+
+  const merged = stripeEventTestUtils.mergeStripeWebhookExtractIntoStripeInfoState(
     current,
     extracted,
     eventOccurredAtIso,
   )
+  return withStoredSubscriptionId(merged, extracted, current)
 }
 
 describe('stripe ACH sequence fixtures (a) processing must not mark paid', () => {
@@ -114,6 +136,7 @@ describe('stripe ACH sequence fixtures (a) processing must not mark paid', () =>
       items: { data: [makeSubscriptionItem()] },
     }, ts)
 
+    expect(state.subscription_id).toBe(FIXTURE_SUBSCRIPTION)
     expect(state.status).toBe('created')
     expect(stripeEventTestUtils.hasStripePaidAccess(state)).toBe(false)
 
@@ -138,11 +161,12 @@ describe('stripe ACH sequence fixtures (a) processing must not mark paid', () =>
 })
 
 describe('stripe ACH sequence fixtures (b) failure reverts paid access', () => {
-  it.concurrent('payment and invoice failures end in failed status without paid_at', () => {
+  it.concurrent('invoice.payment_failed marks failed while payment_intent.payment_failed is ignored', () => {
     let state: StripeInfoState = {
       status: 'succeeded',
       paid_at: '2026-09-01T10:00:00.000Z',
       canceled_at: null,
+      subscription_id: FIXTURE_SUBSCRIPTION,
     }
     const ts = '2026-09-02T12:00:00.000Z'
 
@@ -155,8 +179,8 @@ describe('stripe ACH sequence fixtures (b) failure reverts paid access', () => {
       last_payment_error: { code: 'insufficient_funds', decline_code: 'insufficient_funds' },
     }, ts)
 
-    expect(state.status).toBe('failed')
-    expect(stripeEventTestUtils.hasStripePaidAccess(state)).toBe(false)
+    expect(state.status).toBe('succeeded')
+    expect(stripeEventTestUtils.hasStripePaidAccess(state)).toBe(true)
 
     state = applyWebhookToStripeInfoState(state, 'invoice.payment_failed', {
       ...makeOpenSubscriptionCreateInvoice(),
@@ -256,7 +280,12 @@ describe('stripe ACH sequence fixtures (d) payment method setup must not mark pa
 
 describe('stripe ACH sequence happy path', () => {
   it.concurrent('processing then invoice.paid marks paid once', () => {
-    let state: StripeInfoState = { status: 'created', paid_at: null, canceled_at: null }
+    let state: StripeInfoState = {
+      status: 'created',
+      paid_at: null,
+      canceled_at: null,
+      subscription_id: FIXTURE_SUBSCRIPTION,
+    }
     const processingAt = '2026-09-01T10:00:00.000Z'
     const paidAt = '2026-09-03T15:00:00.000Z'
 
@@ -280,8 +309,13 @@ describe('stripe ACH sequence happy path', () => {
     expect(stripeEventTestUtils.hasStripePaidAccess(state)).toBe(true)
   })
 
-  it.concurrent('processing then payment_intent.succeeded marks paid once', () => {
-    let state: StripeInfoState = { status: 'created', paid_at: null, canceled_at: null }
+  it.concurrent('payment_intent.succeeded does not mark paid without invoice.paid', () => {
+    let state: StripeInfoState = {
+      status: 'created',
+      paid_at: null,
+      canceled_at: null,
+      subscription_id: FIXTURE_SUBSCRIPTION,
+    }
     const processingAt = '2026-09-01T10:00:00.000Z'
     const paidAt = '2026-09-03T15:00:00.000Z'
 
@@ -301,8 +335,73 @@ describe('stripe ACH sequence happy path', () => {
       payment_method_types: ['us_bank_account'],
     }, paidAt)
 
-    expect(state.status).toBe('succeeded')
-    expect(state.paid_at).toBe(paidAt)
-    expect(stripeEventTestUtils.hasStripePaidAccess(state)).toBe(true)
+    expect(state.status).toBe('created')
+    expect(state.paid_at).toBeNull()
+    expect(stripeEventTestUtils.hasStripePaidAccess(state)).toBe(false)
+  })
+})
+
+describe('stripe ACH webhook production guards', () => {
+  it.concurrent('requires invoice subscription to match stored subscription', () => {
+    expect(stripeEventTestUtils.shouldApplyInvoiceToStoredSubscription('sub_a', 'sub_a')).toBe(true)
+    expect(stripeEventTestUtils.shouldApplyInvoiceToStoredSubscription('sub_a', 'sub_b')).toBe(false)
+    expect(stripeEventTestUtils.shouldApplyInvoiceToStoredSubscription(null, 'sub_a')).toBe(false)
+  })
+
+  it.concurrent('keeps legacy succeeded rows on subscription.updated', () => {
+    expect(stripeEventTestUtils.resolveSubscriptionPersistedStatus(
+      'updated',
+      { status: 'succeeded', paid_at: null },
+    )).toBe('succeeded')
+  })
+
+  it.concurrent('prefers positive subscription invoice lines over proration credits', () => {
+    const stripeData = extractDataEvent(mockContext, {
+      data: {
+        object: {
+          customer: FIXTURE_CUSTOMER,
+          id: 'in_proration',
+          object: 'invoice',
+          status: 'paid',
+          lines: {
+            data: [
+              {
+                amount: -1000,
+                parent: {
+                  subscription_item_details: {
+                    subscription: 'sub_old',
+                  },
+                },
+                pricing: {
+                  price_details: {
+                    price: 'price_old',
+                    product: 'prod_old',
+                  },
+                },
+              },
+              {
+                amount: 2000,
+                parent: {
+                  subscription_item_details: {
+                    subscription: FIXTURE_SUBSCRIPTION,
+                  },
+                },
+                pricing: {
+                  price_details: {
+                    price: FIXTURE_PRICE,
+                    product: FIXTURE_PRODUCT,
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+      type: 'invoice.paid',
+    } as any)
+
+    expect(stripeData.data.subscription_id).toBe(FIXTURE_SUBSCRIPTION)
+    expect(stripeData.data.price_id).toBe(FIXTURE_PRICE)
+    expect(stripeData.data.product_id).toBe(FIXTURE_PRODUCT)
   })
 })

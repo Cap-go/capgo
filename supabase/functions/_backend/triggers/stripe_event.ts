@@ -200,10 +200,33 @@ export function resolveSubscriptionPersistedStatus(
   if (webhookStatus === 'past_due' || webhookStatus === 'failed' || webhookStatus === 'canceled')
     return webhookStatus
 
-  if (currentStripeInfo?.status === 'succeeded' && currentStripeInfo?.paid_at)
+  if (currentStripeInfo?.status === 'succeeded')
     return 'succeeded'
 
   return webhookStatus
+}
+
+export function shouldApplyInvoiceToStoredSubscription(
+  storedSubscriptionId: string | null | undefined,
+  invoiceSubscriptionId: string | null | undefined,
+) {
+  return Boolean(storedSubscriptionId && invoiceSubscriptionId && storedSubscriptionId === invoiceSubscriptionId)
+}
+
+function mergeLastStripeEventAt(
+  currentStripeInfo: Pick<StripeInfoRow, 'last_stripe_event_at'> | null | undefined,
+  eventOccurredAtIso: string,
+) {
+  if (!currentStripeInfo?.last_stripe_event_at)
+    return eventOccurredAtIso
+
+  const currentMs = new Date(currentStripeInfo.last_stripe_event_at).getTime()
+  const eventMs = new Date(eventOccurredAtIso).getTime()
+  return eventMs >= currentMs ? eventOccurredAtIso : currentStripeInfo.last_stripe_event_at
+}
+
+type StripeWebhookPersistOptions = {
+  allowOutOfOrderPaymentConfirmation?: boolean
 }
 
 function toStripeInfoUpdate(data: StripeData['data']): StripeInfoUpdate {
@@ -662,10 +685,10 @@ async function persistStripeInfoAndRevenueMovement(
   updateData: StripeInfoUpdate,
   eventOccurredAtIso: string,
   movement: RevenueMovement,
+  options?: StripeWebhookPersistOptions,
 ): Promise<PersistRevenueMovementResult> {
-  const transactionUpdateData: StripeInfoUpdate = {
+  let transactionUpdateData: StripeInfoUpdate = {
     ...updateData,
-    last_stripe_event_at: eventOccurredAtIso,
   }
   const shouldRecordMovement = hasRevenueMovement(movement)
 
@@ -690,10 +713,14 @@ async function persistStripeInfoAndRevenueMovement(
       return 'missing'
     }
 
-    if (isStaleStripeEvent(lockedStripeInfo, eventOccurredAtIso)) {
+    if (!options?.allowOutOfOrderPaymentConfirmation && isStaleStripeEvent(lockedStripeInfo, eventOccurredAtIso)) {
       await pgClient.query('ROLLBACK')
       return 'stale'
     }
+
+    transactionUpdateData.last_stripe_event_at = options?.allowOutOfOrderPaymentConfirmation
+      ? mergeLastStripeEventAt(lockedStripeInfo, eventOccurredAtIso)
+      : eventOccurredAtIso
 
     const churnReason = getChurnReason(lockedStripeInfo, transactionUpdateData)
     const revenueChurnReason = getRevenueChurnReason(lockedStripeInfo, transactionUpdateData, movement)
@@ -1240,10 +1267,11 @@ async function createdOrUpdated(
   currentStripeInfo: StripeInfoRow | null | undefined,
   eventOccurredAtIso: string,
   originalStatus?: StripeWebhookStatus | null,
+  options?: StripeWebhookPersistOptions,
 ): Promise<Response | void> {
   const status = originalStatus ?? stripeData.data.status
   let statusName: string = status ?? ''
-  if (isStaleStripeEvent(currentStripeInfo, eventOccurredAtIso)) {
+  if (!options?.allowOutOfOrderPaymentConfirmation && isStaleStripeEvent(currentStripeInfo, eventOccurredAtIso)) {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'Skipping stale Stripe subscription event',
@@ -1285,6 +1313,7 @@ async function createdOrUpdated(
       updateData,
       eventOccurredAtIso,
       revenueMovement,
+      options,
     )
     if (didPersist === 'duplicate') {
       cloudlog({
@@ -1646,21 +1675,6 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     const handledAutoTopUp = await handleAutoTopUpPaymentIntent(c, stripeEvent, org.id)
     if (handledAutoTopUp)
       return c.json(BRES)
-
-    const paymentIntent = stripeEvent.data.object as Stripe.PaymentIntent
-    if (paymentIntent.status !== 'succeeded')
-      return c.json(BRES)
-
-    if (customer.price_id && customer.product_id) {
-      stripeData.data.status = 'succeeded'
-      stripeData.data.price_id = customer.price_id
-      stripeData.data.product_id = customer.product_id
-      stripeData.data.subscription_id = customer.subscription_id ?? undefined
-      const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
-      const createdOrUpdatedResponse = await createdOrUpdated(c, stripeData, org, customer, eventOccurredAtIso, 'succeeded')
-      if (createdOrUpdatedResponse)
-        return createdOrUpdatedResponse
-    }
     return c.json(BRES)
   }
 
@@ -1669,10 +1683,21 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     if (!invoice.status || invoice.status !== 'paid')
       return c.json(BRES)
 
+    if (!shouldApplyInvoiceToStoredSubscription(customer.subscription_id, stripeData.data.subscription_id))
+      return c.json(BRES)
+
     if (stripeData.data.price_id && stripeData.data.product_id) {
       const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
       stripeData.data.status = 'succeeded'
-      const createdOrUpdatedResponse = await createdOrUpdated(c, stripeData, org, customer, eventOccurredAtIso, 'succeeded')
+      const createdOrUpdatedResponse = await createdOrUpdated(
+        c,
+        stripeData,
+        org,
+        customer,
+        eventOccurredAtIso,
+        'succeeded',
+        { allowOutOfOrderPaymentConfirmation: true },
+      )
       if (createdOrUpdatedResponse)
         return createdOrUpdatedResponse
     }
@@ -1712,7 +1737,17 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     return c.json(BRES)
   }
 
-  if (stripeEvent.type === 'payment_intent.payment_failed' || stripeEvent.type === 'invoice.payment_failed') {
+  if (stripeEvent.type === 'payment_intent.payment_failed')
+    return c.json(BRES)
+
+  if (stripeEvent.type === 'invoice.payment_failed') {
+    const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
+    if (isStaleStripeEvent(customer, eventOccurredAtIso))
+      return c.json(BRES)
+
+    if (!shouldApplyInvoiceToStoredSubscription(customer.subscription_id, stripeData.data.subscription_id))
+      return c.json(BRES)
+
     if (await orgHasActiveUsageCredits(c, org.id)) {
       cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment email because org has active usage credits', orgId: org.id })
     }
@@ -1848,6 +1883,7 @@ export const stripeEventTestUtils = {
   getMovementPlanBreakdown,
   getPaidAtUpdate,
   resolveSubscriptionPersistedStatus,
+  shouldApplyInvoiceToStoredSubscription,
   mergeStripeWebhookExtractIntoStripeInfoState,
   hasStripePaidAccess,
   getPlanChangeTrackingEventName,
