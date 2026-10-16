@@ -106,6 +106,27 @@ describe('native Apple login page', () => {
     expect(mocks.getClaims).toHaveBeenCalledOnce()
   })
 
+  it.each(['rejected', 'network'])('reports failed website-entry Apple starts (%s) and continues saved-session bootstrap', async (failure) => {
+    mocks.available = false
+    mocks.fullPath = '/login?apple_oauth=1'
+    vi.stubEnv('VITE_WEB_APPLE_LOGIN_ENABLED', 'true')
+    vi.stubGlobal('location', { origin: 'https://localhost:5173', protocol: 'https:', href: 'https://localhost:5173/login?apple_oauth=1', assign: mocks.assign })
+    vi.stubGlobal('history', { replaceState: vi.fn() })
+    if (failure === 'network')
+      vi.mocked(fetch).mockRejectedValue(new Error('Network unavailable'))
+    else
+      vi.mocked(fetch).mockResolvedValue(Response.json({ error: 'apple_unavailable' }, { status: 503 }))
+
+    const root = await mount()
+
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(mocks.error).toHaveBeenCalledWith(messages['apple-login-failed']))
+    expect(mocks.getClaims).toHaveBeenCalledOnce()
+    expect((root.querySelector('[data-test="apple-sign-in"]') as HTMLButtonElement).disabled).toBe(false)
+    expect(mocks.assign).not.toHaveBeenCalled()
+    expect(mocks.setSession).not.toHaveBeenCalled()
+  })
+
   it.each([false, true])('warns only for a real profile save failure (%s), not an unavailable optional name', async (profileSaveFailed) => {
     mocks.signIn.mockResolvedValue({ user: { id: 'apple-user', email: 'apple@example.com' }, nameUnavailable: true, profileSaveFailed })
     const root = await mount()

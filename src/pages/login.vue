@@ -775,8 +775,14 @@ async function handleAppleOAuthLanding(parsedUrl: URL) {
     parsedUrl.searchParams.delete('apple_oauth')
     parsedUrl.searchParams.delete('apple_website_state')
     globalThis.history.replaceState({}, '', parsedUrl)
-    await startAppleOAuth(entry)
-    return true
+    try {
+      await startAppleOAuth(entry)
+      return true
+    }
+    catch {
+      toast.error(t('apple-login-failed'))
+      return false
+    }
   }
   captureAppleOAuthCallback(parsedUrl)
   if (hasPendingAppleOAuth()) {
