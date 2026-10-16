@@ -190,6 +190,15 @@ function writeStoredRegistration(registration: StoredNotificationRegistration) {
   }
 }
 
+function clearStoredRegistration(appId: string) {
+  try {
+    getLocalStorage()?.removeItem(registrationStorageKey(appId))
+  }
+  catch {
+    // Best effort cache cleanup.
+  }
+}
+
 function readStoredBadgeState(appId: string): StoredBadgeState | undefined {
   const storage = getLocalStorage()
   if (!storage)
@@ -542,7 +551,7 @@ async function registerToken(options: CapgoNotificationRegisterOptions, token: C
     pushToken: token.value,
     platform,
     locale: navigator.language || '',
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+    timezone: new Intl.DateTimeFormat().resolvedOptions().timeZone || '',
     appVersion: options.appVersion || appInfo.version || '',
     pluginVersion: PLUGIN_VERSION,
     identityProof,
@@ -975,6 +984,44 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
     await ensureBridgeListeners()
     const token = state.token || await requestToken()
     return registerToken(options, token)
+  },
+
+  async unregister() {
+    const appId = state.config?.appId
+    const registration = hydrateStoredRegistration(appId)
+    const externalId = registration?.externalId || state.externalId
+    const identityProof = registration?.identityProof || state.identityProof
+    const pushToken = state.token?.value || registration?.token
+    // Clear identity first so a late native token event cannot re-register the
+    // previous user while the deactivation request is in flight.
+    state.externalId = undefined
+    state.identityProof = undefined
+    state.lastRegistration = undefined
+    state.token = undefined
+    if (appId)
+      clearStoredRegistration(appId)
+    try {
+      if (appId && externalId && identityProof && pushToken) {
+        const platform = assertNativePlatform()
+        await postJson(getServerUrl(), '/notifications/register', {
+          appId,
+          externalId,
+          nativeInstallId: await getInstallId(),
+          pushToken,
+          platform,
+          identityProof,
+          permission: await getPermissionState().catch(() => registration?.permission),
+          badge: state.badge,
+          badgeRevision: state.badgeRevision,
+          pluginVersion: PLUGIN_VERSION,
+          active: false,
+          consent: false,
+        })
+      }
+    }
+    finally {
+      await NativeCapgoNotifications.unregisterPush().catch(() => undefined)
+    }
   },
 
   async setExternalId(externalId, identityProof) {

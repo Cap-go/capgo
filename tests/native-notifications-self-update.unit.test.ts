@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   configure: vi.fn(async () => {}),
   enableUpdaterIntegration: vi.fn(async () => {}),
   register: vi.fn(async () => ({})),
+  unregister: vi.fn(async () => {}),
   runUpdateCheck: vi.fn(async () => ({ status: 'installed', version: '1.2.3' })),
   invokeCapgoApi: vi.fn(),
 }))
@@ -28,13 +29,14 @@ vi.mock('@capgo/capacitor-notifications', () => ({
     configure: mocks.configure,
     enableUpdaterIntegration: mocks.enableUpdaterIntegration,
     register: mocks.register,
+    unregister: mocks.unregister,
     runUpdateCheck: mocks.runUpdateCheck,
   },
 }))
 vi.mock('~/services/capgoApi', () => ({ invokeCapgoApi: mocks.invokeCapgoApi }))
 vi.mock('~/services/supabase', () => ({ defaultApiHost: 'https://api.capgo.app' }))
 
-const { registerNativeNotifications, resolveUpdateInstallMode, setupNativeNotifications } = await import('../src/services/nativeNotifications.ts')
+const { registerNativeNotifications, resolveUpdateInstallMode, setupNativeNotifications, unregisterNativeNotifications } = await import('../src/services/nativeNotifications.ts')
 
 async function pushBackground(data: Record<string, unknown>) {
   const finish = vi.fn(async () => {})
@@ -48,6 +50,7 @@ describe('capgo app native notifications', () => {
     mocks.appState.isActive = false
     mocks.runUpdateCheck.mockClear()
     mocks.register.mockClear()
+    mocks.unregister.mockClear()
     mocks.invokeCapgoApi.mockReset()
     await setupNativeNotifications()
   })
@@ -106,6 +109,39 @@ describe('capgo app native notifications', () => {
   it('does not register when the proof belongs to another user', async () => {
     mocks.invokeCapgoApi.mockResolvedValueOnce({ data: { appId: 'ee.forgr.capacitor_go', externalId: 'someone-else', identityProof: 'proof' }, error: null })
     await registerNativeNotifications('user-2')
+    expect(mocks.register).not.toHaveBeenCalled()
+  })
+
+  it('unregisters the device on sign-out so the previous user stops receiving pushes', async () => {
+    mocks.invokeCapgoApi.mockResolvedValueOnce({ data: { appId: 'ee.forgr.capacitor_go', externalId: 'user-3', identityProof: 'proof' }, error: null })
+    await registerNativeNotifications('user-3')
+    await unregisterNativeNotifications()
+    expect(mocks.unregister).toHaveBeenCalledTimes(1)
+
+    // The registration guard is cleared, so the same user can register again.
+    mocks.invokeCapgoApi.mockResolvedValueOnce({ data: { appId: 'ee.forgr.capacitor_go', externalId: 'user-3', identityProof: 'proof' }, error: null })
+    await registerNativeNotifications('user-3')
+    expect(mocks.register).toHaveBeenCalledTimes(2)
+    await unregisterNativeNotifications()
+  })
+
+  it('skips unregister when nothing was registered unless forced', async () => {
+    await unregisterNativeNotifications()
+    expect(mocks.unregister).not.toHaveBeenCalled()
+    await unregisterNativeNotifications(true)
+    expect(mocks.unregister).toHaveBeenCalledTimes(1)
+  })
+
+  it('undoes a registration that finishes after sign-out', async () => {
+    let releaseProof!: () => void
+    mocks.invokeCapgoApi.mockImplementationOnce(() => new Promise((resolve) => {
+      releaseProof = () => resolve({ data: { appId: 'ee.forgr.capacitor_go', externalId: 'user-4', identityProof: 'proof' }, error: null })
+    }))
+    const pending = registerNativeNotifications('user-4')
+    await vi.waitFor(() => expect(releaseProof).toBeDefined())
+    await unregisterNativeNotifications()
+    releaseProof()
+    await pending
     expect(mocks.register).not.toHaveBeenCalled()
   })
 

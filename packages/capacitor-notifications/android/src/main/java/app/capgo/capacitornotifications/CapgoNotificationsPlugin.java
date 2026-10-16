@@ -26,6 +26,7 @@ import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
+import com.google.firebase.FirebaseApp;
 import com.google.firebase.messaging.CommonNotificationBuilder;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.NotificationParams;
@@ -132,6 +133,11 @@ public class CapgoNotificationsPlugin extends Plugin {
 
     @PluginMethod
     public void registerPush(PluginCall call) {
+        if (!isFirebaseConfigured()) {
+            sendError("Firebase is not configured; add google-services.json to enable Android push");
+            call.reject("Firebase is not configured; add google-services.json to enable Android push", "FIREBASE_NOT_CONFIGURED");
+            return;
+        }
         FirebaseMessaging.getInstance().setAutoInitEnabled(true);
         FirebaseMessaging.getInstance()
             .getToken()
@@ -147,9 +153,24 @@ public class CapgoNotificationsPlugin extends Plugin {
 
     @PluginMethod
     public void unregisterPush(PluginCall call) {
+        if (!isFirebaseConfigured()) {
+            call.resolve();
+            return;
+        }
         FirebaseMessaging.getInstance().setAutoInitEnabled(false);
         FirebaseMessaging.getInstance().deleteToken();
         call.resolve();
+    }
+
+    private boolean isFirebaseConfigured() {
+        try {
+            if (!FirebaseApp.getApps(getContext()).isEmpty()) {
+                return true;
+            }
+            return FirebaseApp.initializeApp(getContext()) != null;
+        } catch (IllegalStateException e) {
+            return false;
+        }
     }
 
     @PluginMethod

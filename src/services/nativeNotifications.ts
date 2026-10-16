@@ -16,6 +16,8 @@ const UPDATE_CHECK_ACTIONS = new Set(['update_check', 'capgo_update_check'])
 let setupPromise: Promise<string | null> | null = null
 let registeredUserId: string | null = null
 let registeringUserId: string | null = null
+// Bumped on sign-out so an in-flight registration for the previous user is discarded.
+let registrationGeneration = 0
 
 function getStringData(data: Record<string, unknown> | undefined, ...keys: string[]) {
   for (const key of keys) {
@@ -123,14 +125,17 @@ export async function registerNativeNotifications(userId: string) {
   if (!Capacitor.isNativePlatform() || registeredUserId === userId || registeringUserId === userId)
     return
   registeringUserId = userId
+  const generation = registrationGeneration
   try {
     const appId = await setupNativeNotifications()
-    if (!appId)
+    if (!appId || generation !== registrationGeneration)
       return
     const { data, error } = await invokeCapgoApi<SelfProofResponse>('private/notification_self_proof', {
       method: 'POST',
       body: { appId },
     })
+    if (generation !== registrationGeneration)
+      return
     if (error || !data?.identityProof || data.externalId !== userId)
       throw error ?? new Error('Missing notification identity proof')
     await CapgoNotifications.register({
@@ -140,6 +145,11 @@ export async function registerNativeNotifications(userId: string) {
       identityProof: data.identityProof,
       consent: true,
     })
+    if (generation !== registrationGeneration) {
+      // Signed out while registering: undo the registration that just landed.
+      await CapgoNotifications.unregister()
+      return
+    }
     registeredUserId = userId
   }
   catch (error) {
@@ -148,5 +158,24 @@ export async function registerNativeNotifications(userId: string) {
   finally {
     if (registeringUserId === userId)
       registeringUserId = null
+  }
+}
+
+/** Stop pushes for the signed-out user: deactivate the server registration and forget the local identity. */
+export async function unregisterNativeNotifications(force = false) {
+  if (!Capacitor.isNativePlatform())
+    return
+  registrationGeneration++
+  const hadRegistration = registeredUserId !== null || registeringUserId !== null
+  registeredUserId = null
+  registeringUserId = null
+  if (!hadRegistration && !force)
+    return
+  try {
+    await setupNativeNotifications()
+    await CapgoNotifications.unregister()
+  }
+  catch (error) {
+    console.warn('Capgo notifications unregister failed', error)
   }
 }

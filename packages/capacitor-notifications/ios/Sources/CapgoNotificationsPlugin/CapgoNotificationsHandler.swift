@@ -3,6 +3,9 @@ import UIKit
 import UserNotifications
 public class CapgoNotificationsHandler: NSObject, NotificationHandlerProtocol {
     public weak var plugin: CAPPlugin?
+    /// Capacitor routes pushes to a single handler. When another push plugin (for example
+    /// @capacitor/push-notifications) also claims it, keep it here and forward to it.
+    public weak var forwardHandler: NotificationHandlerProtocol?
 
     private let backgroundCompletionQueue = DispatchQueue(label: "app.capgo.notifications.backgroundCompletion")
     private var backgroundCompletions: [String: (UIBackgroundFetchResult) -> Void] = [:]
@@ -35,6 +38,7 @@ public class CapgoNotificationsHandler: NSObject, NotificationHandlerProtocol {
     }
 
     public func willPresent(notification: UNNotification) -> UNNotificationPresentationOptions {
+        _ = forwardHandler?.willPresent(notification: notification)
         let notificationData = makeNotificationRequestJSObject(notification.request)
         self.plugin?.notifyListeners("notificationReceived", data: notificationData, retainUntilConsumed: true)
 
@@ -64,6 +68,7 @@ public class CapgoNotificationsHandler: NSObject, NotificationHandlerProtocol {
     }
 
     public func didReceive(response: UNNotificationResponse) {
+        forwardHandler?.didReceive(response: response)
         var data = JSObject()
         let originalNotificationRequest = response.notification.request
         let actionId = response.actionIdentifier

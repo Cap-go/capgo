@@ -46,7 +46,8 @@ public class CapgoNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private static let pendingLock = NSLock()
     private static weak var loadedInstance: CapgoNotificationsPlugin?
-    private static var pendingRemoteNotifications: [([AnyHashable: Any], ((UIBackgroundFetchResult) -> Void)?)] = []
+    private static var pendingRemoteNotifications: [(id: UUID, userInfo: [AnyHashable: Any], completion: ((UIBackgroundFetchResult) -> Void)?)] = []
+    private static let pendingCompletionTimeout: TimeInterval = 25.0
 
     /// Forward `application(_:didReceiveRemoteNotification:fetchCompletionHandler:)` here.
     /// Unlike the NotificationCenter forward, pushes that arrive before the bridge has
@@ -54,8 +55,24 @@ public class CapgoNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
     public static func didReceiveRemoteNotification(_ userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: ((UIBackgroundFetchResult) -> Void)? = nil) {
         pendingLock.lock()
         guard let instance = loadedInstance else {
-            pendingRemoteNotifications.append((userInfo, completionHandler))
+            let id = UUID()
+            pendingRemoteNotifications.append((id: id, userInfo: userInfo, completion: completionHandler))
             pendingLock.unlock()
+            // iOS throttles silent pushes when the fetch handler is never called. If the
+            // bridge does not load this plugin in time, finish the wake-up and keep the
+            // payload so load() still delivers it.
+            if completionHandler != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + pendingCompletionTimeout) {
+                    pendingLock.lock()
+                    var expired: ((UIBackgroundFetchResult) -> Void)?
+                    if let index = pendingRemoteNotifications.firstIndex(where: { $0.id == id }) {
+                        expired = pendingRemoteNotifications[index].completion
+                        pendingRemoteNotifications[index].completion = nil
+                    }
+                    pendingLock.unlock()
+                    expired?(.noData)
+                }
+            }
             return
         }
         pendingLock.unlock()
@@ -65,8 +82,13 @@ public class CapgoNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     override public func load() {
-        self.bridge?.notificationRouter.pushNotificationHandler = self.notificationDelegateHandler
         self.notificationDelegateHandler.plugin = self
+        self.claimPushNotificationHandler()
+        // Plugins load in no fixed order: claim again once the bridge has loaded the
+        // rest, keeping any other push plugin as a forward target instead of losing it.
+        DispatchQueue.main.async { [weak self] in
+            self?.claimPushNotificationHandler()
+        }
 
         NotificationCenter.default.addObserver(self,
                                                selector: #selector(self.didRegisterForRemoteNotificationsWithDeviceToken(notification:)),
@@ -90,8 +112,8 @@ public class CapgoNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
         CapgoNotificationsPlugin.pendingLock.unlock()
         // Let the bridge finish loading the remaining plugins (the updater) first.
         DispatchQueue.main.async {
-            pending.forEach { userInfo, completionHandler in
-                self.notificationDelegateHandler.handleRemoteNotification(userInfo, completionHandler: completionHandler)
+            pending.forEach { entry in
+                self.notificationDelegateHandler.handleRemoteNotification(entry.userInfo, completionHandler: entry.completion)
             }
         }
     }
@@ -126,6 +148,16 @@ public class CapgoNotificationsPlugin: CAPPlugin, CAPBridgedPlugin {
             DispatchQueue.main.sync(execute: invoke)
         }
         return status
+    }
+
+    private func claimPushNotificationHandler() {
+        guard let router = self.bridge?.notificationRouter else { return }
+        if let current = router.pushNotificationHandler, current !== self.notificationDelegateHandler {
+            self.notificationDelegateHandler.forwardHandler = current
+        }
+        if router.pushNotificationHandler !== self.notificationDelegateHandler {
+            router.pushNotificationHandler = self.notificationDelegateHandler
+        }
     }
 
     deinit {

@@ -1,7 +1,7 @@
 import type { UserModule } from '~/types'
 import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
-import { registerNativeNotifications, setupNativeNotifications } from '~/services/nativeNotifications'
+import { registerNativeNotifications, setupNativeNotifications, unregisterNativeNotifications } from '~/services/nativeNotifications'
 import { isSpoofed, useSupabase } from '~/services/supabase'
 
 export const install: UserModule = () => {
@@ -23,10 +23,16 @@ export const install: UserModule = () => {
       void registerWhenActive()
   })
 
-  useSupabase().auth.onAuthStateChange((_event, session) => {
+  useSupabase().auth.onAuthStateChange((event, session) => {
     // Never bind an admin's device to the customer they are logged in as.
+    const previousUserId = userId
     userId = session?.user?.id && !isSpoofed() ? session.user.id : null
     // Defer: calling Supabase from inside this callback can deadlock the auth lock.
-    setTimeout(() => void registerWhenActive(), 0)
+    setTimeout(() => {
+      if (event === 'SIGNED_OUT' || (previousUserId && previousUserId !== userId))
+        void unregisterNativeNotifications(event === 'SIGNED_OUT').then(() => registerWhenActive())
+      else
+        void registerWhenActive()
+    }, 0)
   })
 }
