@@ -2,8 +2,9 @@ import type { SemVer } from '@std/semver'
 import type { Context } from 'hono'
 import type { ManifestEntry } from './downloadUrl.ts'
 import type { MiddlewareKeyVariables } from './hono.ts'
+import type { LazyPgClient } from './pg.ts'
 import type { Database } from './supabase.types.ts'
-import type { AppInfos } from './types.ts'
+import type { AppInfos, VersionUsageChannel } from './types.ts'
 import {
   greaterOrEqual,
   greaterThan,
@@ -19,7 +20,7 @@ import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrgCached } from './notifications.ts'
 import { sendNotifToOrgMembersCached } from './org_email_notifications.ts'
-import { closeClient, createLazyPgClient, getAppBlockProviderInfraRequestsPostgres, getAppOwnerPostgres, getDatabaseURL, getDrizzleClient, getLazyPgQueryCount, getPgClient, refreshReplicationLag, requestInfosChannelDevicePostgres, requestInfosChannelPostgres, requestInfosPostgres, requestManifestEntriesPostgres, setReplicationLagHeader } from './pg.ts'
+import { closeClient, createLazyPgClient, getAppBlockProviderInfraRequestsPostgres, getAppOwnerPostgres, getDatabaseURL, getDrizzleClient, getLazyPgQueryCount, getPgClient, refreshReplicationLag, requestInfosChannelDevicePostgres, requestInfosChannelPostgres, requestInfosPostgres, requestManifestEntriesPostgres, setReplicationLagHeader, withReadOnlyPgTransientRetry } from './pg.ts'
 import { usesCurrentEncryptionKeyIdFormat } from './plugin_compatibility.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './plugin_stats.ts'
@@ -28,10 +29,76 @@ import { getClientIP } from './rate_limit.ts'
 import { onPremiseAppResponse } from './rateLimitInfo.ts'
 import { s3 } from './s3.ts'
 import { shouldQueuePluginNotifications } from './supabase_write_guard.ts'
+import { getUpdateResponseKind, resToVersion, updateResponseSupportsManifest } from './update_response.ts'
 import { isUpdateEnumerationLimited, recordUpdateEnumerationMiss, updateEnumerationLimitedResponse } from './updateOracleGuard.ts'
 import { canServeUpToDateFromCache, getUpdateReadCache, setUpdateReadCache } from './updateReadCache.ts'
 import { getCachedDefaultChannel, shouldUseUpdatesEdgeCache } from './updatesEdgeCache.ts'
-import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName, isVersionDeleted } from './utils.ts'
+import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName, isVersionDeleted } from './utils.ts'
+
+export { getUpdateResponseKind, resToVersion, type UpdateResponseKind } from './update_response.ts'
+
+const updatesMauRecordedByRequest = new WeakMap<object, boolean>()
+const updatesMauInFlightByRequest = new WeakMap<object, Promise<void>>()
+
+export async function recordUpdatesMauOnce(
+  c: Context,
+  deviceId: string,
+  appId: string,
+  ownerOrg: string,
+  platform: string,
+  versionBuild?: string | null,
+) {
+  const requestKey = c.req.raw
+  if (updatesMauRecordedByRequest.get(requestKey))
+    return
+  const inFlight = updatesMauInFlightByRequest.get(requestKey)
+  if (inFlight)
+    return inFlight
+
+  // On workerd, backgroundTask schedules the MAU write with waitUntil and returns
+  // before the insert finishes; the recorded flag is set when dispatch succeeds.
+  const tracked = Promise.resolve(backgroundTask(c, createStatsMau(c, deviceId, appId, ownerOrg, platform, versionBuild)))
+    .then(() => {
+      updatesMauRecordedByRequest.set(requestKey, true)
+    })
+    .finally(() => {
+      updatesMauInFlightByRequest.delete(requestKey)
+    })
+
+  updatesMauInFlightByRequest.set(requestKey, tracked)
+  return tracked
+}
+
+const updatesVersionGetStatsVersionRecordedByRequest = new WeakMap<object, boolean>()
+const updatesVersionGetStatsDeviceRecordedByRequest = new WeakMap<object, boolean>()
+
+/** Dedupe version `get` stats when a connection retry replays updateWithPG. */
+export async function recordUpdatesVersionGetStatsOnce(
+  c: Context,
+  device: ReturnType<typeof makeDevice>,
+  versionName: string,
+  appId: string,
+  channel: VersionUsageChannel,
+) {
+  const requestKey = c.req.raw
+  const versionRecorded = updatesVersionGetStatsVersionRecordedByRequest.get(requestKey)
+  const deviceRecorded = updatesVersionGetStatsDeviceRecordedByRequest.get(requestKey)
+  if (versionRecorded && deviceRecorded)
+    return
+
+  const tasks: Promise<void>[] = []
+  if (!versionRecorded) {
+    tasks.push(createStatsVersion(c, versionName, appId, 'get', channel).then(() => {
+      updatesVersionGetStatsVersionRecordedByRequest.set(requestKey, true)
+    }))
+  }
+  if (!deviceRecorded) {
+    tasks.push(sendStatsAndDevice(c, device, [{ action: 'get', versionName }]).then(() => {
+      updatesVersionGetStatsDeviceRecordedByRequest.set(requestKey, true)
+    }))
+  }
+  await Promise.all(tasks)
+}
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
 // Bound speculative channel prefetch wait so a hung second Hyperdrive client
@@ -124,40 +191,6 @@ function getInvalidIpInfo(): Promise<(ip: string, context?: Context) => Promise<
   return loadInvalidIpInfo
 }
 
-export type UpdateResponseKind = 'up_to_date' | 'blocked' | 'failed'
-
-const UPDATE_UP_TO_DATE_CODES = new Set([
-  'no_new_version_available',
-  'already_on_builtin',
-  'channel_paused',
-])
-
-const UPDATE_BLOCKED_CODES = new Set([
-  'cannot_update_via_private_channel',
-  'disabled_platform_ios',
-  'disabled_platform_android',
-  'disabled_platform_electron',
-  'disable_auto_update_to_major',
-  'disable_auto_update_to_minor',
-  'disable_auto_update_to_patch',
-  'disable_auto_update_to_metadata',
-  'disable_auto_update_under_native',
-  'disable_prod_build',
-  'disable_dev_build',
-  'disable_device',
-  'disable_emulator',
-  'key_id_mismatch',
-  'provider_infrastructure_request_blocked',
-])
-
-export function getUpdateResponseKind(errorCode: string): UpdateResponseKind {
-  if (UPDATE_UP_TO_DATE_CODES.has(errorCode))
-    return 'up_to_date'
-  if (UPDATE_BLOCKED_CODES.has(errorCode))
-    return 'blocked'
-  return 'failed'
-}
-
 function updateError200(c: Context, errorCode: string, message: string, moreInfo: Record<string, unknown> = {}) {
   return simpleError200(c, errorCode, message, {
     ...moreInfo,
@@ -212,33 +245,6 @@ async function providerInfrastructureColdCacheBlockResponse(c: Context, appId: s
   return providerInfrastructureBlockedResponse(c, providerInfo.requestIp, providerInfo.providerInfo)
 }
 
-interface ResponseFeatureSupport {
-  manifest: boolean
-  metadata: boolean
-}
-
-const RESPONSE_FEATURE_SUPPORT_CACHE_MAX = 256
-const responseFeatureSupportCache = new Map<string, ResponseFeatureSupport>()
-
-function getResponseFeatureSupport(plugin_version: string): ResponseFeatureSupport {
-  const cached = responseFeatureSupportCache.get(plugin_version)
-  if (cached)
-    return cached
-
-  const pluginVersion = parse(plugin_version)
-  const support = {
-    manifest: !isDeprecatedPluginVersion(pluginVersion, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7),
-    metadata: !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0'),
-  }
-  if (responseFeatureSupportCache.size >= RESPONSE_FEATURE_SUPPORT_CACHE_MAX) {
-    const oldest = responseFeatureSupportCache.keys().next().value
-    if (oldest !== undefined)
-      responseFeatureSupportCache.delete(oldest)
-  }
-  responseFeatureSupportCache.set(plugin_version, support)
-  return support
-}
-
 export const CHANNEL_UPDATE_PACKAGE_VALUES = ['all', 'zip', 'delta', 'zip_from_builtin', 'delta_from_builtin'] as const
 export type ChannelUpdatePackage = typeof CHANNEL_UPDATE_PACKAGE_VALUES[number]
 export type ResolvedChannelUpdatePackage = 'all' | 'zip' | 'delta'
@@ -258,36 +264,6 @@ export function resolveChannelUpdatePackage(
   if (isOnBuiltin && mode === 'delta_from_builtin')
     return 'delta'
   return 'all'
-}
-
-export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
-  const support = getResponseFeatureSupport(plugin_version)
-  const res: {
-    version: string
-    url: string
-    session_key: string
-    checksum: string | null
-    manifest?: ManifestEntry[]
-    link?: string | null
-    comment?: string | null
-  } = {
-    version: version.name,
-    url: signedURL,
-    // session_key and checksum are always included since v4 is no longer supported
-    session_key: version.session_key ?? '',
-    checksum: version.checksum,
-  }
-  // manifest is supported in v5.10.0+, v6.25.0+, v7.0.35+, v8+
-  if (manifest.length > 0 && support.manifest)
-    res.manifest = manifest
-  // Include link and comment for plugin v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+ (only if expose_metadata is enabled and they have values)
-  if (expose_metadata && support.metadata) {
-    if (version.link)
-      res.link = version.link
-    if (version.comment)
-      res.comment = version.comment
-  }
-  return res
 }
 
 function hasChannelSelfStoreBinding(c: Context) {
@@ -310,6 +286,8 @@ export interface UpdatePathTiming {
   ownerCacheHit?: boolean
 }
 
+const UPDATES_OWNER_PG_OPTIONS = { rethrowReadOnlyConnectionErrors: true } as const
+
 async function getAppOwnerFromEdgeCache(
   c: Context,
   appId: string,
@@ -317,7 +295,7 @@ async function getAppOwnerFromEdgeCache(
   pathTiming?: UpdatePathTiming,
 ) {
   // A connect failure is rethrown (never classified as on-prem), see pluginEdgeCacheReads.ts.
-  const owner = await getAppOwnerWithEdgeCache(c, appId, drizzleClient, PLAN_LIMIT)
+  const owner = await getAppOwnerWithEdgeCache(c, appId, drizzleClient, PLAN_LIMIT, UPDATES_OWNER_PG_OPTIONS)
   if (pathTiming)
     pathTiming.ownerCacheHit = owner.hit
   return owner.value
@@ -387,7 +365,7 @@ export async function updateWithPG(
   const edgeCache = shouldUseUpdatesEdgeCache(c, app_id, device_id)
   const ownerPromise = edgeCache
     ? getAppOwnerFromEdgeCache(c, app_id, drizzleClient, pathTiming)
-    : getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
+    : getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT, UPDATES_OWNER_PG_OPTIONS)
   const channelPrefetchPromise = cachedStatus === 'cloud' && coerce
     ? (async () => {
         try {
@@ -516,7 +494,7 @@ export async function updateWithPG(
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient))
   }
-  await backgroundTask(c, createStatsMau(c, device_id, app_id, appOwner.owner_org, mauPlatformForCollection(platform, deviceDataCollection), mauVersionBuildForCollection(version_build, deviceDataCollection)))
+  await recordUpdatesMauOnce(c, device_id, app_id, appOwner.owner_org, mauPlatformForCollection(platform, deviceDataCollection), mauVersionBuildForCollection(version_build, deviceDataCollection))
 
   // Only query link/comment if plugin supports it (v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+) AND app has expose_metadata enabled
   const needsMetadata = appOwner.expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')
@@ -631,7 +609,7 @@ export async function updateWithPG(
     channelData.channels.update_package,
     isOnBuiltinVersion(version_name, version_build),
   )
-  const pluginSupportsManifest = getResponseFeatureSupport(plugin_version).manifest
+  const pluginSupportsManifest = updateResponseSupportsManifest(plugin_version)
   // External URLs and old plugins cannot consume delta manifests — keep a zip.
   const serveZip = updatePackage !== 'delta' || !pluginSupportsManifest || Boolean(version.external_url)
   const serveDelta = updatePackage !== 'zip' && pluginSupportsManifest && !version.external_url
@@ -959,10 +937,10 @@ export async function updateWithPG(
   // bundle is not installed yet; /stats `set` records it once the device switches.
   // Attribute the offer to the channel that served it so channel stats and
   // release views can scope `get` counts (install/fail already carry it).
-  await Promise.all([
-    createStatsVersion(c, version.name, app_id, 'get', { id: channelData.channels.id, name: channelData.channels.name }),
-    sendStatsAndDevice(c, device, [{ action: 'get', versionName: version.name }]),
-  ])
+  await recordUpdatesVersionGetStatsOnce(c, device, version.name, app_id, {
+    id: channelData.channels.id,
+    name: channelData.channels.name,
+  })
   if (requestInfosMs >= 50 || manifestFetchMs >= 50 || bundleUrlMs >= 50) {
     cloudlog({
       requestId: c.get('requestId'),
@@ -1033,41 +1011,43 @@ export async function update(c: Context, body: AppInfos) {
     return updateWithEdgeCache(c, body, appStatus, startUpdate, appStatusMs)
 
   const startPgClient = performance.now()
-  const pgClient = await getPgClient(c, true)
-  // Hyperdrive: includes await client.connect(). Pool: construction only (lazy connect later).
-  const pgClientMs = Math.round(performance.now() - startPgClient)
   const pathTiming: UpdatePathTiming = {}
-  try {
-    const startLag = performance.now()
-    await setReplicationLagHeader(c, pgClient)
-    const replicationLagMs = Math.round(performance.now() - startLag)
-
-    const drizzlePg = getDrizzleClient(pgClient, { logger: false })
-    // Use the active DB client only when needed
-    const response = await updateWithPG(c, body, drizzlePg, appStatus, pathTiming)
-    const totalMs = Math.round(performance.now() - startUpdate)
-    if (totalMs >= 100) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'plugin_path_timing',
-        path: 'updates',
-        outcome: 'total',
-        totalMs,
-        appStatusMs,
-        pgClientMs,
-        ownerMs: pathTiming.ownerMs ?? 0,
-        requestInfosMs: pathTiming.requestInfosMs ?? 0,
-        channelPrefetchHit: pathTiming.channelPrefetchHit ?? false,
-        replicationLagMs,
-        databaseSource: c.get('databaseSource') ?? c.res.headers.get('X-Database-Source') ?? null,
-        app_id: body.app_id,
-      })
+  let pgClientMs = 0
+  let replicationLagMs = 0
+  const response = await withReadOnlyPgTransientRetry(c, 'updates', async () => {
+    const pgClient = await getPgClient(c, true)
+    if (pgClientMs === 0)
+      pgClientMs = Math.round(performance.now() - startPgClient)
+    return {
+      pgClient,
+      drizzle: getDrizzleClient(pgClient, { logger: false }),
+      cleanup: () => closeClient(c, pgClient),
     }
-    return response
+  }, async (session) => {
+    const startLag = performance.now()
+    await setReplicationLagHeader(c, session.pgClient)
+    replicationLagMs = Math.round(performance.now() - startLag)
+    return updateWithPG(c, body, session.drizzle, appStatus, pathTiming)
+  })
+  const totalMs = Math.round(performance.now() - startUpdate)
+  if (totalMs >= 100) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'plugin_path_timing',
+      path: 'updates',
+      outcome: 'total',
+      totalMs,
+      appStatusMs,
+      pgClientMs,
+      ownerMs: pathTiming.ownerMs ?? 0,
+      requestInfosMs: pathTiming.requestInfosMs ?? 0,
+      channelPrefetchHit: pathTiming.channelPrefetchHit ?? false,
+      replicationLagMs,
+      databaseSource: c.get('databaseSource') ?? c.res.headers.get('X-Database-Source') ?? null,
+      app_id: body.app_id,
+    })
   }
-  finally {
-    await closeClient(c, pgClient)
-  }
+  return response
 }
 
 /**
@@ -1082,26 +1062,34 @@ async function updateWithEdgeCache(
   startUpdate: number,
   appStatusMs: number,
 ) {
-  const lazyClient = createLazyPgClient(c, true)
   const pathTiming: UpdatePathTiming = {}
+  let lazyClient!: LazyPgClient
   let closeInBackground = false
   try {
-    // Pick the replica now (no connection) so the lag lookup uses its cache
-    // key instead of "unknown"; the lazy client connects to the same source.
     try {
       getDatabaseURL(c, true)
     }
     catch {
       // No usable replica: the first query reports it.
     }
-    // Memory-only lag header: a cache hit must not trigger a background probe.
-    await setReplicationLagHeader(c, lazyClient.client, { probeOnMiss: false })
-    const drizzlePg = getDrizzleClient(lazyClient.client, { logger: false })
-    const response = await updateWithPG(c, body, drizzlePg, appStatus, pathTiming)
+
+    const response = await withReadOnlyPgTransientRetry(c, 'updates_edge_cache', async () => {
+      lazyClient = createLazyPgClient(c, true)
+      return {
+        pgClient: lazyClient.client,
+        drizzle: getDrizzleClient(lazyClient.client, { logger: false }),
+        keepOpenAfterSuccess: true,
+        cleanup: async () => {
+          await lazyClient.close()
+        },
+      }
+    }, async (session) => {
+      await setReplicationLagHeader(c, session.pgClient, { probeOnMiss: false })
+      return updateWithPG(c, body, session.drizzle, appStatus, pathTiming)
+    }) as Awaited<ReturnType<typeof updateWithPG>>
+
     const dbQueries = getLazyPgQueryCount(c)
-    if (lazyClient.isConnected()) {
-      // Probe lag only on requests that already use the database, and close
-      // the client after the probe (a Pool cannot run it once ended).
+    if (lazyClient?.isConnected()) {
       closeInBackground = true
       await backgroundTask(c, refreshReplicationLag(c, lazyClient.client).finally(() => lazyClient.close()))
     }
@@ -1132,7 +1120,7 @@ async function updateWithEdgeCache(
     return response
   }
   finally {
-    if (!closeInBackground)
+    if (lazyClient && !closeInBackground)
       await lazyClient.close()
   }
 }

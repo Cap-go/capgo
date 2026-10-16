@@ -177,15 +177,94 @@ jobs:
           gcloud auth activate-service-account --key-file="$credentials_file"
           bun scripts/sync-read-replica-schema.ts
 
+  # Build the web app while the backend deploys; only publishing waits for it.
+  build_webapp:
+    needs: changes
+    if: ${{ needs.changes.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    name: Build webapp
+    permissions:
+      contents: read
+    outputs:
+      native_build_needed: ${{ steps.release_check.outputs.native_build_needed }}
+      changelog: ${{ steps.changelog.outputs.result }}
+      changelog_from_tag: ${{ steps.changelog.outputs.from_tag }}
+      changelog_to_tag: ${{ steps.changelog.outputs.to_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.changes.outputs.deploy_sha }}
+          fetch-depth: 0
+          filter: blob:none
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Set environment variable
+        run: |
+          if [ "${{ needs.changes.outputs.is_alpha }}" = "true" ]; then
+            echo "ENV=dev" >> $GITHUB_ENV
+            echo "CHANNEL=dev" >> $GITHUB_ENV
+          else
+            echo "ENV=prod" >> $GITHUB_ENV
+            echo "CHANNEL=production" >> $GITHUB_ENV
+          fi
+      - parallel:
+          - name: Check if native build is required
+            id: release_check
+            env:
+              CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
+            run: |
+              set +e
+              bunx @capgo/cli@latest build needed --channel "${{ env.CHANNEL }}"
+              exit_code=$?
+              set -e
+              if [ "$exit_code" -eq 0 ]; then
+                echo "native_build_needed=false" >> "$GITHUB_OUTPUT"
+                echo "Release type: OTA"
+              elif [ "$exit_code" -eq 1 ]; then
+                echo "native_build_needed=true" >> "$GITHUB_OUTPUT"
+                echo "Release type: native"
+              else
+                echo "build needed check failed with exit code $exit_code"
+                exit "$exit_code"
+              fi
+          - name: Build
+            run: bun ${{ env.ENV == 'prod' && 'build' || 'build:dev' }}
+            env:
+              VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
+              VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
+          - name: Generate AI changelog
+            id: changelog
+            continue-on-error: true
+            env:
+              CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+              CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+            run: bun run changelog:ai
+      - name: Upload web build
+        uses: actions/upload-artifact@v6
+        with:
+          name: webapp-dist
+          path: dist
+          retention-days: 1
+          include-hidden-files: true
+
   deploy_webapp:
-    needs: [changes, supabase_deploy, read_replica_schema]
-    if: ${{ always() && needs.changes.result == 'success' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') && (needs.read_replica_schema.result == 'success' || needs.read_replica_schema.result == 'skipped') }}
+    needs: [changes, build_webapp, supabase_deploy, read_replica_schema]
+    if: ${{ always() && needs.changes.result == 'success' && needs.build_webapp.result == 'success' && (needs.supabase_deploy.result == 'success' || needs.supabase_deploy.result == 'skipped') && (needs.read_replica_schema.result == 'success' || needs.read_replica_schema.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
     outputs:
-      native_build_needed: ${{ steps.release_check.outputs.native_build_needed }}
+      native_build_needed: ${{ needs.build_webapp.outputs.native_build_needed }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -203,8 +282,14 @@ jobs:
       - name: Reject stale deployment retry
         if: ${{ github.run_attempt > 1 }}
         run: bun scripts/resolve-deploy-tag.ts --assert-current "${{ needs.changes.outputs.deploy_tag }}"
-      - name: Install dependencies
-        run: bun install
+      - parallel:
+          - name: Install dependencies
+            run: bun install
+          - name: Download web build
+            uses: actions/download-artifact@v6
+            with:
+              name: webapp-dist
+              path: dist
       - name: Set environment variable
         run: |
           if [ "${{ needs.changes.outputs.is_alpha }}" = "true" ]; then
@@ -214,46 +299,16 @@ jobs:
             echo "ENV=prod" >> $GITHUB_ENV
             echo "CHANNEL=production" >> $GITHUB_ENV
           fi
-      - name: Check if native build is required
-        id: release_check
-        env:
-          CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
-        run: |
-          set +e
-          bunx @capgo/cli@latest build needed --channel "${{ env.CHANNEL }}"
-          exit_code=$?
-          set -e
-          if [ "$exit_code" -eq 0 ]; then
-            echo "native_build_needed=false" >> "$GITHUB_OUTPUT"
-            echo "Release type: OTA"
-          elif [ "$exit_code" -eq 1 ]; then
-            echo "native_build_needed=true" >> "$GITHUB_OUTPUT"
-            echo "Release type: native"
-          else
-            echo "build needed check failed with exit code $exit_code"
-            exit "$exit_code"
-          fi
-      - name: Build
-        run: bun ${{ env.ENV == 'prod' && 'build:mobile' || 'build:dev:mobile' }}
-        env:
-          VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
-          VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}
-      - name: Generate AI changelog
-        id: changelog
-        continue-on-error: true
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: bun run changelog:ai
-      - name: Publish CF console
-        run: bun run deploy:cloudflare:console:${{ env.ENV }}
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Deploy OTA bundle to Capgo
-        run: bunx @capgo/cli@latest bundle upload --channel ${{ env.CHANNEL }} --delta
-        env:
-          CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
+      - parallel:
+          - name: Publish CF console
+            run: bun run deploy:cloudflare:console:${{ env.ENV }}
+            env:
+              CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+              CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          - name: Deploy OTA bundle to Capgo
+            run: bunx @capgo/cli@latest bundle upload --channel ${{ env.CHANNEL }} --delta
+            env:
+              CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
       - name: Create GitHub release
         id: create_release
         uses: softprops/action-gh-release@v2
@@ -261,11 +316,11 @@ jobs:
           body: |
             ## 🆕 Changelog
 
-            ${{ steps.changelog.outputs.result || '_Changelog was not generated automatically for this release._' }}
+            ${{ needs.build_webapp.outputs.changelog || '_Changelog was not generated automatically for this release._' }}
 
             ---
 
-            🔗 **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.from_tag || needs.changes.outputs.deploy_tag }}...${{ steps.changelog.outputs.to_tag || needs.changes.outputs.deploy_tag }}
+            🔗 **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ needs.build_webapp.outputs.changelog_from_tag || needs.changes.outputs.deploy_tag }}...${{ needs.build_webapp.outputs.changelog_to_tag || needs.changes.outputs.deploy_tag }}
           make_latest: true
           token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
           tag_name: ${{ needs.changes.outputs.deploy_tag }}
@@ -574,7 +629,7 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           BUILD_OUTPUT_UPLOAD_ENABLED: "true"
           BUILD_OUTPUT_RETENTION_SECONDS: "604800"
-        run: bunx @capgo/cli@latest build request --platform ios --path . --sync-ios-version --ai-analytics
+        run: bunx @capgo/cli@latest build request --platform ios --path . --sync-ios-version --xcode-version 27 --ai-analytics
 
   deploy_native_android:
     needs: [changes, supabase_deploy, deploy_webapp]
