@@ -1,6 +1,11 @@
 import type { InventoryConfig, RepairTask } from '../../supabase/functions/_backend/utils/r2_inventory.ts'
+import type { CleanupQueue } from './cleanup.ts'
+import type { CleanupConsumerEnv } from './cleanup_consumer.ts'
 import { Client } from 'pg'
 import { applyInventoryEvents, applyObservations, INVENTORY_CONFIG, normalizeEtag, parseInventoryEvent, readObservationSnapshot } from '../../supabase/functions/_backend/utils/r2_inventory.ts'
+import { CLEANUP_ACTIVATED, runCleanupProducer } from './cleanup.ts'
+import { consumeCleanupBatch } from './cleanup_consumer.ts'
+import { checkCleanupHealth } from './health.ts'
 
 interface RejectedInventoryMessage {
   kind: 'invalid_inventory_message'
@@ -12,17 +17,23 @@ interface RejectedInventoryMessage {
   body: unknown
 }
 
-export interface InventoryEnv {
+export interface InventoryEnv extends Omit<CleanupConsumerEnv, 'CLEANUP_DLQ'> {
+  CLEANUP_DLQ?: Queue<unknown>
   INVENTORY_BUCKET: string
+  HYPERDRIVE_R2_INVENTORY: Hyperdrive
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive
   ATTACHMENT_BUCKET: R2Bucket
   REPAIR_QUEUE: Queue<RepairTask>
   EVENT_DLQ: Queue<RejectedInventoryMessage>
   REPAIR_DLQ: Queue<RejectedInventoryMessage>
+  CLEANUP_QUEUE?: CleanupQueue
 }
 
 async function withDatabase<T>(env: InventoryEnv, operation: (db: Client) => Promise<T>): Promise<T> {
-  const db = new Client({ connectionString: env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString, connectionTimeoutMillis: 5000, query_timeout: 15000 })
+  const connectionString = env.HYPERDRIVE_R2_INVENTORY?.connectionString
+  if (!connectionString)
+    throw new Error('Missing HYPERDRIVE_R2_INVENTORY binding')
+  const db = new Client({ connectionString, connectionTimeoutMillis: 5000, query_timeout: 15000 })
   try {
     await db.connect()
     return await operation(db)
@@ -124,6 +135,12 @@ async function publishInvalidMessages(batch: MessageBatch<unknown>, invalid: { m
 }
 
 export async function consumeInventoryBatch(batch: MessageBatch<unknown>, env: InventoryEnv) {
+  // Dispatch outside the legacy catch/retryAll path: cleanup acknowledges each
+  // storage success before best-effort bookkeeping and must never retry it.
+  if (batch.queue === 'capgo-r2-inventory-prod-cleanup') {
+    await consumeCleanupBatch(batch, env as CleanupConsumerEnv)
+    return
+  }
   try {
     if (batch.queue.endsWith('-repair')) {
       const { valid, invalid } = parseMessages(batch.messages, body => parseRepairTask(body, env.INVENTORY_BUCKET))
@@ -179,4 +196,32 @@ export async function consumeInventoryBatch(batch: MessageBatch<unknown>, env: I
   }
 }
 
-export default { queue: consumeInventoryBatch }
+export async function scheduleInventoryCleanup(_controller: ScheduledController, env: InventoryEnv) {
+  if (!CLEANUP_ACTIVATED) {
+    console.log(JSON.stringify({ event: 'r2_cleanup_disabled', reason: 'Activation prerequisites require a separate reviewed change' }))
+    return
+  }
+  const queue = env.CLEANUP_QUEUE
+  if (env.INVENTORY_BUCKET !== 'capgo' || !queue)
+    throw new Error('Production cleanup bucket or queue binding missing')
+  const client = (connectionString: string) => new Client({ connectionString, connectionTimeoutMillis: 4000, query_timeout: 4000 })
+  const source = client(env.HYPERDRIVE_CAPGO_DIRECT_EU?.connectionString)
+  const inventory = client(env.HYPERDRIVE_R2_INVENTORY?.connectionString)
+  // Query/connection failures are reported by the health helper, without connection strings.
+  source.on('error', () => {})
+  inventory.on('error', () => {})
+  try {
+    const health = await checkCleanupHealth(source, inventory, env.INVENTORY_BUCKET)
+    console.log(JSON.stringify({ event: 'r2_cleanup_health', ...health }))
+    if (!health.healthy)
+      return
+    const retired = await runCleanupProducer(inventory, env.INVENTORY_BUCKET, queue, health)
+    console.log(JSON.stringify({ event: 'r2_cleanup_run', retired }))
+  }
+  finally {
+    void source.end().catch(() => {})
+    void inventory.end().catch(() => {})
+  }
+}
+
+export default { queue: consumeInventoryBatch, scheduled: scheduleInventoryCleanup }

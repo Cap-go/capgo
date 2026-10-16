@@ -1,0 +1,11 @@
+Hi {{ invited_first_name }} {{ invited_last_name }},
+
+{{ org_admin_name }} has invited you to join the "{{ org_name }}" organization on Capgo.app.
+
+To join Capgo and accept this invitation, click the link below:
+
+{{ invite_link }}
+
+This invitation is valid for seven days.
+
+If you did not expect this invitation, you can safely ignore this email.

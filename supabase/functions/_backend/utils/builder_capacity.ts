@@ -29,7 +29,7 @@ export async function recordBuilderCapacityIfChanged(
   source = 'sync',
 ): Promise<BuilderCapacityEvent | null> {
   const total = Math.max(0, Math.trunc(workersTotal))
-  const client = getPgClient(c)
+  const client = await getPgClient(c)
   try {
     await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock($1)', [CAPACITY_ADVISORY_LOCK_KEY])

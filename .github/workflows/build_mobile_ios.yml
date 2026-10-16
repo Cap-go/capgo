@@ -10,7 +10,7 @@ on:
       tag:
         description: "Tag to build (e.g., v1.0.0)"
         required: true
-      submit_to_review:
+      submit_to_store_review:
         description: "Submit the uploaded build for store review"
         type: boolean
         default: false
@@ -74,14 +74,16 @@ jobs:
           P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
           BUILD_OUTPUT_UPLOAD_ENABLED: "true"
           BUILD_OUTPUT_RETENTION_SECONDS: "604800"
-          SUBMIT_TO_REVIEW: ${{ github.event.inputs.submit_to_review }}
+          SUBMIT_TO_STORE_REVIEW: ${{ github.event.inputs.submit_to_store_review }}
           RELEASE_NOTES: ${{ github.event.inputs.release_notes }}
         run: |
-          review_args=()
-          if [ "$SUBMIT_TO_REVIEW" = "true" ]; then
-            review_args+=(--submit-to-store-review --ios-automatic-release)
+          submit_args=()
+          if [ "$SUBMIT_TO_STORE_REVIEW" = "true" ]; then
+            submit_args+=(--submit-to-store-review --ios-automatic-release)
           fi
           if [ -n "$RELEASE_NOTES" ]; then
-            review_args+=(--store-release-notes "$RELEASE_NOTES")
+            submit_args+=(--store-release-notes "$RELEASE_NOTES")
+          elif [ "$SUBMIT_TO_STORE_REVIEW" = "true" ]; then
+            submit_args+=(--store-release-notes "Bug fixes and performance improvements.")
           fi
-          bunx @capgo/cli@latest build request --platform ios --path . --sync-ios-version --ai-analytics "${review_args[@]}"
+          bunx @capgo/cli@latest build request --platform ios --path . --sync-ios-version --ai-analytics "${submit_args[@]}"

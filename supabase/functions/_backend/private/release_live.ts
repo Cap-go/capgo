@@ -433,7 +433,7 @@ async function readActivityCF(c: Context, appId: string, versionName: string, st
 }
 
 async function readActivitySB(c: Context, appId: string, versionName: string, startMs: number, endMs: number, bucketMinutes: number, channel: VersionUsageChannel) {
-  const db = getPgClient(c, true)
+  const db = await getPgClient(c, true)
   try {
     const start = new Date(startMs).toISOString()
     const end = new Date(endMs).toISOString()

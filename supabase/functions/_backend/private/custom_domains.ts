@@ -25,7 +25,7 @@ async function authorize(c: Context<MiddlewareKeyVariables>) {
 
 app.get('/:orgId', async (c) => {
   const orgId = await authorize(c)
-  const pool = getPgClient(c)
+  const pool = await getPgClient(c)
   try {
     const { rows } = await pool.query<{ provider_id: string | null }>('SELECT provider_id FROM public.org_custom_domains WHERE org_id = $1', [orgId])
     if (!rows[0])
@@ -48,7 +48,7 @@ app.post('/:orgId', async (c) => {
   if (!parsed.success)
     return quickError(400, 'invalid_hostname', 'Enter a hostname such as updates.example.com, without a URL or wildcard.')
   const config = customDomainConfig(c)
-  const pool = getPgClient(c)
+  const pool = await getPgClient(c)
   let createdId: string | undefined
   let createdRouteId: string | undefined
   try {
@@ -85,7 +85,7 @@ app.post('/:orgId', async (c) => {
 app.delete('/:orgId', async (c) => {
   // Allow cleanup after an Enterprise downgrade.
   const orgId = await authorize(c)
-  const pool = getPgClient(c)
+  const pool = await getPgClient(c)
   try {
     await withPgTransaction(pool, async (client) => {
       await client.query('SELECT id FROM public.orgs WHERE id = $1 FOR UPDATE', [orgId])

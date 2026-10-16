@@ -557,7 +557,7 @@ async function readBundleInstallStatsSB(
   versionFilter?: Set<string>,
   channel?: VersionUsageChannel,
 ) {
-  const db = getPgClient(c, true)
+  const db = await getPgClient(c, true)
   try {
     const versionNames = versionFilter ? [...versionFilter] : undefined
     const hasVersionFilter = Boolean(versionNames?.length)

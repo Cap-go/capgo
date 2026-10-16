@@ -4,7 +4,7 @@ vi.stubGlobal('EdgeRuntime', {})
 
 const mocks = vi.hoisted(() => ({
   closeClient: vi.fn(async () => undefined),
-  getAppByIdPg: vi.fn(),
+  getAppPlanStatePg: vi.fn(),
   getDrizzleClient: vi.fn(),
   getPgClient: vi.fn(() => ({ id: 'primary-client' })),
   checkPermissionPg: vi.fn(),
@@ -34,10 +34,14 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', async (importOriginal) => 
   return {
     ...actual,
     closeClient: mocks.closeClient,
-    getAppByIdPg: mocks.getAppByIdPg,
     getDrizzleClient: mocks.getDrizzleClient,
     getPgClient: mocks.getPgClient,
   }
+})
+
+vi.mock('../supabase/functions/_backend/utils/pg_files.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../supabase/functions/_backend/utils/pg_files.ts')>()
+  return { ...actual, getAppPlanStatePg: mocks.getAppPlanStatePg }
 })
 
 vi.mock('../supabase/functions/_backend/utils/rbac.ts', async (importOriginal) => {
@@ -98,9 +102,12 @@ describe('request_manifest_upload', () => {
       })),
     })
     mocks.checkPermissionPg.mockResolvedValue(true)
-    mocks.getAppByIdPg.mockResolvedValue({
-      owner_org: '00000000-0000-0000-0000-000000000001',
-      plan_valid: true,
+    mocks.getAppPlanStatePg.mockResolvedValue({
+      kind: 'ok',
+      value: {
+        owner_org: '00000000-0000-0000-0000-000000000001',
+        plan_valid: true,
+      },
     })
   })
 
@@ -172,15 +179,15 @@ describe('request_manifest_upload', () => {
     })
     const authorization = body.upload_targets[0].authorization
     expect(authorization.expires_at).toBeGreaterThanOrEqual(before + 599)
-    expect(authorization.expires_at).toBeLessThanOrEqual(before + 600)
+    expect(authorization.expires_at).toBeLessThanOrEqual(Math.floor(Date.now() / 1000) + 600)
     expect(authorization.token_prefix).toBe(`v1.2026-10-a.${authorization.expires_at}.123.0.`)
     expect(body.entries[0].s3_path_suffix).toMatch(/^[0-9a-f]{64}_index\.html$/)
-    expect(body.entries[0].upload_token).toMatch(/^[A-Za-z0-9_-]{43}$/)
+    expect(body.entries[0].upload_token).toMatch(/^[\w-]{43}$/)
 
     expect(mocks.getPgClient).toHaveBeenCalledTimes(1)
     expect(mocks.getPgClient).toHaveBeenCalledWith(expect.anything(), false)
     expect(mocks.checkPermissionPg).toHaveBeenCalledTimes(1)
-    expect(mocks.getAppByIdPg).toHaveBeenCalledTimes(1)
+    expect(mocks.getAppPlanStatePg).toHaveBeenCalledTimes(1)
     expect(mocks.closeClient).toHaveBeenCalledTimes(1)
   })
 
@@ -255,15 +262,54 @@ describe('request_manifest_upload', () => {
   })
 
   it('preserves the hosted-upload on-premise rejection contract', async () => {
-    mocks.getAppByIdPg.mockResolvedValue({
-      owner_org: '00000000-0000-0000-0000-000000000001',
-      plan_valid: false,
+    mocks.getAppPlanStatePg.mockResolvedValue({
+      kind: 'ok',
+      value: {
+        owner_org: '00000000-0000-0000-0000-000000000001',
+        plan_valid: false,
+      },
     })
     const response = await postRequest(validRequestBody())
 
     expect(response.status).toBe(429)
     await expect(response.json()).resolves.toMatchObject({ error: 'on_premise_app' })
     expect(response.headers.get('cache-control')).toMatch(/^public, max-age=/)
+  })
+
+  it('returns retryable database_unavailable when plan state lookup fails', async () => {
+    mocks.getAppPlanStatePg.mockResolvedValue({
+      kind: 'db_error',
+      error: new Error('Connection terminated unexpectedly'),
+    })
+    const response = await postRequest(validRequestBody())
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'database_unavailable',
+      moreInfo: { retryAfterSeconds: 2 },
+    })
+  })
+
+  it('keeps alerting upstream_unavailable when plan state lookup fails permanently', async () => {
+    mocks.getAppPlanStatePg.mockResolvedValue({
+      kind: 'db_error',
+      error: Object.assign(new Error('column "foo" does not exist'), { code: '42703' }),
+    })
+    const response = await postRequest(validRequestBody())
+
+    expect(response.status).toBe(503)
+    await expect(response.json()).resolves.toMatchObject({ error: 'upstream_unavailable' })
+  })
+
+  it('encodes leading-dot manifest file names in delta storage suffixes', async () => {
+    const body = validRequestBody()
+    body.entries[0]!.file_name = '.htaccess'
+    const response = await postRequest(body)
+    const payload = await response.json() as any
+
+    expect(response.status).toBe(200)
+    expect(payload.entries[0].s3_path_suffix).toMatch(/^[0-9a-f]{64}_%2Ehtaccess$/)
+    expect(payload.entries[0].s3_path_suffix).not.toContain('.htaccess')
   })
 
   it('fails closed when dedicated signing configuration is unavailable', async () => {

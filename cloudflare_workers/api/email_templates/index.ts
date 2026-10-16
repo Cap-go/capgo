@@ -21,6 +21,7 @@ import reauthentication from './reauthentication.html'
 import reauthenticationText from './reauthentication.txt'
 import recovery from './recovery.html'
 import recoveryText from './recovery.txt'
+import { renderEmailTemplate } from './render.ts'
 import signup from './signup.html'
 import signupText from './signup.txt'
 
@@ -71,30 +72,6 @@ export function selectAuthEmailTemplate(action: AuthEmailAction, redirectTo: str
   return action
 }
 
-function render(source: string, details: AuthEmailTemplateDetails, escape: (value: string) => string): string {
-  return source.replace(/\{\{\s*([a-z_]+)\s*\}\}/g, (_match, key: keyof AuthEmailTemplateDetails) => {
-    const value = details[key]
-    if (!value)
-      throw new Error(`Missing auth email template value: ${key}`)
-    return escape(value)
-  })
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, char => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    '\'': '&#39;',
-  })[char] ?? char)
-}
-
 export function renderAuthEmail(action: AuthEmailTemplate, details: AuthEmailTemplateDetails) {
-  const template = templates[action]
-  return {
-    subject: template.subject,
-    html: render(template.html, details, escapeHtml),
-    text: render(template.text, details, value => value),
-  }
+  return renderEmailTemplate(templates[action], { ...details })
 }

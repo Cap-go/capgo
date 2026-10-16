@@ -3,15 +3,15 @@ import type { Database } from '../utils/supabase.types.ts'
 import type { BentoTrackingPayload } from '../utils/tracking.ts'
 import { eq, or } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
+import { buildAppCreatorEventDetails } from '../utils/app_creator.ts'
 import { createIfNotExistStoreInfo } from '../utils/cloudflare.ts'
 import { purgeOnPremCache } from '../utils/cloudflare_cache_purge.ts'
-import { buildAppCreatorEventDetails } from '../utils/app_creator.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { buildOnboardingIntentBentoEventData, parseOrgOnboardingIntent } from '../utils/org_onboarding_intent.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { buildOnboardingIntentBentoEventData, parseOrgOnboardingIntent } from '../utils/org_onboarding_intent.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
@@ -31,7 +31,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
   // The app_versions table uses a DB trigger (auto_owner_org_by_app_id) that derives owner_org
   // from apps.app_id. If the app is deleted before this async trigger runs, inserting default
   // versions will fail with a NOT NULL violation. Always re-check that the app still exists.
-  const pg = getPgClient(c, true)
+  const pg = await getPgClient(c, true)
   const drizzleClient = getDrizzleClient(pg)
   let appExists = false
   let ownerOrg: string | undefined

@@ -1,6 +1,8 @@
 import type { ExecutionContext, ScheduledController } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
+import { app as register } from '../../supabase/functions/_backend/auth/register.ts'
+import { app as apple } from '../../supabase/functions/_backend/auth/apple.ts'
 import { createMcpApp } from '../../supabase/functions/_backend/mcp/index.ts'
 import { app as accept_invitation } from '../../supabase/functions/_backend/private/accept_invitation.ts'
 import { app as bundle_install_stats } from '../../supabase/functions/_backend/private/bundle_install_stats.ts'
@@ -33,6 +35,7 @@ import { app as publicStats } from '../../supabase/functions/_backend/private/pu
 import { app as release_live } from '../../supabase/functions/_backend/private/release_live.ts'
 import { app as replay } from '../../supabase/functions/_backend/private/replay.ts'
 import { app as request_manifest_upload } from '../../supabase/functions/_backend/private/request_manifest_upload.ts'
+import { app as revoke_apple_authorization } from '../../supabase/functions/_backend/private/revoke_apple_authorization.ts'
 import { app as role_bindings } from '../../supabase/functions/_backend/private/role_bindings.ts'
 // Manifest finalization validates size receipts issued by the files worker.
 import { app as set_manifest } from '../../supabase/functions/_backend/private/set_manifest.ts'
@@ -48,6 +51,7 @@ import { app as sso_verify_dns } from '../../supabase/functions/_backend/private
 import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
 import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
+import { app as stripe_past_due } from '../../supabase/functions/_backend/private/stripe_past_due.ts'
 import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
 import { app as update_delivery_stats } from '../../supabase/functions/_backend/private/update_delivery_stats.ts'
 import { app as validate_password_compliance } from '../../supabase/functions/_backend/private/validate_password_compliance.ts'
@@ -69,6 +73,7 @@ import { app as replication } from '../../supabase/functions/_backend/public/rep
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
 import { app as translation } from '../../supabase/functions/_backend/public/translation.ts'
 import { app as webhooks } from '../../supabase/functions/_backend/public/webhooks/index.ts'
+import { app as canceled_org_retention_alerts } from '../../supabase/functions/_backend/triggers/canceled_org_retention_alerts.ts'
 import { app as credit_usage_alerts } from '../../supabase/functions/_backend/triggers/credit_usage_alerts.ts'
 import { app as credit_usage_posthog } from '../../supabase/functions/_backend/triggers/credit_usage_posthog.ts'
 import { app as cron_app_fame } from '../../supabase/functions/_backend/triggers/cron_app_fame.ts'
@@ -105,9 +110,10 @@ import { app as updates_cache_purge } from '../../supabase/functions/_backend/tr
 import { app as webhook_delivery } from '../../supabase/functions/_backend/triggers/webhook_delivery.ts'
 import { app as webhook_dispatcher } from '../../supabase/functions/_backend/triggers/webhook_dispatcher.ts'
 import { BRES, createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
-import { processNativeNotificationQueueBatch } from '../../supabase/functions/_backend/utils/nativeNotificationSender.ts'
+import { runScheduledManifestPlaceholderExpiry } from '../../supabase/functions/_backend/utils/manifest_placeholder_expiry.ts'
 import { flushQueuedPluginNotifications } from '../../supabase/functions/_backend/utils/plugin_notification_flush.ts'
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
+import { processApiQueueBatch } from './queue.ts'
 import { app as send_email } from './triggers/send_email.ts'
 
 function getExecutionContext(c: Context): Context['executionCtx'] | undefined {
@@ -141,6 +147,8 @@ app.route('/queue_health', queue_health)
 app.route('/check_cpu_usage', check_cpu_usage)
 app.route('/translation', translation)
 app.route('/plugin_regions', pluginRegions)
+app.route('/auth/register', register)
+app.route('/auth/apple', apple)
 // Hosted MCP server (POST /mcp) + OAuth discovery/endpoints. Tools replay public API requests
 // through this same worker with the caller's API key, so RBAC and rate limits apply unchanged.
 app.route('/', createMcpApp((request, c) => app.fetch(request, c.env, getExecutionContext(c))))
@@ -178,7 +186,9 @@ appPrivate.route('/bundle_install_stats', bundle_install_stats)
 appPrivate.route('/release_live', release_live)
 appPrivate.route('/stripe_checkout', stripe_checkout)
 appPrivate.route('/stripe_portal', stripe_portal)
+appPrivate.route('/stripe_past_due', stripe_past_due)
 appPrivate.route('/verify_email_otp', verify_email_otp)
+appPrivate.route('/revoke_apple_authorization', revoke_apple_authorization)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/request_manifest_upload', request_manifest_upload)
 appPrivate.route('/set_manifest', set_manifest)
@@ -208,6 +218,7 @@ appTriggers.route('/cron_email', cron_email)
 appTriggers.route('/cron_clear_versions', cron_clear_versions)
 appTriggers.route('/cron_clean_orphan_images', cron_clean_orphan_images)
 appTriggers.route('/cron_reconcile_build_status', cron_reconcile_build_status)
+appTriggers.route('/canceled_org_retention_alerts', canceled_org_retention_alerts)
 appTriggers.route('/credit_usage_alerts', credit_usage_alerts)
 appTriggers.route('/credit_usage_posthog', credit_usage_posthog)
 appTriggers.route('/global_stats', global_stats)
@@ -285,8 +296,11 @@ createAllCatch(appScheduled, functionNameScheduled)
 
 export default {
   fetch: app.fetch,
-  queue: processNativeNotificationQueueBatch,
+  queue: processApiQueueBatch,
   scheduled(_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
     ctx.waitUntil(runScheduledPluginNotificationFlush(env, ctx))
+    ctx.waitUntil(runScheduledManifestPlaceholderExpiry(env).catch((error) => {
+      console.error(JSON.stringify({ event: 'r2_manifest_expiry_failed', error: error instanceof Error ? error.message : 'Unknown error' }))
+    }))
   },
 }

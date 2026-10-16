@@ -183,7 +183,8 @@ describe('pre-organization onboarding v3', () => {
   it.concurrent('blocks app-details navigation while either store import is pending', () => {
     expect(onboardingSource).toContain('const isAppDetailsNavigationPending = computed(() => (')
     expect(onboardingSource).toContain('isSubmitting.value || isImportingStore.value || isImportingStoreIcon.value')
-    expect(onboardingSource.match(/:disabled="isAppDetailsNavigationPending"/g)).toHaveLength(2)
+    expect(onboardingSource.match(/:disabled="isAppDetailsNavigationPending"/g)).toHaveLength(1)
+    expect(onboardingSource).toContain(':disabled="isAppDetailsNavigationPending || (appDetailsStep === \'name\' && !appName.trim())"')
   })
 
   it.concurrent('labels the icon action as skip until an icon is provided', () => {

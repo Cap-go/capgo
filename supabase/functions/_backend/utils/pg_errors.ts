@@ -23,15 +23,16 @@ const TRANSIENT_PG_SQLSTATES = new Set([
   '53300',
   '53400',
   '57014',
+  '40P01',
 ])
 
-const TRANSIENT_ERROR_MESSAGE_RE = /connection (?:terminated|ended|closed|refused|reset)|timeout exceeded when trying to connect|connect(?:ion)? timed? ?out|canceling statement due to (?:statement|lock) timeout|network(?: |_)?error|socket hang up|hyperdrive|too many clients already|waiting for an open slot|timed out while waiting for a message from the origin database/i
+const TRANSIENT_ERROR_MESSAGE_RE = /connection (?:terminated|ended|closed|refused|reset)|timeout exceeded when trying to connect|connect(?:ion)? timed? ?out|canceling statement due to (?:(?:statement|lock) timeout|conflict with recovery)|network(?: |_)?error|socket hang up|not queryable|hyperdrive|too many clients already|waiting for an open slot|timed out while waiting for a message from the origin database/i
 
 const DRIZZLE_ERROR_NAMES = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
 
 const DATABASE_MESSAGE_RE = /Failed query:|(?:FROM|INTO|UPDATE|SELECT|INSERT|DELETE)\s+(?:[\w"$]+\.)?[\w"$]+|relation\s+"[^"]+"\s+does not exist|Connection terminated unexpectedly|timeout exceeded when trying to connect|too many clients already|canceling statement due to/i
 
-const PG_CONNECTION_MESSAGE_RE = /postgres(?:ql)?(?:\.|:|@|\/|\s|$|-)|hyperdrive|pgbouncer|db\.[\w.-]+\.supabase\.(?:co|com)|neon\.tech|\.pooler\.|aws-.*-pooler/i
+const PG_CONNECTION_MESSAGE_RE = /postgres(?:ql)?(?:[.:@/\s]|$|-)|hyperdrive|pgbouncer|db\.[\w.-]+\.supabase\.(?:co|com)|neon\.tech|\.pooler\.|aws-.*-pooler/i
 
 const PG_CONNECT_PORTS = new Set([5432, 5433, 54322, 6543, 6432])
 
@@ -42,9 +43,9 @@ const PG_SEVERITY_RE = /^(?:ERROR|FATAL|PANIC|WARNING|NOTICE|INFO|LOG|DEBUG)$/i
 function isPostgresSqlStateCode(code: string): boolean {
   if (code.length !== 5 || TRANSIENT_NODE_ERROR_CODES.has(code))
     return false
-  if (/^[0-9]{2}[0-9A-Z]{3}$/.test(code))
+  if (/^\d{2}[0-9A-Z]{3}$/.test(code))
     return true
-  if (/^P[0-9]{4}$/.test(code))
+  if (/^P\d{4}$/.test(code))
     return true
   return TRANSIENT_PG_SQLSTATES.has(code)
 }

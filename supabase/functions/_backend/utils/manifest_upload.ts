@@ -1,3 +1,4 @@
+import { encodeManifestPathSegment, encodeManifestPathSegments } from './manifest_encoding.ts'
 import { MAX_FILE_HASH_LENGTH, MAX_FILE_NAME_LENGTH, MAX_MANIFEST_ENTRIES, MAX_S3_PATH_LENGTH } from './manifest_limits.ts'
 import { createManifestUploadCapabilitySigner, MANIFEST_UPLOAD_CAPABILITY_HEADER, MANIFEST_UPLOAD_CAPABILITY_MAX_LIFETIME_SECONDS } from './manifest_upload_capability.ts'
 
@@ -57,6 +58,7 @@ export interface ManifestUploadCapabilityOptions {
   publicBaseUrl: string
   nowUnix?: number
   concurrency?: number
+  reservePaths?: (prefix: string, suffixes: string[], sizes: number[]) => Promise<string[]>
 }
 
 const TOP_LEVEL_FIELDS = new Set([
@@ -156,7 +158,7 @@ function isValidFileName(value: string, compression: 'none' | 'brotli'): boolean
   if ((compression === 'brotli') !== value.endsWith('.br'))
     return false
   try {
-    segments.forEach(segment => encodeURIComponent(segment))
+    segments.forEach(segment => encodeManifestPathSegment(segment))
     return true
   }
   catch {
@@ -195,7 +197,7 @@ function normalizeBaseUrl(value: string): string {
 }
 
 async function mapWithConcurrency<T, U>(values: T[], concurrency: number, mapper: (value: T, index: number) => Promise<U>): Promise<U[]> {
-  const output = new Array<U>(values.length)
+  const output: U[] = []
   let nextIndex = 0
   const workers = Array.from({ length: Math.min(concurrency, values.length) }, async () => {
     while (nextIndex < values.length) {
@@ -242,7 +244,7 @@ export async function createManifestUploadResponse(
     signingUnavailable()
 
   const encodedFileNames = request.entries.map((entry, index) => {
-    const encodedFileName = entry.file_name.split('/').map(segment => encodeURIComponent(segment)).join('/')
+    const encodedFileName = encodeManifestPathSegments(entry.file_name)
     if (defaultS3PathPrefix.length + 64 + 1 + encodedFileName.length > MAX_S3_PATH_LENGTH)
       invalidEntry(index, 'file_name')
     return encodedFileName
@@ -259,7 +261,7 @@ export async function createManifestUploadResponse(
   }, nowUnix).catch(() => signingUnavailable())
   const seenPaths = new Set<string>()
 
-  const entries = await mapWithConcurrency(
+  const originalSuffixes = await mapWithConcurrency(
     request.entries,
     Math.max(1, Math.min(options.concurrency ?? DEFAULT_CRYPTO_CONCURRENCY, DEFAULT_CRYPTO_CONCURRENCY)),
     async (entry, index) => {
@@ -271,14 +273,20 @@ export async function createManifestUploadResponse(
         invalidEntry(index, 'file_name')
       seenPaths.add(normalizedS3Path)
 
-      const capability = await capabilitySigner.create(normalizedS3Path)
-      return {
-        id: entry.id,
-        s3_path_suffix: s3PathSuffix,
-        upload_token: capability.uploadToken,
-      }
+      return s3PathSuffix
     },
   )
+
+  const suffixes = options.reservePaths
+    ? await options.reservePaths(defaultS3PathPrefix, originalSuffixes, request.entries.map(entry => entry.uploaded_bytes_size))
+    : originalSuffixes
+  const entries = await mapWithConcurrency(suffixes, DEFAULT_CRYPTO_CONCURRENCY, async (suffix, index) => {
+    const path = `${defaultS3PathPrefix}${suffix}`
+    if (path.length > MAX_S3_PATH_LENGTH || !suffix || suffixes.length !== request.entries.length)
+      invalidEntry(index, 'file_name')
+    const capability = await capabilitySigner.create(path)
+    return { id: request.entries[index].id, s3_path_suffix: suffix, upload_token: capability.uploadToken }
+  })
 
   return {
     protocol_version: 1,

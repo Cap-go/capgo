@@ -150,10 +150,10 @@ describe('fixture helpers', () => {
 })
 
 describe('registry', () => {
-  it('contains all 85 checks with unique ids', () => {
+  it('contains all 86 checks with unique ids', () => {
     const ids = ALL_CHECKS.map(c => c.id)
     expect(new Set(ids).size).toBe(ids.length)
-    expect(ids.length).toBe(85)
+    expect(ids.length).toBe(86)
     for (const expected of [
       'shared/apikey-permission', 'shared/app-exists', 'shared/credentials-saved',
       'shared/cap-sync-stale', 'shared/node-linker-layout', 'shared/bundle-id-consistency',
@@ -197,9 +197,9 @@ describe('registry', () => {
     ]) expect(ids).toContain(expected)
   })
 
-  it('defers exactly the 35 iOS expansion checks until the hard-coded deadline', () => {
+  it('defers exactly the 36 iOS expansion checks until the hard-coded deadline', () => {
     const deferred = ALL_CHECKS.filter(check => check.enforceAfter === IOS_PRESCAN_EXPANSION_ENFORCE_AFTER)
-    expect(deferred.length).toBe(35)
+    expect(deferred.length).toBe(36)
     expect(deferred.every(check => check.id.startsWith('ios/'))).toBe(true)
     expect(ALL_CHECKS.find(check => check.id === 'ios/p12-opens')?.enforceAfter).toBeUndefined()
   })

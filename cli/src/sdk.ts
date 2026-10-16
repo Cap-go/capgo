@@ -575,6 +575,9 @@ export class CapgoSDK {
           acceptIncompatible: parsed.acceptIncompatible,
           codeCheck: !parsed.disableCodeCheck, // disable if requested, otherwise check
           zip: parsed.useZip, // use legacy zip upload if requested
+          delta: parsed.delta,
+          deltaOnly: parsed.deltaOnly,
+          encryptDelta: parsed.encryptDelta,
         }
 
         // Call internal upload function but suppress CLI behaviors
@@ -761,6 +764,7 @@ export class CapgoSDK {
         appleAppId: creds?.APPLE_APP_ID,
         iosScheme: creds?.CAPGO_IOS_SCHEME,
         iosTarget: creds?.CAPGO_IOS_TARGET,
+        xcodeVersion: parsed.xcodeVersion ?? creds?.CAPGO_IOS_XCODE_VERSION,
         iosDistribution: creds?.CAPGO_IOS_DISTRIBUTION as 'app_store' | 'ad_hoc' | undefined,
         iosProvisioningMap: creds?.CAPGO_IOS_PROVISIONING_MAP,
         androidKeystoreFile: creds?.ANDROID_KEYSTORE_FILE,

@@ -4,9 +4,9 @@ import { app as channel_device } from '../_backend/private/channel_device.ts'
 import { app as channel_stats } from '../_backend/private/channel_stats.ts'
 import { app as config } from '../_backend/private/config.ts'
 import { app as configBuilder } from '../_backend/private/config_builder.ts'
-import { app as customDomains } from '../_backend/private/custom_domains.ts'
 import { app as create_device } from '../_backend/private/create_device.ts'
 import { app as credits } from '../_backend/private/credits.ts'
+import { app as customDomains } from '../_backend/private/custom_domains.ts'
 import { app as deleted_failed_version } from '../_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as download_link } from '../_backend/private/download_link.ts'
@@ -31,6 +31,7 @@ import { app as publicStats } from '../_backend/private/public_stats.ts'
 import { app as release_live } from '../_backend/private/release_live.ts'
 import { app as replay } from '../_backend/private/replay.ts'
 import { app as request_manifest_upload } from '../_backend/private/request_manifest_upload.ts'
+import { app as revoke_apple_authorization } from '../_backend/private/revoke_apple_authorization.ts'
 import { app as role_bindings } from '../_backend/private/role_bindings.ts'
 import { app as roles } from '../_backend/private/roles.ts'
 import { app as set_manifest } from '../_backend/private/set_manifest.ts'
@@ -46,6 +47,7 @@ import { app as sso_verify_dns } from '../_backend/private/sso/verify-dns.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
 import { app as storeTop } from '../_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
+import { app as stripe_past_due } from '../_backend/private/stripe_past_due.ts'
 import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../_backend/private/upload_link.ts'
 import { app as validate_password_compliance } from '../_backend/private/validate_password_compliance.ts'
@@ -84,6 +86,7 @@ appGlobal.route('/mcp_oauth', mcp_oauth)
 appGlobal.route('/stats', stats_priv)
 appGlobal.route('/stripe_checkout', stripe_checkout)
 appGlobal.route('/stripe_portal', stripe_portal)
+appGlobal.route('/stripe_past_due', stripe_past_due)
 appGlobal.route('/upload_link', upload_link)
 appGlobal.route('/request_manifest_upload', request_manifest_upload)
 appGlobal.route('/set_manifest', set_manifest)
@@ -102,6 +105,7 @@ appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.route('/email_preferences', emailPreferences)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)
 appGlobal.route('/verify_email_otp', verify_email_otp)
+appGlobal.route('/revoke_apple_authorization', revoke_apple_authorization)
 appGlobal.route('/website_preview', website_preview)
 appGlobal.route('/sso/check-domain', sso_check_domain)
 appGlobal.route('/sso/check-enforcement', sso_check_enforcement)

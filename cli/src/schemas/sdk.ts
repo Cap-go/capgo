@@ -106,6 +106,9 @@ export const uploadOptionsSchema = z.object({
   acceptIncompatible: z.boolean().optional(),
   disableCodeCheck: z.boolean().optional(),
   useZip: z.boolean().optional(),
+  delta: z.boolean().optional(),
+  deltaOnly: z.boolean().optional(),
+  encryptDelta: z.boolean().optional(),
   capacitorConfig: capacitorConfigOptionSchema.optional(),
 }).superRefine((value, ctx) => {
   rejectConflictingBooleanGroup(value, ctx, ['acceptIncompatible', 'ignoreCompatibilityCheck'])
@@ -398,6 +401,8 @@ export const requestBuildOptionsSchema = z.object({
   nodeModules: z.string().optional(),
   platform: z.enum(['ios', 'android']),
   credentials: buildCredentialsSchema.optional(),
+  /** iOS: build on a machine with this Xcode version (e.g. 26, 26.0.1). */
+  xcodeVersion: z.string().min(1).optional(),
   androidTrack: z.enum(['internal', 'alpha', 'beta', 'production']).optional(),
   androidReleaseStatus: z.enum(['draft', 'completed', 'inProgress', 'halted']).optional(),
   submitToStoreReview: z.boolean().optional(),
