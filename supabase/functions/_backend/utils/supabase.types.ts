@@ -2233,32 +2233,6 @@ export type Database = {
           },
         ]
       }
-      manifest_trash_restore_pending: {
-        Row: {
-          app_version_id: number
-          created_at: string
-          s3_path: string
-        }
-        Insert: {
-          app_version_id: number
-          created_at?: string
-          s3_path: string
-        }
-        Update: {
-          app_version_id?: number
-          created_at?: string
-          s3_path?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "manifest_trash_restore_pending_app_version_id_fkey"
-            columns: ["app_version_id"]
-            isOneToOne: false
-            referencedRelation: "app_versions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       mcp_oauth_clients: {
         Row: {
           client_id: string
