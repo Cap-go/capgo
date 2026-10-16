@@ -161,7 +161,6 @@ describe('onboarding dashboard redirect', () => {
       createdAt: eligibleUser,
       organizationCount: 1,
       path: '/apps',
-      resumeAppId: null,
       userId: 'user-1',
     })).toEqual({
       path: '/app/com.new.app/getting-started',
