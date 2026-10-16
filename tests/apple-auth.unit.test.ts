@@ -1,8 +1,8 @@
 import { exportJWK, generateKeyPair, SignJWT } from 'jose'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ pg: vi.fn(), rpc: vi.fn(), exchange: vi.fn(), signOut: vi.fn(), updateUser: vi.fn(), getUser: vi.fn(), from: vi.fn() }))
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({ getPgClient: async () => ({ query: mocks.pg }), closeClient: vi.fn() }))
+const mocks = vi.hoisted(() => ({ pg: vi.fn(), connect: vi.fn(), close: vi.fn(), rpc: vi.fn(), exchange: vi.fn(), signOut: vi.fn(), updateUser: vi.fn(), getUser: vi.fn(), from: vi.fn() }))
+vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({ getPgClient: mocks.connect, closeClient: mocks.close }))
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   emptySupabaseWithClientIP: () => ({ auth: { signInWithIdToken: mocks.exchange, signOut: mocks.signOut, updateUser: mocks.updateUser, getUser: mocks.getUser }, rpc: mocks.rpc }),
   supabaseAdmin: () => ({ rpc: mocks.rpc, from: mocks.from }),
@@ -84,6 +84,8 @@ function query(sql: string, p: any[]) {
 }
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.connect.mockResolvedValue({ query: mocks.pg })
+  mocks.close.mockResolvedValue(undefined)
   names.clear()
   uses.clear()
   attempts.clear()
@@ -131,6 +133,43 @@ afterEach(() => {
 })
 
 describe('shared Apple endpoint', () => {
+  it('reuses one store client per request and closes it at each request boundary', async () => {
+    const start = { redirect_uri: 'https://console.example.com/login', code_challenge: 'c'.repeat(43), client_state: 's'.repeat(43) }
+    expect((await request('/start', start)).status).toBe(200)
+    expect(mocks.pg).toHaveBeenCalledTimes(3)
+    expect(mocks.connect).toHaveBeenCalledOnce()
+    expect(mocks.close).toHaveBeenCalledOnce()
+    expect((await request('/start', start)).status).toBe(200)
+    expect(mocks.connect).toHaveBeenCalledTimes(2)
+    expect(mocks.close).toHaveBeenCalledTimes(2)
+  })
+
+  it('closes the store client when a statement fails', async () => {
+    mocks.pg.mockRejectedValueOnce(new Error('Database unavailable'))
+    expect((await request('/start', { redirect_uri: 'https://console.example.com/login', code_challenge: 'c'.repeat(43), client_state: 's'.repeat(43) })).status).toBe(500)
+    expect(mocks.connect).toHaveBeenCalledOnce()
+    expect(mocks.close).toHaveBeenCalledOnce()
+  })
+
+  it.each([true, false])('caches provider readiness (%s) without caching API/UI enablement', async (providerReady) => {
+    const stored = new Map<string, Response>()
+    vi.stubGlobal('caches', { open: async () => ({
+      match: async (key: Request) => stored.get(key.url)?.clone(),
+      put: async (key: Request, value: Response) => { stored.set(key.url, value.clone()) },
+    }) })
+    const provider = vi.mocked(fetch).mockImplementation(async () => Response.json({ external: { apple: providerReady } }))
+    const first = await app.request('/capabilities')
+    expect(await first.json()).toMatchObject({ web: { api_enabled: providerReady } })
+    expect(await (await app.request('/capabilities')).json()).toMatchObject({ web: { api_enabled: providerReady } })
+    expect(provider).toHaveBeenCalledOnce()
+    expect([...stored.values()][0].headers.get('cache-control')).toBe('public, s-maxage=60')
+    vi.stubEnv('WEB_APPLE_LOGIN_ENABLED', 'false')
+    expect(await (await app.request('/capabilities')).json()).toMatchObject({ web: { enabled: false } })
+    vi.stubEnv('APPLE_LOGIN_API_ENABLED', 'false')
+    expect(await (await app.request('/capabilities')).json()).toMatchObject({ web: { api_enabled: false } })
+    expect(provider).toHaveBeenCalledOnce()
+  })
+
   it('verifies credentials, provisions the actual profile with opted-out consent and keeps MFA factors', async () => {
     const idToken = await token()
     const response = await request('/', { id_token: idToken, nonce: 'n'.repeat(64), captcha_token: 'captcha', first_name: 'First\u0000', last_name: ' Name ' })

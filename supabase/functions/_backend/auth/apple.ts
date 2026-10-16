@@ -7,7 +7,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { parseSignupAttributionRecord } from '../../shared/signup-attribution.ts'
 import { checkRegistrationEmail, getCaptchaSecret, isAuthRateLimitError, isCaptchaFailedError, provisionUserProfile } from '../utils/accountProvisioning.ts'
-import { appleHash, appleQuery, appleRandom, openAppleCredential, rememberAppleName, sealAppleCredential } from '../utils/appleAuthStore.ts'
+import { appleHash, appleQuery, appleRandom, closeAppleQueryClient, openAppleCredential, rememberAppleName, sealAppleCredential } from '../utils/appleAuthStore.ts'
 import { isAppleLoginApiEnabled, isAppleRolloutEnabled, isAppleSignInConfigured, verifyAppleIdentity } from '../utils/appleSignIn.ts'
 import { CacheHelper } from '../utils/cache.ts'
 import { simpleErrorWithStatus, useCors } from '../utils/hono.ts'
@@ -90,6 +90,9 @@ app.use('*', async (c, next) => {
     // Never forward credentials, provider errors or request bodies to error reporters.
     const failure = error instanceof AppleAuthError ? error : new AppleAuthError(500, 'apple_login_failed')
     return simpleErrorWithStatus(c, failure.status, failure.code, 'Apple authentication could not complete')
+  }
+  finally {
+    await closeAppleQueryClient(c)
   }
 })
 
@@ -404,12 +407,24 @@ app.get('/capabilities', async (c) => {
   try {
     if (!await isAppleLoginApiEnabled(c))
       return c.json(disabled)
-    const response = await fetch(`${getEnv(c, 'SUPABASE_URL')}/auth/v1/settings`, {
-      headers: { apikey: getEnv(c, 'SUPABASE_ANON_KEY') },
-      signal: AbortSignal.timeout(5000),
-    })
-    const settings = await response.json() as { external?: { apple?: boolean } }
-    if (!response.ok || settings.external?.apple !== true)
+    const cache = new CacheHelper(c)
+    const key = cache.buildRequest('/.apple-provider-readiness', { auth: getEnv(c, 'SUPABASE_URL') })
+    let provider = await cache.matchJson<{ enabled: boolean }>(key)
+    if (!provider) {
+      let enabled = false
+      try {
+        const response = await fetch(`${getEnv(c, 'SUPABASE_URL')}/auth/v1/settings`, {
+          headers: { apikey: getEnv(c, 'SUPABASE_ANON_KEY') },
+          signal: AbortSignal.timeout(5000),
+        })
+        const settings = await response.json() as { external?: { apple?: boolean } }
+        enabled = response.ok && settings.external?.apple === true
+      }
+      catch {}
+      provider = { enabled }
+      await cache.putJson(key, provider, 60)
+    }
+    if (!provider.enabled)
       return c.json(disabled)
     const [nativeVisible, webVisible] = await Promise.all([
       isAppleRolloutEnabled(c, 'NATIVE_APPLE_LOGIN_ENABLED'),

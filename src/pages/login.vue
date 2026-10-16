@@ -380,7 +380,7 @@ async function handleAppleLogin() {
       return
     }
 
-    if (result.profileSaveFailed || result.nameUnavailable)
+    if (result.profileSaveFailed)
       toast.warning(t('apple-login-name-save-failed'))
     if (!await checkMfa())
       throw new Error('Apple login could not complete MFA setup')
@@ -766,8 +766,10 @@ async function handleQuerySessionHandoff(accessToken: string, refreshToken: stri
 }
 
 async function handleAppleOAuthLanding(parsedUrl: URL) {
-  if (consumeAppleOAuthLandingError())
-    throw new Error('Apple authorization failed')
+  if (consumeAppleOAuthLandingError()) {
+    toast.error(t('apple-login-failed'))
+    return false
+  }
   if (parsedUrl.searchParams.get('apple_oauth') === '1' && !Capacitor.isNativePlatform()) {
     // Console owns the verifier and resulting session across the Apple round trip.
     const entry = new URL(parsedUrl)

@@ -27,14 +27,25 @@ export async function openAppleCredential<T>(c: Context, value: string): Promise
   return JSON.parse(new TextDecoder().decode(plaintext)) as T
 }
 
+type AppleQueryClient = Promise<Awaited<ReturnType<typeof getPgClient>>>
+
 export async function appleQuery<T extends Record<string, any>>(c: Context, query: string, params: unknown[]) {
-  const client = await getPgClient(c)
-  try {
-    return (await client.query<T>(query, params)).rows
+  let pending = c.get('appleQueryClient') as AppleQueryClient | undefined
+  if (!pending) {
+    pending = getPgClient(c)
+    c.set('appleQueryClient', pending)
   }
-  finally {
+  const client = await pending
+  return (await client.query<T>(query, params)).rows
+}
+
+export async function closeAppleQueryClient(c: Context) {
+  const pending = c.get('appleQueryClient') as AppleQueryClient | undefined
+  c.set('appleQueryClient', undefined)
+  // Connection failures already propagate through the request's error handler.
+  const client = await pending?.catch(() => null)
+  if (client)
     await closeClient(c, client)
-  }
 }
 
 export function sanitizeAppleName(value: unknown) {

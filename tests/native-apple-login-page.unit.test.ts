@@ -7,12 +7,15 @@ import { createI18n } from 'vue-i18n'
 import messages from '../messages/en.json'
 import AppleSignInButton from '../src/components/auth/AppleSignInButton.vue'
 import LoginPage from '../src/pages/login.vue'
+import { prepareAppleOAuthLanding } from '../src/services/appleOAuth'
 
 const mocks = vi.hoisted(() => ({
   available: true,
   signIn: vi.fn(),
   replace: vi.fn(),
   error: vi.fn(),
+  warning: vi.fn(),
+  getClaims: vi.fn(),
   rpc: vi.fn(),
   signOut: vi.fn(),
   listFactors: vi.fn(),
@@ -27,7 +30,7 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ query: { to: '/apps' }, fullPath: mocks.fullPath, hash: '' }),
   useRouter: () => ({ replace: mocks.replace }),
 }))
-vi.mock('vue-sonner', () => ({ toast: { error: mocks.error, warning: vi.fn(), success: vi.fn() } }))
+vi.mock('vue-sonner', () => ({ toast: { error: mocks.error, warning: mocks.warning, success: vi.fn() } }))
 vi.mock('~/services/nativeAppleLogin', () => ({ isNativeAppleLoginAvailable: () => mocks.available, signInWithApple: mocks.signIn }))
 vi.mock('~/services/supabase', () => ({
   defaultApiHost: 'https://api.example.test',
@@ -36,7 +39,7 @@ vi.mock('~/services/supabase', () => ({
   useSupabase: () => ({
     rpc: mocks.rpc,
     auth: {
-      getClaims: async () => ({ data: { claims: null } }),
+      getClaims: mocks.getClaims,
       getSession: async () => ({ data: { session: null } }),
       signOut: mocks.signOut,
       setSession: mocks.setSession,
@@ -72,6 +75,7 @@ async function mount() {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.available = true
+  mocks.getClaims.mockResolvedValue({ data: { claims: null } })
   mocks.fullPath = '/login'
   sessionStorage.clear()
   vi.stubEnv('DEV', true)
@@ -94,6 +98,25 @@ afterEach(() => {
 })
 
 describe('native Apple login page', () => {
+  it('reports a deferred Apple callback failure and continues checking the saved session', async () => {
+    history.replaceState({}, '', '/login#apple_error=cancelled&state=foreign')
+    prepareAppleOAuthLanding()
+    await mount()
+    expect(mocks.error).toHaveBeenCalledWith(messages['apple-login-failed'])
+    expect(mocks.getClaims).toHaveBeenCalledOnce()
+  })
+
+  it.each([false, true])('warns only for a real profile save failure (%s), not an unavailable optional name', async (profileSaveFailed) => {
+    mocks.signIn.mockResolvedValue({ user: { id: 'apple-user', email: 'apple@example.com' }, nameUnavailable: true, profileSaveFailed })
+    const root = await mount()
+    ;(root.querySelector('[data-test="apple-sign-in"]') as HTMLButtonElement).click()
+    await settle()
+    if (profileSaveFailed)
+      expect(mocks.warning).toHaveBeenCalledWith(messages['apple-login-name-save-failed'])
+    else
+      expect(mocks.warning).not.toHaveBeenCalled()
+  })
+
   async function mountOAuthCallback() {
     mocks.available = false
     const state = 's'.repeat(43)
