@@ -1,12 +1,12 @@
 import type { Context } from 'hono'
-import type { PoolClient } from 'pg'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
+import type { PgQueryClient } from '../../utils/pg.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { eq, sql } from 'drizzle-orm'
 import { HTTPException } from 'hono/http-exception'
 import { buildAppCreatorEventDetails } from '../../utils/app_creator.ts'
 import { buildAppOnboardingStepPosthogEvent } from '../../utils/app_onboarding_posthog.ts'
-import { appendAppOnboardingStepHistory, filterAppOnboardingReportedPatch, getAppOnboardingStepHistoryChanges, parseAppOnboarding, parseAppOnboardingPatch } from '../../utils/appOnboarding.ts'
+import { appendAppOnboardingStepHistory, applyAppOnboardingStepAnnotations, filterAppOnboardingReportedPatch, getAppOnboardingStepHistoryChanges, parseAppOnboarding, parseAppOnboardingPatch } from '../../utils/appOnboarding.ts'
 import { lockAppOnboardingForWrite, retryAppOnboardingWrite } from '../../utils/appOnboardingWriteLock.ts'
 import { deleteAppStatus } from '../../utils/appStatus.ts'
 import { trackBentoEvent } from '../../utils/bento.ts'
@@ -46,11 +46,11 @@ export async function persistAppOnboarding(
   appId: string,
   patch: NonNullable<ReturnType<typeof parseAppOnboardingPatch>> | undefined,
   apikey: Database['public']['Tables']['apikeys']['Row'],
-  transactionClient?: PoolClient,
+  transactionClient?: PgQueryClient,
   completePendingOnboarding = false,
   settings?: AppSettings,
 ) {
-  const pool = transactionClient ? null : getPgClient(c)
+  const pool = transactionClient ? null : await getPgClient(c)
   try {
     const drizzle = getDrizzleClient(transactionClient ?? pool!, { logger: false })
     return await retryAppOnboardingWrite(drizzle, async (tx) => {
@@ -140,7 +140,8 @@ export async function persistAppOnboarding(
       `)
       if (!mergeResult.rows[0])
         throw new Error('Cannot merge app onboarding progress')
-      const onboarding = appendAppOnboardingStepHistory(currentOnboarding, mergeResult.rows[0]?.onboarding, patch)
+      const annotatedOnboarding = applyAppOnboardingStepAnnotations(currentOnboarding, mergeResult.rows[0]?.onboarding, patch)
+      const onboarding = appendAppOnboardingStepHistory(currentOnboarding, annotatedOnboarding, patch)
       const historyChanges = getAppOnboardingStepHistoryChanges(currentOnboarding, onboarding, patch)
       const result = await tx.execute<Database['public']['Tables']['apps']['Row']>(sql`
         UPDATE public.apps

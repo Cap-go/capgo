@@ -51,6 +51,8 @@ import {
 } from '../ai/analyze'
 import {
   appendCapturedLine,
+  flushCapturedLogs,
+  readCapturedLog,
   registerCleanupHandlers,
   shouldCaptureLogs,
   startCaptureForJob,
@@ -58,7 +60,6 @@ import {
 import { renderMarkdown } from '../ai/render-markdown'
 import { createStreamingMarkdownRenderer } from '../ai/stream-markdown'
 import { aiAnalysisResultFromPostAnalyze, trackAiAnalysisChoice, trackAiAnalysisResult } from '../ai/telemetry'
-import { type SupportBundleFiles, writeSupportBundleFiles } from '../onboarding-support.js'
 import { CliUserError } from '../shared/cli-user-error'
 import { copyToClipboard, revealInFinder } from '../support/clipboard.js'
 import { contactSupport } from '../support/contact-support.js'
@@ -77,6 +78,7 @@ import { syncIosMarketingVersion } from './ios-marketing-version'
 import { writeBuildOutputRecord } from './output-record'
 import { getPlatformDirFromCapacitorConfig, normalizeNativeDependencyPathsInText } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
+import { prepareBuildSupportLogBundle } from './support-log-bundle.js'
 import { trackBuilderUpload } from './telemetry.js'
 
 /**
@@ -948,6 +950,20 @@ async function extractNativeDependencies(
 }
 
 /**
+ * Detect the iOS dependency manager the same way the Capacitor CLI does:
+ * a Podfile in the native App folder means CocoaPods, otherwise a CapApp-SPM
+ * package means Swift Package Manager. Reported to Capgo for build analytics.
+ */
+export function detectIosDependencyManager(projectDir: string, platformDir: string): 'cocoapods' | 'spm' | undefined {
+  const appDir = join(projectDir, platformDir, 'App')
+  if (existsSync(join(appDir, 'Podfile')))
+    return 'cocoapods'
+  if (existsSync(join(appDir, 'CapApp-SPM', 'Package.swift')))
+    return 'spm'
+  return undefined
+}
+
+/**
  * Check if a file path should be included in the zip
  */
 export function shouldIncludeFile(filePath: string, platform: 'ios' | 'android', nativeDeps: NativeDependencies, platformDir: string): boolean {
@@ -1290,10 +1306,20 @@ export async function zipDirectory(projectDir: string, outputPath: string, platf
  */
 
 /** Keys that are non-secret build options and should NOT be sent in the credentials blob. */
+/**
+ * Normalize a requested build machine macOS / Xcode version ("Xcode 26.0" → "26.0").
+ * Returns undefined when it is not a dotted version the builder can route on.
+ */
+export function normalizeMachineVersion(value: string): string | undefined {
+  const trimmed = value.trim().replace(/^xcode\s*/i, '')
+  return /^\d{1,3}(?:\.\d{1,3}){0,2}$/.test(trimmed) ? trimmed : undefined
+}
+
 export const NON_CREDENTIAL_KEYS = new Set([
   'CAPGO_IOS_SCHEME',
   'CAPGO_IOS_TARGET',
   'CAPGO_IOS_DISTRIBUTION',
+  'CAPGO_IOS_XCODE_VERSION',
   'BUILD_OUTPUT_UPLOAD_ENABLED',
   'BUILD_OUTPUT_RETENTION_SECONDS',
   'SKIP_BUILD_NUMBER_BUMP',
@@ -1395,6 +1421,7 @@ export function splitPayload(
     iosScheme: mergedCredentials.CAPGO_IOS_SCHEME,
     iosTarget: mergedCredentials.CAPGO_IOS_TARGET,
     iosDistribution: mergedCredentials.CAPGO_IOS_DISTRIBUTION as 'app_store' | 'ad_hoc' | undefined,
+    iosXcodeVersion: platform === 'ios' ? mergedCredentials.CAPGO_IOS_XCODE_VERSION : undefined,
     iosSourceDir: mergedCredentials.CAPGO_IOS_SOURCE_DIR,
     iosAppDir: mergedCredentials.CAPGO_IOS_APP_DIR,
     iosProjectDir: mergedCredentials.CAPGO_IOS_PROJECT_DIR,
@@ -1548,6 +1575,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       cliCredentials.CAPGO_IOS_TARGET = options.iosTarget
     if (options.iosDistribution)
       cliCredentials.CAPGO_IOS_DISTRIBUTION = options.iosDistribution
+    if (options.xcodeVersion)
+      cliCredentials.CAPGO_IOS_XCODE_VERSION = options.xcodeVersion
     if (options.iosProvisioningProfile && options.iosProvisioningProfile.length > 0) {
       const provMap = buildProvisioningMap(options.iosProvisioningProfile, resolve(options.path || cwd()))
       cliCredentials.CAPGO_IOS_PROVISIONING_MAP = JSON.stringify(provMap)
@@ -1692,6 +1721,21 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       }
       // Write normalized value back so splitPayload picks it up
       mergedCredentials.CAPGO_IOS_DISTRIBUTION = distributionMode
+      const rawXcodeVersion = mergedCredentials.CAPGO_IOS_XCODE_VERSION
+      // An empty saved value means "any machine", same as unset.
+      if (rawXcodeVersion !== undefined && !rawXcodeVersion.trim()) {
+        delete mergedCredentials.CAPGO_IOS_XCODE_VERSION
+      }
+      else if (rawXcodeVersion !== undefined) {
+        const xcodeVersion = normalizeMachineVersion(rawXcodeVersion)
+        if (xcodeVersion) {
+          mergedCredentials.CAPGO_IOS_XCODE_VERSION = xcodeVersion
+          log.info(`ℹ️  Building on a machine with Xcode ${xcodeVersion}`)
+        }
+        else {
+          missingCreds.push(`Invalid --xcode-version / CAPGO_IOS_XCODE_VERSION value: '${rawXcodeVersion}'. Use a version like 26, 26.1 or 16.4.1`)
+        }
+      }
       if (mergedCredentials.CAPGO_STORE_SUBMIT_REVIEW === 'true' && distributionMode !== 'app_store') {
         missingCreds.push('--submit-to-store-review on iOS requires --ios-distribution app_store')
       }
@@ -1878,12 +1922,18 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       pack.version,
     )
 
+    const iosDependencyManager = platform === 'ios'
+      ? detectIosDependencyManager(projectDir, nativeProjectDir)
+      : undefined
+    if (iosDependencyManager === 'cocoapods')
+      log.warn('⚠️  This iOS project uses CocoaPods. The CocoaPods trunk becomes read-only on December 2, 2026: your pods will stop getting updates and security fixes. Capgo iOS 27 SDK builds are Swift Package Manager only and become the default on January 1, 2027. Moving to Swift Package Manager takes a few minutes: https://capacitorjs.com/docs/ios/spm')
     const requestPayload = {
       app_id: appId,
       platform,
       build_mode: options.buildMode || 'release',
       build_options: buildOptionsPayload,
       build_credentials: buildCredentialsPayload,
+      ...(iosDependencyManager ? { ios_dependency_manager: iosDependencyManager } : {}),
       ...buildJobCachePayload({ cache: options.cache, cacheKey: options.cacheKey }),
     }
 
@@ -2019,6 +2069,14 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     if (!response.ok) {
       const errorText = await response.text()
       await throwIfBuildPlanLimitError(response.status, errorText, 'request', log)
+      if (errorText.includes('build_machine_version_unavailable')) {
+        let message = errorText
+        try {
+          message = (JSON.parse(errorText) as { message?: string }).message || errorText
+        }
+        catch {}
+        throw new Error(`${message} Change or drop --xcode-version.`)
+      }
       const isCapgoAuth = response.status === 401 || response.status === 403
         || /invalid_apikey|unauthorized|no_key_provided|invalid_jwt|no_jwt/i.test(errorText)
       throw new Error(
@@ -2076,7 +2134,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       buildLog: (msg: string) => {
         log.buildLog(msg)
         if (captureEnabled && capturedJobId) {
-          void appendCapturedLine(capturedJobId, msg)
+          appendCapturedLine(capturedJobId, msg)
         }
       },
     }
@@ -2428,19 +2486,29 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       // - 'auto-prompt'    → existing interactive / CI matrix via
       //                      decideAnalyzeBehavior + clack prompts.
       if (finalStatus === 'failed' && captureEnabled && capturedJobId && aiAnalysisMode === 'caller-handled') {
-        // Preserve the captured log until the caller calls
-        // releaseCapturedLogs(jobId) explicitly. Without this, the cleanup
-        // handlers registered above would remove it on process exit before
-        // the caller had a chance to read it.
-        keepPromptFile = true
-        const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
-        aiAnalysisInfo = {
-          jobId: capturedJobId,
-          capturedLogPath: logsPath,
-          ready: true,
+        try {
+          // Do not hand another caller a path until every streamed line is on
+          // disk. A failed drain means the path is not a valid AI input.
+          await flushCapturedLogs(capturedJobId)
+          // Preserve the captured log until the caller calls
+          // releaseCapturedLogs(jobId) explicitly. Without this, the cleanup
+          // handlers registered above would remove it on process exit before
+          // the caller had a chance to read it.
+          keepPromptFile = true
+          const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
+          aiAnalysisInfo = {
+            jobId: capturedJobId,
+            capturedLogPath: logsPath,
+            ready: true,
+          }
+        }
+        catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          process.stderr.write(`AI analysis unavailable because the captured Builder log could not be finalized: ${message}\n`)
         }
       }
       else if (finalStatus === 'failed' && captureEnabled && capturedJobId && aiAnalysisMode === 'auto-prompt') {
+        const failedJobId = capturedJobId
         const behavior = decideAnalyzeBehavior({
           isTTY: process.stdout.isTTY === true,
           aiAnalyticsFlag: options.aiAnalytics === true,
@@ -2449,6 +2517,11 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
         const AI_WARNING = '⚠ AI can make mistakes. Always verify the diagnosis against the full log before applying the suggested fix.'
 
+        const prepareSupportLogBundle = async () => prepareBuildSupportLogBundle({
+          appId,
+          jobId: failedJobId,
+          internalLogPath: getInternalLogPath(),
+        })
 
         const runCapgoAi = async (choice: 'capgo_ai' | 'auto_upload', triggeredBy: 'menu' | 'ci_flag'): Promise<void> => {
           await trackAiAnalysisChoice({
@@ -2472,34 +2545,18 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
                 const answer = await confirm({ message, initialValue: true })
                 return answer === true
               },
-              buildFiles: () => {
+              buildFiles: async () => {
                 const s = spinnerC()
                 s.start('Preparing your logs to send to Capgo support…')
                 try {
-                  let internalLines: string[] = []
-                  const internalLogPath = getInternalLogPath()
-                  if (internalLogPath) {
-                    try { internalLines = readFileSync(internalLogPath, 'utf8').split('\n') }
-                    catch { /* best-effort */ }
-                  }
-                  let buildLogLines: string[] = []
-                  try {
-                    const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
-                    buildLogLines = readFileSync(logsPath, 'utf8').split('\n')
-                  }
-                  catch { /* best-effort */ }
-                  const built = writeSupportBundleFiles({
-                    kind: 'build-request',
-                    appId,
-                    error: `Cloud build ${capturedJobId} failed`,
-                    logs: buildLogLines,
-                    sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
-                  })
+                  const built = await prepareSupportLogBundle()
                   s.stop(built ? 'Logs ready.' : 'Couldn\'t prepare logs.')
                   return built
                 }
-                catch {
+                catch (error) {
                   s.stop('Couldn\'t prepare logs.')
+                  const message = error instanceof Error ? error.message : String(error)
+                  process.stderr.write(`Could not prepare support logs because the captured Builder log is unavailable: ${message}\n`)
                   return null
                 }
               },
@@ -2517,8 +2574,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
           let logs = ''
           try {
-            const { readFile } = await import('node:fs/promises')
-            logs = await readFile(logsPath, 'utf8')
+            logs = await readCapturedLog(failedJobId)
           }
           catch (err) {
             // Don't crash the CLI on a missing/unreadable log file, but DO tell
@@ -2642,41 +2698,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
         // Spec: at a build failure, "Email Capgo support" comes first — the same
         // contact-support flow as the onboarding wizard, with clack-flavored deps.
-        // Shared bundle prep for both the interactive email flow and the CI/CD
-        // --send-logs flow: read the internal log + the full persisted build log
-        // (both best-effort) and render/gzip them into a support bundle. The
-        // bundle is gzipped + uploaded/attached, so size isn't a concern here —
-        // support needs the full build log, not a tail.
-        const prepareSupportLogBundle = ({
-          capturedJobId,
-          appId,
-        }: {
-          capturedJobId: string | null
-          appId: string
-        }): SupportBundleFiles | null => {
-          const internalLogPath = getInternalLogPath()
-          let internalLines: string[] = []
-          if (internalLogPath) {
-            try {
-              internalLines = readFileSync(internalLogPath, 'utf8').split('\n')
-            }
-            catch { /* best-effort */ }
-          }
-          let buildLogLines: string[] = []
-          try {
-            const logsPath = `${process.env.CAPGO_AI_LOG_BASE_DIR || '/tmp/capgo-builds'}/${capturedJobId}.log`
-            buildLogLines = readFileSync(logsPath, 'utf8').split('\n')
-          }
-          catch { /* best-effort */ }
-          return writeSupportBundleFiles({
-            kind: 'build-request',
-            appId,
-            error: `Cloud build ${capturedJobId} failed`,
-            logs: buildLogLines,
-            sections: internalLines.length > 0 ? [{ title: 'Internal log', lines: internalLines }] : [],
-          })
-        }
-
+        // Shared bundle prep drains the persisted Builder log before reading it;
+        // the optional internal log remains best-effort.
         const runEmailSupport = async (): Promise<void> => {
           await contactSupport({
             subject: `Capgo Builder support — ${appId} (${platform})`,
@@ -2702,18 +2725,20 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
                 return true
               }
             },
-            buildFiles: () => {
+            buildFiles: async () => {
               // The build log can be large; show a spinner while we render + gzip
               // (and trim to fit the 10 MB cap) so it doesn't look frozen.
               const s = spinnerC()
               s.start('Preparing your logs to send…')
               try {
-                const built = prepareSupportLogBundle({ capturedJobId, appId })
+                const built = await prepareSupportLogBundle()
                 s.stop(built ? 'Logs ready.' : 'Couldn\'t prepare logs.')
                 return built
               }
-              catch {
+              catch (error) {
                 s.stop('Couldn\'t prepare logs.')
+                const message = error instanceof Error ? error.message : String(error)
+                process.stderr.write(`Could not prepare support logs because the captured Builder log is unavailable: ${message}\n`)
                 return null
               }
             },
@@ -2738,7 +2763,15 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         // process or changes the exit code: any failure prints a graceful note
         // pointing at support@capgo.app.
         const runSendLogs = async (): Promise<void> => {
-          const files = prepareSupportLogBundle({ capturedJobId, appId })
+          let files: Awaited<ReturnType<typeof prepareSupportLogBundle>>
+          try {
+            files = await prepareSupportLogBundle()
+          }
+          catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            process.stderr.write(`Could not prepare your build logs to upload because the captured Builder log is unavailable: ${message}\nPlease email support@capgo.app and describe the issue (job ${capturedJobId}).\n`)
+            return
+          }
           if (!files) {
             process.stderr.write(`Could not prepare your build logs to upload. Please email support@capgo.app and describe the issue (job ${capturedJobId}).\n`)
             return

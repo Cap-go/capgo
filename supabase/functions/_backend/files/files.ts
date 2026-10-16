@@ -8,22 +8,27 @@ import { app as download_link } from '../private/download_link.ts'
 import { app as upload_link } from '../private/upload_link.ts'
 import { app as ok } from '../public/ok.ts'
 import { sendDiscordAlert } from '../utils/discord.ts'
-import { quickError, simpleError } from '../utils/hono.ts'
-import { onPremiseAppResponse } from '../utils/rateLimitInfo.ts'
+import { quickError, simpleError, simpleRateLimit } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { closeClient, getAppByIdPg, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { getAppByAppIdPg, getUserIdFromApikey } from '../utils/pg_files.ts'
-import { checkPermissionPg } from '../utils/rbac.ts'
+import { getDotfileDeltaStorageCandidateKeys } from '../utils/manifest_encoding.ts'
+import { createManifestSizeReceipt, getManifestReceiptBucket, MANIFEST_SIZE_RECEIPT_HEADER, manifestSizeReceiptEvidenceFromR2, verifyManifestSizeReceiptFacts } from '../utils/manifest_size_receipt.ts'
+import { MANIFEST_UPLOAD_CAPABILITY_HEADER, verifyManifestUploadCapability } from '../utils/manifest_upload_capability.ts'
+import { closeClient, getPgClient } from '../utils/pg.ts'
+import { throwDatabaseLookupError } from '../utils/pg_auth_lookup.ts'
+import { getAppPlanStatePg, getUserIdFromApikey, withFreshPgRetry } from '../utils/pg_files.ts'
+import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
+import { buildRateLimitInfo, onPremiseAppResponse } from '../utils/rateLimitInfo.ts'
+import { checkPermissionPgFreshRetry } from '../utils/rbac.ts'
 import { createStatsBandwidth } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { backgroundTask } from '../utils/utils.ts'
+import { backgroundTask, getEnv } from '../utils/utils.ts'
 import { buildFileReadCacheRequest, getFileReadCache, isAttachmentVersionDeleted } from './file_read_cache.ts'
 import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, getSafeAttachmentReadCandidateKeys, headFirstExistingAttachmentCandidate, isRetryableDurableObjectResetError, MAX_UPLOAD_LENGTH_BYTES, NO_TRANSFORM_CACHE_CONTROL, parseAppScopedAttachmentPath, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256, X_UPLOAD_HANDLER_RETRYABLE } from './util.ts'
+import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, encodeR2KeyForUploadLocation, EXPOSED_HEADERS, getSafeAttachmentReadCandidateKeys, headFirstExistingAttachmentCandidate, isRetryableDurableObjectResetError, MAX_UPLOAD_LENGTH_BYTES, NO_TRANSFORM_CACHE_CONTROL, parseAppScopedAttachmentPath, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256, X_UPLOAD_HANDLER_RETRYABLE } from './util.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 30 minutes
 const DO_FETCH_RETRY_ATTEMPTS = 3
@@ -35,6 +40,7 @@ const TUS_UPLOAD_CONTENT_TYPE = 'application/offset+octet-stream'
 const FILE_READ_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 
 export const app = new Hono<MiddlewareKeyVariables>()
+const legacyAttachmentUploadAuthentication = middlewareKey({ usePostgres: true, readOnly: false, rateLimitScope: 'upload' })
 
 function isRetryableDurableObjectFetchError(error: unknown): boolean {
   return isRetryableDurableObjectResetError(error)
@@ -420,7 +426,8 @@ async function getSupabaseStorageResponse(c: Context, fileId: string): Promise<R
   if (method !== 'HEAD') {
     await saveBandwidthUsage(c, getTransferredBytesFromResponse(response))
   }
-  return withAttachmentResponseHeaders(response, fileId, method !== 'HEAD')
+  const attachmentResponse = withAttachmentResponseHeaders(response, fileId, method !== 'HEAD')
+  return attachmentResponse
 }
 
 async function getHandler(c: Context): Promise<Response> {
@@ -445,7 +452,15 @@ async function getHandler(c: Context): Promise<Response> {
 
   const cache = await getFileReadCache()
   const rawFileId = getRawAttachmentRouteId(c)
-  const candidateKeys = getSafeAttachmentReadCandidateKeys(fileId, rawFileId)
+  // Receipt-aware CLI checks must test the exact key they will put in the manifest.
+  // Devices retain legacy alias reads, but an alias cannot satisfy upload existence.
+  const wantsReceipt = shouldAddManifestSizeReceipt(c)
+  const candidateKeys = wantsReceipt
+    ? [fileId]
+    : [...new Set(
+        getSafeAttachmentReadCandidateKeys(fileId, rawFileId)
+          .flatMap(key => getDotfileDeltaStorageCandidateKeys(key)),
+      )]
   const cacheKey = buildFileReadCacheRequest(c.req.raw)
   let response = cache ? await cache.match(cacheKey) : null
   if (response != null) {
@@ -457,9 +472,6 @@ async function getHandler(c: Context): Promise<Response> {
     const cachedResponse = ensureNoTransformResponse(response)
     response = cachedResponse
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
-    if (!isHead) {
-      await saveBandwidthUsage(c, getTransferredBytesFromResponse(cachedResponse))
-    }
     // Best-effort restore: if a live file is cached but missing in R2, write it back.
     await backgroundTask(c, async () => {
       try {
@@ -488,7 +500,40 @@ async function getHandler(c: Context): Promise<Response> {
         cloudlog({ requestId: c.get('requestId'), message: 'Failed to restore cached file to R2', fileId, error: String(err) })
       }
     })
-    return isHead ? toHeadersOnlyResponse(cachedResponse) : cachedResponse
+    const cachedHeaders = new Headers(cachedResponse.headers)
+    cachedHeaders.delete(MANIFEST_SIZE_RECEIPT_HEADER)
+    const secret = getEnv(c, 'MANIFEST_SIZE_RECEIPT_SECRET')
+    if (wantsReceipt) {
+      const originalReceipt = cachedResponse.headers.get(MANIFEST_SIZE_RECEIPT_HEADER)
+      const facts = originalReceipt ? await verifyManifestSizeReceiptFacts(secret, getManifestReceiptBucket(getEnv(c, 'ENV_NAME')), [{ path: fileId, receipt: originalReceipt }]) : null
+      if (facts?.[0]?.version === 2) {
+        // Cache evidence keeps its original receipt, including its original signing time.
+        cachedHeaders.set(MANIFEST_SIZE_RECEIPT_HEADER, originalReceipt!)
+      }
+      else {
+        // Older caches cannot attest current R2 presence. CLI existence checks may
+        // obtain actual metadata; ordinary cached downloads do not do this work.
+        const readStartedAt = Date.now()
+        try {
+          const objectInfo = await headFirstExistingAttachmentCandidate(new RetryBucket(bucket, DEFAULT_RETRY_PARAMS), candidateKeys)
+          if (!objectInfo || objectInfo.key !== fileId)
+            return notFoundAttachmentResponse(c, isHead)
+          await addManifestSizeReceipt(c, cachedHeaders, objectInfo, readStartedAt)
+        }
+        catch (error) {
+          cloudlogErr({ requestId: c.get('requestId'), message: 'Cached file receipt R2 metadata unavailable', fileId, error })
+          throw quickError(503, 'upstream_unavailable', 'File storage evidence temporarily unavailable', { fileId }, error, { alert: false })
+        }
+      }
+    }
+    if (!isHead)
+      await saveBandwidthUsage(c, getTransferredBytesFromResponse(cachedResponse))
+    const responseWithRequestHeaders = new Response(cachedResponse.body, {
+      headers: cachedHeaders,
+      status: cachedResponse.status,
+      statusText: cachedResponse.statusText,
+    })
+    return isHead ? toHeadersOnlyResponse(responseWithRequestHeaders) : responseWithRequestHeaders
   }
 
   if (await isAttachmentVersionDeleted(c, fileId)) {
@@ -524,6 +569,7 @@ async function getHandler(c: Context): Promise<Response> {
     // HEAD must use R2 metadata only (head()), never bucket.get() — streaming a
     // multi-MB body and stripping it breaks HTTP/2 Content-Length on Workers.
     let objectInfo: R2Object | null = null
+    const readStartedAt = Date.now()
     try {
       objectInfo = await headFirstExistingAttachmentCandidate(new RetryBucket(bucket, DEFAULT_RETRY_PARAMS), candidateKeys)
     }
@@ -538,6 +584,7 @@ async function getHandler(c: Context): Promise<Response> {
     }
 
     const headers = objectHeaders(objectInfo)
+    await addManifestSizeReceipt(c, headers, objectInfo, readStartedAt)
     headers.set('Content-Disposition', `attachment; filename="${objectInfo.key}"`)
 
     if (rangeHeaderFromRequest) {
@@ -556,6 +603,7 @@ async function getHandler(c: Context): Promise<Response> {
   }
 
   let object: R2ObjectBody | null = null
+  const readStartedAt = Date.now()
   try {
     for (const candidateKey of candidateKeys) {
       object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(candidateKey, {
@@ -580,16 +628,17 @@ async function getHandler(c: Context): Promise<Response> {
   if (object.range != null && c.req.header('range')) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeader(object.size, object.range) })
     headers.set('content-range', rangeHeader(object.size, object.range))
+    await addManifestSizeReceipt(c, headers, object, readStartedAt)
     response = new Response(object.body, { headers, status: 206 })
     return response
   }
   headers.set('Content-Disposition', `attachment; filename="${object.key}"`)
+  await addManifestSizeReceipt(c, headers, object, readStartedAt)
   response = new Response(object.body, { headers })
   if (cache && !await isAttachmentVersionDeleted(c, fileId)) {
-    await backgroundTask(c, () => {
-      cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId })
-      return cache.put(cacheKey, response.clone())
-    })
+    const cacheResponse = response.clone()
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId })
+    await backgroundTask(c, cache.put(cacheKey, cacheResponse))
   }
   return response
 }
@@ -612,6 +661,27 @@ function objectHeaders(object: R2Object): Headers {
     headers.set(X_CHECKSUM_SHA256, object.customMetadata[X_CHECKSUM_SHA256])
   }
   return headers
+}
+
+function shouldAddManifestSizeReceipt(c: Context): boolean {
+  const hasNoCacheQuery = new URL(c.req.url).searchParams.has('nocache')
+  const cliVersion = c.req.header('x-cli-version')
+  return hasNoCacheQuery || (cliVersion != null && cliVersion.trim().length > 0)
+}
+
+async function addManifestSizeReceipt(c: Context, headers: Headers, object: R2Object, readStartedAt: number) {
+  headers.delete(MANIFEST_SIZE_RECEIPT_HEADER)
+  const secret = getEnv(c, 'MANIFEST_SIZE_RECEIPT_SECRET')
+  // Inventory evidence must describe the exact key the manifest will register.
+  if (secret && shouldAddManifestSizeReceipt(c) && object.key === c.get('fileId')) {
+    try {
+      headers.set(MANIFEST_SIZE_RECEIPT_HEADER, await createManifestSizeReceipt(secret, getManifestReceiptBucket(getEnv(c, 'ENV_NAME')), object.key, manifestSizeReceiptEvidenceFromR2(object, 'r2_read', readStartedAt)))
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'File manifest size receipt evidence unavailable', error })
+      throw quickError(503, 'upstream_unavailable', 'File storage evidence temporarily unavailable', undefined, error, { alert: false })
+    }
+  }
 }
 
 function rangeHeader(objLen: number, r2Range: R2Range): string {
@@ -647,9 +717,9 @@ export function calculateBytesTransferred(objLen: number, r2Range: R2Range | und
   return isPositiveFiniteNumber(bytesTransferred) ? bytesTransferred : objLen
 }
 
-type ParsedAttachmentByteRange =
-  | { kind: 'partial', start: number, end: number, bytesTransferred: number }
-  | { kind: 'invalid' }
+type ParsedAttachmentByteRange
+  = | { kind: 'partial', start: number, end: number, bytesTransferred: number }
+    | { kind: 'invalid' }
 
 export function parseAttachmentByteRange(rangeHeader: string, fileSize: number): ParsedAttachmentByteRange {
   if (!isPositiveFiniteNumber(fileSize)) {
@@ -811,6 +881,7 @@ async function uploadHandler(c: Context) {
   // rewrite filename metadata to the normalized key that authorization checked.
   const headers = new Headers(c.req.raw.headers)
   headers.set('X-Request-Id', c.get('requestId') || 'unknown')
+  headers.delete(MANIFEST_UPLOAD_CAPABILITY_HEADER)
   if (method === 'POST')
     headers.set('Upload-Metadata', buildNormalizedUploadMetadataHeader(c, normalizedRequestId))
 
@@ -824,7 +895,16 @@ async function uploadHandler(c: Context) {
     requestInit.body = uploadBody
     requestInit.duplex = 'half'
   }
-  const request = new Request(c.req.url, requestInit)
+  const requestUrl = new URL(c.req.url)
+  if (method === 'HEAD' || method === 'PATCH') {
+    const uploadPrefix = `/upload/${ATTACHMENT_PREFIX}/`
+    const prefixIndex = requestUrl.pathname.indexOf(uploadPrefix)
+    if (prefixIndex >= 0) {
+      requestUrl.pathname = `${requestUrl.pathname.slice(0, prefixIndex + uploadPrefix.length)}${encodeR2KeyForUploadLocation(normalizedRequestId)}`
+    }
+  }
+
+  const request = new Request(requestUrl, requestInit)
   return await fetchUploadHandlerWithRetry(c, handler, request)
 }
 
@@ -972,6 +1052,89 @@ async function setKeyFromIdParam(c: Context, next: Next) {
   await next()
 }
 
+function isCapabilityBearingTusRequest(c: Context): boolean {
+  if (!c.req.raw.headers.has(MANIFEST_UPLOAD_CAPABILITY_HEADER))
+    return false
+
+  const method = c.req.raw.method
+  return method === 'POST'
+    || method === 'PATCH'
+    || (method === 'HEAD' && c.req.header('Tus-Resumable') != null)
+}
+
+async function authenticateAttachmentUpload(c: Context, next: Next) {
+  if (isCapabilityBearingTusRequest(c)) {
+    const ipRateLimited = await isIPRateLimited(c)
+    if (ipRateLimited.limited) {
+      return simpleRateLimit({ reason: 'too_many_failed_auth_attempts', ...buildRateLimitInfo(ipRateLimited.resetAt) })
+    }
+
+    await next()
+    return
+  }
+
+  return await legacyAttachmentUploadAuthentication(c, next)
+}
+
+function capabilityRejectionResponse(
+  c: Context,
+  status: 401 | 403 | 503,
+  error: 'upload_authorization_unavailable' | 'upload_path_not_authorized' | 'upload_token_invalid',
+  message: string,
+) {
+  return c.json({
+    error,
+    message,
+    abandon_explicit_error: 'Upload authorization could not be verified. Please contact Capgo support.',
+    moreInfo: { requestId: c.get('requestId') },
+  }, status)
+}
+
+async function authorizeAttachmentUpload(c: Context, next: Next) {
+  if (!isCapabilityBearingTusRequest(c))
+    return await checkWriteAppAccess(c, next)
+
+  const path = c.get('fileId') as string
+  if (parseAppScopedAttachmentPath(path)?.kind !== 'scoped') {
+    await recordFailedAuth(c)
+    return capabilityRejectionResponse(c, 403, 'upload_path_not_authorized', 'Upload path is not authorized')
+  }
+
+  const verification = await verifyManifestUploadCapability(
+    c,
+    c.req.header(MANIFEST_UPLOAD_CAPABILITY_HEADER) ?? '',
+    path,
+  )
+
+  if (!verification.ok) {
+    if (verification.reason === 'unavailable') {
+      return capabilityRejectionResponse(c, 503, 'upload_authorization_unavailable', 'Upload authorization is unavailable')
+    }
+
+    if (verification.reason === 'expired') {
+      await recordFailedAuth(c)
+      return c.json({
+        error: 'upload_token_expired',
+        message: 'Upload authorization expired',
+        moreInfo: { requestId: c.get('requestId') },
+        ...(verification.claims.manifestUploadAutoEnabled
+          ? { abandon_manifest_only_explicit_error: 'Your manifest upload has expired. Uploading manifest files took too long. Continuing with ZIP-only upload.' }
+          : { abandon_explicit_error: 'Your upload has expired. Uploading files took too long. Please re-run the command' }),
+      }, 401)
+    }
+
+    await recordFailedAuth(c)
+    return capabilityRejectionResponse(c, 401, 'upload_token_invalid', 'Upload authorization is invalid')
+  }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'authorizeAttachmentUpload - capability accepted',
+    versionId: verification.claims.versionId,
+  })
+  await next()
+}
+
 async function checkWriteAppAccess(c: Context, next: Next) {
   const requestId = c.get('fileId') as string
   cloudlog({
@@ -1020,12 +1183,15 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   })
 
   // Use Postgres instead of Supabase SDK
-  const pgClient = getPgClient(c, false) // authz + plan gating must read primary
-  const drizzleClient = getDrizzleClient(pgClient)
+  const pgClient = await getPgClient(c, false) // authz + plan gating must read primary
 
   try {
     // Get user_id from apikey using Postgres
-    const userId = await getUserIdFromApikey(c, capgkey, drizzleClient)
+    const userLookup = await getUserIdFromApikey(c, capgkey, pgClient)
+    if (userLookup.kind === 'db_error')
+      throwDatabaseLookupError(c, 'checkWriteAppAccess.getUserIdFromApikey', userLookup.error, { app_id })
+
+    const userId = userLookup.kind === 'ok' ? userLookup.value : null
 
     cloudlog({
       requestId: c.get('requestId'),
@@ -1053,17 +1219,17 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - checking app permissions via checkPermissionPg',
+      message: 'checkWriteAppAccess - checking app permissions via checkPermissionPgFreshRetry',
       userId,
       app_id,
     })
 
     // Use the new RBAC permission check
-    const hasPermission = await checkPermissionPg(c, 'app.upload_bundle', { appId: app_id }, drizzleClient, userId, capgkey)
+    const hasPermission = await checkPermissionPgFreshRetry(c, 'app.upload_bundle', { appId: app_id }, userId, capgkey, false)
 
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - checkPermissionPg result',
+      message: 'checkWriteAppAccess - checkPermissionPgFreshRetry result',
       hasPermission,
     })
 
@@ -1083,8 +1249,12 @@ async function checkWriteAppAccess(c: Context, next: Next) {
       })
     }
 
-    // Get app using Postgres
-    const app = await getAppByAppIdPg(c, app_id, drizzleClient)
+    // One primary read for ownership + plan gating
+    const appLookup = await getAppPlanStatePg(c, app_id, pgClient, ATTACHMENT_PLAN_LIMIT)
+    if (appLookup.kind === 'db_error')
+      throwDatabaseLookupError(c, 'checkWriteAppAccess.getAppPlanStatePg', appLookup.error, { app_id })
+
+    const app = appLookup.kind === 'ok' ? appLookup.value : null
 
     if (!app) {
       cloudlog({
@@ -1123,12 +1293,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
       })
     }
 
-    const appPlan = await getAppByIdPg(c, app_id, drizzleClient, ATTACHMENT_PLAN_LIMIT)
-    if (!appPlan) {
-      throw quickError(503, 'upstream_unavailable', 'App plan state temporarily unavailable', { app_id })
-    }
-
-    if (!appPlan.plan_valid) {
+    if (!app.plan_valid) {
       // Keep the explicit on_premise_app 429 (with Retry-After / Cache-Control) —
       // the edge cache contract depends on that error code and headers.
       return onPremiseAppResponse(c)
@@ -1136,19 +1301,25 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 
     // Ready bundle objects are immutable. Refuse resumable uploads that target a
     // finalized bundle path even if the caller has upload permission on the app.
-    const readyBundlePath = await pgClient.query<{ id: number }>(
-      `
-        SELECT id
-        FROM public.app_versions
-        WHERE owner_org = $1
-          AND app_id = $2
-          AND r2_path = $3
-          AND COALESCE(deleted, false) = false
-          AND storage_provider IS DISTINCT FROM 'r2-direct'
-        LIMIT 1
-      `,
-      [owner_org, app_id, requestId],
-    )
+    let readyBundlePath: { rows: { id: number }[] }
+    try {
+      readyBundlePath = await withFreshPgRetry(c, 'checkWriteAppAccess.readyBundlePath', pgClient, client => client.query<{ id: number }>(
+        `
+          SELECT id
+          FROM public.app_versions
+          WHERE owner_org = $1
+            AND app_id = $2
+            AND r2_path = $3
+            AND COALESCE(deleted, false) = false
+            AND storage_provider IS DISTINCT FROM 'r2-direct'
+          LIMIT 1
+        `,
+        [owner_org, app_id, requestId],
+      ))
+    }
+    catch (error) {
+      throwDatabaseLookupError(c, 'checkWriteAppAccess.readyBundlePath', error, { app_id })
+    }
 
     if (readyBundlePath.rows.length > 0) {
       cloudlog({
@@ -1183,7 +1354,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 }
 
 app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey({ usePostgres: true, readOnly: false, rateLimitScope: 'upload' }), setKeyFromMetadata, checkWriteAppAccess, (c) => {
+app.post(`/upload/${ATTACHMENT_PREFIX}`, authenticateAttachmentUpload, setKeyFromMetadata, authorizeAttachmentUpload, (c) => {
   if (getRuntimeKey() !== 'workerd') {
     return supabaseTusCreateHandler(c)
   }
@@ -1194,9 +1365,9 @@ app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
 // Combined GET/HEAD handler for TUS uploads - Hono tiny routes HEAD to GET
 app.get(
   `/upload/${ATTACHMENT_PREFIX}/:id{.+}`,
-  middlewareKey({ usePostgres: true, readOnly: false, rateLimitScope: 'upload' }),
+  authenticateAttachmentUpload,
   setKeyFromIdParam,
-  checkWriteAppAccess,
+  authorizeAttachmentUpload,
   (c) => {
     const isTusRequest = c.req.header('Tus-Resumable') != null
     // In Hono/tiny, HEAD is routed to the GET handler. Use the raw request method.
@@ -1216,7 +1387,7 @@ app.get(
   },
 )
 app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey({ usePostgres: true, readOnly: false, rateLimitScope: 'upload' }), setKeyFromIdParam, checkWriteAppAccess, (c) => {
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, authenticateAttachmentUpload, setKeyFromIdParam, authorizeAttachmentUpload, (c) => {
   if (getRuntimeKey() !== 'workerd') {
     return supabaseTusPatchHandler(c)
   }

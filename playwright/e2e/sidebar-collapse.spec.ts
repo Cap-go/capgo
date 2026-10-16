@@ -90,6 +90,7 @@ test.describe('Desktop sidebar collapse', () => {
     await expect(page.locator('#sidebar')).toBeVisible()
 
     await page.setViewportSize({ width: 375, height: 667 })
+    await dismissSupportPrompt(page)
 
     await expect(page.locator('[data-test="sidebar-collapse-toggle"]')).toBeHidden()
     await expect(page.locator('[data-test="sidebar-mobile-toggle"]')).toBeVisible()
@@ -97,7 +98,7 @@ test.describe('Desktop sidebar collapse', () => {
 
     await page.locator('[data-test="sidebar-mobile-toggle"]').click()
     await expect(page.locator('#sidebar')).toBeInViewport()
-    await expect(page.locator('#sidebar')).toContainText(/pages/i)
+    await expect(page.locator('#sidebar')).toContainText(/workspace/i)
     await expect(page.locator('#sidebar [data-test="org-switcher"]')).toBeVisible()
   })
 

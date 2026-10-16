@@ -2,14 +2,15 @@ import type { Context } from 'hono'
 import type { AppOnboardingBuilderStepId, AppOnboardingBuilderStepState, AppOnboardingPatch } from './appOnboarding.ts'
 import type { MiddlewareKeyVariables } from './hono.ts'
 import type { TrackOptions } from './tracking.ts'
-import { emitCommittedAppOnboardingHistory } from './app_onboarding_posthog.ts'
+import { emitCommittedAppOnboardingHistory, emitCommittedSystemAppOnboardingHistory } from './app_onboarding_posthog.ts'
 import { applyAppOnboardingPatch } from './appOnboarding.ts'
-import { persistAuthorizedOnboardingMutation } from './appOnboardingMutation.ts'
+import { persistAppOnboardingMutation, persistAuthorizedOnboardingMutation } from './appOnboardingMutation.ts'
 import { cloudlogErr, serializeError } from './logging.ts'
 
 type BuilderChecklistStatus = 'pending' | 'done' | 'skipped' | 'warning'
 type BuilderChecklistAnnotationType = 'note' | 'warning'
-type IosBuilderStep = 'start_setup' | 'choose_destination' | 'connect_app_store' | 'prepare_certificate'
+type IosBuilderStep = 'start_setup' | 'choose_destination' | 'connect_app_store' | 'prepare_certificate' | 'prepare_profile'
+type AndroidBuilderStep = 'start_setup' | 'prepare_keystore' | 'connect_google_play'
 
 export type BuilderChecklistUpdate = {
   platform: 'ios'
@@ -19,10 +20,22 @@ export type BuilderChecklistUpdate = {
   annotationType?: BuilderChecklistAnnotationType
 } | {
   platform: 'android'
-  step: 'start_setup'
+  step: AndroidBuilderStep
   status: 'done'
   annotation?: never
   annotationType?: never
+} | {
+  platform: 'ios' | 'android'
+  step: 'successful_cloud_build'
+  status: 'done' | 'warning'
+  annotation?: string
+  annotationType?: BuilderChecklistAnnotationType
+}
+
+export interface BuilderBuildOutcome {
+  appId: string
+  platform: 'ios' | 'android'
+  status: string
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -96,6 +109,22 @@ function certificateUpdate(tags: Record<string, string | number | boolean>): Bui
     : null
 }
 
+function profileUpdate(tags: Record<string, string | number | boolean>): BuilderChecklistUpdate | null {
+  if (tags.action !== 'profile_prepared'
+    || typeof tags.app_id !== 'string' || !tags.app_id.trim()
+    || typeof tags.attempt_id !== 'string' || !tags.attempt_id.trim()
+    || typeof tags.journey_id !== 'string' || !tags.journey_id.trim()) {
+    return null
+  }
+
+  const validCreatedStep = tags.source === 'created'
+    && (tags.step === 'creating-profile' || tags.step === 'import-create-profile-only')
+  const validImportedStep = tags.source === 'imported' && tags.step === 'import-exporting'
+  return validCreatedStep || validImportedStep
+    ? { platform: 'ios', step: 'prepare_profile', status: 'done' }
+    : null
+}
+
 function startSetupUpdate(tags: Record<string, string | number | boolean>): BuilderChecklistUpdate | null {
   const platform = tags.platform
   if (tags.action !== 'start_setup'
@@ -111,14 +140,44 @@ function startSetupUpdate(tags: Record<string, string | number | boolean>): Buil
     : { platform: 'android', step: 'start_setup', status: 'done' }
 }
 
+function androidPreparationUpdate(tags: Record<string, string | number | boolean>): BuilderChecklistUpdate | null {
+  if (typeof tags.app_id !== 'string' || !tags.app_id.trim()
+    || typeof tags.attempt_id !== 'string' || !tags.attempt_id.trim()
+    || typeof tags.journey_id !== 'string' || !tags.journey_id.trim()) {
+    return null
+  }
+
+  if (tags.action === 'keystore_prepared') {
+    const generated = tags.source === 'generated'
+      && tags.step === 'keystore-generating'
+      && tags.key_password === 'generated_with_keystore'
+    const imported = tags.source === 'imported'
+      && tags.step === 'keystore-existing-key-password'
+      && (tags.key_password === 'verified' || tags.key_password === 'not_checked')
+    return generated || imported
+      ? { platform: 'android', step: 'prepare_keystore', status: 'done' }
+      : null
+  }
+
+  if (tags.action !== 'google_play_connected')
+    return null
+  const imported = tags.source === 'imported_service_account' && tags.step === 'sa-json-validating'
+  const generated = tags.source === 'generated_service_account' && tags.step === 'gcp-setup-running'
+  return imported || generated
+    ? { platform: 'android', step: 'connect_google_play', status: 'done' }
+    : null
+}
+
 export function getBuilderChecklistUpdateFromAnalytics(event: Pick<TrackOptions, 'channel' | 'event' | 'tags'>): BuilderChecklistUpdate | null {
   if (event.channel !== 'builder-onboarding' || event.event !== 'Builder Onboarding Action' || !event.tags)
     return null
   if (event.tags.action === 'start_setup')
     return startSetupUpdate(event.tags)
+  if (event.tags.platform === 'android')
+    return androidPreparationUpdate(event.tags)
   if (event.tags.platform !== 'ios')
     return null
-  return destinationUpdate(event.tags) ?? appStoreUpdate(event.tags) ?? certificateUpdate(event.tags)
+  return destinationUpdate(event.tags) ?? appStoreUpdate(event.tags) ?? certificateUpdate(event.tags) ?? profileUpdate(event.tags)
 }
 
 export function applyBuilderChecklistUpdate(
@@ -128,6 +187,31 @@ export function applyBuilderChecklistUpdate(
 ): Record<string, unknown> | null {
   const patch = buildBuilderChecklistPatch(onboarding, update, now)
   return patch ? applyAppOnboardingPatch(onboarding, patch, now) : null
+}
+
+export function getBuilderBuildOutcomeUpdate(platform: 'ios' | 'android', status: string): BuilderChecklistUpdate | null {
+  if (status === 'succeeded' || status === 'released')
+    return { platform, step: 'successful_cloud_build', status: 'done' }
+  if (status === 'failed')
+    return { platform, step: 'successful_cloud_build', status: 'warning', annotation: 'cloud_build_failed', annotationType: 'warning' }
+  return null
+}
+
+export function buildBuilderBuildOutcomePatch(
+  onboarding: unknown,
+  outcomes: Array<Pick<BuilderBuildOutcome, 'platform' | 'status'>>,
+  now = () => new Date().toISOString(),
+): AppOnboardingPatch | null {
+  const builderSteps: NonNullable<AppOnboardingPatch['builderSteps']> = {}
+  const at = now()
+  for (const outcome of outcomes) {
+    const update = getBuilderBuildOutcomeUpdate(outcome.platform, outcome.status)
+    if (!update)
+      continue
+    const patch = buildBuilderChecklistPatch(onboarding, update, () => at)
+    Object.assign(builderSteps, patch?.builderSteps)
+  }
+  return Object.keys(builderSteps).length ? { builderSteps } : null
 }
 
 function buildBuilderChecklistPatch(
@@ -205,7 +289,7 @@ export async function markBuilderChecklistFromAnalytics(
   const auth = c.get('auth')
   if (!appId || !update || !auth?.userId)
     return false
-  if (event.tags?.action === 'start_setup' && event.tags.app_id !== appId)
+  if (event.tags?.app_id !== appId)
     return false
 
   const stepId = `builder.${update.platform}.${update.step}` as AppOnboardingBuilderStepId
@@ -227,6 +311,36 @@ export async function markBuilderChecklistFromAnalytics(
       message: 'builder onboarding checklist analytics update failed',
       app_id: appId,
       step: update.step,
+      error: serializeError(error),
+    })
+    return false
+  }
+}
+
+export async function persistBuilderBuildOutcome(
+  c: Context<MiddlewareKeyVariables>,
+  { appId, platform, status }: BuilderBuildOutcome,
+): Promise<boolean> {
+  const update = getBuilderBuildOutcomeUpdate(platform, status)
+  if (!update)
+    return false
+
+  try {
+    const result = await persistAppOnboardingMutation(c, appId, {
+      buildPatch: ({ currentValue, at }) => buildBuilderChecklistPatch(currentValue, update, () => at),
+    })
+    if (!result)
+      return false
+    await emitCommittedSystemAppOnboardingHistory(c, [result])
+    return true
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'builder onboarding checklist build outcome update failed',
+      app_id: appId,
+      platform,
+      status,
       error: serializeError(error),
     })
     return false

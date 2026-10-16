@@ -171,6 +171,41 @@ export function parsePreviewDeepLink(value: string): PreviewDeepLink | null {
   }
 }
 
+/**
+ * Normalize a scanned QR payload into a single URL. Scanners and QR generators
+ * can wrap the link in whitespace, quotes, angle brackets, markdown, or extra
+ * text ("Open: capgo://..."), which made valid preview links fail to parse.
+ */
+export function normalizeScannedPreviewValue(value: string) {
+  const trimmed = value.replace(/[\u200B-\u200D\uFEFF]/g, '').trim()
+  // A capgo:// link wins over any earlier https:// URL in the surrounding text.
+  const match = trimmed.match(/capgo:\/\/[^\s"'<>`]+/i) ?? trimmed.match(/https?:\/\/[^\s"'<>`]+/i)
+  if (!match)
+    return trimmed
+  // A clean payload is kept verbatim: channel names may legitimately end in "."
+  if (match[0] === trimmed)
+    return trimmed
+
+  // Wrapped in text: drop sentence punctuation and closers that are not part of the URL.
+  let url = match[0]
+  for (;;) {
+    const last = url[url.length - 1]
+    if (last && '.,;:!?'.includes(last)) {
+      url = url.slice(0, -1)
+      continue
+    }
+    if (last === ')' && url.split('(').length < url.split(')').length) {
+      url = url.slice(0, -1)
+      continue
+    }
+    if (last === ']' && url.split('[').length < url.split(']').length) {
+      url = url.slice(0, -1)
+      continue
+    }
+    return url
+  }
+}
+
 export function hasNativeConfirmedPreview(value: string) {
   const url = parseUrl(value)
   return url?.searchParams.get(NATIVE_CONFIRMED_PREVIEW_PARAM) === '1'

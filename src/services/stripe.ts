@@ -19,6 +19,7 @@ async function presentActionSheetOpen(url: string) {
       },
       {
         text: t('continue'),
+        role: 'primary',
         id: 'continue-button',
         handler: async () => {
           window.open(url, '_blank')
@@ -71,7 +72,9 @@ export async function openBlank(link: string) {
 const PORTAL_URL_CACHE_TTL_MS = 3 * 60 * 1000
 const portalUrlCache = new Map<string, { url: string, callbackUrl: string, createdAt: number }>()
 
-export async function openPortal(orgId: string, t: ComposerTranslation) {
+export type PortalFlow = 'cancel_subscription'
+
+export async function openPortal(orgId: string, t: ComposerTranslation, flow?: PortalFlow) {
   const dialogStore = useDialogV2Store()
   const now = Date.now()
   for (const [cachedOrgId, entry] of portalUrlCache) {
@@ -79,24 +82,25 @@ export async function openPortal(orgId: string, t: ComposerTranslation) {
       portalUrlCache.delete(cachedOrgId)
   }
   const callbackUrl = globalThis.location.href
-  const cachedEntry = portalUrlCache.get(orgId)
+  const cacheKey = flow ? `${orgId}:${flow}` : orgId
+  const cachedEntry = portalUrlCache.get(cacheKey)
   const cachedUrl = cachedEntry?.callbackUrl === callbackUrl
     ? cachedEntry.url
     : ''
   const portalUrl = cachedUrl
     ? Promise.resolve(cachedUrl)
     : invokeCapgoApi('private/stripe_portal', {
-        body: JSON.stringify({ callbackUrl, orgId }),
+        body: JSON.stringify({ callbackUrl, orgId, flow }),
       }).then(({ data }) => {
         const url = data?.url || ''
         if (url)
-          portalUrlCache.set(orgId, { url, callbackUrl, createdAt: Date.now() })
+          portalUrlCache.set(cacheKey, { url, callbackUrl, createdAt: Date.now() })
         return url
       }, () => '')
 
   dialogStore.openDialog({
-    title: t('open-your-portal'),
-    description: t('stripe-billing-portal-will-be-opened-in-a-new-tab'),
+    title: t(flow === 'cancel_subscription' ? 'cancel-plan' : 'open-your-portal'),
+    description: t(flow === 'cancel_subscription' ? 'cancel-plan-portal-desc' : 'stripe-billing-portal-will-be-opened-in-a-new-tab'),
     buttons: [
       {
         text: t('button-cancel'),
@@ -249,14 +253,16 @@ export async function getCreditAutoTopUp(orgId: string) {
     threshold: number
     hasPaymentMethod: boolean
     availableCredits: number
+    monthlyLimit: number
+    monthlyTotal: number | null
   } | null
 }
 
-export async function saveCreditAutoTopUp(orgId: string, enabled: boolean, threshold: number) {
+export async function saveCreditAutoTopUp(orgId: string, enabled: boolean, threshold: number, monthlyLimit: number) {
   if (!orgId)
     return null
   const { data, error } = await invokeCapgoApi('private/credits/auto-top-up', {
-    body: JSON.stringify({ orgId, enabled, threshold }),
+    body: JSON.stringify({ orgId, enabled, threshold, monthlyLimit }),
   })
   if (error) {
     console.error('Failed to save credit auto top-up', error)
@@ -267,5 +273,31 @@ export async function saveCreditAutoTopUp(orgId: string, enabled: boolean, thres
     threshold: number
     hasPaymentMethod: boolean
     availableCredits: number
+    monthlyLimit: number
+    monthlyTotal: number | null
   } | null
+}
+
+interface PastDueInvoice {
+  hosted_invoice_url: string | null
+  amount_due: number
+  currency: string
+  attempt_count: number
+  next_payment_attempt: string | null
+}
+
+export interface PastDueStatus {
+  past_due: boolean
+  invoice: PastDueInvoice | null
+}
+
+export async function getPastDueStatus(orgId: string): Promise<PastDueStatus | null> {
+  if (!orgId)
+    return null
+  const { data, error } = await invokeCapgoApi<PastDueStatus>('private/stripe_past_due', {
+    body: JSON.stringify({ orgId }),
+  })
+  if (error || !data)
+    return null
+  return data
 }

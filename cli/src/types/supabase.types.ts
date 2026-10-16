@@ -39,6 +39,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      r2_inventory_checkpoints: {
+        Row: {
+          bucket_name: string
+          job_name: string
+          partition_key: string
+          accepted_event_floor: string | null
+          checkpoint: Json
+          updated_at: string
+        }
+        Insert: {
+          bucket_name: string
+          job_name: string
+          partition_key?: string
+          accepted_event_floor?: string | null
+          checkpoint?: Json
+          updated_at?: string
+        }
+        Update: {
+          bucket_name?: string
+          job_name?: string
+          partition_key?: string
+          accepted_event_floor?: string | null
+          checkpoint?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      r2_objects: {
+        Row: {
+          bucket_name: string
+          r2_key: string
+          r2_state: Database["public"]["Enums"]["r2_object_state"]
+          size_bytes: number | null
+          etag: string | null
+          r2_last_modified_at: string | null
+          last_event_at: string | null
+          last_reconciled_at: string | null
+          tombstone_expires_at: string | null
+          cleanup_requested_at: string | null
+          first_seen_at: string
+          updated_at: string
+          revision: number
+        }
+        Insert: {
+          bucket_name: string
+          r2_key: string
+          r2_state: Database["public"]["Enums"]["r2_object_state"]
+          size_bytes?: number | null
+          etag?: string | null
+          r2_last_modified_at?: string | null
+          last_event_at?: string | null
+          last_reconciled_at?: string | null
+          tombstone_expires_at?: string | null
+          cleanup_requested_at?: string | null
+          first_seen_at?: string
+          updated_at?: string
+          revision?: number
+        }
+        Update: {
+          bucket_name?: string
+          r2_key?: string
+          r2_state?: Database["public"]["Enums"]["r2_object_state"]
+          size_bytes?: number | null
+          etag?: string | null
+          r2_last_modified_at?: string | null
+          last_event_at?: string | null
+          last_reconciled_at?: string | null
+          tombstone_expires_at?: string | null
+          cleanup_requested_at?: string | null
+          first_seen_at?: string
+          updated_at?: string
+          revision?: number
+        }
+        Relationships: []
+      }
       apikey_global_permissions: {
         Row: {
           apikey_rbac_id: string
@@ -824,6 +899,7 @@ export type Database = {
           ios: boolean
           name: string
           owner_org: string
+          paused_at: string | null
           public: boolean
           auto_pause_action: string
           auto_pause_confidence: number
@@ -864,6 +940,7 @@ export type Database = {
           ios?: boolean
           name: string
           owner_org: string
+          paused_at?: string | null
           public?: boolean
           auto_pause_action?: string
           auto_pause_confidence?: number
@@ -904,6 +981,7 @@ export type Database = {
           ios?: boolean
           name?: string
           owner_org?: string
+          paused_at?: string | null
           public?: boolean
           auto_pause_action?: string
           auto_pause_confidence?: number
@@ -2532,6 +2610,51 @@ export type Database = {
         }
         Relationships: []
       }
+      sso_provider_org_links: {
+        Row: {
+          created_at: string
+          id: string
+          linked_by: string | null
+          org_id: string
+          role_mapping: Json | null
+          sso_provider_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          linked_by?: string | null
+          org_id: string
+          role_mapping?: Json | null
+          sso_provider_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          linked_by?: string | null
+          org_id?: string
+          role_mapping?: Json | null
+          sso_provider_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sso_provider_org_links_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sso_provider_org_links_sso_provider_id_fkey"
+            columns: ["sso_provider_id"]
+            isOneToOne: false
+            referencedRelation: "sso_providers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sso_providers: {
         Row: {
           attribute_mapping: Json | null
@@ -2648,6 +2771,7 @@ export type Database = {
           created_at: string
           customer_country: string | null
           customer_id: string
+          extra_mau: number
           id: number
           is_good_plan: boolean | null
           last_stripe_event_at: string | null
@@ -2675,6 +2799,7 @@ export type Database = {
           created_at?: string
           customer_country?: string | null
           customer_id: string
+          extra_mau?: number
           id?: number
           is_good_plan?: boolean | null
           last_stripe_event_at?: string | null
@@ -2702,6 +2827,7 @@ export type Database = {
           created_at?: string
           customer_country?: string | null
           customer_id?: string
+          extra_mau?: number
           id?: number
           is_good_plan?: boolean | null
           last_stripe_event_at?: string | null
@@ -2785,6 +2911,7 @@ export type Database = {
           future_uuid: string
           id: number
           invite_magic_string: string
+          invited_by_user_id: string | null
           last_name: string
           org_id: string
           rbac_role_name: string
@@ -2798,6 +2925,7 @@ export type Database = {
           future_uuid?: string
           id?: number
           invite_magic_string?: string
+          invited_by_user_id?: string | null
           last_name: string
           org_id: string
           rbac_role_name?: string
@@ -2811,6 +2939,7 @@ export type Database = {
           future_uuid?: string
           id?: number
           invite_magic_string?: string
+          invited_by_user_id?: string | null
           last_name?: string
           org_id?: string
           rbac_role_name?: string
@@ -3399,6 +3528,14 @@ export type Database = {
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
+      ack_updates_cache_purge: {
+        Args: {
+          p_lease_token: string
+          p_retry_after_seconds?: number
+          p_success: boolean
+        }
+        Returns: undefined
+      }
       acknowledge_compatibility_event: {
         Args: { event_id: number; note: string }
         Returns: undefined
@@ -3417,6 +3554,7 @@ export type Database = {
           p_billing_cycle_end: string
           p_billing_cycle_start: string
           p_details?: Json
+          p_included_amount?: number
           p_metric: Database["public"]["Enums"]["credit_metric_type"]
           p_org_id: string
           p_overage_amount: number
@@ -3433,17 +3571,30 @@ export type Database = {
         }[]
       }
       audit_logs_allowed_orgs: { Args: never; Returns: string[] }
-      calculate_credit_cost: {
-        Args: {
-          p_metric: Database["public"]["Enums"]["credit_metric_type"]
-          p_overage_amount: number
-        }
-        Returns: {
-          credit_cost_per_unit: number
-          credit_step_id: number
-          credits_required: number
-        }[]
-      }
+      calculate_credit_cost:
+        | {
+            Args: {
+              p_metric: Database["public"]["Enums"]["credit_metric_type"]
+              p_overage_amount: number
+            }
+            Returns: {
+              credit_cost_per_unit: number
+              credit_step_id: number
+              credits_required: number
+            }[]
+          }
+        | {
+            Args: {
+              p_included_amount: number
+              p_metric: Database["public"]["Enums"]["credit_metric_type"]
+              p_overage_amount: number
+            }
+            Returns: {
+              credit_cost_per_unit: number
+              credit_step_id: number
+              credits_required: number
+            }[]
+          }
       calculate_org_metrics_cache_entry: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
@@ -3514,6 +3665,10 @@ export type Database = {
       claim_legacy_onboarding_demo_data: {
         Args: { p_app_uuid: string }
         Returns: undefined
+      }
+      claim_updates_cache_purge: {
+        Args: { p_limit?: number }
+        Returns: Json
       }
       cleanup_expired_apikeys: { Args: never; Returns: undefined }
       cleanup_expired_demo_apps: { Args: never; Returns: undefined }
@@ -4816,6 +4971,7 @@ export type Database = {
       verify_mfa: { Args: never; Returns: boolean }
     }
     Enums: {
+      r2_object_state: "to_be_uploaded" | "present" | "to_be_deleted" | "deleted"
       action_type: "mau" | "storage" | "bandwidth" | "build_time"
       channel_update_package:
         | "all"
@@ -4916,6 +5072,8 @@ export type Database = {
         | "os_version_changed"
         | "native_app_version_changed"
         | "app_nav"
+        | "channelPaused"
+        | "update_check_error"
       stripe_status:
         | "created"
         | "succeeded"
@@ -5084,6 +5242,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      r2_object_state: ["to_be_uploaded", "present", "to_be_deleted", "deleted"],
       action_type: ["mau", "storage", "bandwidth", "build_time"],
       channel_update_package: [
         "all",
@@ -5186,6 +5345,8 @@ export const Constants = {
         "os_version_changed",
         "native_app_version_changed",
         "app_nav",
+        "channelPaused",
+        "update_check_error",
       ],
       stripe_status: [
         "created",

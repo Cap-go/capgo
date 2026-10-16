@@ -5,7 +5,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 import pack from '../../package.json'
 import { enableSupabaseInstrumentation, setInvocationSource, trackMcpServerStarted, withMcpToolTracking } from '../analytics/track'
 import { parseSchema } from '../schemas/schema_validation'
-import { starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateChannelOptionsSchema } from '../schemas/sdk'
+import { promoteChannelOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateChannelOptionsSchema } from '../schemas/sdk'
 import {
   mcpAddAppInputSchema,
   mcpAddChannelInputSchema,
@@ -18,6 +18,7 @@ import {
   mcpDoctorInputSchema,
   mcpGenerateEncryptionKeysInputSchema,
   mcpGetCurrentBundleInputSchema,
+  mcpPromoteChannelInputSchema,
   mcpGetStatsInputSchema,
   mcpListBundlesInputSchema,
   mcpListChannelsInputSchema,
@@ -196,7 +197,7 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
   server.registerTool(
     'capgo_upload_bundle',
     {
-      description: 'Upload a new app bundle to Capgo Cloud for distribution',
+      description: 'Upload a new app bundle to Capgo Cloud for distribution. Set delta=true to also upload the per-file manifest for delta updates.',
       inputSchema: mcpUploadBundleInputSchema,
     },
     async ({
@@ -215,6 +216,10 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
       autoBump,
       encrypt,
       acceptIncompatible,
+      delta,
+      deltaOnly,
+      encryptDelta,
+      apikey,
       capacitorConfig,
     }) => {
       const result = await sdk.uploadBundle({
@@ -233,6 +238,10 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
         autoBump,
         encrypt,
         acceptIncompatible,
+        delta,
+        deltaOnly,
+        encryptDelta,
+        apikey,
         capacitorConfig,
       })
       if (!result.success) {
@@ -518,6 +527,24 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
           type: 'text' as const,
           text: JSON.stringify({ channel: channelId, currentBundle: result.data }, null, 2),
         }],
+      }
+    },
+  )
+
+  server.registerTool(
+    'capgo_promote_channel',
+    {
+      description: 'Promote the bundle currently linked to one channel to another channel (for example staging to production) without knowing the bundle version',
+      inputSchema: mcpPromoteChannelInputSchema,
+    },
+    async ({ appId, fromChannel, toChannel, acceptIncompatible, ignoreMetadataCheck, sendUpdateNotification }) => {
+      const payload = parseSchema(promoteChannelOptionsSchema, { appId, fromChannel, toChannel, acceptIncompatible, ignoreMetadataCheck, sendUpdateNotification })
+      const result = await sdk.promoteChannel(payload)
+      if (!result.success) {
+        return formatMcpError(result)
+      }
+      return {
+        content: [{ type: 'text' as const, text: `Successfully promoted bundle ${result.data?.bundle} from ${fromChannel} to ${toChannel}` }],
       }
     },
   )

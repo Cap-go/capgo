@@ -44,7 +44,8 @@ vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseAdmin: (...args: unknown[]) => supabaseAdminMock(...args),
 }))
 
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
+  ...(await import('./helpers/pg-checkout-release-mocks.ts')),
   getPgClient: (...args: unknown[]) => getPgClientMock(...args),
   closeClient: (...args: unknown[]) => closeClientMock(...args),
 }))
@@ -95,6 +96,7 @@ function createOrgRow(overrides: Partial<OrgRow> & Pick<OrgRow, 'id' | 'name' | 
     auto_top_up_enabled: false,
     auto_top_up_last_attempt_at: null,
     auto_top_up_threshold: 10,
+    auto_top_up_monthly_limit: 0,
     has_usage_credits: false,
     id: 'org-123',
     last_stats_updated_at: null,
@@ -108,6 +110,7 @@ function createOrgRow(overrides: Partial<OrgRow> & Pick<OrgRow, 'id' | 'name' | 
     required_encryption_key: null,
     stats_refresh_requested_at: null,
     stats_updated_at: null,
+    signup_plugin: null,
     support_channel_set_at: null,
     support_channel_type: null,
     support_channel_url: null,

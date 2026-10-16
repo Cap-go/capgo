@@ -14,6 +14,7 @@ import IconRefresh from '~icons/lucide/refresh-cw'
 import IconSearch from '~icons/lucide/search'
 import IconSend from '~icons/lucide/send'
 import IconZap from '~icons/lucide/zap'
+import { formatNumber, formatNumberValue } from '~/services/formatLocale'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
@@ -84,6 +85,8 @@ const providers = ref<NotificationProviderConfig[]>([])
 const campaigns = ref<NotificationCampaign[]>([])
 const stats = ref<NotificationStat[]>([])
 const devices = ref<NotificationDevice[]>([])
+// Devices only exist as recipient lookup results; there is no app-wide device count here.
+const hasRecipientLookup = ref(false)
 const activeNotificationTab = ref<NotificationTab>('dashboard')
 const broadcastSearch = ref('')
 const apiSearch = ref('')
@@ -521,6 +524,7 @@ async function lookupRecipient() {
       body: JSON.stringify({ appId: id.value, externalId: lookupExternalId.value.trim() }),
     })
     devices.value = response.devices || []
+    hasRecipientLookup.value = true
     toast.success(t('notification-lookup-success'))
   }
   catch (error) {
@@ -620,12 +624,13 @@ watch(() => {
 }, async (appParam) => {
   const refreshId = ++activeRefreshId
   id.value = appParam
+  devices.value = []
+  hasRecipientLookup.value = false
   if (!appParam) {
     app.value = undefined
     providers.value = []
     campaigns.value = []
     stats.value = []
-    devices.value = []
     selectedCampaign.value = null
     selectedCampaignStats.value = []
     selectedCampaignStatsLoading.value = false
@@ -684,7 +689,7 @@ watch(activeNotificationTab, () => {
       </nav>
       <div class="mt-0 md:mt-8">
         <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-sm md:rounded-xl border-slate-200 dark:bg-slate-800/60 dark:border-white/10">
             <div class="flex flex-col gap-4 px-4 py-4 border-b sm:flex-row sm:items-center sm:justify-between border-slate-200 dark:border-slate-700">
               <div class="min-w-0">
                 <div class="flex flex-wrap items-center gap-2">
@@ -709,7 +714,7 @@ watch(activeNotificationTab, () => {
                   {{ t('notification-configured-providers') }}
                 </div>
                 <div class="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
-                  {{ configuredProviders }}
+                  {{ formatNumber(configuredProviders) }}
                 </div>
               </div>
               <div class="p-4">
@@ -717,7 +722,7 @@ watch(activeNotificationTab, () => {
                   {{ t('notification-events-30d') }}
                 </div>
                 <div class="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
-                  {{ totalEvents }}
+                  {{ formatNumber(totalEvents) }}
                 </div>
               </div>
               <div class="p-4">
@@ -725,7 +730,7 @@ watch(activeNotificationTab, () => {
                   {{ t('notification-campaigns') }}
                 </div>
                 <div class="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
-                  {{ campaigns.length }}
+                  {{ formatNumber(campaigns.length) }}
                 </div>
               </div>
               <div class="p-4">
@@ -733,7 +738,10 @@ watch(activeNotificationTab, () => {
                   {{ t('notification-device-results') }}
                 </div>
                 <div class="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">
-                  {{ devices.length }}
+                  {{ hasRecipientLookup ? formatNumber(devices.length) : '-' }}
+                </div>
+                <div v-if="!hasRecipientLookup" class="mt-1 text-xs truncate text-slate-500 dark:text-slate-400">
+                  {{ t('notification-device-results-hint') }}
                 </div>
               </div>
             </div>
@@ -897,7 +905,7 @@ watch(activeNotificationTab, () => {
                   </h2>
                   <div>
                     <div class="text-3xl font-semibold text-slate-950 dark:text-white">
-                      {{ totalEvents }}
+                      {{ formatNumber(totalEvents) }}
                     </div>
                     <div class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                       {{ t('notification-events-30d') }}
@@ -907,7 +915,7 @@ watch(activeNotificationTab, () => {
                     <div v-for="stat in stats" :key="stat.event" class="space-y-1">
                       <div class="flex items-center justify-between gap-3 text-sm">
                         <span class="font-medium text-slate-700 dark:text-slate-200">{{ stat.event }}</span>
-                        <span class="font-mono text-slate-950 dark:text-white">{{ stat.count }}</span>
+                        <span class="font-mono text-slate-950 dark:text-white">{{ formatNumberValue(stat.count) }}</span>
                       </div>
                       <progress class="w-full h-1.5 d-progress d-progress-secondary" :value="stat.count" :max="totalEvents || 1" />
                     </div>
@@ -966,7 +974,7 @@ watch(activeNotificationTab, () => {
                       {{ activeNotificationTab === 'broadcasts' ? t('notification-broadcasts') : t('notification-api-sends') }}
                     </h2>
                     <span class="text-sm text-slate-500 dark:text-slate-400">
-                      {{ activeNotificationTab === 'broadcasts' ? broadcastCampaigns.length : apiCampaigns.length }} {{ t('notification-campaigns') }}
+                      {{ formatNumber(activeNotificationTab === 'broadcasts' ? broadcastCampaigns.length : apiCampaigns.length) }} {{ t('notification-campaigns') }}
                     </span>
                   </div>
                 </section>
@@ -1037,7 +1045,7 @@ watch(activeNotificationTab, () => {
                     </button>
                     <div class="overflow-x-auto border rounded-lg border-slate-200 dark:border-slate-700">
                       <table class="w-full text-sm text-left text-gray-500 d-table d-table-sm dark:text-gray-400">
-                        <thead class="text-gray-700 bg-gray-50 dark:text-gray-400 dark:bg-gray-700">
+                        <thead class="text-[11px] font-semibold tracking-wider uppercase border-y border-slate-200 text-slate-500 bg-slate-50 dark:border-white/10 dark:text-slate-400 dark:bg-white/[0.03]">
                           <tr>
                             <th class="whitespace-nowrap">
                               {{ t('device') }}
@@ -1111,7 +1119,7 @@ watch(activeNotificationTab, () => {
 
                   <div>
                     <div class="text-3xl font-semibold text-slate-950 dark:text-white">
-                      {{ selectedCampaignTotalEvents }}
+                      {{ formatNumber(selectedCampaignTotalEvents) }}
                     </div>
                     <div class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                       {{ t('notification-events-30d') }}
@@ -1126,7 +1134,7 @@ watch(activeNotificationTab, () => {
                     <div v-for="stat in selectedCampaignStats" :key="stat.event" class="space-y-1">
                       <div class="flex items-center justify-between gap-3 text-sm">
                         <span class="font-medium text-slate-700 dark:text-slate-200">{{ stat.event }}</span>
-                        <span class="font-mono text-slate-950 dark:text-white">{{ stat.count }}</span>
+                        <span class="font-mono text-slate-950 dark:text-white">{{ formatNumberValue(stat.count) }}</span>
                       </div>
                       <progress class="w-full h-1.5 d-progress d-progress-secondary" :value="stat.count" :max="selectedCampaignTotalEvents || 1" />
                     </div>
@@ -1140,13 +1148,13 @@ watch(activeNotificationTab, () => {
                       <div class="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                         {{ t('notification-audience-json') }}
                       </div>
-                      <pre class="max-h-40 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200">{{ formatJson(selectedCampaign.audience) }}</pre>
+                      <pre class="max-h-40 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200">{{ formatJson(selectedCampaign.audience) }}</pre>
                     </div>
                     <div>
                       <div class="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">
                         {{ t('notification-payload-json') }}
                       </div>
-                      <pre class="max-h-40 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200">{{ formatJson(selectedCampaign.payload) }}</pre>
+                      <pre class="max-h-40 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-200">{{ formatJson(selectedCampaign.payload) }}</pre>
                     </div>
                   </div>
                 </div>

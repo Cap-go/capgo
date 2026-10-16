@@ -5,10 +5,12 @@ import { setupLayouts } from 'virtual:generated-layouts'
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
+import { prepareAppleOAuthLanding } from '~/services/appleOAuth'
 import { installDeepLinkHandler } from '~/services/deepLinks'
 import { isDocumentNavigationPending, replaceDocument } from '~/services/documentNavigation'
 import { getNativeExternalPurchaseRedirect, isNativeAppStoreContext, isNativeExternalPurchaseRestrictedPath } from '~/services/nativeCompliance'
 import { posthogLoader } from '~/services/posthog'
+import { captureConsoleAttributionFromLocation } from '~/services/signupAttribution'
 import { getErrorMessage, isComponentResolutionErrorMessage, isKnownCrawlerNoiseErrorMessage, isStaleAssetErrorMessage } from '~/services/staleAssetErrors'
 import { getLocalConfig } from '~/services/supabase'
 import { getAllowedConfirmationHosts, resolveConfirmationUrl } from '~/utils/safeRedirect'
@@ -16,6 +18,8 @@ import App from './App.vue'
 import { getRemoteConfig } from './services/supabase'
 // your custom styles here
 import './styles/style.css'
+
+prepareAppleOAuthLanding()
 
 // Handle chunk load errors (stale chunks after deployment)
 // When a new version is deployed, old chunk URLs return 404/HTML instead of JS
@@ -237,13 +241,25 @@ const router = createRouter({
         hash: to.hash,
       }),
     },
+    // Removed mobile modules / plugins pages
+    { path: '/app/modules', redirect: '/apps' },
+    { path: '/app/modules_test', redirect: '/apps' },
+    { path: '/app/plugins', redirect: '/apps' },
     // Legacy app tab URLs after settings/observe revamp
     { path: '/app/:app/info', redirect: redirectAppPath('/settings') },
     { path: '/app/:app/access', redirect: redirectAppPath('/settings/access') },
-    { path: '/app/:app/logs/insights', redirect: redirectAppPath('/observe/updater') },
+    { path: '/app/:app/logs/insights', redirect: redirectAppPath('/observe/errors') },
     { path: '/app/:app/logs', redirect: redirectAppPath('/observe/logs') },
     { path: '/app/:app/compatibility', redirect: redirectAppPath('/observe/compatibility') },
-    { path: '/app/:app/observe', redirect: redirectAppPath('/observe/native') },
+    { path: '/app/:app/observe', redirect: redirectAppPath('') },
+    // Legacy overview sub-tabs and Observe tabs after the overview/observe regrouping
+    { path: '/app/:app/live', redirect: redirectAppPath('') },
+    { path: '/app/:app/installs', redirect: redirectAppPath('') },
+    { path: '/app/:app/active-bundle', redirect: redirectAppPath('') },
+    { path: '/app/:app/native', redirect: redirectAppPath('/observe/native') },
+    { path: '/app/:app/observe/releases', redirect: redirectAppPath('') },
+    { path: '/app/:app/observe/updater', redirect: redirectAppPath('/observe/errors') },
+    { path: '/app/:app/observe/plugins', redirect: to => ({ ...redirectAppPath('/observe/compatibility')(to), query: { ...to.query, view: 'plugins' } }) },
     ...setupLayouts(newRoutes),
   ],
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -292,6 +308,7 @@ router.beforeEach((to, from, next) => {
 
 const config = getLocalConfig()
 posthogLoader(config.supaHost)
+captureConsoleAttributionFromLocation()
 
 // install all modules under `modules/`
 type UserModule = (ctx: { app: typeof app, router: Router }) => void

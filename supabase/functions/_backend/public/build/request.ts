@@ -1,11 +1,12 @@
 import type { Context } from 'hono'
 import type { Database, Json } from '../../utils/supabase.types.ts'
+import { notifyCocoaPodsDeprecation } from '../../utils/cocoapods_deprecation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { sendEventToTracking } from '../../utils/tracking.ts'
-import { getEnv } from '../../utils/utils.ts'
+import { backgroundTask, getEnv } from '../../utils/utils.ts'
 import { assertNativeBuildConcurrencyAvailable, getPlansUpgradeUrl } from './concurrency.ts'
 
 export interface RequestBuildBody {
@@ -21,6 +22,19 @@ export interface RequestBuildBody {
   cache_enabled?: boolean
   /** Custom cache namespace for compilation cache restore/save (e.g. rc, prod). */
   cache_key?: string
+  /** iOS dependency manager detected by the CLI. Stored for build analytics only. */
+  ios_dependency_manager?: IosDependencyManager
+}
+
+type IosDependencyManager = 'cocoapods' | 'spm'
+
+const IOS_DEPENDENCY_MANAGERS: readonly IosDependencyManager[] = ['cocoapods', 'spm']
+
+/** Unknown or non-iOS values are dropped instead of rejected: this field is analytics-only. */
+function normalizeIosDependencyManager(platform: string, value: unknown): IosDependencyManager | null {
+  if (platform !== 'ios' || typeof value !== 'string')
+    return null
+  return IOS_DEPENDENCY_MANAGERS.find(manager => manager === value) ?? null
 }
 
 export interface RequestBuildResponse {
@@ -48,6 +62,7 @@ interface ValidBuildRequestBody {
   build_credentials: Record<string, string>
   cache_enabled?: boolean
   cache_key?: string
+  ios_dependency_manager: IosDependencyManager | null
 }
 
 function throwBuilderUnavailable(message: string, moreInfo: Record<string, unknown> = {}, cause?: unknown): never {
@@ -98,7 +113,7 @@ export function buildBuilderPayload(input: {
 }
 
 /** Exported for unit tests — follows bundleUsageTestUtils pattern. */
-export const builderPayloadTestUtils = { buildBuilderPayload }
+export const builderPayloadTestUtils = { buildBuilderPayload, normalizeIosDependencyManager, parseMachineVersionUnavailable }
 
 function hasLegacyCredentials(body: RequestBuildBody): boolean {
   const credentials = Reflect.get(body, 'credentials')
@@ -115,6 +130,7 @@ function validateBuildRequestBody(c: Context, body: RequestBuildBody, userId: st
     build_credentials = {},
     cache_enabled,
     cache_key,
+    ios_dependency_manager,
   } = body
 
   cloudlog({
@@ -186,6 +202,7 @@ function validateBuildRequestBody(c: Context, body: RequestBuildBody, userId: st
     build_credentials,
     cache_enabled,
     cache_key: cache_key?.trim(),
+    ios_dependency_manager: normalizeIosDependencyManager(platform, ios_dependency_manager),
   }
 }
 
@@ -267,6 +284,21 @@ function getBuilderConfig(c: Context) {
   return { builderUrl, builderApiKey }
 }
 
+/** Returns the builder's message when it rejected a build pinned to a macOS / Xcode no machine has. */
+function parseMachineVersionUnavailable(status: number, body: string): string | null {
+  if (status !== 400)
+    return null
+  try {
+    const parsed = JSON.parse(body) as { code?: unknown, error?: unknown }
+    return parsed.code === 'runner_version_unavailable' && typeof parsed.error === 'string' && parsed.error.length > 0
+      ? parsed.error
+      : null
+  }
+  catch {
+    return null
+  }
+}
+
 async function createBuilderJob(c: Context, input: {
   builderUrl: string
   builderApiKey: string
@@ -339,13 +371,22 @@ async function createBuilderJob(c: Context, input: {
       app_id: appId,
       platform,
     })
+    // The requested macOS / Xcode is not on any build machine: tell the user which versions are.
+    const machineUnavailable = parseMachineVersionUnavailable(builderResponse.status, errorText)
+    if (machineUnavailable) {
+      throw quickError(400, 'build_machine_version_unavailable', machineUnavailable, {
+        app_id: appId,
+        platform,
+      }, undefined, { alert: false })
+    }
     throwBuilderUnavailable('Build service unavailable (builder error)', {
       status: builderResponse.status,
       statusText: builderResponse.statusText,
     })
   }
   catch (error) {
-    if (error && typeof error === 'object' && 'status' in error && (error as { status?: unknown }).status === 503) {
+    const status = error && typeof error === 'object' && 'status' in error ? (error as { status?: unknown }).status : undefined
+    if (status === 503 || status === 400) {
       throw error
     }
     cloudlogErr({
@@ -386,6 +427,7 @@ async function persistBuildRequest(c: Context, input: {
   platform: 'ios' | 'android'
   build_mode: 'release' | 'debug'
   build_config: Json
+  ios_dependency_manager: IosDependencyManager | null
   builder_job_id: string
   upload_session_key: string
   upload_path: string
@@ -399,6 +441,7 @@ async function persistBuildRequest(c: Context, input: {
     platform,
     build_mode,
     build_config,
+    ios_dependency_manager,
     builder_job_id,
     upload_session_key,
     upload_path,
@@ -416,6 +459,7 @@ async function persistBuildRequest(c: Context, input: {
       platform,
       build_mode,
       build_config,
+      ios_dependency_manager,
       status: 'pending',
       builder_job_id,
       upload_session_key,
@@ -481,6 +525,7 @@ export async function requestBuild(
     build_credentials,
     cache_enabled,
     cache_key,
+    ios_dependency_manager,
   } = validateBuildRequestBody(c, body, apikey.user_id)
 
   await ensureBuildPermission(c, app_id, apikey.user_id)
@@ -517,7 +562,8 @@ export async function requestBuild(
     appId: app_id,
     platform,
     uploadPath: upload_path,
-    buildOptions: build_options,
+    // The builder schedules some builds by dependency manager.
+    buildOptions: ios_dependency_manager ? { ...build_options, iosDependencyManager: ios_dependency_manager } : build_options,
     buildCredentials: build_credentials,
     cacheEnabled: cache_enabled,
     cacheKey: cache_key,
@@ -541,6 +587,7 @@ export async function requestBuild(
     platform,
     build_mode,
     build_config,
+    ios_dependency_manager,
     builder_job_id: builderJob.jobId,
     upload_session_key,
     upload_path,
@@ -556,6 +603,9 @@ export async function requestBuild(
     app_id,
     platform,
   })
+
+  if (ios_dependency_manager === 'cocoapods')
+    await backgroundTask(c, notifyCocoaPodsDeprecation(c, { orgId: org_id, appId: app_id, iosDependencyManager: ios_dependency_manager }))
 
   await recordBuildRequestedTelemetry(c, {
     app_id,

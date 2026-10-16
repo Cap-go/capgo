@@ -1,11 +1,24 @@
 import type { CapacitorConfig } from '@capacitor/cli'
 import pkg from './package.json'
 
+// Capgo mobile app: native plugin set for plugin doc QR previews.
 const config: CapacitorConfig = {
   appId: 'ee.forgr.capacitor_go',
   appName: 'Capgo',
   webDir: 'dist',
   plugins: {
+    SocialLogin: {
+      logLevel: 0,
+      providers: {
+        apple: true,
+        google: false,
+        facebook: false,
+        twitter: false,
+        telegram: false,
+        linkedin: false,
+        tiktok: false,
+      },
+    },
     PushNotifications: {
       presentationOptions: [
         'badge',
@@ -24,6 +37,13 @@ const config: CapacitorConfig = {
       autoUpdate: 'atInstall',
       autoSplashscreen: true,
       version: pkg.version,
+    },
+    Env: {
+      DEMO_API_URL: 'https://api.example.com',
+      DEMO_TENANT_ID: 'capgo-plugin-preview',
+    },
+    DeviceIntegrity: {
+      cloudProjectNumber: '123456789012',
     },
   },
   android: {

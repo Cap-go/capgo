@@ -36,6 +36,10 @@ export const mcpUploadBundleInputSchema = z.object({
   autoBump: z.enum(['major', 'minor', 'patch', 'metadata', 'ai']).optional().describe('Semver part to bump from latest remote version (default minor when set via CLI without value); ai classifies via Capgo Workers AI'),
   encrypt: z.boolean().optional(),
   acceptIncompatible: z.boolean().optional().describe('Accept native-package incompatibility as handled (still checks and warns, continues, skips the crash-warning email)'),
+  delta: z.boolean().optional().describe('Also upload the per-file manifest for delta (differential) updates'),
+  deltaOnly: z.boolean().optional().describe('Upload only the delta manifest files, without the full zip'),
+  encryptDelta: z.boolean().optional().describe('Encrypt delta manifest files (auto-enabled for updater >= 6.14.4)'),
+  apikey: z.string().optional().describe('API key to use instead of the saved one, e.g. from the hosted Capgo MCP tool capgo_get_upload_command'),
   capacitorConfig: capacitorConfigOptionSchema.optional(),
 })
 
@@ -118,6 +122,15 @@ export const mcpDeleteChannelInputSchema = z.object({
 export const mcpGetCurrentBundleInputSchema = z.object({
   appId: z.string().describe('App ID'),
   channelId: z.string().describe('Channel name'),
+})
+
+export const mcpPromoteChannelInputSchema = z.object({
+  appId: z.string().describe('App ID'),
+  fromChannel: z.string().describe('Channel to copy the current bundle from, for example staging'),
+  toChannel: z.string().describe('Channel to link that bundle to, for example production'),
+  acceptIncompatible: z.boolean().describe('Link the bundle even if its native packages do not match the target channel').optional(),
+  ignoreMetadataCheck: z.boolean().describe('Skip the native package compatibility check. Cannot be combined with acceptIncompatible').optional(),
+  sendUpdateNotification: z.boolean().describe('Send a native update-check notification to devices on the target channel after linking').optional(),
 })
 
 export const mcpAddOrganizationInputSchema = z.object({

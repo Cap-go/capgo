@@ -12,6 +12,8 @@ import {
 } from '../../utils/build_timeout.ts'
 import { emitBuildTransitionEvent } from '../../utils/build_tracking.ts'
 import { isoFromBuilderTimestamp } from '../../utils/builder_capacity.ts'
+import { getBuilderXcodeVersion } from '../../utils/builder_machine.ts'
+import { persistBuilderBuildOutcome } from '../../utils/builder_onboarding_checklist.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -226,6 +228,7 @@ export async function getBuildStatus(
       runner_wait_seconds: runnerWaitSeconds,
       started_at: isoFromBuilderTimestamp(builderJob.job.started_at) ?? undefined,
       completed_at: isoFromBuilderTimestamp(effectiveCompletedAt) ?? undefined,
+      xcode_version: getBuilderXcodeVersion(builderJob.machine) ?? undefined,
       updated_at: new Date().toISOString(),
     })
     .eq('builder_job_id', job_id)
@@ -242,6 +245,7 @@ export async function getBuildStatus(
     })
   }
   else if (updatedRows && updatedRows.length > 0) {
+    await persistBuilderBuildOutcome(c, { appId: buildRequest.app_id, platform: resolvedPlatform, status: effectiveStatus })
     await emitBuildTransitionEvent(c, {
       jobId: job_id,
       previousStatus,

@@ -1475,11 +1475,14 @@ async function handleInviteNewUserSubmit() {
 
 <template>
   <div>
-    <div class="flex flex-col h-full pb-8 overflow-hidden overflow-y-auto bg-white border shadow-lg md:p-8 md:pb-0 max-h-fit grow md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-      <div class="flex justify-between w-full mb-5 ml-2 md:ml-0">
+    <div class="flex flex-col h-full pb-8 overflow-hidden overflow-y-auto bg-white border shadow-sm md:p-8 md:pb-0 max-h-fit grow md:rounded-xl dark:bg-slate-800/60 border-slate-200 dark:border-white/10">
+      <div class="w-full px-4 mb-5 md:px-0">
         <h2 class="text-2xl font-bold dark:text-white text-slate-800">
           {{ t('members') }}
         </h2>
+        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          {{ t('members-page-description') }}
+        </p>
       </div>
       <DataTable
         v-model:columns="columns"
@@ -1592,7 +1595,7 @@ async function handleInviteNewUserSubmit() {
 
             <div class="relative flex items-center text-xs text-blue-600 cursor-pointer dark:text-blue-400 group" :class="{ 'mt-2': isInviteFormValid }">
               <IconInformation class="w-4 h-4 mr-1" />
-              <span class="font-medium">Why do I need this?</span>
+              <span class="font-medium">{{ t('captcha-why-required') }}</span>
 
               <!-- Tooltip that appears on hover -->
               <div class="absolute px-3 py-2 mb-2 text-xs text-center text-white transition-opacity transform -translate-x-1/2 bg-gray-800 rounded-lg shadow-lg opacity-0 pointer-events-none left-1/2 bottom-full w-60 group-hover:opacity-100">

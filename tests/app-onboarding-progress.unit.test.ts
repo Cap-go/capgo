@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../src/services/appOnboarding.ts'
+import { BUILDER_STEP_IDS } from '../src/services/builderOnboardingChecklist.ts'
 import {
   buildGettingStartedSteps,
   getAppOnboardingFeature,
@@ -12,8 +14,8 @@ import {
   parseAppOnboardingStage,
   rankAppOnboardingStage,
   shouldShowGettingStartedNav,
-  shouldSkipOnboardingResume,
   shouldShowOnboardingNextStep,
+  shouldSkipOnboardingResume,
   withGettingStartedDismissed,
   withoutGettingStartedDismissed,
 } from '../src/utils/appOnboardingProgress.ts'
@@ -202,6 +204,156 @@ describe('app onboarding progress ledger', () => {
         ota: { succeeded_at: '2026-08-04T00:00:00.000Z', stage: 'testflight' },
       },
     }, { storeReleaseValidated: true })).toBe(false)
+  })
+
+  it.concurrent('uses v3 checklist steps for the nav even when features disagree', () => {
+    const steps = Object.fromEntries([
+      'login_cli_mcp',
+      'add_channel',
+      'add_updater',
+      'add_code',
+      'run_device',
+      'upload_bundle',
+      'test_update',
+    ].map(id => [id, { status: 'done' }]))
+    const onboarding = {
+      setup: { todo_list_version: 3, outcome: 'completed', steps: { ...steps, test_update: { status: 'pending' } } },
+      features: { ota: { succeeded_at: '2026-09-01T00:00:00.000Z', stage: 'store_live' } },
+    }
+    expect(shouldShowGettingStartedNav(onboarding)).toBe(true)
+    expect(shouldShowGettingStartedNav({ setup: { todo_list_version: 3, steps } })).toBe(false)
+    expect(shouldShowGettingStartedNav({ setup: { todo_list_version: 3, steps: { ...steps, test_update: { status: 'skipped' } } } })).toBe(false)
+  })
+
+  it.concurrent('uses v4 OTA checklist steps without falling back to features', () => {
+    const setup = { todo_list_version: 4, ota_todo_list_version: '1', steps: { ota: { test_update: { status: 'pending' } } } }
+    expect(shouldShowGettingStartedNav({ setup, features: { ota: { stage: 'store_live' } } })).toBe(true)
+    expect(shouldShowGettingStartedNav({ setup: { todo_list_version: 4 }, features: {} })).toBe(false)
+
+    const doneSteps = Object.fromEntries([
+      'login_cli_mcp',
+      'add_channel',
+      'add_updater',
+      'add_code',
+      'run_device',
+      'upload_bundle',
+      'test_update',
+    ].map(id => [id, { status: 'done' }]))
+    expect(shouldShowGettingStartedNav({ setup: { ...setup, steps: { ota: doneSteps } }, features: {} })).toBe(false)
+    expect(shouldShowGettingStartedNav({ setup: { todo_list_version: 5 }, features: {} })).toBe(false)
+  })
+
+  it.concurrent('uses incomplete v4 Builder steps from either platform', () => {
+    const doneBuilderSteps = {
+      ios: Object.fromEntries(BUILDER_STEP_IDS.ios.map(id => [id, { status: 'done' }])),
+      android: Object.fromEntries(BUILDER_STEP_IDS.android.map(id => [id, { status: 'done' }])),
+    }
+    const setup = {
+      todo_list_version: 4,
+      builder_todo_list_version: '1',
+      paths: ['builder'],
+      steps: { builder: doneBuilderSteps },
+    }
+
+    expect(shouldShowGettingStartedNav({ setup })).toBe(false)
+    expect(shouldShowGettingStartedNav({
+      setup: {
+        ...setup,
+        steps: { builder: { ...doneBuilderSteps, ios: { ...doneBuilderSteps.ios, prepare_profile: { status: 'pending' } } } },
+      },
+    })).toBe(true)
+    expect(shouldShowGettingStartedNav({
+      setup: {
+        ...setup,
+        steps: { builder: { ...doneBuilderSteps, android: { ...doneBuilderSteps.android, prepare_keystore: { status: 'pending' } } } },
+      },
+    })).toBe(true)
+    expect(shouldShowGettingStartedNav({
+      setup: {
+        ...setup,
+        steps: { builder: { ...doneBuilderSteps, ios: { ...doneBuilderSteps.ios, connect_app_store: { status: 'warning' } } } },
+      },
+    })).toBe(true)
+    expect(shouldShowGettingStartedNav({
+      setup: {
+        ...setup,
+        steps: { builder: { ...doneBuilderSteps, ios: { ...doneBuilderSteps.ios, prepare_profile: { status: 'skipped' } } } },
+      },
+    })).toBe(false)
+  })
+
+  it.concurrent('keeps feature-based nav visibility for v1 and v2', () => {
+    for (const version of [1, 2]) {
+      expect(shouldShowGettingStartedNav({ setup: { todo_list_version: version }, features: {} })).toBe(true)
+      expect(shouldShowGettingStartedNav({
+        setup: { todo_list_version: version },
+        features: { ota: { succeeded_at: '2026-09-01T00:00:00.000Z', stage: 'store_live' } },
+      })).toBe(false)
+    }
+  })
+})
+
+describe('checklist-based onboarding redirects', () => {
+  function otaSetup(version: number, steps: Record<string, { status: string }>, outcome = 'in_progress') {
+    return {
+      todo_list_version: version,
+      ...(version === 4 ? { ota_todo_list_version: '1', paths: ['ota'] } : {}),
+      steps: version === 4 ? { ota: steps } : steps,
+      outcome,
+    }
+  }
+
+  it.concurrent.each([3, 4])('keeps pending v%i setup open after an OTA install', (version) => {
+    const onboarding = {
+      setup: otaSetup(version, {}),
+      features: { ota: { succeeded_at: '2026-09-01T00:00:00.000Z', stage: 'store_live' } },
+    }
+    expect(shouldShowGettingStartedNav(onboarding)).toBe(true)
+    expect(shouldSkipOnboardingResume(onboarding)).toBe(false)
+  })
+
+  it.concurrent.each([3, 4])('keeps pending v%i steps open despite a terminal summary', (version) => {
+    const steps = Object.fromEntries(APP_ONBOARDING_OTA_V1_STEP_IDS.map(id => [id, { status: 'done' }]))
+    for (const outcome of ['completed', 'skipped']) {
+      const onboarding = { setup: otaSetup(version, { ...steps, test_update: { status: 'pending' } }, outcome) }
+      expect(shouldShowGettingStartedNav(onboarding)).toBe(true)
+      expect(shouldSkipOnboardingResume(onboarding)).toBe(false)
+    }
+  })
+
+  it.concurrent.each([3, 4])('leaves v%i setup when every step is done or skipped without feature signals', (version) => {
+    const steps = Object.fromEntries(APP_ONBOARDING_OTA_V1_STEP_IDS.map(id => [id, { status: 'done' }]))
+    for (const status of ['done', 'skipped']) {
+      const onboarding = { setup: otaSetup(version, { ...steps, test_update: { status } }) }
+      expect(shouldShowGettingStartedNav(onboarding)).toBe(false)
+      expect(shouldSkipOnboardingResume(onboarding)).toBe(true)
+    }
+  })
+
+  it.concurrent.each(['ios', 'android'] as const)('keeps pending v4 Builder %s steps open after an OTA install', (platform) => {
+    const steps = {
+      ios: Object.fromEntries(BUILDER_STEP_IDS.ios.map(id => [id, { status: 'done' }])),
+      android: Object.fromEntries(BUILDER_STEP_IDS.android.map(id => [id, { status: 'done' }])),
+    }
+    const onboarding = {
+      setup: { todo_list_version: 4, builder_todo_list_version: '1', paths: ['builder'], steps: { builder: steps }, outcome: 'completed' },
+      features: { ota: { succeeded_at: '2026-09-01T00:00:00.000Z' } },
+    }
+    steps[platform].successful_cloud_build = { status: 'pending' }
+    expect(shouldShowGettingStartedNav(onboarding)).toBe(true)
+    expect(shouldSkipOnboardingResume(onboarding)).toBe(false)
+    steps[platform].successful_cloud_build = { status: 'skipped' }
+    expect(shouldShowGettingStartedNav(onboarding)).toBe(false)
+    expect(shouldSkipOnboardingResume(onboarding)).toBe(true)
+  })
+
+  it.concurrent.each([3, 4])('honors explicit dismissal of pending v%i setup', (version) => {
+    const onboarding = {
+      setup: otaSetup(version, {}),
+      getting_started_dismissed_at: '2026-09-01T00:00:00.000Z',
+    }
+    expect(shouldShowGettingStartedNav(onboarding)).toBe(false)
+    expect(shouldSkipOnboardingResume(onboarding)).toBe(true)
   })
 })
 

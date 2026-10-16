@@ -1,11 +1,18 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
+import type { PgQueryClient } from '../../utils/pg.ts'
+import type { SsoAccess } from './role-mapping.ts'
 import { createHono, quickError, useCors } from '../../utils/hono.ts'
 import { middlewareAuth } from '../../utils/hono_jwt.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { getPgClient } from '../../utils/pg.ts'
+import { closeClient, getPgClient, withPgTransaction } from '../../utils/pg.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
+import { mappedAttributes, parseStoredRoleMapping, readAttributeValues, resolveSsoAccess } from './role-mapping.ts'
+
+// Transactions go through withPgTransaction (one checked-out connection);
+// plain reads may use the pool directly.
+type PgExecutor = Awaited<ReturnType<typeof getPgClient>> | PgQueryClient
 
 interface PublicUserSeed {
   id: string
@@ -22,6 +29,15 @@ type OrgRoleName
 
 interface EnsureOrgMembershipResult {
   alreadyMember: boolean
+  // The provider's role mapping grants no role: org access was revoked.
+  noAccess?: boolean
+}
+
+// One org the login provisions: the provider's owner org (legacy behavior
+// when it has no role mapping) and every linked org with a role mapping.
+interface OrgAccessTarget {
+  orgId: string
+  access: SsoAccess | null
 }
 
 interface SsoProviderRecord {
@@ -36,7 +52,7 @@ export const app = createHono('', version)
 app.use('*', useCors)
 app.use('*', middlewareAuth)
 
-async function findCanonicalAuthUserIdByEmail(pgClient: ReturnType<typeof getPgClient>, email: string, excludedUserId: string, trustedProviders: string[]): Promise<string | null> {
+async function findCanonicalAuthUserIdByEmail(pgClient: PgExecutor, email: string, excludedUserId: string, trustedProviders: string[]): Promise<string | null> {
   const result = await pgClient.query<{ id: string }>(
     `
       select au.id
@@ -127,7 +143,67 @@ function getAuthorizedSsoProviders(provider: SsoProviderRecord, authenticatedPro
   })
 }
 
-async function transferSsoIdentities(pgClient: ReturnType<typeof getPgClient>, originalUserId: string, duplicateUserId: string, trustedProviders: string[]): Promise<number> {
+// Role mapping input comes from the SSO identity that authenticated this login;
+// Supabase Auth refreshes its identity_data on every SAML login.
+function resolveMappedAccess(provider: { role_mapping?: unknown }, authorizedSsoProviders: string[], identities: any[]): SsoAccess | null {
+  const mapping = parseStoredRoleMapping(provider.role_mapping)
+  if (!mapping)
+    return null
+  const identity = identities.find(candidate => authorizedSsoProviders.includes(candidate?.provider))
+  return resolveSsoAccess(mapping, readAttributeValues(identity?.identity_data, mappedAttributes(mapping)))
+}
+
+// Orgs sharing the provider (sso_provider_org_links) are only provisioned
+// through their own role mapping: a link without a valid mapping grants
+// nothing. Read inside the provisioning transaction with a share lock, so an
+// unlink or mapping change waits for this login instead of being overridden
+// by a stale read. Sorted by org id so concurrent logins take org locks in
+// one order.
+async function resolveOrgTargets(
+  pgClient: PgQueryClient,
+  provider: { id: string, org_id: string, role_mapping?: unknown },
+  authorizedSsoProviders: string[],
+  identities: any[],
+): Promise<OrgAccessTarget[]> {
+  const { rows } = await pgClient.query<{ org_id: string, role_mapping: unknown }>(
+    `
+      select org_id, role_mapping
+      from public.sso_provider_org_links
+      where sso_provider_id = $1
+        and role_mapping is not null
+        and org_id <> $2
+      order by org_id
+      for share
+    `,
+    [provider.id, provider.org_id],
+  )
+  const linked = rows.flatMap((link) => {
+    const access = resolveMappedAccess(link, authorizedSsoProviders, identities)
+    return access ? [{ orgId: link.org_id, access }] : []
+  })
+  return [{ orgId: provider.org_id, access: resolveMappedAccess(provider, authorizedSsoProviders, identities) }, ...linked]
+}
+
+// The login is denied only when no org grants access.
+async function provisionOrgsInTransaction(
+  client: PgQueryClient,
+  requestId: string,
+  userId: string,
+  targets: OrgAccessTarget[],
+): Promise<EnsureOrgMembershipResult> {
+  const results: EnsureOrgMembershipResult[] = []
+  for (const target of targets) {
+    results.push(target.access
+      ? await applyMappedAccessInTransaction(client, requestId, userId, target.orgId, target.access)
+      : await ensureOrgMembershipInTransaction(client, requestId, userId, target.orgId))
+  }
+  return {
+    alreadyMember: results.every(result => result.alreadyMember),
+    noAccess: results.every(result => result.noAccess === true),
+  }
+}
+
+async function transferSsoIdentities(pgClient: PgExecutor, originalUserId: string, duplicateUserId: string, trustedProviders: string[]): Promise<number> {
   const result = await pgClient.query(
     `
       update auth.identities
@@ -142,7 +218,7 @@ async function transferSsoIdentities(pgClient: ReturnType<typeof getPgClient>, o
   return result.rowCount ?? 0
 }
 
-async function setAuthUserSsoOnly(pgClient: ReturnType<typeof getPgClient>, userId: string, authorizedSsoProviders: string[]): Promise<void> {
+async function setAuthUserSsoOnly(pgClient: PgExecutor, userId: string, authorizedSsoProviders: string[]): Promise<void> {
   const primarySsoProvider = authorizedSsoProviders[0]
   if (!primarySsoProvider) {
     throw new Error('missing_sso_provider')
@@ -191,26 +267,19 @@ function buildPublicUserSeed(userId: string, email: string, userMetadata: Record
   }
 }
 
+type TargetResolver = (client: PgQueryClient) => Promise<OrgAccessTarget[]>
+
 async function ensureOrgMembership(
-  pgClient: ReturnType<typeof getPgClient>,
+  pgPool: Awaited<ReturnType<typeof getPgClient>>,
   requestId: string,
   userId: string,
-  orgId: string,
-  fallbackRole: OrgRoleName = 'org_member',
+  resolveTargets: TargetResolver,
 ): Promise<EnsureOrgMembershipResult> {
-  await pgClient.query('begin')
   try {
-    const membershipResult = await ensureOrgMembershipInTransaction(pgClient, requestId, userId, orgId, fallbackRole)
-    await pgClient.query('commit')
-    return membershipResult
+    return await withPgTransaction(pgPool, async client => provisionOrgsInTransaction(client, requestId, userId, await resolveTargets(client)))
   }
   catch (error) {
-    try {
-      await pgClient.query('rollback')
-    }
-    catch (rollbackError) {
-      cloudlogErr({ requestId, message: 'Failed to roll back SSO provisioning transaction', userId, orgId, error: rollbackError })
-    }
+    cloudlogErr({ requestId, message: 'SSO provisioning transaction rolled back', userId, error })
     throw error
   }
 }
@@ -266,7 +335,7 @@ async function ensurePublicUserRowExists(
 }
 
 async function ensurePublicUserRowExistsInTransaction(
-  pgClient: ReturnType<typeof getPgClient>,
+  pgClient: PgExecutor,
   requestId: string,
   user: PublicUserSeed,
 ): Promise<void> {
@@ -288,8 +357,15 @@ async function ensurePublicUserRowExistsInTransaction(
   }
 }
 
+// org_users has no unique (user_id, org_id) constraint and FOR UPDATE cannot
+// lock a missing row, so concurrent provisioning of the same user (callback
+// and auth guard, or a retry after a client timeout) is serialized here.
+async function lockOrgMembership(pgClient: PgExecutor, userId: string, orgId: string): Promise<void> {
+  await pgClient.query('select pg_advisory_xact_lock(hashtext($1))', [`sso_org_membership:${orgId}:${userId}`])
+}
+
 async function ensureOrgMembershipInTransaction(
-  pgClient: ReturnType<typeof getPgClient>,
+  pgClient: PgExecutor,
   requestId: string,
   userId: string,
   orgId: string,
@@ -392,6 +468,7 @@ async function ensureOrgMembershipInTransaction(
   }
 
   try {
+    await lockOrgMembership(pgClient, userId, orgId)
     const existingMembership = await pgClient.query<{ id: string, is_invite: boolean, rbac_role_name: string | null }>(
       `
         select id, is_invite, rbac_role_name
@@ -446,53 +523,226 @@ async function ensureOrgMembershipInTransaction(
   }
 }
 
+async function countOtherOrgSuperAdmins(client: PgQueryClient, orgId: string, userId: string): Promise<number> {
+  const result = await client.query<{ count: string }>(
+    `
+      select count(*) as count
+      from public.role_bindings rb
+      join public.roles r on r.id = rb.role_id
+      where rb.scope_type = public.rbac_scope_org()
+        and rb.org_id = $1
+        and rb.principal_type = public.rbac_principal_user()
+        and rb.principal_id <> $2
+        and r.name = public.rbac_role_org_super_admin()
+        and (rb.expires_at is null or rb.expires_at > now())
+    `,
+    [orgId, userId],
+  )
+  return Number(result.rows[0]?.count ?? 0)
+}
+
+async function getOrgRoleName(client: PgQueryClient, orgId: string, userId: string): Promise<string | null> {
+  const result = await client.query<{ name: string }>(
+    `
+      select r.name
+      from public.role_bindings rb
+      join public.roles r on r.id = rb.role_id
+      where rb.principal_type = public.rbac_principal_user()
+        and rb.principal_id = $1
+        and rb.scope_type = public.rbac_scope_org()
+        and rb.org_id = $2
+      limit 1
+    `,
+    [userId, orgId],
+  )
+  return result.rows[0]?.name ?? null
+}
+
+// Applies a role mapping result on every login: the IdP is the source of
+// truth for the org role and for membership of the groups the mapping
+// references (upgrades and downgrades). The org's last super admin is never
+// demoted or removed, so a misconfigured IdP cannot orphan the org.
+async function applyMappedAccessInTransaction(
+  client: PgQueryClient,
+  requestId: string,
+  userId: string,
+  orgId: string,
+  access: SsoAccess,
+): Promise<EnsureOrgMembershipResult> {
+  await lockOrgMembership(client, userId, orgId)
+  const membership = await client.query<{ id: string, is_invite: boolean }>(
+    `
+      select id, is_invite
+      from public.org_users
+      where user_id = $1
+        and org_id = $2
+      for update
+    `,
+    [userId, orgId],
+  )
+  const existing = membership.rows[0]
+  const currentRole = await getOrgRoleName(client, orgId, userId)
+  // Two super admins demoted by concurrent logins could each still count the
+  // other: serialize on the same org-wide lock the last-super-admin triggers use.
+  if (currentRole === 'org_super_admin')
+    await client.query('select pg_advisory_xact_lock(hashtext($1))', [orgId])
+  const isLastSuperAdmin = currentRole === 'org_super_admin' && await countOtherOrgSuperAdmins(client, orgId, userId) === 0
+
+  if (access.orgRole === null) {
+    if (isLastSuperAdmin) {
+      cloudlog({ requestId, message: 'SSO role mapping grants no access but user is the last super admin; keeping membership', userId, orgId })
+      return { alreadyMember: true, noAccess: true }
+    }
+    // Every group of the org, not only mapped ones: group bindings grant
+    // permissions without an org_users row.
+    await client.query(
+      'delete from public.group_members gm using public.groups g where g.id = gm.group_id and g.org_id = $2 and gm.user_id = $1',
+      [userId, orgId],
+    )
+    await client.query(
+      `
+        delete from public.role_bindings
+        where principal_type = public.rbac_principal_user()
+          and principal_id = $1
+          and org_id = $2
+      `,
+      [userId, orgId],
+    )
+    await client.query('delete from public.org_users where user_id = $1 and org_id = $2', [userId, orgId])
+    cloudlog({ requestId, message: 'SSO role mapping revoked org access', userId, orgId, hadMembership: !!existing })
+    return { alreadyMember: false, noAccess: true }
+  }
+
+  const targetRole = isLastSuperAdmin ? 'org_super_admin' : access.orgRole
+  if (isLastSuperAdmin && access.orgRole !== 'org_super_admin')
+    cloudlog({ requestId, message: 'SSO role mapping would demote the last super admin; keeping org_super_admin', userId, orgId, mappedRole: access.orgRole })
+
+  if (existing) {
+    await client.query('update public.org_users set is_invite = false, rbac_role_name = $1 where id = $2', [targetRole, existing.id])
+  }
+  else {
+    await client.query(
+      'insert into public.org_users (user_id, org_id, rbac_role_name, is_invite) values ($1, $2, $3, false)',
+      [userId, orgId, targetRole],
+    )
+  }
+
+  if (currentRole !== targetRole) {
+    await client.query(
+      `
+        delete from public.role_bindings
+        where principal_type = public.rbac_principal_user()
+          and principal_id = $1
+          and scope_type = public.rbac_scope_org()
+          and org_id = $2
+      `,
+      [userId, orgId],
+    )
+    await client.query(
+      `
+        insert into public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by, reason, is_direct)
+        select public.rbac_principal_user(), $1, r.id, public.rbac_scope_org(), $2, $1, 'SSO role mapping', true
+        from public.roles r
+        where r.name = $3
+          and r.scope_type = public.rbac_scope_org()
+      `,
+      [userId, orgId, targetRole],
+    )
+  }
+
+  if (access.managedAppIds.length > 0) {
+    const appRoles = JSON.stringify(access.appRoles)
+    // Drop bindings on mapped apps the user no longer matches, or whose role changed.
+    await client.query(
+      `
+        delete from public.role_bindings rb
+        using public.roles r
+        where r.id = rb.role_id
+          and rb.principal_type = public.rbac_principal_user()
+          and rb.principal_id = $1
+          and rb.scope_type = public.rbac_scope_app()
+          and rb.app_id = any($2::uuid[])
+          and r.name is distinct from ($3::jsonb ->> rb.app_id::text)
+      `,
+      [userId, access.managedAppIds, appRoles],
+    )
+    await client.query(
+      `
+        insert into public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, app_id, granted_by, reason, is_direct)
+        select public.rbac_principal_user(), $1, r.id, public.rbac_scope_app(), $2, a.id, $1, 'SSO role mapping', true
+        from jsonb_each_text($3::jsonb) mapped
+        join public.apps a on a.id = mapped.key::uuid and a.owner_org = $2
+        join public.roles r on r.name = mapped.value and r.scope_type = public.rbac_scope_app()
+        on conflict do nothing
+      `,
+      [userId, orgId, appRoles],
+    )
+  }
+
+  const removedGroupIds = access.managedGroupIds.filter(groupId => !access.groupIds.includes(groupId))
+  if (removedGroupIds.length > 0)
+    await client.query('delete from public.group_members where user_id = $1 and group_id = any($2::uuid[])', [userId, removedGroupIds])
+  if (access.groupIds.length > 0) {
+    await client.query(
+      `
+        insert into public.group_members (group_id, user_id, added_by)
+        select g.id, $1, $1
+        from public.groups g
+        where g.id = any($2::uuid[])
+          and g.org_id = $3
+        on conflict do nothing
+      `,
+      [userId, access.groupIds, orgId],
+    )
+  }
+
+  return { alreadyMember: !!existing && !existing.is_invite }
+}
+
 async function mergeSsoIdentityWithExistingAccount(
-  pgClient: ReturnType<typeof getPgClient>,
+  pgPool: Awaited<ReturnType<typeof getPgClient>>,
   requestId: string,
   params: {
     originalUserId: string
     duplicateUserId: string
     publicUser: PublicUserSeed
-    orgId: string
+    resolveTargets: TargetResolver
     authorizedSsoProviders: string[]
   },
-): Promise<void> {
-  await pgClient.query('begin')
+): Promise<{ noAccess: boolean }> {
   try {
-    let transferredIdentityCount = 0
-    try {
-      transferredIdentityCount = await transferSsoIdentities(pgClient, params.originalUserId, params.duplicateUserId, params.authorizedSsoProviders)
-    }
-    catch (identityTransferError) {
-      cloudlogErr({ requestId, message: 'Failed to transfer SSO identity during merge', userId: params.duplicateUserId, originalUserId: params.originalUserId, error: identityTransferError })
-      throw new Error('identity_transfer_failed')
-    }
+    return await withPgTransaction(pgPool, async (pgClient) => {
+      let transferredIdentityCount = 0
+      try {
+        transferredIdentityCount = await transferSsoIdentities(pgClient, params.originalUserId, params.duplicateUserId, params.authorizedSsoProviders)
+      }
+      catch (identityTransferError) {
+        cloudlogErr({ requestId, message: 'Failed to transfer SSO identity during merge', userId: params.duplicateUserId, originalUserId: params.originalUserId, error: identityTransferError })
+        throw new Error('identity_transfer_failed')
+      }
 
-    if (transferredIdentityCount === 0) {
-      cloudlogErr({ requestId, message: 'No SSO identities were transferred during merge', userId: params.duplicateUserId, originalUserId: params.originalUserId })
-      throw new Error('identity_transfer_failed')
-    }
+      if (transferredIdentityCount === 0) {
+        cloudlogErr({ requestId, message: 'No SSO identities were transferred during merge', userId: params.duplicateUserId, originalUserId: params.originalUserId })
+        throw new Error('identity_transfer_failed')
+      }
 
-    await ensurePublicUserRowExistsInTransaction(pgClient, requestId, params.publicUser)
-    await ensureOrgMembershipInTransaction(pgClient, requestId, params.originalUserId, params.orgId)
+      await ensurePublicUserRowExistsInTransaction(pgClient, requestId, params.publicUser)
+      const membership = await provisionOrgsInTransaction(pgClient, requestId, params.originalUserId, await params.resolveTargets(pgClient))
 
-    try {
-      await setAuthUserSsoOnly(pgClient, params.originalUserId, params.authorizedSsoProviders)
-    }
-    catch (ssoFlagError) {
-      cloudlogErr({ requestId, message: 'Failed to enforce SSO-only auth state on original user during merge', originalUserId: params.originalUserId, error: ssoFlagError })
-      throw new Error('sso_flag_update_failed')
-    }
-
-    await pgClient.query('commit')
+      try {
+        await setAuthUserSsoOnly(pgClient, params.originalUserId, params.authorizedSsoProviders)
+      }
+      catch (ssoFlagError) {
+        cloudlogErr({ requestId, message: 'Failed to enforce SSO-only auth state on original user during merge', originalUserId: params.originalUserId, error: ssoFlagError })
+        throw new Error('sso_flag_update_failed')
+      }
+      // The identity is still linked: the account belongs to this person even
+      // when the mapping currently grants them no access.
+      return { noAccess: membership.noAccess === true }
+    })
   }
   catch (error) {
-    try {
-      await pgClient.query('rollback')
-    }
-    catch (rollbackError) {
-      cloudlogErr({ requestId, message: 'Failed to roll back SSO merge transaction', userId: params.duplicateUserId, originalUserId: params.originalUserId, error: rollbackError })
-    }
+    cloudlogErr({ requestId, message: 'SSO merge transaction rolled back', userId: params.duplicateUserId, originalUserId: params.originalUserId, error })
     throw error
   }
 }
@@ -511,9 +761,9 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   }
 
   const admin = supabaseAdmin(c)
-  let pgClient: ReturnType<typeof getPgClient> | undefined
-  const getSharedPgClient = () => {
-    pgClient ??= getPgClient(c)
+  let pgClient: Awaited<ReturnType<typeof getPgClient>> | undefined
+  const getSharedPgClient = async () => {
+    pgClient ??= await getPgClient(c)
     return pgClient
   }
 
@@ -563,7 +813,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     // so a pre-signup cannot become the merge target.
     let resolvedExistingUserId: string | null = null
     try {
-      resolvedExistingUserId = await findCanonicalAuthUserIdByEmail(getSharedPgClient(), userEmail, userId, trustedSsoProviders)
+      resolvedExistingUserId = await findCanonicalAuthUserIdByEmail(await getSharedPgClient(), userEmail, userId, trustedSsoProviders)
       if (resolvedExistingUserId) {
         cloudlog({ requestId, message: 'Canonical pre-existing auth account found — will merge SSO identity after provider authorization', userId, originalUserId: resolvedExistingUserId, email: userEmail })
       }
@@ -585,7 +835,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       // Step 1: Resolve the SSO provider org so we can ensure the original user is a member
       const { data: mergeProvider, error: mergeProviderError } = await (admin as any)
         .from('sso_providers')
-        .select('id, org_id, provider_id')
+        .select('id, org_id, provider_id, role_mapping')
         .eq('domain', userDomain)
         .eq('status', 'active')
         .maybeSingle()
@@ -607,15 +857,16 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       }
 
       // Step 2: Transfer the SSO identity and provision the merged account atomically.
+      let mergeResult: { noAccess: boolean }
       try {
-        await mergeSsoIdentityWithExistingAccount(getSharedPgClient(), requestId, {
+        mergeResult = await mergeSsoIdentityWithExistingAccount(await getSharedPgClient(), requestId, {
           originalUserId,
           duplicateUserId: userId,
           publicUser: {
             ...publicUserSeed,
             id: originalUserId,
           },
-          orgId: mergeProvider.org_id,
+          resolveTargets: client => resolveOrgTargets(client, mergeProvider, authorizedSsoProviders, userIdentities),
           authorizedSsoProviders,
         })
       }
@@ -646,6 +897,9 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
         // Identity already transferred — log but still return merged so frontend redirects to login
       }
 
+      if (mergeResult.noAccess)
+        return quickError(403, 'sso_no_access', 'Your identity provider does not grant you access to this organization. Contact your administrator.')
+
       cloudlog({ requestId, message: 'SSO account merged successfully — user must re-login', userId, originalUserId })
       return c.json({ success: true, merged: true })
     }
@@ -653,7 +907,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     // Resolve the provider from the user's email domain server-side
     const { data: provider, error: providerError } = await (admin as any)
       .from('sso_providers')
-      .select('id, org_id, domain, status, provider_id')
+      .select('id, org_id, domain, status, provider_id, role_mapping')
       .eq('domain', userDomain)
       .eq('status', 'active')
       .maybeSingle()
@@ -683,10 +937,14 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 
     let membershipResult: EnsureOrgMembershipResult
     try {
-      membershipResult = await ensureOrgMembership(getSharedPgClient(), requestId, userId, provider.org_id)
+      membershipResult = await ensureOrgMembership(await getSharedPgClient(), requestId, userId, client => resolveOrgTargets(client, provider, authorizedSsoProviders, userIdentities))
     }
     catch {
       return quickError(500, 'provision_failed', 'Failed to provision user to organization')
+    }
+
+    if (membershipResult.noAccess) {
+      return quickError(403, 'sso_no_access', 'Your identity provider does not grant you access to this organization. Contact your administrator.')
     }
 
     if (membershipResult.alreadyMember) {
@@ -699,7 +957,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   }
   finally {
     if (pgClient) {
-      await pgClient.end()
+      await closeClient(c, pgClient)
     }
   }
 })

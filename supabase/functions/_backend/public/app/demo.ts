@@ -225,7 +225,7 @@ function generateDeviceId(): string {
   return crypto.randomUUID()
 }
 
-type PgClient = ReturnType<typeof getPgClient>
+type PgClient = Awaited<ReturnType<typeof getPgClient>>
 
 interface SeedDemoAppDataOptions {
   appUuid: string
@@ -277,7 +277,7 @@ async function seedOnboardingDemoDataInTransaction(
   c: Context<MiddlewareKeyVariables>,
   options: SeedDemoAppDataOptions,
 ): Promise<void> {
-  const pgClient = getPgClient(c)
+  const pgClient = await getPgClient(c)
   let shouldRollback = false
 
   try {

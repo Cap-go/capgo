@@ -3,6 +3,19 @@
 This file provides guidance to AI agents (Claude Code, Cursor, Copilot, etc.)
 when working with code in this repository.
 
+## MUST NOT — modify the admin dashboard in this repository
+
+The admin dashboard is maintained in the private
+[`Cap-go/capgo_admin_dashboard`](https://github.com/Cap-go/capgo_admin_dashboard)
+repository and deployed at `admin.capgo.app`. The web app only links to it. Do
+not add dashboard code or open dashboard pull requests here.
+
+For admin dashboard work, load
+`.agents/skills/modify-admin-dashboard/SKILL.md` and make the change and pull
+request in `Cap-go/capgo_admin_dashboard`. Shared backend producers that serve
+other Capgo features can still be changed here when the requested work genuinely
+belongs to shared infrastructure. See `docs/admin-dashboard.md`.
+
 ## MUST NOT — never publish private customer data
 
 **This repository is public.** Chat, tickets, and internal messages may contain
@@ -67,7 +80,10 @@ CLI identity path (`get_user_id(text)` with a valid API key must keep working).
 - `bun mobile` - Build for mobile and copy to Capacitor platforms
 - `bun dev-build` - Build with development branch configuration
 - `bun run cli:build` - Build the CLI workspace in `cli/`
-- `bun run cli:test` - Run the CLI workspace test suite
+- `bun run cli:test` - Run the CLI workspace test suite (the setup steps
+  `test:helper-dce` and `test:version-detection:setup` run first, then the rest
+  of `cli` `test:suite` runs in parallel; `bun run --cwd cli test:serial` runs
+  everything one by one)
 - `bun run cli:check` - Lint, typecheck, build, and test the CLI workspace
 
 ### Testing
@@ -89,7 +105,8 @@ CLI identity path (`get_user_id(text)` with a valid API key must keep working).
 - `bun test:cli` - Run CLI-specific tests (workspace CLI plus
   `tests/cli-compat.test.ts`, which pins `@capgo/cli` to `MIN_CLI_VERSION`)
 - `bun test:local` - Legacy alias for the default monorepo backend test run
-- `bun test:front` - Run Playwright frontend tests
+- `bun test:front` - Run Playwright frontend tests (CI shards spec files by
+  measured duration from `playwright/spec-durations.json`; add slow new specs there)
 - `bun test:all:local` - Legacy alias for `bun test:all`
 - `bun test:cli:local` - Legacy alias for `bun test:cli`
 
@@ -158,8 +175,26 @@ testing against Cloudflare Workers.
 `/channel_self`, `/updates`, and `/stats` are public plugin endpoints in `plugins/`. They take no API key, JWT, or device secret — the client asserts `device_id`. That is the product.
 
 - Unauthenticated SET on `/channel_self` (POST/DELETE persist, client-controlled `plugin_version`, `device_id` spoof) is **intended behavior**. It is **NOT** a security issue.
-- Do **not** open a security-fix PR or keep a GHSA open for "missing auth on channel_self set". Closed: GHSA-g9h5 / PR #3222. Same class as GHSA-469v (GET `/channel_self` enumeration is already documented as intended).
+- Do **not** open a security-fix PR or keep a GHSA open for "missing auth on channel_self set". Closed in PR #3222. GET `/channel_self` enumeration is also documented as intended.
 - Dashboard/API forced overrides on private channels remain a separate, authenticated path. Do **not** "fix" the public plugin set path.
+
+## MUST NOT — security advisories and public PRs
+
+- Do **not** put GHSA ids in public PR titles, bodies, branch names, commit messages, issues, or changelogs.
+- Do **not** quote unpublished advisory bodies or PoCs into public docs, Issues, or PRs.
+- Embargoed security detail stays need-to-know until Charly/Martin approve disclosure.
+- Private Cap-go/crew-memory may reference GHSA ids when already in play.
+
+## Agent security regressions
+
+Before changing authz, OTA/channel/bundle, CLI zip paths, webhooks, or SECURITY DEFINER SQL, read and follow:
+
+`docs/agent-security-regressions.md`
+
+Known non-vulns (also in org SECURITY.md / https://capgo.app/security/):
+
+- Unauthenticated `channel_self` SET and designed no-API-key `/updates` / `/stats` are intentional (see Plugin endpoint security triage HARD RULE above).
+- Uploader encryption mislabel on `external_url` bundles is not a Capgo vulnerability.
 
 ### Production Scale Guardrails
 
@@ -1222,6 +1257,15 @@ Console CSP, SRI maintenance, sanitization helpers, and redirect validation are
 documented in [docs/frontend-security.md](docs/frontend-security.md). Review
 that checklist when touching `public/_headers`, external scripts, or user-controlled
 HTML/URL rendering.
+
+## Billing usage retention
+
+Deleted-app usage stays billable for 35 days, a deleted app ID recreated by
+another org in that window shares its usage rows (both orgs billed, new owner
+can read them), and app transfers count MAU for each org. These are intentional
+anti-fraud behaviors documented in
+[docs/billing-usage-retention.md](docs/billing-usage-retention.md). Do not
+change them without a product decision.
 
 ## Graphify
 

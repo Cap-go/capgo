@@ -1,10 +1,8 @@
 <script setup lang="ts">
-import { Capacitor } from '@capacitor/core'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import IconPanelLeft from '~icons/lucide/panel-left'
-import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import IconMenu from '~icons/material-symbols/menu-rounded'
 import { useDisplayStore } from '~/stores/display'
 import Banner from './Banner.vue'
@@ -21,20 +19,30 @@ const props = defineProps({
 })
 
 defineEmits(['toggleSidebar', 'toggleSidebarCollapse'])
-const isMobile = ref(Capacitor.isNativePlatform())
-
-const router = useRouter()
-
 const displayStore = useDisplayStore()
-const lastBreadcrumbName = computed(() => displayStore.pathTitle.at(-1)?.name)
-const showNavTitle = computed(() => displayStore.NavTitle && displayStore.pathTitle.length === 0)
-function back() {
-  if (window.history.length > 2)
-    router.back()
-  else
-    router.push(displayStore.defaultBack)
-}
 const { t } = useI18n()
+const showNavTitle = computed(() => displayStore.NavTitle && displayStore.pathTitle.length === 0)
+const route = useRoute()
+// Settings sub-pages have a parent crumb ("Organization") plus their own title
+// ("Members"). Render that title as the current crumb instead of a dangling "/".
+// Scoped to settings, where every page sets NavTitle, so a stale title never leaks.
+const trailingTitle = computed(() => {
+  const last = displayStore.pathTitle.at(-1)
+  if (!route.path.startsWith('/settings/') || !last || !displayStore.NavTitle)
+    return ''
+  const lastName = last.translate === false ? last.name : t(last.name)
+  return displayStore.NavTitle !== lastName ? displayStore.NavTitle : ''
+})
+// Mobile has no breadcrumbs, so fall back to the current crumb: without it,
+// app pages show an empty header and users lose track of where they are.
+const mobileTitle = computed(() => {
+  if (displayStore.NavTitle)
+    return displayStore.NavTitle
+  const last = displayStore.pathTitle.at(-1)
+  if (!last)
+    return ''
+  return last.translate === false ? last.name : t(last.name)
+})
 </script>
 
 <template>
@@ -43,21 +51,10 @@ const { t } = useI18n()
       <div class="relative flex items-center justify-between h-16 -mb-px">
         <!-- Header: Left side -->
         <div class="flex items-center space-x-4 lg:space-x-3">
-          <div v-if="displayStore.NavTitle && isMobile" class="pr-2">
-            <button
-              type="button"
-              class="flex p-2 rounded-sm dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:bg-slate-600 hover:bg-slate-300"
-              :aria-label="t('button-back')"
-              @click="back()"
-            >
-              <IconBack class="w-6 h-6 fill-current" />
-              <span class="hidden md:block">{{ t('button-back') }}</span>
-            </button>
-          </div>
           <div class="hidden lg:block">
             <button
               type="button"
-              class="d-btn d-btn-ghost d-btn-square d-btn-sm dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
+              class="d-btn d-btn-ghost d-btn-square d-btn-sm dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
               data-test="sidebar-collapse-toggle"
               aria-controls="sidebar"
               :aria-expanded="!props.sidebarCollapsed"
@@ -71,7 +68,7 @@ const { t } = useI18n()
           <!-- Hamburger button -->
           <button
             type="button"
-            class="p-1 rounded-md lg:hidden dark:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
+            class="p-1 rounded-md lg:hidden dark:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 text-slate-500 dark:hover:text-slate-50 hover:text-slate-600"
             data-test="sidebar-mobile-toggle"
             aria-controls="sidebar"
             :aria-expanded="props.sidebarOpen"
@@ -87,11 +84,11 @@ const { t } = useI18n()
             <div class="flex items-center space-x-2 font-bold truncate md:text-2xl dark:text-white text-md text-dark">
               <nav class="text-sm font-normal text-slate-600 dark:text-slate-400" aria-label="Breadcrumb">
                 <ol class="inline-flex items-center space-x-1">
-                  <li v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i" class="flex items-center">
+                  <li v-for="(breadcrumb, i) in displayStore.pathTitle" :key="i" class="flex items-center h-16">
                     <span v-if="i > 0" class="mx-1" aria-hidden="true"> / </span>
                     <!-- Last crumb points at the current route, so render it as plain text rather than a dead link -->
                     <span
-                      v-if="i === displayStore.pathTitle.length - 1"
+                      v-if="i === displayStore.pathTitle.length - 1 && !trailingTitle"
                       class="flex items-center h-16 px-2 font-bold text-slate-600 dark:text-slate-100"
                       aria-current="page"
                     >
@@ -100,13 +97,16 @@ const { t } = useI18n()
                     <router-link
                       v-else
                       :to="breadcrumb.path"
-                      class="flex items-center h-16 px-2 rounded-sm underline underline-offset-2 decoration-slate-400/60 hover:decoration-slate-600 hover:text-slate-800 dark:decoration-slate-500 dark:hover:decoration-slate-300 dark:hover:text-white focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none"
+                      class="flex items-center px-2 py-1 rounded-md underline underline-offset-2 decoration-slate-400/60 hover:bg-slate-200/70 hover:decoration-slate-600 hover:text-slate-800 active:bg-slate-200 dark:decoration-slate-500 dark:hover:bg-slate-800 dark:hover:decoration-slate-300 dark:hover:text-white dark:active:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                     >
                       {{ breadcrumb.translate === false ? breadcrumb.name : t(breadcrumb.name) }}
                     </router-link>
                   </li>
-                  <li v-if="displayStore.pathTitle.length && displayStore.NavTitle && displayStore.NavTitle !== lastBreadcrumbName" class="flex items-center">
+                  <li v-if="trailingTitle" class="flex items-center">
                     <span class="mx-1" aria-hidden="true"> / </span>
+                    <span class="flex items-center h-16 px-2 font-bold capitalize text-slate-600 dark:text-slate-100" aria-current="page">
+                      {{ trailingTitle }}
+                    </span>
                   </li>
                   <li v-if="showNavTitle" class="flex items-center">
                     <span class="mx-1 font-bold text-slate-600 dark:text-slate-100 md:text-2xl" aria-hidden="true">{{ displayStore.NavTitle }}</span>
@@ -119,8 +119,8 @@ const { t } = useI18n()
 
         <!-- Centered title on mobile -->
         <div class="flex-1 px-4 text-center lg:hidden">
-          <div class="font-bold truncate dark:text-white text-md text-dark">
-            {{ displayStore.NavTitle }}
+          <div class="font-bold truncate dark:text-white text-md text-dark first-letter:uppercase">
+            {{ mobileTitle }}
           </div>
         </div>
 

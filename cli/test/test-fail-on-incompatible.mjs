@@ -8,16 +8,18 @@
  * matrix below is the tested source of truth.
  */
 import assert from 'node:assert/strict'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { shouldBlockIncompatibleUpload } from '../src/bundle/builder-cta.ts'
 import { checkValidOptions } from '../src/bundle/upload.ts'
-import { rejectOrAcceptIncompatibleChannelBundle } from '../src/channel/set.ts'
+import { rejectOrAcceptIncompatibleChannelBundle, throwChannelWriteError } from '../src/channel/set.ts'
+import { shouldCapturePosthogException } from '../src/posthog.ts'
 import { requestBuildOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../src/schemas/sdk.ts'
 
 let failures = 0
 
-function test(name, fn) {
+async function test(name, fn) {
   try {
-    fn()
+    await fn()
     console.log(`✅ ${name}`)
   }
   catch (error) {
@@ -164,6 +166,31 @@ test('--accept-incompatible alone does not trigger a conflict', () => {
   assert.doesNotThrow(() => checkValidOptions({ acceptIncompatible: true }))
 })
 
+test('partial S3 configuration is rejected before upload side effects', () => {
+  assert.throws(
+    () => checkValidOptions({ s3BucketName: 'bundle-bucket' }),
+    /for S3 upload you need to provide/,
+  )
+})
+
+test('complete S3 configuration passes upload option validation', () => {
+  assert.doesNotThrow(() => checkValidOptions({
+    s3Apikey: 'access-key',
+    s3Apisecret: 'secret-key',
+    s3BucketName: 'bundle-bucket',
+    s3Endpoint: 's3.example.test',
+    s3Port: 443,
+    s3Region: 'test-region',
+  }))
+})
+
+test('dry uploads also reject incomplete S3 configuration', () => {
+  assert.throws(
+    () => checkValidOptions({ dryUpload: true, s3BucketName: 'bundle-bucket' }),
+    /for S3 upload you need to provide/,
+  )
+})
+
 test('SDK uploadOptionsSchema rejects acceptIncompatible with ignoreCompatibilityCheck', () => {
   const result = uploadOptionsSchema.safeParse({
     appId: 'com.example.app',
@@ -265,7 +292,12 @@ test('channel set throws when incompatible and not accepted', () => {
       heading: 'nope',
       errorMessage: 'Bundle is not compatible with production channel',
     }),
-    /Bundle is not compatible with production channel/,
+    (error) => {
+      assert.match(error.message, /Bundle is not compatible with production channel/)
+      // An expected rejection, not a crash: error tracking must skip it.
+      assert.equal(shouldCapturePosthogException(error), false)
+      return true
+    },
   )
 })
 
@@ -289,6 +321,39 @@ test('channel set continues when compatible', () => {
     errorMessage: 'nope',
   }))
 })
+
+function httpError(status, body) {
+  return new FunctionsHttpError(new Response(JSON.stringify(body), { status }))
+}
+
+console.log('\n🧪 Testing throwChannelWriteError...\n')
+
+await test('a channel write denial is not captured', () => assert.rejects(
+  throwChannelWriteError(httpError(400, { error: 'cannot_access_app' }), true),
+  (error) => {
+    assert.equal(error.message, 'API key is not allowed to set this channel')
+    assert.equal(shouldCapturePosthogException(error), false)
+    return true
+  },
+))
+
+await test('a forbidden channel write is not captured', () => assert.rejects(
+  throwChannelWriteError(httpError(403, { error: 'forbidden' }), true),
+  error => shouldCapturePosthogException(error) === false,
+))
+
+await test('a network failure on a channel write is captured', () => {
+  const cause = new TypeError('fetch failed')
+  return assert.rejects(
+    throwChannelWriteError(cause, true),
+    error => error.cause === cause && shouldCapturePosthogException(error),
+  )
+})
+
+await test('a server error on a channel write is captured', () => assert.rejects(
+  throwChannelWriteError(httpError(500, { error: 'internal_error' }), true),
+  error => shouldCapturePosthogException(error),
+))
 
 if (failures > 0) {
   console.error(`\n❌ ${failures} fail-on-incompatible test(s) failed`)

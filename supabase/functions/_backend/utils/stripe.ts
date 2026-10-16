@@ -110,8 +110,10 @@ export function getStripe(c: Context): Stripe {
   })
 }
 
+// The plan item: the Enterprise extra MAU item is licensed too, so skip it.
 function getLicensedSubscriptionItem(items: Stripe.SubscriptionItem[] | undefined) {
-  return items?.find(item => item.plan.usage_type === 'licensed') ?? items?.[0] ?? null
+  const planItems = items?.filter(item => !isExtraMauItem(item))
+  return planItems?.find(item => item.plan.usage_type === 'licensed') ?? planItems?.[0] ?? null
 }
 
 function getSubscriptionProductId(c: Context, item: Stripe.SubscriptionItem | null) {
@@ -166,6 +168,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
 
     return {
       productId,
+      extraMau: getExtraMau(subscription.items.data),
       status: subscription.status,
       cycleStart,
       cycleEnd,
@@ -182,25 +185,6 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
     else {
       cloudlogErr({ requestId: c.get('requestId'), message: 'getSubscriptionData', error })
     }
-    return null
-  }
-}
-
-/**
- * Fetches cancellation details for a Stripe subscription, if available.
- */
-export async function getCancellationDetails(c: Context, subscriptionId: string | null): Promise<Stripe.Subscription.CancellationDetails | null> {
-  if (!subscriptionId)
-    return null
-  if (!isStripeConfigured(c))
-    return null
-
-  try {
-    const subscription = await getStripe(c).subscriptions.retrieve(subscriptionId)
-    return subscription.cancellation_details ?? null
-  }
-  catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'getCancellationDetails', error, subscriptionId })
     return null
   }
 }
@@ -296,6 +280,8 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
     }
     if (subscriptionData)
       updateData.canceled_at = subscriptionData.canceledAt ?? null
+    // Extra MAU only counts while the subscription that bought it is live.
+    updateData.extra_mau = dbStatus === 'succeeded' ? subscriptionData?.extraMau ?? 0 : 0
 
     const { error: updateError } = await supabaseAdmin(c)
       .from('stripe_info')
@@ -311,10 +297,48 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
   }
 }
 
-export async function createPortal(c: Context, customerId: string, callbackUrl: string) {
+export type PortalFlow = 'cancel_subscription'
+
+async function getActiveSubscriptionId(c: Context, customerId: string) {
+  const { data, error } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .select('subscription_id, status')
+    .eq('customer_id', customerId)
+    .maybeSingle()
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getActiveSubscriptionId', error })
+    return null
+  }
+  if (!data?.subscription_id || data.status === 'canceled' || data.status === 'deleted')
+    return null
+  return data.subscription_id
+}
+
+export async function createPortal(c: Context, customerId: string, callbackUrl: string, flow?: PortalFlow) {
   if (!isStripeConfigured(c))
     return { url: '' }
   const allowedReturnUrl = getAllowedRedirectUrl(c, callbackUrl, 'return_url')
+  if (flow === 'cancel_subscription') {
+    const subscriptionId = await getActiveSubscriptionId(c, customerId)
+    if (subscriptionId) {
+      try {
+        const session = await getStripe(c).billingPortal.sessions.create({
+          customer: customerId,
+          return_url: allowedReturnUrl,
+          flow_data: {
+            type: 'subscription_cancel',
+            subscription_cancel: { subscription: subscriptionId },
+            after_completion: { type: 'redirect', redirect: { return_url: allowedReturnUrl } },
+          },
+        })
+        return { url: session.url }
+      }
+      catch (error) {
+        // Cancel flow can be rejected (already canceling, portal config); fall back to the plain portal.
+        cloudlogErr({ requestId: c.get('requestId'), message: 'createPortal cancel flow failed', error })
+      }
+    }
+  }
   const session = await getStripe(c).billingPortal.sessions.create({
     customer: customerId,
     return_url: allowedReturnUrl,
@@ -429,6 +453,57 @@ export async function cancelSubscription(c: Context, customerId: string) {
   return succeeded
 }
 
+// Unpaid subscription invoice details safe to show to billing members.
+export interface OpenSubscriptionInvoiceSummary {
+  hosted_invoice_url: string | null
+  amount_due: number
+  currency: string
+  attempt_count: number
+  next_payment_attempt: string | null
+}
+
+type OpenInvoiceShape = Pick<Stripe.Invoice, 'amount_due' | 'attempt_count' | 'billing_reason' | 'created' | 'currency' | 'next_payment_attempt'> & {
+  amount_remaining?: number | null
+  hosted_invoice_url?: string | null
+  parent?: { subscription_details?: unknown } | null
+}
+
+export function isSubscriptionInvoice(invoice: Pick<OpenInvoiceShape, 'billing_reason' | 'parent'>) {
+  if (invoice.parent?.subscription_details)
+    return true
+  return typeof invoice.billing_reason === 'string' && invoice.billing_reason.startsWith('subscription')
+}
+
+export function toOpenSubscriptionInvoiceSummary(invoice: OpenInvoiceShape): OpenSubscriptionInvoiceSummary {
+  return {
+    hosted_invoice_url: invoice.hosted_invoice_url ?? null,
+    amount_due: invoice.amount_remaining ?? invoice.amount_due,
+    currency: invoice.currency,
+    attempt_count: invoice.attempt_count,
+    next_payment_attempt: invoice.next_payment_attempt
+      ? new Date(invoice.next_payment_attempt * 1000).toISOString()
+      : null,
+  }
+}
+
+// Best effort: dunning emails and the past-due banner still work without the pay link.
+export async function getLatestOpenSubscriptionInvoice(c: Context, customerId: string): Promise<OpenSubscriptionInvoiceSummary | null> {
+  if (!isStripeConfigured(c) || !customerId)
+    return null
+  try {
+    // Stripe lists newest first; page past newer non-subscription invoices.
+    for await (const invoice of getStripe(c).invoices.list({ customer: customerId, status: 'open', limit: 10 })) {
+      if (isSubscriptionInvoice(invoice))
+        return toOpenSubscriptionInvoiceSummary(invoice)
+    }
+    return null
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getLatestOpenSubscriptionInvoice', customerId, error })
+    return null
+  }
+}
+
 async function getStoredPlanPriceId(c: Context, planId: string, recurrence: string): Promise<string | null> {
   try {
     const { data, error } = await supabaseAdmin(c)
@@ -506,6 +581,117 @@ export interface StripeData {
   previousProductId: string | undefined
 }
 
+// Enterprise MAU slider: MAU above the plan allowance is a second item on the
+// subscription, billed per 1,000 MAU with graduated tiers that mirror the MAU
+// usage tiers. It raises the plan quota (stripe_info.extra_mau); it is not
+// credits. Its prices are tagged so plan detection skips the item.
+export const EXTRA_MAU_PRICE_KIND = 'extra_mau'
+const EXTRA_MAU_LOOKUP_KEY_PREFIX = 'capgo_extra_mau_'
+export const EXTRA_MAU_UNIT = 1_000
+export const MAX_EXTRA_MAU = 1_000_000_000
+
+interface TaggedPrice {
+  lookup_key?: string | null
+  metadata?: Stripe.Metadata | null
+}
+
+export function isExtraMauPrice(price: TaggedPrice | null | undefined) {
+  if (!price)
+    return false
+  return price.metadata?.capgo_kind === EXTRA_MAU_PRICE_KIND
+    || (price.lookup_key?.startsWith(EXTRA_MAU_LOOKUP_KEY_PREFIX) ?? false)
+}
+
+export function isExtraMauItem(item: Pick<Stripe.SubscriptionItem, 'price'>) {
+  return isExtraMauPrice(item.price)
+}
+
+export function getExtraMau(items: Array<Pick<Stripe.SubscriptionItem, 'price' | 'quantity'>>) {
+  return items.filter(isExtraMauItem).reduce((total, item) => total + (item.quantity ?? 0) * EXTRA_MAU_UNIT, 0)
+}
+
+interface MauTierStep {
+  step_min: number
+  step_max: number
+  price_per_unit: number
+}
+
+// Graduated Stripe tiers for the MAU above `includedMau`, per 1,000 MAU, in cents.
+export function buildExtraMauTiers(steps: MauTierStep[], includedMau: number, interval: 'month' | 'year') {
+  const months = interval === 'year' ? 12 : 1
+  const tiers: Stripe.PriceCreateParams.Tier[] = []
+  for (const step of [...steps].sort((a, b) => a.step_min - b.step_min)) {
+    if (step.step_max <= includedMau)
+      continue
+    // Current tiers are whole cents per 1,000 MAU ($0.60, $0.45, ...).
+    const unitCents = Math.round(step.price_per_unit * EXTRA_MAU_UNIT * 100 * months)
+    const isLast = step.step_max >= Number.MAX_SAFE_INTEGER
+    tiers.push({
+      up_to: isLast ? 'inf' : Math.ceil((step.step_max - includedMau) / EXTRA_MAU_UNIT),
+      unit_amount: unitCents,
+    })
+  }
+  if (tiers.length)
+    tiers[tiers.length - 1].up_to = 'inf'
+  return tiers
+}
+
+// Short stable hash so a tier change gets a new price (lookup keys are unique).
+function hashString(value: string) {
+  let hash = 0x811C9DC5
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193) >>> 0
+  }
+  return hash.toString(36)
+}
+
+// Found by lookup key, created (with its product) on first use.
+async function getExtraMauPriceId(c: Context, includedMau: number, interval: 'month' | 'year', taxBehavior: Stripe.Price.TaxBehavior | null) {
+  const { data: steps, error } = await supabaseAdmin(c)
+    .from('capgo_credits_steps')
+    .select('step_min, step_max, price_per_unit')
+    .eq('type', 'mau')
+    .is('org_id', null)
+  if (error || !steps?.length)
+    throw simpleError('mau_tiers_not_found', 'Cannot load MAU price tiers', { error })
+
+  const tiers = buildExtraMauTiers(steps, includedMau, interval)
+  const lookupKey = `${EXTRA_MAU_LOOKUP_KEY_PREFIX}${interval}_${hashString(JSON.stringify({ includedMau, tiers }))}`
+  const existing = await getStripe(c).prices.list({ lookup_keys: [lookupKey], active: true, limit: 1 })
+  if (existing.data[0])
+    return existing.data[0].id
+
+  let created: Stripe.Price
+  try {
+    created = await getStripe(c).prices.create({
+      currency: 'usd',
+      billing_scheme: 'tiered',
+      tiers_mode: 'graduated',
+      tiers,
+      recurring: { interval, usage_type: 'licensed' },
+      product_data: {
+        name: 'Enterprise extra MAU',
+        unit_label: '1,000 MAU',
+        metadata: { capgo_kind: EXTRA_MAU_PRICE_KIND },
+      },
+      lookup_key: lookupKey,
+      nickname: `Enterprise extra MAU (${interval})`,
+      metadata: { capgo_kind: EXTRA_MAU_PRICE_KIND, included_mau: String(includedMau) },
+      ...(taxBehavior && taxBehavior !== 'unspecified' ? { tax_behavior: taxBehavior } : {}),
+    })
+  }
+  catch (error) {
+    // A concurrent first checkout may have created the same lookup key: reuse its price.
+    const raced = await getStripe(c).prices.list({ lookup_keys: [lookupKey], active: true, limit: 1 })
+    if (raced.data[0])
+      return raced.data[0].id
+    throw error
+  }
+  cloudlog({ requestId: c.get('requestId'), message: 'created extra MAU price', priceId: created.id, lookupKey })
+  return created.id
+}
+
 export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { priceId: string | null, productId: string | null } {
   let priceId: string | null = null
   let productId: string | null = null
@@ -514,7 +700,7 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'prices stripe', prices })
     prices.forEach((price) => {
-      if (price.plan.usage_type === 'licensed') {
+      if (price.plan.usage_type === 'licensed' && !isExtraMauItem(price)) {
         priceId = price.plan.id
         productId = price.plan.product as string
       }
@@ -541,13 +727,32 @@ function getAffonsoReferralMetadata(affonsoReferral?: string | null): Record<str
   return { affonso_referral: affonsoReferral }
 }
 
-export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string, datafastAttribution?: DatafastAttribution, affonsoReferral?: string | null) {
+// Checkout only offers saved cards with allow_redisplay "always" by default. Cards added
+// through the billing portal are "limited"/"unspecified", so customers were asked for a card again.
+const CHECKOUT_SAVED_PAYMENT_METHOD_OPTIONS: Stripe.Checkout.SessionCreateParams.SavedPaymentMethodOptions = {
+  allow_redisplay_filters: ['always', 'limited', 'unspecified'],
+}
+
+export interface ExtraMauCheckout {
+  includedMau: number
+  extraMau: number
+}
+
+export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string, datafastAttribution?: DatafastAttribution, affonsoReferral?: string | null, extraMau?: ExtraMauCheckout) {
   if (!isStripeConfigured(c))
     return { url: '' }
   const prices = await getPriceIds(c, planId, recurrence)
   cloudlog({ requestId: c.get('requestId'), message: 'prices', prices })
   if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: prices.priceId, quantity: 1 }]
+  if (extraMau && extraMau.extraMau > 0) {
+    // Same interval as the plan: Checkout bills every item of a subscription together.
+    const interval = recurrence === 'year' ? 'year' : 'month'
+    const planPrice = await getStripe(c).prices.retrieve(prices.priceId)
+    const extraMauPriceId = await getExtraMauPriceId(c, extraMau.includedMau, interval, planPrice.tax_behavior ?? null)
+    lineItems.push({ price: extraMauPriceId, quantity: extraMau.extraMau / EXTRA_MAU_UNIT })
+  }
   const metadata = {
     ...(attributionId ? { attribution_id: attributionId } : {}),
     ...getDatafastAttributionMetadata(datafastAttribution),
@@ -570,12 +775,8 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
       name: 'auto',
     },
     tax_id_collection: { enabled: true },
-    line_items: [
-      {
-        price: prices.priceId,
-        quantity: 1,
-      },
-    ],
+    saved_payment_method_options: CHECKOUT_SAVED_PAYMENT_METHOD_OPTIONS,
+    line_items: lineItems,
   })
   return { url: session.url }
 }
@@ -640,6 +841,7 @@ export async function createOneTimeCheckout(
       name: 'auto',
     },
     tax_id_collection: { enabled: true },
+    saved_payment_method_options: CHECKOUT_SAVED_PAYMENT_METHOD_OPTIONS,
     invoice_creation: { enabled: true },
     line_items: [
       {

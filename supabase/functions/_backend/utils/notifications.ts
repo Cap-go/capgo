@@ -232,7 +232,7 @@ export async function sendNotifOrg(
   }
 
   // Create write-capable drizzle client for mutations
-  const pgClient = getPgClient(c)
+  const pgClient = await getPgClient(c)
   const writeClient = createDrizzleClient(pgClient)
 
   let shouldSend = false
@@ -320,24 +320,39 @@ export async function claimNotifOrgOnce(
   uniqId: string,
   writeClient?: ReturnType<typeof createDrizzleClient>,
 ): Promise<boolean> {
+  return await claimNotifOrgOnceWithResult(c, eventName, orgId, uniqId, writeClient) === 'claimed'
+}
+
+/**
+ * Like claimNotifOrgOnce, but tells a duplicate claim (`already_claimed`)
+ * apart from a failed write (`failed`), which callers must keep retryable.
+ */
+export async function claimNotifOrgOnceWithResult(
+  c: Context,
+  eventName: string,
+  orgId: string,
+  uniqId: string,
+  writeClient?: ReturnType<typeof createDrizzleClient>,
+): Promise<'claimed' | 'already_claimed' | 'failed'> {
   if (shouldSkipSupabaseNotificationWrites(c)) {
     logSkippedSupabaseWrite(c, 'claimNotifOrgOnce')
-    return false
+    return 'failed'
   }
 
-  const ownedPgClient = writeClient ? undefined : getPgClient(c)
+  const ownedPgClient = writeClient ? undefined : await getPgClient(c)
   const effectiveWriteClient = writeClient ?? createDrizzleClient(ownedPgClient!)
 
   try {
     const claimed = await insertNotificationClaim(effectiveWriteClient, eventName, orgId, uniqId)
     if (!claimed) {
       cloudlog({ requestId: c.get('requestId'), message: 'notif once already claimed', event: eventName, orgId, uniqId })
+      return 'already_claimed'
     }
-    return claimed
+    return 'claimed'
   }
   catch (e: unknown) {
     logPgError(c, 'claimNotifOrgOnce', e)
-    return false
+    return 'failed'
   }
   finally {
     if (ownedPgClient)
@@ -360,7 +375,7 @@ export async function sendNotifOrgOnce(
     return { sent: false, cleanupFailed: false }
   }
 
-  const ownedPgClient = writeClient ? undefined : getPgClient(c)
+  const ownedPgClient = writeClient ? undefined : await getPgClient(c)
   const effectiveWriteClient = writeClient ?? createDrizzleClient(ownedPgClient!)
 
   try {

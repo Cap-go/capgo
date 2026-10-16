@@ -53,14 +53,30 @@ const state = {
 const events: string[] = []
 const channelEvents: Array<{ event: OnboardingChannelEvent, properties: OnboardingChannelEventProperties }> = []
 const preview = { state, events, channelEvents, appId: ref(previewAppId), command: ref('npx @capgo/cli@latest i [API_KEY]'), hiding: ref(false), selectedOrgId: ref('') }
+const previewUserOnboarding = {
+  abtests: {
+    ...(params.get('channelTreatment') === '1' ? { new_channel: { assigned_at: '2026-09-25T00:00:00.000Z', branch: 'A' } } : {}),
+    ...(params.get('todoListTreatment') === '1' ? { ota_todo_list_v3: { assigned_at: '2026-09-25T00:00:00.000Z', branch: 'A' } } : {}),
+  },
+  intent: assignment ? 'builder' : 'ota',
+  status: 'in_progress',
+  step: 'setup',
+  flow: 'existing_org',
+  setup_stage: 'cli',
+  app_id: previewAppId,
+  ...(params.get('legacyChannel') === '1' ? {} : { final_step: 'setup' }),
+}
 Object.assign(window, { onboardingSetupPreview: preview })
 
 function previewOnboarding() {
+  const features = params.get('otaInstalled') === '1'
+    ? { ota: { succeeded_at: '2026-09-01T00:00:00.000Z' } }
+    : {}
   const selectedPath = assignment === 'both-ota' || assignment === 'ota-only' ? 'ota' : 'builder'
   const hasBuilder = builderComponentView || assignment === 'builder-only' || assignment === 'both-builder' || assignment === 'both-ota'
   const hasOta = assignment === 'ota-only' || assignment === 'both-builder' || assignment === 'both-ota'
   if (hasBuilder || hasOta) {
-    return { setup: {
+    return { features, setup: {
       todo_list_version: 4,
       ...(hasBuilder ? { builder_todo_list_version: '1' } : {}),
       ...(hasOta ? { ota_todo_list_version: '1' } : {}),
@@ -68,13 +84,13 @@ function previewOnboarding() {
       ...(assignment === 'builder-only' ? {} : { selected_path: selectedPath }),
       ...(state.selectedBuilderPlatform ? { selected_builder_platform: state.selectedBuilderPlatform } : {}),
       steps: {
-        ...(hasOta ? { ota: {} } : {}),
+        ...(hasOta ? { ota: state.steps } : {}),
         ...(hasBuilder ? { builder: state.builderSteps } : {}),
       },
       outcome: state.outcome,
     } }
   }
-  return { setup: { todo_list_version: state.version, steps: state.steps, outcome: state.outcome } }
+  return { features, setup: { todo_list_version: state.version, steps: state.steps, outcome: state.outcome } }
 }
 
 // This isolated component fixture never sends requests to production.
@@ -103,10 +119,14 @@ window.fetch = async (input, init) => {
     return new Response(JSON.stringify(state.error
       ? { message: 'Progress unavailable' }
       : {
-          onboarding: { setup: { todo_list_version: state.version, steps: state.steps, outcome: state.outcome } },
+          onboarding: previewOnboarding(),
           ...(checkChannel && !channelError ? { hasChannel } : {}),
           checkErrors: checkChannel && channelError ? ['add_channel'] : [],
         }), { status: state.error ? 503 : 200, headers: { 'Content-Type': 'application/json' } })
+  }
+  if (url.pathname.endsWith('/rpc/verify_getting_started')) {
+    events.push('getting-started-verified')
+    return new Response(JSON.stringify(previewOnboarding()), { headers: { 'Content-Type': 'application/json' } })
   }
   if (url.pathname.includes('/rpc/')) {
     return new Response(JSON.stringify(state.channelPermissions), { headers: { 'Content-Type': 'application/json' } })
@@ -140,7 +160,7 @@ window.fetch = async (input, init) => {
   }
   if (params.get('view') === 'flow' || navigationView) {
     const app = { id: '00000000-0000-4000-8000-000000000003', app_id: previewAppId, name: 'My Capacitor app', icon_url: '', owner_org: '00000000-0000-4000-8000-000000000002', need_onboarding: true, onboarding: previewOnboarding() }
-    const user = { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', onboarding: { intent: assignment ? 'builder' : 'ota', status: 'in_progress', step: 'setup', flow: 'app', setup_stage: 'cli', app_id: previewAppId } }
+    const user = { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', onboarding: previewUserOnboarding }
     const rows = url.pathname.endsWith('/apps') ? (!url.searchParams.get('owner_org') || url.searchParams.get('owner_org') === `eq.${app.owner_org}` ? [app] : []) : url.pathname.endsWith('/users') ? [user] : url.pathname.endsWith('/apikeys') ? [{ key: '00000000-0000-4000-8000-000000000004', rbac_id: '00000000-0000-4000-8000-000000000005', expires_at: null }] : url.pathname.endsWith('/role_bindings') ? [{ principal_id: '00000000-0000-4000-8000-000000000005', scope_type: 'org', roles: { name: 'org_super_admin' } }] : []
     const single = new Headers(init?.headers).get('Accept')?.includes('object')
     return new Response(JSON.stringify(single ? rows[0] ?? {} : rows), { headers: { 'Content-Type': 'application/json' } })
@@ -171,7 +191,7 @@ const app = createApp(defineComponent({
         navigationView
           ? h(RouterView)
           : params.get('view') === 'flow'
-            ? h(AppOnboardingFlow, { onboarding: true })
+            ? h(AppOnboardingFlow, { onboarding: true, setupAppId: params.get('resume') ?? undefined })
             : builderComponentView
               ? h(AppOnboardingBuilderChecklist, {
                   appId: preview.appId.value,
@@ -210,7 +230,7 @@ const app = createApp(defineComponent({
 const pinia = createPinia()
 app.use(pinia)
 // Supply identity to the real channel form without starting dashboard store watchers.
-Object.defineProperty(useMainStore(pinia), 'user', { value: { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', onboarding: { intent: assignment ? 'builder' : 'ota', status: 'in_progress', step: 'setup', flow: 'app', setup_stage: 'cli', app_id: previewAppId } } })
+Object.defineProperty(useMainStore(pinia), 'user', { value: { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', onboarding: previewUserOnboarding } })
 Object.defineProperty(useMainStore(pinia), 'auth', { value: { id: '00000000-0000-4000-8000-000000000001' } })
 useMainStore(pinia).awaitInitialLoad = async () => true
 const organization = useOrganizationStore(pinia)
@@ -238,7 +258,8 @@ const router = createRouter({
             return () => h(GettingStartedPage)
           },
         }) },
-        { path: '/:pathMatch(.*)*', component: defineComponent({ setup: () => () => h(AppOnboardingFlow, { onboarding: true }) }) },
+        // A resume id renders the setup UI the way Getting started embeds it.
+        { path: '/:pathMatch(.*)*', component: defineComponent({ setup: () => () => h(AppOnboardingFlow, { onboarding: true, setupAppId: params.get('resume') ?? undefined }) }) },
       ]
     : [{ path: '/:pathMatch(.*)*', component: { render: () => null } }],
 })

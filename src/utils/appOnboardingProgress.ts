@@ -1,4 +1,6 @@
 import type { Json } from '~/types/supabase.types'
+import { getAppOnboardingStepIds, parseAppOnboarding } from '~/services/appOnboarding'
+import { BUILDER_STEP_IDS, hasSupportedBuilderTodoList, parseBuilderOnboarding } from '~/services/builderOnboardingChecklist'
 
 export const APP_ONBOARDING_FEATURES = ['cli_install', 'ota', 'builder'] as const
 export type AppOnboardingFeatureKey = typeof APP_ONBOARDING_FEATURES[number]
@@ -266,9 +268,36 @@ export function gettingStartedProgress(steps: GettingStartedStep[]): {
   }
 }
 
-export function shouldShowGettingStartedNav(ledger: AppOnboardingLedger, extras?: GettingStartedStepExtras): boolean {
+export function shouldShowGettingStartedNav(onboarding: unknown, extras?: GettingStartedStepExtras): boolean {
+  const ledger = parseAppOnboardingLedger(onboarding)
   if (ledger.getting_started_dismissed_at)
     return false
+
+  const checklist = parseAppOnboarding(onboarding)
+  if (checklist.todo_list_version === 3 || checklist.todo_list_version === 4) {
+    const hasPendingOtaStep = getAppOnboardingStepIds(checklist.todo_list_version, checklist.ota_todo_list_version)
+      .some((id) => {
+        const status = checklist.steps[id]?.status
+        return status !== 'done' && status !== 'skipped'
+      })
+    if (checklist.todo_list_version === 3)
+      return hasPendingOtaStep
+    if (hasPendingOtaStep)
+      return true
+
+    if (!hasSupportedBuilderTodoList(onboarding))
+      return false
+
+    const builder = parseBuilderOnboarding(onboarding)
+    return (Object.keys(BUILDER_STEP_IDS) as Array<keyof typeof BUILDER_STEP_IDS>)
+      .some(platform => BUILDER_STEP_IDS[platform].some((id) => {
+        const status = builder.steps[platform][id]
+        return status !== 'done' && status !== 'skipped'
+      }))
+  }
+  if (checklist.todo_list_version !== 1 && checklist.todo_list_version !== 2)
+    return false
+
   return buildGettingStartedSteps(ledger, extras)
     .some(step => step.group === 'essential' && !step.done)
 }
@@ -286,6 +315,11 @@ export function shouldSkipOnboardingResume(onboarding: unknown): boolean {
   const ledger = parseAppOnboardingLedger(onboarding)
   if (ledger.getting_started_dismissed_at)
     return true
+  const checklist = parseAppOnboarding(onboarding)
+  // Keep versioned checklists reachable whenever the sidebar shows them.
+  // Feature timestamps and summary outcomes must not override pending items.
+  if (checklist.todo_list_version === 3 || checklist.todo_list_version === 4)
+    return !shouldShowGettingStartedNav(onboarding)
   // started_at is set when the user opens OTA setup, and refresh also copies
   // first-bundle time into it. succeeded_at is first device install. Do not
   // skip on started_at or opening OTA setup would hide Getting Started.

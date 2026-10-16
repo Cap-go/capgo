@@ -160,7 +160,20 @@ test.describe('Registration', () => {
     await expect(page.locator('[data-test="app-onboarding-existing-no"]')).toHaveCount(0)
     await expect(page.locator('[data-test="app-onboarding-name"]')).toBeVisible()
     await expect(page.locator('#app-onboarding-app-id')).toHaveCount(0)
-    await page.fill('[data-test="app-onboarding-name"]', appName)
+    const appNameInput = page.locator('[data-test="app-onboarding-name"]')
+    const continueButton = page.locator('[data-test="app-onboarding-continue"]')
+    await expect(continueButton).toBeVisible()
+    await expect(continueButton).toBeDisabled()
+    await appNameInput.fill('   ')
+    await expect(continueButton).toBeDisabled()
+    await appNameInput.fill(appName)
+    await expect(continueButton).toBeEnabled()
+    await appNameInput.fill('')
+    await expect(continueButton).toBeDisabled()
+    await appNameInput.fill('   ')
+    await expect(continueButton).toBeDisabled()
+    await appNameInput.fill(`  ${appName}  `)
+    await expect(continueButton).toBeEnabled()
     await continueFromAppNameToOrganization(page)
 
     await expectProtectedRouteRedirect(page, '/apps', /\/onboarding\/app/, '[data-test="onboarding-logout"]')
@@ -185,7 +198,7 @@ test.describe('Registration', () => {
 
     await continuePastChannelOnboardingIfShown(page)
     await expect(page.locator('[data-test="onboarding-technical-invite"]')).toBeVisible()
-    await expect(page).toHaveURL(/\/onboarding\/app/)
+    await expect(page).toHaveURL(/\/app\/[^/]+\/getting-started$/)
   })
 
   test('should offer to continue or restart onboarding after a dropout', async ({ page }) => {

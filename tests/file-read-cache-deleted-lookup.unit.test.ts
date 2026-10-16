@@ -79,7 +79,52 @@ describe('file_read_cache deleted lookup', () => {
     ])
 
     expect(getPgClientMock).toHaveBeenCalledTimes(1)
-    expect(queryMock).toHaveBeenCalledTimes(1)
+    expect(queryMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('re-checks the deleted marker on every call within the same request', async () => {
+    const { isAttachmentVersionDeleted } = await import('../supabase/functions/_backend/files/file_read_cache.ts')
+    const fileId = 'orgs/test-org/apps/test-app/bundle.zip'
+    let markerPresent = false
+    globalThis.caches = {
+      default: {
+        match: async () => (markerPresent ? new Response('deleted') : null),
+      },
+    } as any
+
+    const context = createContext()
+    await isAttachmentVersionDeleted(context, fileId)
+    markerPresent = true
+
+    await expect(isAttachmentVersionDeleted(context, fileId)).resolves.toBe(true)
+    expect(getPgClientMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('fails open when client acquisition exceeds the timeout budget', async () => {
+    vi.useFakeTimers()
+    try {
+      const { fileReadCacheTestUtils, isAttachmentVersionDeleted } = await import('../supabase/functions/_backend/files/file_read_cache.ts')
+      const context = createContext()
+      const fileId = 'orgs/test-org/apps/test-app/bundle.zip'
+      const lateClient = { query: queryMock }
+      let resolveClient: (client: typeof lateClient) => void = () => {}
+
+      getPgClientMock.mockImplementation(() => new Promise((resolve) => {
+        resolveClient = resolve
+      }))
+
+      const pending = isAttachmentVersionDeleted(context, fileId)
+      await vi.advanceTimersByTimeAsync(fileReadCacheTestUtils.DELETED_LOOKUP_TIMEOUT_MS + 50)
+      await expect(pending).resolves.toBe(false)
+
+      resolveClient(lateClient)
+      await Promise.resolve()
+      expect(closeClientMock).toHaveBeenCalledWith(context, lateClient)
+    }
+    finally {
+      vi.useRealTimers()
+      getPgClientMock.mockImplementation(async () => ({ query: queryMock }))
+    }
   })
 
   it('fails open when the lookup exceeds the timeout budget', async () => {
