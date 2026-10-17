@@ -94,7 +94,7 @@ function getOrganizationUpdateColumn(field: string) {
 function buildOrganizationUpdateQuery(
   orgId: string,
   updateFields: OrgUpdateFields,
-  options?: { expectedCurrentName?: string, expectedCurrentFields?: OrgUpdateFields },
+  options?: { expectedCurrentName?: string, expectedCurrentFields?: OrgUpdateFields, replaceMergedColumns?: boolean },
 ) {
   const params: unknown[] = []
   const assignments: string[] = []
@@ -102,7 +102,8 @@ function buildOrganizationUpdateQuery(
     if (value === undefined)
       continue
     const column = getOrganizationUpdateColumn(field)
-    if (ORGANIZATION_MERGE_COLUMNS.has(field)) {
+    // Rollbacks restore the exact previous value, so they must not merge into the current one.
+    if (ORGANIZATION_MERGE_COLUMNS.has(field) && !options?.replaceMergedColumns) {
       params.push(JSON.stringify(value))
       assignments.push(`${column} = COALESCE(${column}, '{}'::jsonb) || $${params.length}::jsonb`)
       continue
@@ -332,7 +333,7 @@ async function updateOrg(
   auth: AuthInfo,
   orgId: string,
   updateFields: OrgUpdateFields,
-  options?: { expectedCurrentName?: string, expectedCurrentFields?: OrgUpdateFields },
+  options?: { expectedCurrentName?: string, expectedCurrentFields?: OrgUpdateFields, replaceMergedColumns?: boolean },
 ) {
   let pgPool: Awaited<ReturnType<typeof getPgClient>> | null = null
   let dbClient: PgTransactionClient | null = null
@@ -500,6 +501,7 @@ export async function put(
           await updateOrg(c, auth, body.orgId, rollbackFields, {
             expectedCurrentName: dataOrg.name,
             expectedCurrentFields: buildExpectedCurrentFields(dataOrg, updateFields),
+            replaceMergedColumns: true,
           })
         }
         catch (rollbackError) {

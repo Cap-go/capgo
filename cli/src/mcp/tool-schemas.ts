@@ -10,6 +10,7 @@ import {
   refineObserveDeviceId,
   updateAccountOptionsSchema,
   updateAppOptionsSchema,
+  updateChannelOptionsBaseSchema,
   updateOrganizationOptionsSchema,
 } from '../schemas/sdk'
 import { DOCS_SEARCH_MAX_RESULTS } from '../shared/docs-search'
@@ -102,7 +103,7 @@ export const mcpUpdateChannelInputSchema = z.object({
   resume: z.boolean().optional().describe('Resume updates on a paused channel'),
   selfAssign: z.boolean().optional(),
   disableAutoUpdate: z.string().optional(),
-  updatePackage: z.enum(['all', 'zip', 'delta', 'zip_from_builtin', 'delta_from_builtin']).optional().describe('Which update package types devices may download'),
+  updatePackage: updateChannelOptionsBaseSchema.shape.updatePackage.describe('Which update package types devices may download'),
   dev: z.boolean().optional(),
   emulator: z.boolean().optional(),
   device: z.boolean().optional(),

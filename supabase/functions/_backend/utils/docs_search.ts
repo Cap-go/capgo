@@ -8,6 +8,8 @@ const DOCSEARCH_SEARCH_KEY = '039b8d50eaa068b9ff8726d912c6f388'
 const DOCSEARCH_INDEX = 'capgo'
 const DOCSEARCH_TIMEOUT_MS = 8_000
 const SNIPPET_MAX_CHARS = 300
+// Bounds latency when many hits share a URL.
+const DOCSEARCH_MAX_PAGES = 5
 
 export const DOCS_SEARCH_MAX_RESULTS = 20
 
@@ -45,8 +47,7 @@ function hitSnippet(hit: DocSearchHit): string | undefined {
   return content.length > SNIPPET_MAX_CHARS ? `${content.slice(0, SNIPPET_MAX_CHARS)}…` : content
 }
 
-export async function searchCapgoDocs(query: string, limit = 8, fetchImpl: typeof fetch = fetch): Promise<DocsSearchResult[]> {
-  const size = Math.min(Math.max(Math.trunc(limit), 1), DOCS_SEARCH_MAX_RESULTS)
+async function fetchDocSearchPage(query: string, hitsPerPage: number, page: number, fetchImpl: typeof fetch): Promise<{ hits: DocSearchHit[], nbPages: number }> {
   const response = await fetchImpl(`https://${DOCSEARCH_APP_ID}-dsn.algolia.net/1/indexes/${DOCSEARCH_INDEX}/query`, {
     method: 'POST',
     headers: {
@@ -56,8 +57,8 @@ export async function searchCapgoDocs(query: string, limit = 8, fetchImpl: typeo
     },
     body: JSON.stringify({
       query,
-      // Over-fetch: several hits can point at the same section anchor.
-      hitsPerPage: size * 2,
+      hitsPerPage,
+      page,
       facetFilters: ['lang:en'],
       attributesToRetrieve: ['url', 'hierarchy', 'content'],
       attributesToHighlight: [],
@@ -66,16 +67,29 @@ export async function searchCapgoDocs(query: string, limit = 8, fetchImpl: typeo
   })
   if (!response.ok)
     throw new Error(`Docs search failed with HTTP ${response.status}`)
-  const data = await response.json() as { hits?: DocSearchHit[] }
+  const data = await response.json() as { hits?: DocSearchHit[], nbPages?: number }
+  return { hits: data.hits ?? [], nbPages: data.nbPages ?? 0 }
+}
+
+export async function searchCapgoDocs(query: string, limit = 8, fetchImpl: typeof fetch = fetch): Promise<DocsSearchResult[]> {
+  const size = Math.min(Math.max(Math.trunc(limit), 1), DOCS_SEARCH_MAX_RESULTS)
+  // Over-fetch: several hits often point at the same section anchor, so keep paging
+  // until enough unique URLs are collected or the index has no more results.
+  const hitsPerPage = size * 2
   const seen = new Set<string>()
   const results: DocsSearchResult[] = []
-  for (const hit of data.hits ?? []) {
-    if (!hit.url || seen.has(hit.url))
-      continue
-    seen.add(hit.url)
-    const snippet = hitSnippet(hit)
-    results.push({ title: hitTitle(hit), url: hit.url, ...(snippet ? { snippet } : {}) })
-    if (results.length >= size)
+  for (let page = 0; page < DOCSEARCH_MAX_PAGES && results.length < size; page++) {
+    const { hits, nbPages } = await fetchDocSearchPage(query, hitsPerPage, page, fetchImpl)
+    for (const hit of hits) {
+      if (!hit.url || seen.has(hit.url))
+        continue
+      seen.add(hit.url)
+      const snippet = hitSnippet(hit)
+      results.push({ title: hitTitle(hit), url: hit.url, ...(snippet ? { snippet } : {}) })
+      if (results.length >= size)
+        break
+    }
+    if (hits.length < hitsPerPage || page + 1 >= nbPages)
       break
   }
   return results

@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { MCP_TOOLS } from '../supabase/functions/_backend/mcp/tools.ts'
 import { searchCapgoDocs } from '../supabase/functions/_backend/utils/docs_search.ts'
 
-function fakeFetch(hits: unknown[], status = 200) {
+function fakeFetch(hits: unknown[] | unknown[][], status = 200) {
+  const pages = Array.isArray(hits[0]) ? hits as unknown[][] : [hits]
   const requests: { url: string, body: Record<string, unknown> }[] = []
   const impl = (async (url: string, init?: RequestInit) => {
-    requests.push({ url, body: JSON.parse(String(init?.body)) })
-    return new Response(JSON.stringify({ hits }), { status })
+    const body = JSON.parse(String(init?.body))
+    requests.push({ url, body })
+    return new Response(JSON.stringify({ hits: pages[body.page] ?? [], nbPages: pages.length }), { status })
   }) as unknown as typeof fetch
   return { impl, requests }
 }
@@ -25,6 +27,19 @@ describe('capgo docs search', () => {
       { title: 'Channels > Progressive rollouts', url: 'https://capgo.app/docs/live-updates/channels/#progressive-rollouts' },
       { title: 'Encryption', url: 'https://capgo.app/docs/live-updates/encryption/', snippet: 'Encrypt bundles > 200MB end to end.' },
     ])
+  })
+
+  it.concurrent('keeps paging until enough unique URLs are found', async () => {
+    const same = { url: 'https://capgo.app/docs/a/', hierarchy: { lvl1: 'A' } }
+    const { impl, requests } = fakeFetch([
+      [same, same],
+      [{ url: 'https://capgo.app/docs/b/', hierarchy: { lvl1: 'B' } }, same],
+    ])
+    const results = await searchCapgoDocs('a', 1, impl)
+    expect(results.map(result => result.url)).toEqual(['https://capgo.app/docs/a/'])
+    expect(requests).toHaveLength(1)
+    const two = await searchCapgoDocs('a', 2, fakeFetch([[same, same, same, same], [{ url: 'https://capgo.app/docs/b/', hierarchy: { lvl1: 'B' } }]]).impl)
+    expect(two.map(result => result.url)).toEqual(['https://capgo.app/docs/a/', 'https://capgo.app/docs/b/'])
   })
 
   it.concurrent('clamps the limit and reports HTTP failures', async () => {

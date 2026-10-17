@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
-import type { Database } from '../../utils/supabase.types.ts'
+import type { PgQueryClient } from '../../utils/pg.ts'
 import { z } from 'zod'
 import { getBodyOrQuery, honoFactory, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { middlewareAuth } from '../../utils/hono_middleware.ts'
+import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from '../../utils/pg.ts'
 import { safeParseSchema } from '../../utils/schema_validation.ts'
 import { emailPreferencesPatchSchema, USER_SETTINGS_EMAIL_PREFERENCE_KEYS } from '../../utils/settings_email_preferences.ts'
 import { createSignedImageUrl } from '../../utils/storage.ts'
@@ -31,6 +32,9 @@ const updateBodySchema = z.object({
 
 type ProfileRow = Record<string, unknown> & { id: string, image_url: string | null }
 
+// Column names come from this fixed list only, never from the request.
+const UPDATABLE_COLUMNS = ['first_name', 'last_name', 'country', 'discord_username', 'format_locale', 'enable_notifications', 'opt_for_newsletters'] as const
+
 function getCallerId(c: Context<MiddlewareKeyVariables>) {
   const userId = c.get('auth')?.userId
   if (!userId)
@@ -57,35 +61,55 @@ export const app = honoFactory.createApp()
 
 app.use('*', useCors)
 
-app.get('/', middlewareAuth(), async (c) => {
+app.get('/', middlewareAuth({ preferApiKey: true }), async (c) => {
   const userId = getCallerId(c)
   return c.json(await withSignedImage(c, await loadProfile(c, userId)))
 })
 
-app.put('/', middlewareAuth(), async (c) => {
+app.put('/', middlewareAuth({ preferApiKey: true }), async (c) => {
   const userId = getCallerId(c)
   const parsed = safeParseSchema(updateBodySchema, await getBodyOrQuery<unknown>(c))
   if (!parsed.success)
     throw simpleError('invalid_body', 'Invalid body', { error: parsed.error })
   const { email_preferences: emailPreferencesPatch, ...fields } = parsed.data
 
-  const update: Database['public']['Tables']['users']['Update'] = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined))
-  if (emailPreferencesPatch) {
-    const current = await loadProfile(c, userId)
-    const currentPrefs = (current.email_preferences && typeof current.email_preferences === 'object') ? current.email_preferences as Record<string, boolean> : {}
-    update.email_preferences = { ...currentPrefs, ...emailPreferencesPatch }
+  const params: unknown[] = []
+  const assignments: string[] = []
+  for (const column of UPDATABLE_COLUMNS) {
+    if (fields[column] === undefined)
+      continue
+    params.push(fields[column])
+    assignments.push(`${column} = $${params.length}`)
   }
-  if (Object.keys(update).length === 0)
+  if (emailPreferencesPatch) {
+    // Merge in SQL so concurrent patches of different keys cannot overwrite each other.
+    params.push(JSON.stringify(emailPreferencesPatch))
+    assignments.push(`email_preferences = COALESCE(email_preferences, '{}'::jsonb) || $${params.length}::jsonb`)
+  }
+  if (assignments.length === 0)
     throw simpleError('invalid_body', 'Nothing to update')
+  params.push(userId)
 
   // Service role write strictly pinned to the authenticated caller's own row.
-  const { data, error } = await supabaseAdmin(c)
-    .from('users')
-    .update(update)
-    .eq('id', userId)
-    .select(PROFILE_COLUMNS)
-    .single()
-  if (error || !data)
-    throw simpleError('cannot_update_user', 'Cannot update user', { error })
-  return c.json(await withSignedImage(c, data as unknown as ProfileRow))
+  const pgPool = await getPgClient(c)
+  let client: PgQueryClient | null = null
+  let data: ProfileRow | undefined
+  try {
+    client = await checkoutPgClient(pgPool)
+    const result = await client.query<ProfileRow>(
+      `UPDATE public.users SET ${assignments.join(', ')} WHERE id = $${params.length}::uuid RETURNING ${PROFILE_COLUMNS}`,
+      params,
+    )
+    data = result.rows[0]
+  }
+  catch (error) {
+    throw simpleError('cannot_update_user', 'Cannot update user', { error: error instanceof Error ? error.message : String(error) })
+  }
+  finally {
+    releasePgClient(pgPool, client)
+    await closeClient(c, pgPool)
+  }
+  if (!data)
+    throw quickError(404, 'user_not_found', 'User not found')
+  return c.json(await withSignedImage(c, data))
 })

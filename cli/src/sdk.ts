@@ -86,7 +86,7 @@ import { listOrganizationsInternal } from './organization/list'
 import { inviteMemberInternal, removeMemberInternal, setMemberRoleInternal } from './organization/member-manage'
 import { listMembersInternal } from './organization/members'
 import { setOrganizationInternal } from './organization/set'
-import { promoteChannelOptionsSchema, requestBuildOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from './schemas/sdk'
+import { organizationMemberRoleOptionsSchema, organizationMemberSdkOptionsSchema, promoteChannelOptionsSchema, requestBuildOptionsSchema, updateAccountOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from './schemas/sdk'
 import { CliUserError } from './shared/cli-user-error'
 import { getUserIdInternal } from './user/account'
 import { getAccountInternal, setAccountInternal } from './user/settings'
@@ -1272,12 +1272,13 @@ export class CapgoSDK {
    */
   async inviteOrganizationMember(options: InviteOrganizationMemberOptions): Promise<SDKResult> {
     try {
-      await inviteMemberInternal(options.orgId, {
-        apikey: options.apikey || this.apikey || findSavedKey(true),
-        supaHost: options.supaHost || this.supaHost,
-        supaAnon: options.supaAnon || this.supaAnon,
-        email: options.email,
-        role: options.role,
+      const parsed = organizationMemberRoleOptionsSchema.parse(options)
+      await inviteMemberInternal(parsed.orgId, {
+        apikey: parsed.apikey || this.apikey || findSavedKey(true),
+        supaHost: parsed.supaHost || this.supaHost,
+        supaAnon: parsed.supaAnon || this.supaAnon,
+        email: parsed.email,
+        role: parsed.role,
       }, true)
       return { success: true }
     }
@@ -1291,12 +1292,13 @@ export class CapgoSDK {
    */
   async updateOrganizationMemberRole(options: UpdateOrganizationMemberRoleOptions): Promise<SDKResult> {
     try {
-      await setMemberRoleInternal(options.orgId, {
-        apikey: options.apikey || this.apikey || findSavedKey(true),
-        supaHost: options.supaHost || this.supaHost,
-        supaAnon: options.supaAnon || this.supaAnon,
-        email: options.email,
-        role: options.role,
+      const parsed = organizationMemberRoleOptionsSchema.parse(options)
+      await setMemberRoleInternal(parsed.orgId, {
+        apikey: parsed.apikey || this.apikey || findSavedKey(true),
+        supaHost: parsed.supaHost || this.supaHost,
+        supaAnon: parsed.supaAnon || this.supaAnon,
+        email: parsed.email,
+        role: parsed.role,
       }, true)
       return { success: true }
     }
@@ -1310,11 +1312,12 @@ export class CapgoSDK {
    */
   async removeOrganizationMember(options: RemoveOrganizationMemberOptions): Promise<SDKResult> {
     try {
-      await removeMemberInternal(options.orgId, {
-        apikey: options.apikey || this.apikey || findSavedKey(true),
-        supaHost: options.supaHost || this.supaHost,
-        supaAnon: options.supaAnon || this.supaAnon,
-        email: options.email,
+      const parsed = organizationMemberSdkOptionsSchema.parse(options)
+      await removeMemberInternal(parsed.orgId, {
+        apikey: parsed.apikey || this.apikey || findSavedKey(true),
+        supaHost: parsed.supaHost || this.supaHost,
+        supaAnon: parsed.supaAnon || this.supaAnon,
+        email: parsed.email,
       }, true)
       return { success: true }
     }
@@ -1354,18 +1357,19 @@ export class CapgoSDK {
    */
   async updateAccount(options: UpdateAccountOptions): Promise<SDKResult<AccountProfile>> {
     try {
+      const parsed = updateAccountOptionsSchema.parse(options)
       const data = await setAccountInternal({
-        apikey: options.apikey || this.apikey || findSavedKey(true),
-        supaHost: options.supaHost || this.supaHost,
-        supaAnon: options.supaAnon || this.supaAnon,
-        firstName: options.firstName,
-        lastName: options.lastName,
-        country: options.country,
-        discordUsername: options.discordUsername,
-        formatLocale: options.formatLocale,
-        notifications: options.notifications,
-        newsletter: options.newsletter,
-        emailPreferences: options.emailPreferences,
+        apikey: parsed.apikey || this.apikey || findSavedKey(true),
+        supaHost: parsed.supaHost || this.supaHost,
+        supaAnon: parsed.supaAnon || this.supaAnon,
+        firstName: parsed.firstName,
+        lastName: parsed.lastName,
+        country: parsed.country,
+        discordUsername: parsed.discordUsername,
+        formatLocale: parsed.formatLocale,
+        notifications: parsed.notifications,
+        newsletter: parsed.newsletter,
+        emailPreferences: parsed.emailPreferences,
       }, true)
       return { success: true, data }
     }

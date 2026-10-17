@@ -63,11 +63,6 @@ async function manageMemberInternal(action: MemberAction, orgId: string, options
   await checkAlerts()
 
   const apikey = options.apikey || findSavedKey()
-  if (!apikey) {
-    if (!silent)
-      log.error('Missing API key, you need to provide an API key to manage organization members')
-    throw new Error('Missing API key')
-  }
   if (!orgId) {
     if (!silent)
       log.error('Missing argument, you need to provide an organization ID')
