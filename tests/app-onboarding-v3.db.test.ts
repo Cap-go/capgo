@@ -10,9 +10,9 @@ describe('persisted app checklists', () => {
   it.concurrent.each([
     ['ota', 'ota', null, true, 4],
     ['ota', 'builder', 'B', false, 4],
-    // Every non-Builder app gets the seven-step OTA checklist, whatever the org intent.
+    // Every non-Builder intent gets the seven-step OTA checklist. Builder intents
+    // are covered in app-onboarding-builder-v4.db.test.ts.
     ['both', 'ota', 'A', true, 4],
-    ['builder', 'ota', 'A', true, 4],
     ['unknown', 'ota', 'A', true, 4],
   ] as const)('assigns org intent %s, creator intent %s, saved branch %s, creator-owned org %s to version %s', async (orgIntent, creatorIntent, branch, ownOrg, expectedVersion) => {
     const email = `onboarding-v3-${randomUUID()}@example.com`

@@ -1330,8 +1330,9 @@ async function loadResumeApp(appId = resumeAppId.value) {
   const resumeFinalStep = !newChannelTreatment.value
     || Boolean(savedProgress && savedProgress.app_id === data.app_id && savedProgress.final_step && savedProgress.setup_stage === 'cli')
   flowStep.value = resumeFinalStep ? 'setup' : 'channel'
-  if (!savedProgress?.intent)
-    hydrateIntentFromCurrentOrg()
+  // The app's organization intent wins over the user's saved intent, which may
+  // come from an earlier organization with a different goal.
+  hydrateIntentFromCurrentOrg()
   return true
 }
 

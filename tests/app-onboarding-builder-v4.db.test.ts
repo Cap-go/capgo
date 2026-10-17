@@ -58,12 +58,15 @@ describe('builder checklist v4 database initialization', () => {
   })
 
   it.concurrent.each([
-    ['builder', 'A', true, 'builder'],
-    ['builder', null, true, 'ota'],
-    ['builder', 'B', true, 'ota'],
-    ['ota', 'A', true, 'ota'],
-    ['builder', 'A', false, 'ota'],
-  ] as const)('assigns creator intent %s, branch %s, creator-owned org %s to the %s checklist', async (intent, branch, ownOrg, expectedPath) => {
+    ['builder', null, true, 'builder'],
+    ['publish', null, true, 'builder'],
+    ['ota', 'builder', true, 'builder'],
+    ['builder', 'builder', false, 'builder'],
+    ['builder', 'ota', true, 'ota'],
+    ['exploring', null, true, 'ota'],
+    [null, null, true, 'ota'],
+    ['builder', 'unknown', true, 'builder'],
+  ] as const)('assigns creator intent %s, org intent %s, creator-owned org %s to the %s checklist', async (intent, orgIntent, ownOrg, expectedPath) => {
     const email = `builder-v4-${randomUUID()}@example.com`
     const orgId = randomUUID()
     const appId = `com.test.builder.v4.${randomUUID()}`
@@ -83,11 +86,11 @@ describe('builder checklist v4 database initialization', () => {
       expect((await admin.from('users').upsert({
         id: userId,
         email,
-        onboarding: { intent, abtests: branch ? { builder_todo_list_v4: { branch, assigned_at: new Date().toISOString() } } : {} },
+        onboarding: intent ? { intent } : {},
       })).error).toBeNull()
       if (ownerId)
         expect((await admin.from('users').upsert({ id: ownerId, email: ownerEmail })).error).toBeNull()
-      expect((await admin.from('orgs').insert({ id: orgId, created_by: ownerId ?? userId, name: 'Builder checklist test', management_email: email, onboarding: { intent: 'builder' } })).error).toBeNull()
+      expect((await admin.from('orgs').insert({ id: orgId, created_by: ownerId ?? userId, name: 'Builder checklist test', management_email: email, ...(orgIntent ? { onboarding: { intent: orgIntent } } : {}) })).error).toBeNull()
       const app = await admin.from('apps').insert({
         app_id: appId,
         owner_org: orgId,
@@ -121,7 +124,7 @@ describe('builder checklist v4 database initialization', () => {
         expect(setup.steps.ota).toBeUndefined()
       }
 
-      expect((await admin.from('users').update({ onboarding: { intent: 'builder', abtests: {} } }).eq('id', userId)).error).toBeNull()
+      expect((await admin.from('users').update({ onboarding: { intent: 'builder' } }).eq('id', userId)).error).toBeNull()
       expect((await admin.from('orgs').update({ onboarding: { intent: 'ota' } }).eq('id', orgId)).error).toBeNull()
       const renamed = await admin.from('apps').update({ name: 'Renamed' }).eq('app_id', appId).select('onboarding').single()
       expect(renamed.error).toBeNull()
