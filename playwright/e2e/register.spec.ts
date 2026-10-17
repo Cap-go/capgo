@@ -1,8 +1,8 @@
 import type { Page } from '@playwright/test'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
-import { getSupabaseStatus } from '../../scripts/supabase-worktree-status'
 import { getSupabaseWorktreeConfig } from '../../scripts/supabase-worktree-config'
+import { getSupabaseStatus } from '../../scripts/supabase-worktree-status'
 import { expect, test } from '../support/commands'
 
 const { ports: supabasePorts } = getSupabaseWorktreeConfig()
