@@ -130,6 +130,9 @@ const props = defineProps<{
   // Getting started renders the post-creation setup for this app inside the
   // dashboard shell. Creation pages hand off there once the app exists.
   setupAppId?: string
+  // View persisted setup without automatically leaving a finished checklist
+  // or restarting the user's onboarding run.
+  showChecklist?: boolean
   // An existing user creating another organization runs the same first-run
   // flow from the start, ignoring any saved onboarding progress.
   newOrganization?: boolean
@@ -811,6 +814,8 @@ async function persistOnboardingProgress(
   options: OnboardingPersistOptions = {},
 ) {
   clearScheduledOnboardingProgress()
+  if (props.showChecklist)
+    return 'skipped' as const
   return onboardingProgressPersistence.persist(status, options)
 }
 
@@ -1329,9 +1334,11 @@ async function loadResumeApp(appId = resumeAppId.value) {
   const iconLoadRun = ++resumeIconLoadRun
   localIconPreview.value = getImmediateImageUrl(data.icon_url) || ''
   void loadResumeIconPreview(data.icon_url, data.app_id, iconLoadRun)
-  const resumeFinalStep = !newChannelTreatment.value
+  const resumeFinalStep = props.showChecklist || !newChannelTreatment.value
     || Boolean(savedProgress && savedProgress.app_id === data.app_id && savedProgress.final_step && savedProgress.setup_stage === 'cli')
   flowStep.value = resumeFinalStep ? 'setup' : 'channel'
+  if (props.showChecklist)
+    setupStage.value = 'cli'
   if (!savedProgress?.intent)
     hydrateIntentFromCurrentOrg()
   return true
@@ -2592,7 +2599,7 @@ async function leaveSplashIfAlreadySetup() {
   const skip = data != null
     ? shouldSkipOnboardingResume(data as unknown)
     : shouldSkipOnboardingResume(app.onboarding)
-  if (!skip)
+  if (!skip || props.showChecklist)
     return false
   allowOnboardingDashboardExploration(onboardingUserId.value, app.app_id)
   await persistOnboardingProgress('completed')
