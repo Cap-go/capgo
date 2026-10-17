@@ -365,7 +365,7 @@ async function guard(
       return next('/login?message=sso_account_linked')
     }
     if (provisioningResult === 'abort_navigation') {
-      hideLoader()
+      await hideLoader()
       return next(false)
     }
 
@@ -384,11 +384,11 @@ async function guard(
     const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations(organizationFetchOptions))
     const nameRedirect = requiredNameRedirect(organizationsLoaded)
     if (nameRedirect === false) {
-      hideLoader()
+      await hideLoader()
       return next(false)
     }
     if (nameRedirect) {
-      hideLoader()
+      await hideLoader()
       return next(nameRedirect)
     }
     if (shouldRedirectToPendingInviteOnboarding(organizationsLoaded)) {
@@ -445,11 +445,11 @@ async function guard(
     let organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations(organizationFetchOptions))
     const nameRedirect = requiredNameRedirect(organizationsLoaded)
     if (nameRedirect === false) {
-      hideLoader()
+      await hideLoader()
       return next(false)
     }
     if (nameRedirect) {
-      hideLoader()
+      await hideLoader()
       return next(nameRedirect)
     }
     if (shouldRedirectToPendingInviteOnboarding(organizationsLoaded)) {
@@ -489,11 +489,11 @@ async function guard(
     if (onboardingRedirect)
       return next(onboardingRedirect)
 
-    hideLoader()
+    await hideLoader()
     next()
   }
   else {
-    hideLoader()
+    await hideLoader()
     next()
   }
 }

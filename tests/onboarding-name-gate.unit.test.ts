@@ -7,7 +7,8 @@ describe('required initial onboarding name', () => {
     expect(needsInitialOnboardingName({ first_name, last_name, onboarding: { version: 6 } })).toBe(true)
   })
   it('preserves complete profiles, invitations and legacy cohorts', () => {
-    expect(needsInitialOnboardingName({ first_name: 'Alice', last_name: 'Smith', onboarding: { version: 6 } })).toBe(false)
+    expect(needsInitialOnboardingName({ first_name: 'Alice', last_name: 'Smith', onboarding: { version: 6 } })).toBe(true)
+    expect(needsInitialOnboardingName({ first_name: 'Alice', last_name: 'Smith', onboarding: { version: 6, profile_completed_at: '2026-10-17T00:00:00Z' } })).toBe(false)
     expect(needsInitialOnboardingName({ created_via_invite: true, onboarding: { version: 6 } })).toBe(false)
     for (const version of [4, 5, '5.C', undefined])
       expect(needsInitialOnboardingName({ onboarding: { version } })).toBe(false)

@@ -857,6 +857,11 @@ async function writeOnboardingProgress(
       return 'skipped'
 
     let persistableProgress = snapshotOnboardingProgress(status)
+    if (options.clearProfileDraft) {
+      // A restart must stay pristine when the required name step remounts the wizard.
+      delete persistableProgress.existing_app
+      delete persistableProgress.existing_app_setup
+    }
     let usedConstraintFallback = false
     const result = await replaceUserOnboardingWithRetry(
       userId,
@@ -913,9 +918,16 @@ async function resetOnboardingForm() {
   localIconPreview.value = ''
   iconStoreUrl.value = ''
   resetStoreImportState()
-  const resetPersistResult = await persistOnboardingProgress('in_progress', { clearIntent: true, clearProfileDraft: true })
+  let resetPersistResult = await persistOnboardingProgress('in_progress', { clearIntent: true, clearProfileDraft: true })
   if (resetPersistResult === 'retryable_failure' && !onboardingFlowDisposed)
-    await persistOnboardingProgress('in_progress', { clearIntent: true, clearProfileDraft: true })
+    resetPersistResult = await persistOnboardingProgress('in_progress', { clearIntent: true, clearProfileDraft: true })
+  if (resetPersistResult !== 'persisted') {
+    if (!onboardingFlowDisposed)
+      toast.error(t('account-error'))
+    return
+  }
+  if (props.preOrg && !props.newOrganization && profileOnboarding.value && !organizationStore.hasOrganizations)
+    await router.replace({ path: '/onboarding/name', query: { to: '/onboarding/app' } })
 }
 
 function showWelcomeOnDesktop() {

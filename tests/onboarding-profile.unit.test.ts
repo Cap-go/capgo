@@ -31,10 +31,10 @@ vi.mock('~/services/supabase', () => ({
 }))
 
 let app: ReturnType<typeof createApp> | undefined
-function mount() {
+function mount(initial = false) {
   const container = document.createElement('div')
   const fields = vi.fn()
-  app = createApp(OnboardingProfile, { onFieldInput: fields })
+  app = createApp(OnboardingProfile, { onFieldInput: fields, initial })
   const profile = app.mount(container) as unknown as { isValid: boolean, save: () => Promise<boolean>, resetDraft: () => Promise<boolean> }
   return { container, profile, fields }
 }
@@ -251,9 +251,20 @@ describe('profile draft reset', () => {
   it('removes unfinished drafts during wizard restart without removing account identity or metadata', () => {
     expect(mergeUserOnboardingProgress({ step: 'intent', status: 'in_progress' }, {
       version: 6, app_name: 'Old app', app_id: 'com.old', intent: 'ota',
-      profile_draft: { first_name: 'Draft' }, abtests: { kept: true },
+      profile_draft: { first_name: 'Draft' }, profile_completed_at: '2026-10-17T00:00:00Z', abtests: { kept: true },
     }, { clearIntent: true, clearProfileDraft: true })).toEqual({
       version: 6, step: 'intent', status: 'in_progress', abtests: { kept: true },
     })
   })
+})
+
+it('prefills and confirms complete names in the mandatory initial screen', async () => {
+  state.user.first_name = 'Known'
+  state.user.last_name = 'User'
+  const { container, profile } = mount(true)
+  expect(container.querySelector<HTMLInputElement>('[data-test="onboarding-first-name"]')?.value).toBe('Known')
+  expect(container.querySelector<HTMLInputElement>('[data-test="onboarding-last-name"]')?.value).toBe('User')
+  expect(profile.isValid).toBe(true)
+  expect(await profile.save()).toBe(true)
+  expect(mocks.update).toHaveBeenCalledWith({ first_name: 'Known', last_name: 'User' })
 })

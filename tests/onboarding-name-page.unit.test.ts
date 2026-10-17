@@ -5,6 +5,7 @@ import NamePage from '../src/pages/onboarding/name.vue'
 
 const mocks = vi.hoisted(() => ({
   valid: false,
+  persist: vi.fn(), toastError: vi.fn(),
   save: vi.fn(), reset: vi.fn(), replace: vi.fn(), logout: vi.fn(), capture: vi.fn(),
   profileEmit: undefined as undefined | ((event: string, ...args: unknown[]) => void),
   route: { query: {} as Record<string, string> },
@@ -20,12 +21,12 @@ vi.mock('vue-router', () => ({
     return { path: url.pathname, query: Object.fromEntries(url.searchParams), hash: url.hash }
   } }),
 }))
-vi.mock('vue-sonner', () => ({ toast: { error: vi.fn() } }))
+vi.mock('vue-sonner', () => ({ toast: { error: mocks.toastError } }))
 vi.mock('~/services/supabase', () => ({ getLocalConfig: () => ({ supaHost: 'https://example.com' }), isLocal: () => false }))
 vi.mock('~/services/onboardingTracking', () => ({ sendOnboardingEvent: mocks.capture }))
 vi.mock('~/services/userOnboardingWriteQueue', () => ({
   serializeUserOnboardingWrite: (_id: string, write: () => unknown) => write(),
-  replaceUserOnboardingWithRetry: async (_id: string, current: unknown, build: (current: unknown) => unknown) => ({ status: 'persisted', onboarding: build(current) }),
+  replaceUserOnboardingWithRetry: mocks.persist,
 }))
 vi.mock('~/components/auth/AuthPageShell.vue', async () => {
   const { defineComponent, h } = await import('vue')
@@ -66,6 +67,7 @@ async function submit(container: HTMLElement) {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.valid = false
+  mocks.persist.mockImplementation(async (_id: string, current: unknown, build: (current: unknown) => unknown) => ({ status: 'persisted', onboarding: build(current) }))
   mocks.route.query = {}
   mocks.save.mockResolvedValue(true)
   mocks.reset.mockResolvedValue(true)
@@ -96,9 +98,25 @@ describe('separate required name screen', () => {
     mocks.route.query.to = '/onboarding/organization?source=org-switcher#details'
     const container = await mount()
     await submit(container)
+    await vi.waitFor(() => expect(mocks.replace).toHaveBeenCalled())
+    expect(main.user.onboarding.profile_completed_at).toEqual(expect.any(String))
     expect(mocks.replace).toHaveBeenCalledWith(expect.objectContaining({ path: '/onboarding/organization', query: { source: 'org-switcher' }, hash: '#details', state: { capgoProfileOnboardingHandoff: expect.objectContaining({ attemptId: expect.any(String), runId: expect.any(String) }) } }))
     expect(mocks.capture).toHaveBeenCalledWith('onboarding_profile_saved', expect.objectContaining({ step: 'name', onboarding_version: 6 }))
     expect(mocks.capture).toHaveBeenCalledWith('onboarding_step_completed', expect.not.objectContaining({ next_step: 'welcome' }))
+  })
+  it.each(['error', 'throw'])('requires persisted confirmation when its write fails with %s', async (failure) => {
+    mocks.valid = true
+    const container = await mount()
+    if (failure === 'throw')
+      mocks.persist.mockRejectedValueOnce(new Error('network unavailable'))
+    else
+      mocks.persist.mockResolvedValueOnce({ status: 'error', error: new Error('write rejected') })
+    await submit(container)
+    await vi.waitFor(() => expect(mocks.toastError).toHaveBeenCalled())
+    expect(mocks.replace).not.toHaveBeenCalled()
+    expect(main.user.onboarding.profile_completed_at).toBeUndefined()
+    expect(mocks.capture).toHaveBeenCalledWith('onboarding_profile_save_failed', expect.objectContaining({ step: 'name' }))
+    expect(mocks.capture.mock.calls.some(call => call[0] === 'onboarding_step_completed')).toBe(false)
   })
   it('debounces field events for 500 ms and sends lengths without raw names', async () => {
     vi.useFakeTimers()

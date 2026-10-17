@@ -32,6 +32,26 @@ function trackField(field: 'first_name' | 'last_name', value: string) {
   fields.schedule(field === 'first_name' ? 'onboarding_first_name_entered' : 'onboarding_last_name_entered', field, 'name', value)
 }
 
+async function persistProfileProgress(patch: Record<string, string>) {
+  const userId = main.user?.id
+  if (!userId)
+    return false
+  const authGeneration = main.authGeneration
+  return serializeUserOnboardingWrite(userId, async () => {
+    const isCurrentUser = () => main.user?.id === userId && main.authGeneration === authGeneration
+    if (!isCurrentUser())
+      return false
+    const result = await replaceUserOnboardingWithRetry(userId, main.user!.onboarding, current => ({
+      ...(current && typeof current === 'object' && !Array.isArray(current) ? current : {}),
+      ...patch,
+    }), isCurrentUser)
+    if (result.status !== 'persisted' || !isCurrentUser())
+      return false
+    main.user = { ...main.user!, onboarding: result.onboarding }
+    return true
+  })
+}
+
 async function continueAfterName() {
   if (isSaving.value || !profileForm.value?.isValid)
     return
@@ -39,6 +59,18 @@ async function continueAfterName() {
   try {
     if (!await profileForm.value.save())
       return
+    let confirmed = false
+    try {
+      confirmed = await persistProfileProgress({ profile_completed_at: new Date().toISOString() })
+    }
+    catch (error) {
+      console.warn('Cannot confirm profile onboarding', error)
+    }
+    if (!confirmed) {
+      tracker.trackStepEvent('onboarding_profile_save_failed', 'name')
+      toast.error(t('account-error'))
+      return
+    }
     fields.dispose()
     tracker.trackStepEvent('onboarding_profile_saved', 'name')
     tracker.completeStep('name')
@@ -80,20 +112,12 @@ onMounted(async () => {
   }
   tracker.viewStep('name')
   document.addEventListener('visibilitychange', visibilityChanged)
-  const userId = main.user!.id
-  const authGeneration = main.authGeneration
-  await serializeUserOnboardingWrite(userId, async () => {
-    const isCurrentUser = () => main.user?.id === userId && main.authGeneration === authGeneration
-    if (!isCurrentUser())
-      return
-    const result = await replaceUserOnboardingWithRetry(userId, main.user!.onboarding, current => ({
-      ...(current && typeof current === 'object' && !Array.isArray(current) ? current : {}),
-      onboarding_attempt_id: identity.attemptId,
-      last_run_id: identity.runId,
-    }), isCurrentUser)
-    if (result.status === 'persisted' && isCurrentUser())
-      main.user = { ...main.user!, onboarding: result.onboarding }
-  })
+  try {
+    await persistProfileProgress({ onboarding_attempt_id: identity.attemptId, last_run_id: identity.runId })
+  }
+  catch (error) {
+    console.warn('Cannot persist profile onboarding identity', error)
+  }
 })
 
 onBeforeUnmount(() => {
@@ -105,11 +129,11 @@ onBeforeUnmount(() => {
 <template>
   <AuthPageShell :card-title="t('unified-onboarding-step-about-you')" :card-kicker="t('onboarding-name-kicker')" :card-description="t('onboarding-name-description')">
     <form class="space-y-6" data-test="onboarding-name-step" @submit.prevent="continueAfterName">
-      <OnboardingProfile ref="profileForm" :disabled="isSaving" @field-input="trackField" @save-failed="tracker.trackStepEvent('onboarding_profile_save_failed', 'name')" />
+      <OnboardingProfile ref="profileForm" initial :disabled="isSaving" @field-input="trackField" @save-failed="tracker.trackStepEvent('onboarding_profile_save_failed', 'name')" />
       <p class="text-sm leading-6 text-slate-500 dark:text-slate-400">
         {{ t('onboarding-name-required') }}
       </p>
-      <button type="submit" :class="authPrimaryButtonClass" :disabled="!profileForm?.isValid || isSaving" data-test="onboarding-name-continue">
+      <button type="submit" class="max-sm:transition-none max-sm:hover:translate-y-0" :class="authPrimaryButtonClass" :disabled="!profileForm?.isValid || isSaving" data-test="onboarding-name-continue">
         <IconLoader v-if="isSaving" class="h-4 w-4 animate-spin" />
         {{ t('continue') }}
         <IconArrowRight v-if="!isSaving" class="h-4 w-4" />

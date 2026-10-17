@@ -9,7 +9,7 @@ import { replaceUserOnboardingWithRetry, serializeUserOnboardingWrite } from '~/
 import { useMainStore } from '~/stores/main'
 import { hasProfileOnboarding } from '~/utils/onboardingABTests'
 
-defineProps<{ disabled?: boolean }>()
+const props = defineProps<{ disabled?: boolean, initial?: boolean }>()
 const emit = defineEmits<{
   fieldInput: [field: 'first_name' | 'last_name', value: string]
   saved: []
@@ -21,7 +21,7 @@ const supabase = useSupabase()
 const { t } = useI18n()
 const firstName = ref(main.user?.first_name ?? '')
 const lastName = ref(main.user?.last_name ?? '')
-const needsProfileName = computed(() => hasProfileOnboarding(main.user?.onboarding) && (!main.user?.first_name?.trim() || !main.user?.last_name?.trim()))
+const needsProfileName = computed(() => hasProfileOnboarding(main.user?.onboarding) && (props.initial || !main.user?.first_name?.trim() || !main.user?.last_name?.trim()))
 const isValid = computed(() => !!main.user?.id && (!needsProfileName.value || (!!firstName.value.trim() && !!lastName.value.trim())))
 let draftGeneration = 0
 let draftTimer: ReturnType<typeof setTimeout> | undefined
@@ -119,6 +119,7 @@ async function resetDraft() {
       const result = await replaceUserOnboardingWithRetry(userId, main.user!.onboarding, (current) => {
         const onboarding = { ...onboardingObject(current) }
         delete onboarding.profile_draft
+        delete onboarding.profile_completed_at
         return onboarding
       }, isCurrentUser)
       if (result.status !== 'persisted' || !isCurrentUser())

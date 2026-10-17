@@ -529,6 +529,7 @@ test.describe('Registration', () => {
     await loginToOnboarding(page, email, password)
     await expect(page.locator('[data-test="onboarding-resume-restart"]')).toBeVisible()
     await page.locator('[data-test="onboarding-resume-restart"]').click()
+    await page.locator('[data-test="onboarding-name-continue"]').click()
     await continuePastWelcome(page)
     await expect(page.locator('[data-test="onboarding-intent-ota"]')).toBeVisible()
     await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveCount(0)

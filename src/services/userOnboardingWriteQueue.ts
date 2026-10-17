@@ -25,8 +25,10 @@ export function mergeUserOnboardingProgress(
   for (const key of Object.keys(USER_ONBOARDING_PROGRESS_FIELDS))
     delete merged[key]
 
-  if (options.clearProfileDraft)
+  if (options.clearProfileDraft) {
     delete merged.profile_draft
+    delete merged.profile_completed_at
+  }
 
   const next = isJsonObject(nextProgress) ? { ...nextProgress } : {}
   if (options.clearIntent) {

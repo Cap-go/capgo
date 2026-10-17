@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createApp, nextTick } from 'vue'
 import AppOnboardingFlow from '../src/components/dashboard/AppOnboardingFlow.vue'
 import { sendOnboardingEvent } from '../src/services/onboardingTracking'
+import { parseUserOnboardingProgress, shouldPromptOnboardingResume } from '../src/utils/userOnboardingProgress'
 
 const writerMocks = vi.hoisted(() => ({
   abTestAssignments: {} as Record<string, unknown>,
@@ -761,12 +762,15 @@ describe('app onboarding progress analytics integration', () => {
     }
   })
 
-  it('clears the persisted intent when the user explicitly restarts onboarding', async () => {
+  it('clears name confirmation and wizard progress so returning from names does not prompt to resume again', async () => {
     const previousUser = writerMocks.main.user
     const previousDialogRole = writerMocks.dialog.lastButtonRole
     const previousAssignments = writerMocks.abTestAssignments
     const matchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
     const currentOnboarding = {
+      version: 6,
+      profile_completed_at: '2026-10-17T10:00:00.000Z',
+      profile_draft: { first_name: 'Draft', last_name: 'User' },
       abtests: {
         new_channel: {
           assigned_at: '2026-09-11T10:00:00.000Z',
@@ -803,7 +807,12 @@ describe('app onboarding progress analytics integration', () => {
       app.mount(container)
       await vi.waitFor(() => expect(writerMocks.replaceUserOnboardingIfUnchanged).toHaveBeenCalled())
 
-      expect(writerMocks.replaceUserOnboardingIfUnchanged.mock.calls[0]?.[2]).not.toHaveProperty('intent')
+      const reset = writerMocks.replaceUserOnboardingIfUnchanged.mock.calls[0]?.[2]
+      expect(reset).not.toHaveProperty('intent')
+      expect(reset).not.toHaveProperty('profile_draft')
+      expect(reset).not.toHaveProperty('profile_completed_at')
+      expect(shouldPromptOnboardingResume(parseUserOnboardingProgress({ ...reset, profile_completed_at: new Date().toISOString() }), 'pre_org')).toBe(false)
+      await vi.waitFor(() => expect(writerMocks.router.replace).toHaveBeenCalledWith({ path: '/onboarding/name', query: { to: '/onboarding/app' } }))
     }
     finally {
       app.unmount()
