@@ -68,7 +68,8 @@ describe('user A/B enrollment through PostgREST', () => {
       headers: { ...headers, 'apikey': SUPABASE_ANON_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=representation' },
       body: JSON.stringify({ id: userId, email, created_via_invite: false }),
     })
-    expect(upsert.status, await upsert.clone().text()).toBe(201)
+    // A successful upsert can create a row or update an existing one.
+    expect([200, 201], await upsert.clone().text()).toContain(upsert.status)
     expect(await upsert.json()).toEqual([{ created_via_invite: true }])
     const { data, error } = await getSupabaseClient().from('users').update({
       onboarding: { ...managed, abtests_enrolled: ['backend-edit'], intent: 'ota' },
