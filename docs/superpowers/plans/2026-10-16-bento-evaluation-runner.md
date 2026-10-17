@@ -11,7 +11,7 @@
 ## Task 1: Contracts, schema, and storage
 
 - [x] Define evaluation, eligible-user metadata, run, ledger, audit, and helper contracts under `cloudflare_workers/bento_dispatch/`.
-- [x] Rewrite `supabase/migrations/20261015164155_bento_invitation_dispatches.sql` into the two-table private schema described by the approved specification. Remove the enrollment SQL trigger/function and schedule/partition columns; add explicit grants, RLS denial, unique keys, active-flow/run/pending-audit indexes.
+- [x] Rewrite `supabase/migrations/20261017131933_bento_invitation_dispatches.sql` into the two-table private schema described by the approved specification. Remove the enrollment SQL trigger/function and schedule/partition columns; add explicit grants, RLS denial, unique keys, active-flow/run/pending-audit indexes.
 - [x] Implement transactional schedule/publication/execution claims, read-only database execution, selection persistence, event claims/acknowledgements, termination, audit append/handoff in `store.ts`.
 - [x] Replace pgTAP and real PostgreSQL tests; prove 1/5-minute cadence, overlap/fencing, max-five attempts, read-only SQL rejection, and mutation/audit atomicity.
 
