@@ -3728,6 +3728,7 @@
   "wrong-name-org-del": "Used in Capgo web console areas: pages/settings/organization. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "x-hours-short": "Used in Capgo web console areas: pages/settings/organization. Role: short UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "yearly": "Used in Capgo web console areas: pages/settings/organization. Role: short UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "yearly-two-months-free": "Used in Capgo web console areas: pages/settings/organization. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "yes": "Used in Capgo web console areas: components/tables, pages/app. Role: short UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "you-are-deleting-unsafely": "Used in Capgo web console areas: components/tables, pages/app. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "you-are-deleting-unsafely-plural": "Used in Capgo web console areas: components/tables. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
