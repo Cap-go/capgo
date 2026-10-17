@@ -1200,7 +1200,7 @@ export async function customerToSegmentOrg(
     trial1: false,
     trial0: false,
     paying: false,
-    payingMonthly: plan?.price_m_id === price_id,
+    payingMonthly: !!price_id && (plan?.price_m_id === price_id || plan?.price_m_id_us === price_id),
     overuse: false,
     canceled: await isCanceledOrg(c, orgId),
     issueSegment: false,
@@ -1278,12 +1278,14 @@ function processSegments(segmentsObj: any): { segments: string[], deleteSegments
 }
 
 export async function getStripeCustomer(c: Context, customerId: string) {
-  const { data: stripeInfo } = await supabaseAdmin(c)
+  const { data, error } = await supabaseAdmin(c)
     .from('stripe_info')
     .select('*')
     .eq('customer_id', customerId)
-    .single()
-  return stripeInfo
+    .maybeSingle()
+  if (error)
+    throw error
+  return data
 }
 
 export async function getDefaultPlan(c: Context) {
