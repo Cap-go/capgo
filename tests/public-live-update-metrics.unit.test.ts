@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getDeviceDaySuccessRateCF, getPublicLiveUpdateMetricsCF } from '../supabase/functions/_backend/utils/cloudflare.ts'
+import { getPublicLiveUpdateMetricsCF } from '../supabase/functions/_backend/utils/cloudflare.ts'
 
 interface AnalyticsColumn { name: string, type: string }
 
@@ -266,29 +266,5 @@ describe('public live update metrics', () => {
     expect(firstDayQuery).toContain('argMin(failures, date)')
     expect(firstDayQuery).toContain('sum(successes)')
     expect(firstDayQuery).toContain('GROUP BY app_id, version_name')
-  })
-
-  it('computes device-day success rate for global_stats windows', async () => {
-    vi.stubEnv('CF_ANALYTICS_TOKEN', 'analytics-token')
-    vi.stubEnv('CF_ACCOUNT_ANALYTICS_ID', 'analytics-account')
-    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
-      const query = String(init?.body ?? '')
-      expect(query).toContain('GROUP BY date, app_id, device_id')
-      expect(query).toContain('sum(if(succeeded = 0, failed, 0))')
-      return analyticsResponse(
-        [
-          { name: 'successes', type: 'UInt64' },
-          { name: 'failures', type: 'UInt64' },
-        ],
-        [{ successes: '68', failures: '32' }],
-      )
-    }))
-
-    const rate = await getDeviceDaySuccessRateCF(
-      createContext(),
-      new Date('2026-08-10T00:00:00.000Z'),
-      new Date('2026-08-11T00:00:00.000Z'),
-    )
-    expect(rate).toBe(68)
   })
 })

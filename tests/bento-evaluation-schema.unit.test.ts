@@ -8,7 +8,7 @@ describe('approved evaluation runner replacement', () => {
     expect(() => parseDispatchJob(job)).not.toThrow()
   })
   it('keeps exactly the two private ledgers and removes scheduled recipient enrollment', () => {
-    const sql = readFileSync('supabase/migrations/20261015164155_bento_invitation_dispatches.sql', 'utf8')
+    const sql = readFileSync('supabase/migrations/20261017131933_bento_invitation_dispatches.sql', 'utf8')
     expect(sql).toContain('CREATE TABLE public.bento_evaluation_runs')
     expect(sql).not.toMatch(/\bdue_at\b|\bpartition\b|CREATE TRIGGER/)
     expect(sql.match(/CREATE TABLE/g)).toHaveLength(2)

@@ -1200,7 +1200,7 @@ export async function customerToSegmentOrg(
     trial1: false,
     trial0: false,
     paying: false,
-    payingMonthly: plan?.price_m_id === price_id,
+    payingMonthly: !!price_id && (plan?.price_m_id === price_id || plan?.price_m_id_us === price_id),
     overuse: false,
     canceled: await isCanceledOrg(c, orgId),
     issueSegment: false,
@@ -1278,12 +1278,14 @@ function processSegments(segmentsObj: any): { segments: string[], deleteSegments
 }
 
 export async function getStripeCustomer(c: Context, customerId: string) {
-  const { data: stripeInfo } = await supabaseAdmin(c)
+  const { data, error } = await supabaseAdmin(c)
     .from('stripe_info')
     .select('*')
     .eq('customer_id', customerId)
-    .single()
-  return stripeInfo
+    .maybeSingle()
+  if (error)
+    throw error
+  return data
 }
 
 export async function getDefaultPlan(c: Context) {
@@ -2209,75 +2211,6 @@ export async function getCurrentPlanNameOrg(c: Context, orgId?: string): Promise
     throw new Error(error.message)
 
   return data ?? DEFAULT_PLAN_NAME
-}
-
-interface UpdateStats {
-  apps: {
-    app_id: string
-    failed: number
-    set: number
-    get: number
-    success_rate: number
-    healthy: boolean
-  }[]
-  total: {
-    failed: number
-    set: number
-    get: number
-    success_rate: number
-    healthy: boolean
-  }
-}
-
-export async function getUpdateStatsSB(c: Context): Promise<UpdateStats> {
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('get_update_stats')
-
-  if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting update stats', error })
-    return {
-      apps: [],
-      total: {
-        failed: 0,
-        set: 0,
-        get: 0,
-        success_rate: 100,
-        healthy: true,
-      },
-    }
-  }
-
-  const apps = data.map((app: any) => {
-    const totalOutcomes = app.failed + app.install
-    const successRate = Number((totalOutcomes > 0 ? (app.install / totalOutcomes) * 100 : 100).toFixed(2))
-    return {
-      app_id: app.app_id,
-      failed: Number(app.failed),
-      set: Number(app.install),
-      get: Number(app.get),
-      success_rate: successRate,
-      healthy: successRate >= 70,
-    }
-  })
-
-  const total = apps.reduce((acc, app) => {
-    acc.failed += app.failed
-    acc.set += app.set
-    acc.get += app.get
-    return acc
-  }, { failed: 0, set: 0, get: 0 })
-
-  const totalOutcomes = total.failed + total.set
-  const totalSuccessRate = totalOutcomes > 0 ? (total.set / totalOutcomes) * 100 : 100
-
-  return {
-    apps,
-    total: {
-      ...total,
-      success_rate: Number(totalSuccessRate.toFixed(2)),
-      healthy: totalSuccessRate >= 70,
-    },
-  }
 }
 
 /**

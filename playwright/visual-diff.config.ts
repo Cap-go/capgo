@@ -10,6 +10,7 @@ export interface VisualDiffRoute {
 }
 
 async function prepareProfileGoalScreenshot(page: Page) {
+  await page.route('**/rest/v1/rpc/get_orgs_v7', route => route.fulfill({ json: [] }))
   await page.route('**/rest/v1/users?*', async (route) => {
     if (route.request().method() !== 'GET')
       return route.fulfill({ json: [] })
@@ -21,7 +22,10 @@ async function prepareProfileGoalScreenshot(page: Page) {
   await page.reload()
   const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
   const goal = page.locator('[data-test="onboarding-intent-ota"]')
-  await welcome.or(goal).waitFor()
+  const name = page.locator('[data-test="onboarding-name-step"]')
+  await welcome.or(goal).or(name).waitFor()
+  if (await name.isVisible())
+    return
   if (await welcome.isVisible())
     await welcome.click()
   await goal.click()
@@ -362,7 +366,41 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     },
   },
   { slug: 'app-getting-started', path: '/app/com.demo.app/getting-started', auth: true },
-  { slug: 'app-settings', path: '/app/com.demo.app/settings', auth: true },
+  {
+    slug: 'app-settings',
+    path: '/app/com.demo.app/settings',
+    auth: true,
+    prepare: async (page) => {
+      const fieldset = page.locator('[data-test="device-data-collection"]')
+      try {
+        await fieldset.waitFor({ state: 'visible', timeout: 5000 })
+        await fieldset.scrollIntoViewIfNeeded()
+      }
+      catch (error) {
+        if (error instanceof Error && error.name === 'TimeoutError')
+          return
+        throw error
+      }
+    },
+  },
+  {
+    slug: 'app-settings-device-data-collection',
+    path: '/app/com.demo.app/settings',
+    auth: true,
+    prepare: async (page) => {
+      const fieldset = page.locator('[data-test="device-data-collection"]')
+      try {
+        await fieldset.waitFor({ state: 'visible', timeout: 5000 })
+        await fieldset.locator('summary').click()
+        await fieldset.scrollIntoViewIfNeeded()
+      }
+      catch (error) {
+        if (error instanceof Error && error.name === 'TimeoutError')
+          return
+        throw error
+      }
+    },
+  },
   { slug: 'app-settings-access', path: '/app/com.demo.app/settings/access', auth: true },
   { slug: 'org-settings', path: '/settings/organization', auth: true },
   { slug: 'org-settings-team', path: '/settings/organization/members', auth: true },

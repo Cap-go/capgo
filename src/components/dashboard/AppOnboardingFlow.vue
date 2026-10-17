@@ -114,6 +114,7 @@ import AppOnboardingCliSteps from './AppOnboardingCliSteps.vue'
 import AppOnboardingIconInput from './AppOnboardingIconInput.vue'
 import AppOnboardingSetupChecklist from './AppOnboardingSetupChecklist.vue'
 import AppOnboardingWelcome from './AppOnboardingWelcome.vue'
+import BillingRegionChoice from './BillingRegionChoice.vue'
 import ChannelConsoleAssignOnboarding from './ChannelConsoleAssignOnboarding.vue'
 import ChannelCreateOnboarding from './ChannelCreateOnboarding.vue'
 import ChannelDefaultRoutingOnboarding from './ChannelDefaultRoutingOnboarding.vue'
@@ -241,6 +242,7 @@ const hasEditedAppId = ref(false)
 const storeAppIdLookupFailed = ref(false)
 const selectedDevelopmentEnvironment = ref<OnboardingDevelopmentEnvironment | null>(null)
 const skippedPublishAppQuestion = ref(false)
+const billingAccount = ref<'ee' | 'us' | undefined>()
 const selectedIntent = ref<OnboardingIntent | null>(null)
 const profileOnboarding = computed(() => hasProfileOnboarding(main.user?.onboarding))
 const intentStepLabel = computed(() => t('unified-onboarding-step-intent'))
@@ -2057,6 +2059,7 @@ async function createOrganizationAndApp() {
         startingOut: selectedStop.startingOut === true,
         developmentEnvironment: selectedDevelopmentEnvironment.value ?? 'skipped',
         website: websitePreview.value?.website,
+        billingAccount: billingAccount.value,
       },
     })
 
@@ -3412,6 +3415,8 @@ defineExpose({
                   </label>
                 </div>
               </div>
+
+              <BillingRegionChoice v-model="billingAccount" />
 
               <div v-if="showWebNativeRecommendation" class="rounded-2xl border border-primary-500/30 bg-primary-500/5 p-5 dark:border-primary-400/30 dark:bg-primary-400/10" data-test="onboarding-webnative-recommendation">
                 <div class="flex gap-3">

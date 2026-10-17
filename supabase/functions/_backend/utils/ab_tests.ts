@@ -1,7 +1,9 @@
 import type { Context } from 'hono'
+import type { ABTestAssignment, AssignmentAudienceUser } from './ab_test_allocation.ts'
 import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import { sql } from 'drizzle-orm'
+import { createABTestAssignments as allocateABTests, isABTestBranch, isProspectiveUser, isRecord, resolveABTestAssignments, validateABTestsConfig } from './ab_test_allocation.ts'
 import rawABTestsConfig from './ab_tests.json' with { type: 'json' }
 import { syncBentoSubscriberTags } from './bento.ts'
 import { quickError } from './hono.ts'
@@ -9,26 +11,8 @@ import { cloudlogErr } from './logging.ts'
 import { checkoutPgClient, closeClient, getDrizzleClient, getPgClient, releasePgClient } from './pg.ts'
 import { backgroundTask } from './utils.ts'
 
-export type ABTestAudience = 'all' | 'self_signup'
-export type ABTestBranch = 'A' | 'B' | 'C' | 'D'
-export const AB_TEST_INTENTS = ['ota', 'builder', 'both', 'exploring', 'publish'] as const
-export type ABTestIntent = typeof AB_TEST_INTENTS[number]
-
-export interface ABTestConfig {
-  audience: ABTestAudience
-  intents?: ABTestIntent[]
-  onboarding_version?: number
-  label: string
-  branches: Record<string, { bento_tag: string, label: string }>
-  control_branch: ABTestBranch
-  treatment_branch: ABTestBranch
-  treatment_percentage: number
-}
-
-export interface ABTestAssignment {
-  assigned_at: string
-  branch: ABTestBranch
-}
+export { AB_TEST_INTENTS, validateABTestsConfig } from './ab_test_allocation.ts'
+export type { ABTestAssignment, ABTestAudience, ABTestBranch, ABTestConfig, ABTestIntent } from './ab_test_allocation.ts'
 
 interface ABTestBentoSyncState {
   cleanup_emails: string[]
@@ -36,17 +20,10 @@ interface ABTestBentoSyncState {
   pending: boolean
 }
 
-type ABTestsConfig = Record<string, ABTestConfig>
-type AssignmentAudienceUser = Pick<Database['public']['Tables']['users']['Row'], 'created_via_invite'> & { intent?: unknown, onboarding_version?: unknown }
 type AssignmentUser = AssignmentAudienceUser & Record<string, unknown> & { abtests: unknown }
-type SyncUser = Pick<Database['public']['Tables']['users']['Row'], 'created_via_invite' | 'id'> & { onboarding?: unknown }
-const AB_TEST_BRANCHES = ['A', 'B', 'C', 'D'] as const
+type SyncUser = Pick<Database['public']['Tables']['users']['Row'], 'created_via_invite' | 'id'>
 const BENTO_AB_TEST_SYNC_MAX_ATTEMPTS = 3
 const BENTO_AB_TEST_SYNC_TIMEOUT_MS = 5_000
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 function normalizeEmail(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim().toLowerCase() : undefined
@@ -70,190 +47,27 @@ function needsBentoSync(user: AssignmentUser, state: ABTestBentoSyncState) {
   return state.pending || (state.email !== undefined && state.email !== email)
 }
 
-function invalidConfig(testName?: string): never {
-  throw new Error(`Invalid A/B test configuration${testName ? ` for ${testName}` : ''}`)
-}
-
-function isABTestBranch(value: unknown): value is ABTestBranch {
-  return typeof value === 'string' && (AB_TEST_BRANCHES as readonly string[]).includes(value)
-}
-
-function isABTestIntent(value: unknown): value is ABTestIntent {
-  return typeof value === 'string' && (AB_TEST_INTENTS as readonly string[]).includes(value)
-}
-
-export function validateABTestsConfig(value: unknown): ABTestsConfig {
-  if (!isRecord(value))
-    invalidConfig()
-
-  const config: ABTestsConfig = {}
-  const bentoTags = new Set<string>()
-  for (const [testName, entry] of Object.entries(value)) {
-    if (!testName.trim() || !isRecord(entry))
-      invalidConfig(testName)
-
-    const audience = entry.audience
-    const label = entry.label
-    const percentage = entry.treatment_percentage
-    const treatmentBranch = entry.treatment_branch
-    const controlBranch = entry.control_branch
-    const branches = entry.branches
-    const intents = entry.intents
-    const onboardingVersion = entry.onboarding_version
-    if (onboardingVersion !== undefined && (!Number.isInteger(onboardingVersion) || Number(onboardingVersion) < 1))
-      invalidConfig(testName)
-    if ((audience !== 'all' && audience !== 'self_signup')
-      || typeof label !== 'string'
-      || !label.trim()
-      || typeof percentage !== 'number'
-      || !Number.isInteger(percentage)
-      || percentage < 0
-      || percentage > 100
-      || !isRecord(branches)
-      || !isABTestBranch(treatmentBranch)
-      || !isABTestBranch(controlBranch)
-      || treatmentBranch === controlBranch
-      || Object.keys(branches).length !== 2
-      || !isRecord(branches[treatmentBranch])
-      || !isRecord(branches[controlBranch])) {
-      invalidConfig(testName)
-    }
-    if (intents !== undefined
-      && (!Array.isArray(intents)
-        || intents.length === 0
-        || !intents.every(isABTestIntent)
-        || new Set(intents).size !== intents.length)) {
-      invalidConfig(testName)
-    }
-
-    const treatmentTag = branches[treatmentBranch].bento_tag
-    const controlTag = branches[controlBranch].bento_tag
-    const treatmentLabel = branches[treatmentBranch].label
-    const controlLabel = branches[controlBranch].label
-    if (typeof treatmentTag !== 'string'
-      || typeof controlTag !== 'string'
-      || typeof treatmentLabel !== 'string'
-      || typeof controlLabel !== 'string'
-      || !treatmentTag.trim()
-      || !controlTag.trim()
-      || !treatmentLabel.trim()
-      || !controlLabel.trim()
-      || treatmentTag === controlTag
-      || bentoTags.has(treatmentTag)
-      || bentoTags.has(controlTag)) {
-      invalidConfig(testName)
-    }
-    bentoTags.add(treatmentTag)
-    bentoTags.add(controlTag)
-
-    config[testName] = {
-      audience,
-      ...(onboardingVersion === undefined ? {} : { onboarding_version: onboardingVersion as number }),
-      label: label.trim(),
-      ...(intents === undefined ? {} : { intents: [...intents] }),
-      control_branch: controlBranch,
-      treatment_branch: treatmentBranch,
-      treatment_percentage: percentage,
-      branches: {
-        [treatmentBranch]: { bento_tag: treatmentTag, label: treatmentLabel.trim() },
-        [controlBranch]: { bento_tag: controlTag, label: controlLabel.trim() },
-      },
-    }
-  }
-
-  return config
-}
-
 export const AB_TESTS_CONFIG = validateABTestsConfig(rawABTestsConfig)
 
-function isEligibleForTest(user: AssignmentAudienceUser, test: ABTestConfig) {
-  if (test.audience === 'self_signup' && user.created_via_invite)
-    return false
-  if (test.onboarding_version !== undefined && Number(user.onboarding_version) !== test.onboarding_version)
-    return false
-  return test.intents === undefined
-    || (isABTestIntent(user.intent) && test.intents.includes(user.intent))
-}
-
-export function createABTestAssignments(
-  user: AssignmentAudienceUser,
-  config = AB_TESTS_CONFIG,
-  random = Math.random,
-  now = () => new Date(),
-): Record<string, ABTestAssignment> {
-  const assignments: Record<string, ABTestAssignment> = {}
-  let assignedAt: string | undefined
-
-  for (const [testName, test] of Object.entries(config)) {
-    if (test.treatment_percentage === 0 || !isEligibleForTest(user, test))
-      continue
-
-    assignedAt ??= now().toISOString()
-    assignments[testName] = {
-      assigned_at: assignedAt,
-      branch: random() * 100 < test.treatment_percentage ? test.treatment_branch : test.control_branch,
-    }
-  }
-
-  return assignments
-}
-
-function readExistingAssignments(value: unknown, testNames: string[]) {
-  const storedAssignments = isRecord(value) ? value : {}
-  const assignments: Record<string, ABTestAssignment> = {}
-  const missing: string[] = []
-  for (const testName of testNames) {
-    const test = AB_TESTS_CONFIG[testName]
-    const assignment = storedAssignments[testName]
-    if (assignment === undefined) {
-      if (test.treatment_percentage !== 0)
-        missing.push(testName)
-      continue
-    }
-    const branch = isRecord(assignment) ? assignment.branch : undefined
-    if (!test
-      || !isRecord(assignment)
-      || typeof assignment.assigned_at !== 'string'
-      || !isABTestBranch(branch)
-      || (branch !== test.treatment_branch && branch !== test.control_branch)) {
-      quickError(500, 'ab_test_assignment_failed', 'A/B test assignment failed', { testName })
-    }
-    assignments[testName] = {
-      assigned_at: assignment.assigned_at,
-      branch,
-    }
-  }
-  return { assignments, missing }
-}
-
-function readPersistedAssignments(value: unknown, testNames: string[]) {
-  const existing = readExistingAssignments(value, testNames)
-  if (existing.missing.length > 0)
-    quickError(500, 'ab_test_assignment_failed', 'A/B test assignment failed', { testNames: existing.missing })
-  return existing.assignments
-}
-
-function eligibleTestNames(user: AssignmentAudienceUser) {
-  return Object.entries(AB_TESTS_CONFIG)
-    .filter(([, test]) => isEligibleForTest(user, test))
-    .map(([testName]) => testName)
-}
-
-function ineligibleAssignedTestNames(value: unknown, user: AssignmentAudienceUser) {
-  const storedAssignments = isRecord(value) ? value : {}
-  return Object.entries(AB_TESTS_CONFIG)
-    .filter(([testName, test]) => test.intents !== undefined
-      && storedAssignments[testName] !== undefined
-      && !isEligibleForTest(user, test))
-    .map(([testName]) => testName)
+export function createABTestAssignments(user: AssignmentAudienceUser, config = AB_TESTS_CONFIG, random = Math.random, now = () => new Date()) {
+  return allocateABTests(user, config, random, now)
 }
 
 function hasIntentGatedTests() {
-  return Object.values(AB_TESTS_CONFIG).some(test => test.intents !== undefined)
+  return Object.values(AB_TESTS_CONFIG).some(test => test.intents !== undefined
+    || test.treatment_percentage_by_intent !== undefined || test.required_assignments_by_intent !== undefined
+    || test.required_assignments !== undefined || test.enroll_new_users_after !== undefined)
 }
 
-function configForTests(testNames: string[]): ABTestsConfig {
-  return Object.fromEntries(testNames.map(testName => [testName, AB_TESTS_CONFIG[testName]]))
+function enrollmentsForSignup(user: AssignmentUser) {
+  const enrolled = Array.isArray(user.abtests_enrolled) ? user.abtests_enrolled.filter((name): name is string => typeof name === 'string') : []
+  for (const [name, test] of Object.entries(AB_TESTS_CONFIG)) {
+    if (test.enroll_new_users_after !== undefined && isProspectiveUser(user.created_at, test.enroll_new_users_after)
+      && (test.audience === 'all' || !user.created_via_invite) && !enrolled.includes(name)) {
+      enrolled.push(name)
+    }
+  }
+  return enrolled
 }
 
 async function readAssignmentUser(
@@ -265,9 +79,10 @@ async function readAssignmentUser(
     const pgClient = await checkoutPgClient(pgPool)
     try {
       const result = await pgClient.query<AssignmentUser>(
-        `SELECT created_via_invite,
+        `SELECT id, created_at, created_via_invite,
                 email,
                 onboarding->'abtests_bento_sync' AS abtests_bento_sync,
+                onboarding->'abtests_enrolled' AS abtests_enrolled,
                 onboarding->>'version' AS onboarding_version,
                 onboarding->>'intent' AS intent,
                 onboarding->'abtests' AS abtests
@@ -287,44 +102,6 @@ async function readAssignmentUser(
   }
 }
 
-async function persistABTestAssignments(
-  c: Context<MiddlewareKeyVariables>,
-  userId: string,
-  candidates: Record<string, ABTestAssignment>,
-) {
-  const pgPool = await getPgClient(c)
-  let persisted: unknown
-  try {
-    const pgClient = await checkoutPgClient(pgPool)
-    try {
-      const result = await pgClient.query<{ abtests: unknown }>(
-        `UPDATE public.users
-         SET onboarding = COALESCE(onboarding, '{}'::jsonb)
-           || pg_catalog.jsonb_build_object(
-             'abtests',
-             $2::jsonb || CASE
-               WHEN pg_catalog.jsonb_typeof(onboarding->'abtests') = 'object'
-                 THEN onboarding->'abtests'
-               ELSE '{}'::jsonb
-             END
-           )
-         WHERE id = $1::uuid
-         RETURNING onboarding->'abtests' AS abtests`,
-        [userId, JSON.stringify(candidates)],
-      )
-      persisted = result.rows[0]?.abtests
-    }
-    finally {
-      releasePgClient(pgPool, pgClient, true)
-    }
-  }
-  finally {
-    await closeClient(c, pgPool)
-  }
-
-  return readPersistedAssignments(persisted, Object.keys(candidates))
-}
-
 function buildBentoTagUpdate(user: AssignmentUser) {
   const email = normalizeEmail(user.email)
   if (!email)
@@ -334,14 +111,15 @@ function buildBentoTagUpdate(user: AssignmentUser) {
   const segments: string[] = []
   const deleteSegments: string[] = []
 
+  const eligibleAssignments = resolveABTestAssignments(user, user.abtests, AB_TESTS_CONFIG, undefined, undefined, false).assignments
   for (const [testName, test] of Object.entries(AB_TESTS_CONFIG)) {
     const storedAssignment = storedAssignments[testName]
     const branch = isRecord(storedAssignment) ? storedAssignment.branch : undefined
     const isCurrentBranch = isABTestBranch(branch)
       && (branch === test.treatment_branch || branch === test.control_branch)
-    if (test.treatment_percentage === 0 && !isCurrentBranch)
+    if (test.treatment_percentage === 0 && !Object.values(test.treatment_percentage_by_intent ?? {}).some(value => value > 0) && !isCurrentBranch)
       continue
-    if (!isCurrentBranch || !isEligibleForTest(user, test)) {
+    if (!isCurrentBranch || eligibleAssignments[testName] === undefined) {
       deleteSegments.push(
         test.branches[test.treatment_branch].bento_tag,
         test.branches[test.control_branch].bento_tag,
@@ -398,8 +176,9 @@ async function reconcileBentoSyncState(
   return await drizzle.transaction(async (tx) => {
     await tx.execute(sql`SET LOCAL lock_timeout = '2s'`)
     const currentUserResult = await tx.execute<AssignmentUser & { email?: string | null }>(sql`
-      SELECT created_via_invite,
+      SELECT id, created_at, created_via_invite,
              onboarding->'abtests_bento_sync' AS abtests_bento_sync,
+                onboarding->'abtests_enrolled' AS abtests_enrolled,
              email,
              onboarding->>'version' AS onboarding_version,
                 onboarding->>'intent' AS intent,
@@ -444,55 +223,82 @@ async function reconcileBentoSyncState(
   })
 }
 
+type BentoSyncSnapshot = NonNullable<Awaited<ReturnType<typeof reconcileBentoSyncState>>>
+
+interface BentoTagSyncContext {
+  c: Context<MiddlewareKeyVariables>
+  drizzle: ReturnType<typeof getDrizzleClient>
+  userId: string
+  cleanedEmails: Set<string>
+  signal: AbortSignal
+  strict: boolean
+}
+
+async function deliverBentoTagUpdate(
+  context: BentoTagSyncContext,
+  update: NonNullable<ReturnType<typeof buildBentoTagUpdate>>,
+  failureMessage: string,
+) {
+  const result = await syncBentoSubscriberTags(context.c, update, context.signal)
+  if (result === true)
+    return true
+  if (context.strict && result === false)
+    throw new Error('Bento A/B test delivery failed')
+  cloudlogErr({ message: failureMessage, requestId: context.c.get('requestId') })
+  return false
+}
+
+async function advanceBentoTagSync(context: BentoTagSyncContext, snapshot: BentoSyncSnapshot) {
+  const { drizzle, userId, cleanedEmails } = context
+  const cleanupEmail = snapshot.state.cleanup_emails.find(email => !cleanedEmails.has(email))
+  if (cleanupEmail) {
+    const accepted = await deliverBentoTagUpdate(context, buildBentoTagCleanup(cleanupEmail), 'on-demand A/B Bento email cleanup failed')
+    if (!accepted)
+      return undefined
+    cleanedEmails.add(cleanupEmail)
+    // Persist accepted cleanup before spending more of the bounded budget.
+    return reconcileBentoSyncState(drizzle, userId, snapshot.state, cleanedEmails)
+  }
+
+  const tagUpdate = buildBentoTagUpdate(snapshot.user)
+  if (!tagUpdate) {
+    await reconcileBentoSyncState(drizzle, userId, snapshot.state, cleanedEmails)
+    return undefined
+  }
+  const accepted = await deliverBentoTagUpdate(context, tagUpdate, 'on-demand A/B Bento sync failed')
+  if (!accepted)
+    return undefined
+  return reconcileBentoSyncState(drizzle, userId, snapshot.state, cleanedEmails, tagUpdate)
+}
+
 async function syncCurrentUserABTestTags(
   c: Context<MiddlewareKeyVariables>,
   drizzle: ReturnType<typeof getDrizzleClient>,
   userId: string,
   initialState: ABTestBentoSyncState,
+  strict = false,
 ) {
   try {
-    const signal = AbortSignal.timeout(BENTO_AB_TEST_SYNC_TIMEOUT_MS)
-    const cleanedEmails = new Set<string>()
-    let snapshot = await reconcileBentoSyncState(drizzle, userId, initialState, cleanedEmails)
-    if (snapshot?.complete)
-      return
-    let attempt = 0
-    while (snapshot && attempt < BENTO_AB_TEST_SYNC_MAX_ATTEMPTS) {
-      const cleanupEmail = snapshot.state.cleanup_emails.find(email => !cleanedEmails.has(email))
-      if (cleanupEmail) {
-        attempt += 1
-        const cleanupResult = await syncBentoSubscriberTags(c, buildBentoTagCleanup(cleanupEmail), signal)
-        if (cleanupResult !== true) {
-          cloudlogErr({
-            message: 'on-demand A/B Bento email cleanup failed',
-            requestId: c.get('requestId'),
-          })
-          return
-        }
-        cleanedEmails.add(cleanupEmail)
-        continue
-      }
-
-      const tagUpdate = buildBentoTagUpdate(snapshot.user)
-      if (!tagUpdate) {
-        await reconcileBentoSyncState(drizzle, userId, snapshot.state, cleanedEmails)
-        return
-      }
-      attempt += 1
-      const result = await syncBentoSubscriberTags(c, tagUpdate, signal)
-      if (result !== true) {
-        cloudlogErr({
-          message: 'on-demand A/B Bento sync failed',
-          requestId: c.get('requestId'),
-        })
-        return
-      }
-      snapshot = await reconcileBentoSyncState(drizzle, userId, snapshot.state, cleanedEmails, tagUpdate)
-      if (snapshot?.complete)
-        return
+    const context: BentoTagSyncContext = {
+      c,
+      drizzle,
+      userId,
+      strict,
+      signal: AbortSignal.timeout(BENTO_AB_TEST_SYNC_TIMEOUT_MS),
+      cleanedEmails: new Set<string>(),
     }
+    let snapshot = await reconcileBentoSyncState(drizzle, userId, initialState, context.cleanedEmails)
+    for (let attempt = 0; snapshot && attempt < BENTO_AB_TEST_SYNC_MAX_ATTEMPTS; attempt++) {
+      if (snapshot.complete)
+        return
+      snapshot = await advanceBentoTagSync(context, snapshot)
+    }
+    if (strict && snapshot && !snapshot.complete)
+      throw new Error('Bento A/B test delivery failed')
   }
   catch (error) {
+    if (strict)
+      throw error
     cloudlogErr({
       error,
       message: 'on-demand A/B Bento reconciliation failed',
@@ -501,12 +307,13 @@ async function syncCurrentUserABTestTags(
   }
 }
 
-export async function getOrCreateUserABTests(
+async function reconcileUserABTests(
   c: Context<MiddlewareKeyVariables>,
   userId: string,
+  signup = false,
 ) {
   let replicaUser: AssignmentUser | undefined
-  if (!hasIntentGatedTests()) {
+  if (!signup && !hasIntentGatedTests()) {
     try {
       replicaUser = await readAssignmentUser(c, userId)
     }
@@ -515,11 +322,9 @@ export async function getOrCreateUserABTests(
     }
   }
   if (replicaUser) {
-    const testNames = eligibleTestNames(replicaUser)
-    const existing = readExistingAssignments(replicaUser.abtests, testNames)
-    const revoked = ineligibleAssignedTestNames(replicaUser.abtests, replicaUser)
+    const existing = resolveABTestAssignments({ ...replicaUser, id: userId }, replicaUser.abtests, AB_TESTS_CONFIG)
     const bentoSyncState = readBentoSyncState(replicaUser.abtests_bento_sync)
-    if (existing.missing.length === 0 && revoked.length === 0 && !needsBentoSync(replicaUser, bentoSyncState))
+    if (!existing.changed && !needsBentoSync(replicaUser, bentoSyncState))
       return existing.assignments
   }
 
@@ -534,8 +339,9 @@ export async function getOrCreateUserABTests(
     const drizzle = getDrizzleClient(pgPool)
     result = await drizzle.transaction(async (tx) => {
       const lockedUserResult = await tx.execute<AssignmentUser & { email?: string | null }>(sql`
-        SELECT created_via_invite,
+        SELECT id, created_at, created_via_invite,
                onboarding->'abtests_bento_sync' AS abtests_bento_sync,
+                onboarding->'abtests_enrolled' AS abtests_enrolled,
                email,
                onboarding->>'version' AS onboarding_version,
                 onboarding->>'intent' AS intent,
@@ -548,11 +354,11 @@ export async function getOrCreateUserABTests(
       if (!user)
         quickError(404, 'user_not_found', 'User not found')
 
-      const testNames = eligibleTestNames(user)
-      const existing = readExistingAssignments(user.abtests, testNames)
-      const revoked = ineligibleAssignedTestNames(user.abtests, user)
+      const enrolled = signup ? enrollmentsForSignup(user) : user.abtests_enrolled
+      const existing = resolveABTestAssignments({ ...user, id: userId, abtests_enrolled: enrolled }, user.abtests, AB_TESTS_CONFIG)
+      const enrollmentChanged = signup && JSON.stringify(enrolled) !== JSON.stringify(user.abtests_enrolled ?? [])
       const bentoSyncState = readBentoSyncState(user.abtests_bento_sync)
-      if (existing.missing.length === 0 && revoked.length === 0) {
+      if (!existing.changed && !enrollmentChanged) {
         return {
           assignments: existing.assignments,
           bentoSyncState,
@@ -560,11 +366,7 @@ export async function getOrCreateUserABTests(
         }
       }
 
-      const candidates = createABTestAssignments(user, configForTests(existing.missing))
-      const retainedAssignments = isRecord(user.abtests) ? { ...user.abtests } : {}
-      for (const testName of revoked)
-        delete retainedAssignments[testName]
-      const nextAssignments = { ...retainedAssignments, ...candidates }
+      const nextAssignments = existing.nextAssignments
       const email = normalizeEmail(user.email)
       const cleanupEmails = new Set(bentoSyncState.cleanup_emails)
       if (bentoSyncState.email && bentoSyncState.email !== email)
@@ -572,7 +374,7 @@ export async function getOrCreateUserABTests(
       const nextBentoSyncState: ABTestBentoSyncState = {
         cleanup_emails: [...cleanupEmails],
         ...(email ? { email } : {}),
-        pending: true,
+        pending: existing.changed || needsBentoSync(user, bentoSyncState),
       }
       const updateResult = await tx.execute<{ abtests?: unknown }>(sql`
         UPDATE public.users
@@ -580,6 +382,8 @@ export async function getOrCreateUserABTests(
           || pg_catalog.jsonb_build_object(
             'abtests',
             ${JSON.stringify(nextAssignments)}::jsonb,
+            'abtests_enrolled',
+            ${JSON.stringify(enrolled ?? [])}::jsonb,
             'abtests_bento_sync',
             ${JSON.stringify(nextBentoSyncState)}::jsonb
           )
@@ -588,22 +392,27 @@ export async function getOrCreateUserABTests(
       `)
       const updated = updateResult.rows[0]
       return {
-        assignments: readPersistedAssignments(updated?.abtests, testNames),
+        assignments: updated?.abtests === undefined
+          ? quickError(500, 'ab_test_assignment_failed', 'A/B test assignment failed')
+          : resolveABTestAssignments({ ...user, id: userId, abtests_enrolled: enrolled }, updated.abtests, AB_TESTS_CONFIG, undefined, undefined, false).assignments,
         bentoSyncState: nextBentoSyncState,
-        needsBentoSync: true,
+        needsBentoSync: nextBentoSyncState.pending,
       }
     })
     if (result.needsBentoSync) {
       closeInFinally = false
       const task = (async () => {
         try {
-          await syncCurrentUserABTestTags(c, drizzle, userId, result.bentoSyncState)
+          await syncCurrentUserABTestTags(c, drizzle, userId, result.bentoSyncState, signup)
         }
         finally {
           await closeClient(c, pgPool)
         }
       })()
-      await backgroundTask(c, task)
+      if (signup)
+        await task
+      else
+        await backgroundTask(c, task)
       return result.assignments
     }
   }
@@ -614,31 +423,14 @@ export async function getOrCreateUserABTests(
   return result.assignments
 }
 
+export async function getOrCreateUserABTests(c: Context<MiddlewareKeyVariables>, userId: string) {
+  return reconcileUserABTests(c, userId)
+}
+
 export async function syncNewUserABTests(
   c: Context<MiddlewareKeyVariables>,
-  email: string,
+  _email: string,
   user: SyncUser,
 ) {
-  const candidates = createABTestAssignments({
-    ...user,
-    onboarding_version: isRecord(user.onboarding) ? user.onboarding.version : undefined,
-  })
-  const testNames = Object.keys(candidates)
-  if (testNames.length === 0)
-    return
-
-  const assignments = await persistABTestAssignments(c, user.id, candidates)
-  const segments: string[] = []
-  const deleteSegments: string[] = []
-  for (const testName of testNames) {
-    const test = AB_TESTS_CONFIG[testName]
-    const branch = assignments[testName].branch
-    const oppositeBranch = branch === test.treatment_branch ? test.control_branch : test.treatment_branch
-    segments.push(test.branches[branch].bento_tag)
-    deleteSegments.push(test.branches[oppositeBranch].bento_tag)
-  }
-
-  const result = await syncBentoSubscriberTags(c, { email, segments, deleteSegments })
-  if (result === false)
-    quickError(500, 'bento_ab_test_delivery_failed', 'Bento A/B test delivery failed')
+  await reconcileUserABTests(c, user.id, true)
 }
