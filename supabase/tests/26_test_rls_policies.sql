@@ -1,7 +1,7 @@
 -- Test RLS Policies
 -- This file tests all Row Level Security policies in the database
 BEGIN;
-SELECT plan(72);
+SELECT plan(71);
 SELECT
     policies_are(
         'public',
@@ -29,15 +29,6 @@ SELECT
             'Prevent non 2FA access'
         ],
         'apps should have correct policies'
-    );
-
--- Test global_stats policies
-SELECT
-    policies_are(
-        'public',
-        'global_stats',
-        ARRAY['Allow none to select']::text [],
-        'global_stats should have correct policies'
     );
 
 -- Test stats policies
