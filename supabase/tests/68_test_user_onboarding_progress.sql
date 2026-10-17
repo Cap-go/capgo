@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(14);
+SELECT plan(15);
 
 SELECT tests.create_supabase_user('onboarding_progress_user', 'onboarding_progress_user@test.local');
 
@@ -129,9 +129,19 @@ SELECT tests.authenticate_as('onboarding_progress_user');
 
 SELECT lives_ok(
   $$UPDATE public.users
-    SET onboarding = '{"status":"in_progress","step":"details","flow":"pre_org"}'::jsonb
+    SET onboarding = '{"version":6,"status":"in_progress","step":"intent","flow":"pre_org","profile_completed_at":"2026-10-17T10:00:00.000Z"}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
   'owner can update own onboarding progress through RLS'
+);
+
+SELECT is(
+  (
+    SELECT onboarding ->> 'profile_completed_at'
+    FROM public.users
+    WHERE id = tests.get_supabase_uid('onboarding_progress_user')
+  ),
+  '2026-10-17T10:00:00.000Z',
+  'owner can persist name confirmation through RLS and onboarding triggers'
 );
 
 SELECT tests.clear_authentication();
