@@ -3748,7 +3748,6 @@
   "onboarding-name-kicker": "Required initial name step in the Capgo console. Explain that both first and last name must be provided before onboarding can continue. Keep the tone welcoming and concise.",
   "onboarding-name-description": "Required initial name step in the Capgo console. Explain that both first and last name must be provided before onboarding can continue. Keep the tone welcoming and concise.",
   "onboarding-name-required": "Required initial name step in the Capgo console. Explain that both first and last name must be provided before onboarding can continue. Keep the tone welcoming and concise.",
-  "$schema": "Used in the initial Capgo onboarding profile screen. Translate as concise user interface text.",
   "unified-onboarding-step-about-you": "Title of onboarding V6 first step, collecting first and last name together before choosing a goal. Translate as a short heading about the user.",
   "unified-onboarding-profile-goal-question": "Goal question displayed below the profile name fields in onboarding V6. Translate as a concise question about what the user wants to do with Capgo."
 }
