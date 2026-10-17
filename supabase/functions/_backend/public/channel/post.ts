@@ -29,6 +29,8 @@ interface ChannelSet {
   allow_device?: boolean
   allow_dev?: boolean
   allow_prod?: boolean
+  /** Channel-level pause: true stops serving new bundles on this channel, false resumes. */
+  paused?: boolean
   rolloutVersion?: string | number | null
   rollout_version?: string | number | null
   rolloutPercentage?: number
@@ -171,6 +173,7 @@ const channelInsertColumns = [
   'allow_device',
   'allow_dev',
   'allow_prod',
+  'paused_at',
   'rollout_version',
   'rollout_percentage_bps',
   'rollout_enabled',
@@ -216,6 +219,7 @@ async function insertChannelInTransaction(
     allow_device: channel.allow_device,
     allow_dev: channel.allow_dev,
     allow_prod: channel.allow_prod,
+    paused_at: channel.paused_at,
     rollout_version: channel.rollout_version,
     rollout_percentage_bps: channel.rollout_percentage_bps,
     rollout_enabled: channel.rollout_enabled,
@@ -342,7 +346,7 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
   }
   const { data: existingChannel } = await supabaseAdmin(c)
     .from('channels')
-    .select('id, version, rollout_version, public')
+    .select('id, version, rollout_version, public, paused_at')
     .eq('app_id', body.app_id)
     .eq('name', body.channel)
     .maybeSingle()
@@ -446,6 +450,13 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     ? body.rolloutPausedAt
     : body.rolloutPaused == null ? undefined : body.rolloutPaused ? new Date().toISOString() : null
 
+  if (body.paused != null && typeof body.paused !== 'boolean')
+    throw simpleError('invalid_paused', 'paused must be a boolean', { paused: body.paused })
+  // Keep the original pause timestamp when an already-paused channel is paused again.
+  const pausedAt = body.paused == null
+    ? undefined
+    : body.paused ? (existingChannel?.paused_at ?? new Date().toISOString()) : null
+
   const channel: Database['public']['Tables']['channels']['Insert'] = {
     created_by: apikey.user_id,
     app_id: body.app_id,
@@ -459,6 +470,7 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     ...(body.allow_device == null ? {} : { allow_device: body.allow_device }),
     ...(body.allow_dev == null ? {} : { allow_dev: body.allow_dev }),
     ...(body.allow_prod == null ? {} : { allow_prod: body.allow_prod }),
+    ...(pausedAt === undefined ? {} : { paused_at: pausedAt }),
     ...(body.ios == null ? {} : { ios: body.ios }),
     ...(body.android == null ? {} : { android: body.android }),
     ...(inferredElectron == null ? {} : { electron: inferredElectron }),
