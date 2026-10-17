@@ -27,13 +27,15 @@ export interface ABTestAssignment {
 export type ABTestsConfig = Record<string, ABTestConfig>
 export interface AssignmentAudienceUser { created_via_invite: boolean | null, intent?: unknown, id?: string, created_at?: unknown, abtests_enrolled?: unknown }
 const AB_TEST_BRANCHES = ['A', 'B', 'C', 'D'] as const
+const RESERVED_TEST_NAMES = new Set(['__proto__', 'constructor', 'prototype'])
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function invalidConfig(testName?: string): never {
-  throw new Error(`Invalid A/B test configuration${testName ? ` for ${testName}` : ''}`)
+  const suffix = testName ? ` for ${testName}` : ''
+  throw new Error(`Invalid A/B test configuration${suffix}`)
 }
 
 export function isABTestBranch(value: unknown): value is ABTestBranch {
@@ -51,100 +53,7 @@ export function validateABTestsConfig(value: unknown): ABTestsConfig {
   const config: ABTestsConfig = {}
   const bentoTags = new Set<string>()
   for (const [testName, entry] of Object.entries(value)) {
-    if (!testName.trim() || !isRecord(entry))
-      invalidConfig(testName)
-
-    const audience = entry.audience
-    const label = entry.label
-    const percentage = entry.treatment_percentage
-    const treatmentBranch = entry.treatment_branch
-    const controlBranch = entry.control_branch
-    const branches = entry.branches
-    const intents = entry.intents
-    if ((audience !== 'all' && audience !== 'self_signup')
-      || typeof label !== 'string'
-      || !label.trim()
-      || typeof percentage !== 'number'
-      || !Number.isInteger(percentage)
-      || percentage < 0
-      || percentage > 100
-      || !isRecord(branches)
-      || !isABTestBranch(treatmentBranch)
-      || !isABTestBranch(controlBranch)
-      || treatmentBranch === controlBranch
-      || Object.keys(branches).length !== 2
-      || !isRecord(branches[treatmentBranch])
-      || !isRecord(branches[controlBranch])) {
-      invalidConfig(testName)
-    }
-    if (intents !== undefined
-      && (!Array.isArray(intents)
-        || intents.length === 0
-        || !intents.every(isABTestIntent)
-        || new Set(intents).size !== intents.length)) {
-      invalidConfig(testName)
-    }
-
-    const treatmentTag = branches[treatmentBranch].bento_tag
-    const controlTag = branches[controlBranch].bento_tag
-    const treatmentLabel = branches[treatmentBranch].label
-    const controlLabel = branches[controlBranch].label
-    if (typeof treatmentTag !== 'string'
-      || typeof controlTag !== 'string'
-      || typeof treatmentLabel !== 'string'
-      || typeof controlLabel !== 'string'
-      || !treatmentTag.trim()
-      || !controlTag.trim()
-      || !treatmentLabel.trim()
-      || !controlLabel.trim()
-      || treatmentTag === controlTag
-      || bentoTags.has(treatmentTag)
-      || bentoTags.has(controlTag)) {
-      invalidConfig(testName)
-    }
-    bentoTags.add(treatmentTag)
-    bentoTags.add(controlTag)
-
-    const byIntent = entry.treatment_percentage_by_intent
-    if (byIntent !== undefined && (!isRecord(byIntent) || Object.entries(byIntent).some(([intent, amount]) => !isABTestIntent(intent) || !validPercentage(amount))))
-      invalidConfig(testName)
-    const requirements = entry.required_assignments
-    const requirementsByIntent = entry.required_assignments_by_intent
-    if (requirements !== undefined && !validRequirements(requirements))
-      invalidConfig(testName)
-    if (requirementsByIntent !== undefined && (!isRecord(requirementsByIntent) || Object.entries(requirementsByIntent).some(([intent, required]) => !isABTestIntent(intent) || !validRequirements(required))))
-      invalidConfig(testName)
-    if (isRecord(requirementsByIntent) && Object.values(requirementsByIntent).some(required =>
-      Object.entries(required as Record<string, ABTestBranch>).some(([name, branch]) => requirements?.[name] !== undefined && requirements[name] !== branch))) {
-      invalidConfig(testName)
-    }
-    if ((entry.allocation !== undefined && entry.allocation !== 'deterministic')
-      || (entry.assign_control !== undefined && typeof entry.assign_control !== 'boolean')
-      || (entry.enroll_new_users_after !== undefined && (typeof entry.enroll_new_users_after !== 'string' || !Number.isFinite(Date.parse(entry.enroll_new_users_after))))) {
-      invalidConfig(testName)
-    }
-    // Omitted controls must never be re-randomized on the next lookup.
-    if (entry.assign_control === false && entry.allocation !== 'deterministic')
-      invalidConfig(testName)
-
-    config[testName] = {
-      audience,
-      ...(byIntent === undefined ? {} : { treatment_percentage_by_intent: { ...byIntent } }),
-      ...(requirements === undefined ? {} : { required_assignments: { ...requirements } }),
-      ...(requirementsByIntent === undefined ? {} : { required_assignments_by_intent: structuredClone(requirementsByIntent) }),
-      ...(entry.allocation === undefined ? {} : { allocation: entry.allocation }),
-      ...(entry.assign_control === undefined ? {} : { assign_control: entry.assign_control }),
-      ...(entry.enroll_new_users_after === undefined ? {} : { enroll_new_users_after: entry.enroll_new_users_after }),
-      label: label.trim(),
-      ...(intents === undefined ? {} : { intents: [...intents] }),
-      control_branch: controlBranch,
-      treatment_branch: treatmentBranch,
-      treatment_percentage: percentage,
-      branches: {
-        [treatmentBranch]: { bento_tag: treatmentTag, label: treatmentLabel.trim() },
-        [controlBranch]: { bento_tag: controlTag, label: controlLabel.trim() },
-      },
-    }
+    config[testName] = parseABTestConfig(testName, entry, bentoTags)
   }
 
   orderedTestNames(config)
@@ -157,6 +66,117 @@ function validPercentage(value: unknown): value is number {
 
 function validRequirements(value: unknown): value is Record<string, ABTestBranch> {
   return isRecord(value) && Object.values(value).every(isABTestBranch)
+}
+
+function nonemptyString(value: unknown): value is string {
+  return typeof value === 'string' && Boolean(value.trim())
+}
+
+function parseBranch(value: unknown, testName: string, bentoTags: Set<string>) {
+  if (!isRecord(value) || !nonemptyString(value.bento_tag) || !nonemptyString(value.label)
+    || bentoTags.has(value.bento_tag)) {
+    invalidConfig(testName)
+  }
+  bentoTags.add(value.bento_tag)
+  return { bento_tag: value.bento_tag, label: value.label.trim() }
+}
+
+function parseABTestCore(entry: Record<string, unknown>, testName: string, bentoTags: Set<string>): ABTestConfig {
+  const { audience, label, treatment_percentage: percentage, treatment_branch: treatmentBranch, control_branch: controlBranch, branches } = entry
+  if ((audience !== 'all' && audience !== 'self_signup') || !nonemptyString(label) || !validPercentage(percentage)
+    || !isABTestBranch(treatmentBranch) || !isABTestBranch(controlBranch) || treatmentBranch === controlBranch
+    || !isRecord(branches) || Object.keys(branches).length !== 2) {
+    invalidConfig(testName)
+  }
+  return {
+    audience,
+    label: label.trim(),
+    control_branch: controlBranch,
+    treatment_branch: treatmentBranch,
+    treatment_percentage: percentage,
+    branches: {
+      [treatmentBranch]: parseBranch(branches[treatmentBranch], testName, bentoTags),
+      [controlBranch]: parseBranch(branches[controlBranch], testName, bentoTags),
+    },
+  }
+}
+
+function parseIntents(value: unknown, testName: string): ABTestIntent[] | undefined {
+  if (value === undefined)
+    return undefined
+  if (!Array.isArray(value) || value.length === 0 || !value.every(isABTestIntent) || new Set(value).size !== value.length)
+    invalidConfig(testName)
+  return [...value]
+}
+
+function parseIntentOptions<T>(value: unknown, isValid: (option: unknown) => option is T, testName: string): Partial<Record<ABTestIntent, T>> | undefined {
+  if (value === undefined)
+    return undefined
+  if (!isRecord(value) || Object.entries(value).some(([intent, option]) => !isABTestIntent(intent) || !isValid(option)))
+    invalidConfig(testName)
+  return structuredClone(value) as Partial<Record<ABTestIntent, T>>
+}
+
+function parseRequirements(value: unknown, testName: string) {
+  if (value === undefined)
+    return undefined
+  if (!validRequirements(value))
+    invalidConfig(testName)
+  return { ...value }
+}
+
+function validateRequirementCompatibility(
+  requirements: ABTestConfig['required_assignments'],
+  requirementsByIntent: ABTestConfig['required_assignments_by_intent'],
+  testName: string,
+) {
+  for (const required of Object.values(requirementsByIntent ?? {})) {
+    if (Object.entries(required).some(([name, branch]) => requirements?.[name] !== undefined && requirements[name] !== branch))
+      invalidConfig(testName)
+  }
+}
+
+function parseAllocationOptions(entry: Record<string, unknown>, testName: string): Pick<ABTestConfig, 'allocation' | 'assign_control' | 'enroll_new_users_after'> {
+  const { allocation, assign_control: assignControl, enroll_new_users_after: cutoff } = entry
+  if ((allocation !== undefined && allocation !== 'deterministic')
+    || (assignControl !== undefined && typeof assignControl !== 'boolean')
+    || (cutoff !== undefined && (typeof cutoff !== 'string' || !Number.isFinite(Date.parse(cutoff))))) {
+    invalidConfig(testName)
+  }
+  // Omitted controls must never be re-randomized on the next lookup.
+  if (assignControl === false && allocation !== 'deterministic')
+    invalidConfig(testName)
+  return {
+    ...(allocation === undefined ? {} : { allocation }),
+    ...(assignControl === undefined ? {} : { assign_control: assignControl }),
+    ...(cutoff === undefined ? {} : { enroll_new_users_after: cutoff }),
+  }
+}
+
+function parseABTestConfig(testName: string, entry: unknown, bentoTags: Set<string>): ABTestConfig {
+  if (!testName.trim() || RESERVED_TEST_NAMES.has(testName) || !isRecord(entry))
+    invalidConfig(testName)
+  const core = parseABTestCore(entry, testName, bentoTags)
+  const intents = parseIntents(entry.intents, testName)
+  const byIntent = parseIntentOptions(entry.treatment_percentage_by_intent, validPercentage, testName)
+  const requirements = parseRequirements(entry.required_assignments, testName)
+  const requirementsByIntent = parseIntentOptions(entry.required_assignments_by_intent, validRequirements, testName)
+  validateRequirementCompatibility(requirements, requirementsByIntent, testName)
+  return {
+    ...core,
+    ...(byIntent === undefined ? {} : { treatment_percentage_by_intent: byIntent }),
+    ...(requirements === undefined ? {} : { required_assignments: requirements }),
+    ...(requirementsByIntent === undefined ? {} : { required_assignments_by_intent: requirementsByIntent }),
+    ...parseAllocationOptions(entry, testName),
+    ...(intents === undefined ? {} : { intents }),
+  }
+}
+
+function compareTestNames(left: string, right: string) {
+  const compared = left.localeCompare(right, 'en')
+  if (compared !== 0 || left === right)
+    return compared
+  return left < right ? -1 : 1
 }
 
 function orderedTestNames(config: ABTestsConfig) {
@@ -174,7 +194,7 @@ function orderedTestNames(config: ABTestsConfig) {
       invalidConfig(name)
     const requirements = [test.required_assignments, ...Object.values(test.required_assignments_by_intent ?? {})]
     const dependencies = requirements.flatMap(required => Object.entries(required ?? {}))
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => compareTestNames(left, right))
     for (const [dependency, branch] of dependencies) {
       if (!config[dependency]?.branches?.[branch])
         invalidConfig(name)
@@ -184,13 +204,17 @@ function orderedTestNames(config: ABTestsConfig) {
     visited.add(name)
     ordered.push(name)
   }
-  for (const name of Object.keys(config).sort())
+  for (const name of Object.keys(config).sort(compareTestNames))
     visit(name)
   return ordered
 }
 
 export function isProspectiveUser(createdAt: unknown, cutoff: string) {
-  const timestamp = createdAt instanceof Date ? createdAt.getTime() : typeof createdAt === 'string' ? Date.parse(createdAt) : Number.NaN
+  let timestamp = Number.NaN
+  if (createdAt instanceof Date)
+    timestamp = createdAt.getTime()
+  else if (typeof createdAt === 'string')
+    timestamp = Date.parse(createdAt)
   return timestamp >= Date.parse(cutoff)
 }
 
@@ -220,10 +244,42 @@ function requirementsMatch(user: AssignmentAudienceUser, test: ABTestConfig, ass
 function allocationFraction(userId: string, testName: string) {
   let hash = 2166136261
   for (const character of `${testName}:${userId}`) {
-    hash ^= character.charCodeAt(0)
+    hash ^= character.codePointAt(0)!
     hash = Math.imul(hash, 16777619)
   }
   return (hash >>> 0) / 4294967296
+}
+
+function treatmentPercentage(user: AssignmentAudienceUser, test: ABTestConfig) {
+  const intentPercentage = isABTestIntent(user.intent) ? test.treatment_percentage_by_intent?.[user.intent] : undefined
+  return intentPercentage ?? test.treatment_percentage
+}
+
+function excludedFromTreatment(user: AssignmentAudienceUser, name: string, test: ABTestConfig, percentage: number) {
+  return test.assign_control === false && test.allocation === 'deterministic'
+    && (!user.id || allocationFraction(user.id, name) * 100 >= percentage)
+}
+
+function readStoredAssignment(existing: unknown, test: ABTestConfig): ABTestAssignment | undefined {
+  if (!isRecord(existing) || typeof existing.assigned_at !== 'string' || !isABTestBranch(existing.branch)
+    || !test.branches[existing.branch]) {
+    return undefined
+  }
+  return { assigned_at: existing.assigned_at, branch: existing.branch }
+}
+
+function mayRetainAssignment(assignment: ABTestAssignment, test: ABTestConfig) {
+  return test.assign_control !== false || assignment.branch !== test.control_branch
+}
+
+function selectNewBranch(user: AssignmentAudienceUser, name: string, test: ABTestConfig, percentage: number, random: () => number, allowNewAssignments: boolean) {
+  if (!allowNewAssignments || percentage === 0 || (test.allocation === 'deterministic' && !user.id))
+    return undefined
+  const fraction = test.allocation === 'deterministic' ? allocationFraction(user.id!, name) : random()
+  const branch = fraction * 100 < percentage ? test.treatment_branch : test.control_branch
+  if (test.assign_control === false && branch === test.control_branch)
+    return undefined
+  return branch
 }
 
 export function resolveABTestAssignments(
@@ -234,45 +290,35 @@ export function resolveABTestAssignments(
   now = () => new Date(),
   allowNewAssignments = true,
 ) {
-  const nextAssignments = isRecord(stored) ? { ...stored } : {}
+  const storedAssignments = isRecord(stored) ? stored : {}
+  const nextAssignments = { ...storedAssignments }
   const assignments: Record<string, ABTestAssignment> = {}
   let assignedAt: string | undefined
   for (const name of orderedTestNames(config)) {
     const test = config[name]
-    const existing = nextAssignments[name]
-    if (!isEligibleForTest(user, test, name) || !requirementsMatch(user, test, assignments)) {
-      delete nextAssignments[name]
-      continue
-    }
-    const percentage = (isABTestIntent(user.intent) ? test.treatment_percentage_by_intent?.[user.intent] : undefined) ?? test.treatment_percentage
-    if (test.assign_control === false && test.allocation === 'deterministic'
-      && (!user.id || allocationFraction(user.id, name) * 100 >= percentage)) {
+    const existing = readStoredAssignment(nextAssignments[name], test)
+    const percentage = treatmentPercentage(user, test)
+    if (!isEligibleForTest(user, test, name) || !requirementsMatch(user, test, assignments)
+      || excludedFromTreatment(user, name, test, percentage)) {
       delete nextAssignments[name]
       continue
     }
     if (existing !== undefined) {
-      if (!isRecord(existing) || typeof existing.assigned_at !== 'string' || !isABTestBranch(existing.branch)
-        || !test.branches[existing.branch]) {
-        throw new Error('A/B test assignment failed')
-      }
-      if (test.assign_control === false && existing.branch === test.control_branch) {
+      if (mayRetainAssignment(existing, test))
+        assignments[name] = existing
+      else
         delete nextAssignments[name]
-        continue
-      }
-      assignments[name] = { assigned_at: existing.assigned_at, branch: existing.branch }
       continue
     }
-    if (!allowNewAssignments || percentage === 0 || (test.allocation === 'deterministic' && !user.id))
-      continue
-    const fraction = test.allocation === 'deterministic' ? allocationFraction(user.id!, name) : random()
-    const branch = fraction * 100 < percentage ? test.treatment_branch : test.control_branch
-    if (test.assign_control === false && branch === test.control_branch)
+    delete nextAssignments[name]
+    const branch = selectNewBranch(user, name, test, percentage, random, allowNewAssignments)
+    if (branch === undefined)
       continue
     assignedAt ??= now().toISOString()
     assignments[name] = { assigned_at: assignedAt, branch }
     nextAssignments[name] = assignments[name]
   }
-  const changed = JSON.stringify(nextAssignments) !== JSON.stringify(isRecord(stored) ? stored : {})
+  const changed = JSON.stringify(nextAssignments) !== JSON.stringify(storedAssignments)
   return { assignments, nextAssignments, changed }
 }
 

@@ -57,6 +57,15 @@ describe('generic intent allocation', () => {
     expect(run(requirements)).toEqual(run(Object.fromEntries(Object.entries(requirements).reverse())))
   })
 
+  it('breaks collation ties consistently when experiment names have equivalent Unicode forms', () => {
+    const entries = [['é', experiment('é')], ['e\u0301', experiment('e\u0301')]] as const
+    const run = (value: unknown) => {
+      const rolls = [0.1, 0.9]
+      return createABTestAssignments(user('ota'), validateABTestsConfig(value), () => rolls.shift()!, () => new Date(timestamp))
+    }
+    expect(run(Object.fromEntries(entries))).toEqual(run(Object.fromEntries([...entries].reverse())))
+  })
+
   it('fails closed when a prior account forges a prospective marker', () => {
     const result = createABTestAssignments(user('builder', { created_at: '2026-01-01T00:00:00.000Z' }), validateABTestsConfig(rawConfig), () => 0)
     expect(result).not.toHaveProperty('new_emails_v2')
@@ -143,6 +152,23 @@ describe('generic intent allocation', () => {
     expect(result.assignments.webnativeapp_publish_intent).toEqual(assignment('B'))
   })
 
+  it.each([null, { branch: 'legacy', assigned_at: timestamp }, { branch: 'A' }])('repairs malformed eligible assignments without changing valid branches: %j', (malformed) => {
+    const config = validateABTestsConfig({
+      damaged: experiment('damaged'),
+      stable: experiment('stable'),
+    })
+    const result = resolveABTestAssignments(user('ota'), { damaged: malformed, stable: assignment('B') }, config, () => 0, () => new Date(timestamp))
+    expect(result.assignments).toEqual({ damaged: assignment(), stable: assignment('B') })
+    expect(result.nextAssignments).toEqual(result.assignments)
+  })
+
+  it('omits malformed assignments during read-only tag reconciliation', () => {
+    const config = validateABTestsConfig({ damaged: experiment('damaged') })
+    const result = resolveABTestAssignments(user('ota'), { damaged: { branch: 'legacy' } }, config, () => 0, () => new Date(timestamp), false)
+    expect(result.assignments).toEqual({})
+    expect(result.nextAssignments).toEqual({})
+  })
+
   it.each([
     { treatment_percentage_by_intent: { invalid: 50 } },
     { treatment_percentage_by_intent: { ota: 100.1 } },
@@ -157,6 +183,10 @@ describe('generic intent allocation', () => {
     { enroll_new_users_after: 'invalid' },
   ])('rejects invalid allocation and dependency config %j', (extra) => {
     expect(() => validateABTestsConfig({ target: experiment('target', extra as never), other: experiment('other') })).toThrow('Invalid A/B test configuration')
+  })
+
+  it.each(['__proto__', 'constructor', 'prototype'])('rejects reserved experiment name %s', (name) => {
+    expect(() => validateABTestsConfig(Object.fromEntries([[name, experiment(name)]]))).toThrow('Invalid A/B test configuration')
   })
 
   it('rejects dependency cycles including intent-specific edges', () => {

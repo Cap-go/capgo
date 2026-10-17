@@ -4,10 +4,10 @@ import { getAuthHeadersForCredentials, getSupabaseClient, SUPABASE_ANON_KEY, SUP
 
 const email = `ab-enrollment-${randomUUID()}@example.com`
 const password = `AbEnrollment!${randomUUID()}`
-const createdAt = '2026-10-18T00:00:00+00:00'
+const createdAt = '2026-10-16T00:00:00+00:00'
 const managed = {
-  abtests: { new_emails_v2: { branch: 'A', assigned_at: createdAt } },
-  abtests_enrolled: ['new_emails_v2'],
+  abtests: { retired_experiment: { branch: 'A', assigned_at: createdAt } },
+  abtests_enrolled: ['retired_experiment'],
   abtests_bento_sync: { pending: false },
 }
 let userId: string
@@ -40,8 +40,8 @@ afterAll(async () => {
 describe('user A/B enrollment through PostgREST', () => {
   it('allows intent edits while preserving backend assignments, enrollment and creation time', async () => {
     for (const onboarding of [
-      { intent: 'builder', abtests: {}, abtests_enrolled: ['forged'], abtests_bento_sync: { pending: true } },
-      { intent: 'exploring' },
+      { intent: 'publish', abtests: {}, abtests_enrolled: ['forged'], abtests_bento_sync: { pending: true } },
+      { intent: 'ota' },
     ]) {
       const response = await fetch(`${SUPABASE_BASE_URL}/rest/v1/users?id=eq.${userId}&select=onboarding,created_at`, {
         method: 'PATCH',

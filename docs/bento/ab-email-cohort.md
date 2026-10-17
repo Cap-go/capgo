@@ -25,7 +25,8 @@ transaction. Intent-specific requirements extend common requirements.
   Changing intent removes stale assignments without replenishing enrollment or
   changing the deterministic bucket. A Builder treatment user returning to OTA
   must qualify for the same OTA bucket as before. Existing eligible legacy
-  branches and unrelated/retired experiment data are preserved.
+  branches and unrelated/retired experiment data are preserved. Malformed eligible
+  entries are repaired as missing assignments; read-only tag rendering omits them.
 - Nonselected OTA decisions need no control branch: the protected enrollment and
   immutable user ID determine the same result on every retry. Missing IDs,
   invalid creation times, missing enrollment and unmet prerequisites fail closed.

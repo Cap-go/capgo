@@ -221,6 +221,54 @@ async function reconcileBentoSyncState(
   })
 }
 
+type BentoSyncSnapshot = NonNullable<Awaited<ReturnType<typeof reconcileBentoSyncState>>>
+
+interface BentoTagSyncContext {
+  c: Context<MiddlewareKeyVariables>
+  drizzle: ReturnType<typeof getDrizzleClient>
+  userId: string
+  cleanedEmails: Set<string>
+  signal: AbortSignal
+  strict: boolean
+}
+
+async function deliverBentoTagUpdate(
+  context: BentoTagSyncContext,
+  update: NonNullable<ReturnType<typeof buildBentoTagUpdate>>,
+  failureMessage: string,
+) {
+  const result = await syncBentoSubscriberTags(context.c, update, context.signal)
+  if (result === true)
+    return true
+  if (context.strict && result === false)
+    throw new Error('Bento A/B test delivery failed')
+  cloudlogErr({ message: failureMessage, requestId: context.c.get('requestId') })
+  return false
+}
+
+async function advanceBentoTagSync(context: BentoTagSyncContext, snapshot: BentoSyncSnapshot) {
+  const { drizzle, userId, cleanedEmails } = context
+  const cleanupEmail = snapshot.state.cleanup_emails.find(email => !cleanedEmails.has(email))
+  if (cleanupEmail) {
+    const accepted = await deliverBentoTagUpdate(context, buildBentoTagCleanup(cleanupEmail), 'on-demand A/B Bento email cleanup failed')
+    if (!accepted)
+      return undefined
+    cleanedEmails.add(cleanupEmail)
+    // Persist accepted cleanup before spending more of the bounded budget.
+    return reconcileBentoSyncState(drizzle, userId, snapshot.state, cleanedEmails)
+  }
+
+  const tagUpdate = buildBentoTagUpdate(snapshot.user)
+  if (!tagUpdate) {
+    await reconcileBentoSyncState(drizzle, userId, snapshot.state, cleanedEmails)
+    return undefined
+  }
+  const accepted = await deliverBentoTagUpdate(context, tagUpdate, 'on-demand A/B Bento sync failed')
+  if (!accepted)
+    return undefined
+  return reconcileBentoSyncState(drizzle, userId, snapshot.state, cleanedEmails, tagUpdate)
+}
+
 async function syncCurrentUserABTestTags(
   c: Context<MiddlewareKeyVariables>,
   drizzle: ReturnType<typeof getDrizzleClient>,
@@ -229,53 +277,19 @@ async function syncCurrentUserABTestTags(
   strict = false,
 ) {
   try {
-    const signal = AbortSignal.timeout(BENTO_AB_TEST_SYNC_TIMEOUT_MS)
-    const cleanedEmails = new Set<string>()
-    let snapshot = await reconcileBentoSyncState(drizzle, userId, initialState, cleanedEmails)
-    if (snapshot?.complete)
-      return
-    let attempt = 0
-    while (snapshot && attempt < BENTO_AB_TEST_SYNC_MAX_ATTEMPTS) {
-      const cleanupEmail = snapshot.state.cleanup_emails.find(email => !cleanedEmails.has(email))
-      if (cleanupEmail) {
-        attempt += 1
-        const cleanupResult = await syncBentoSubscriberTags(c, buildBentoTagCleanup(cleanupEmail), signal)
-        if (cleanupResult !== true) {
-          if (strict && cleanupResult === false)
-            throw new Error('Bento A/B test delivery failed')
-          cloudlogErr({
-            message: 'on-demand A/B Bento email cleanup failed',
-            requestId: c.get('requestId'),
-          })
-          return
-        }
-        cleanedEmails.add(cleanupEmail)
-        // Persist accepted cleanup before spending more of the bounded budget.
-        snapshot = await reconcileBentoSyncState(drizzle, userId, snapshot.state, cleanedEmails)
-        if (snapshot?.complete)
-          return
-        continue
-      }
-
-      const tagUpdate = buildBentoTagUpdate(snapshot.user)
-      if (!tagUpdate) {
-        await reconcileBentoSyncState(drizzle, userId, snapshot.state, cleanedEmails)
+    const context: BentoTagSyncContext = {
+      c,
+      drizzle,
+      userId,
+      strict,
+      signal: AbortSignal.timeout(BENTO_AB_TEST_SYNC_TIMEOUT_MS),
+      cleanedEmails: new Set<string>(),
+    }
+    let snapshot = await reconcileBentoSyncState(drizzle, userId, initialState, context.cleanedEmails)
+    for (let attempt = 0; snapshot && attempt < BENTO_AB_TEST_SYNC_MAX_ATTEMPTS; attempt++) {
+      if (snapshot.complete)
         return
-      }
-      attempt += 1
-      const result = await syncBentoSubscriberTags(c, tagUpdate, signal)
-      if (result !== true) {
-        if (strict && result === false)
-          throw new Error('Bento A/B test delivery failed')
-        cloudlogErr({
-          message: 'on-demand A/B Bento sync failed',
-          requestId: c.get('requestId'),
-        })
-        return
-      }
-      snapshot = await reconcileBentoSyncState(drizzle, userId, snapshot.state, cleanedEmails, tagUpdate)
-      if (snapshot?.complete)
-        return
+      snapshot = await advanceBentoTagSync(context, snapshot)
     }
     if (strict && snapshot && !snapshot.complete)
       throw new Error('Bento A/B test delivery failed')
