@@ -1,4 +1,6 @@
 import type { Page } from '@playwright/test'
+import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../src/services/appOnboarding'
+import { BUILDER_STEP_IDS } from '../src/services/builderOnboardingChecklist'
 
 export interface VisualDiffRoute {
   slug: string
@@ -191,13 +193,39 @@ async function mockReleaseLive(page: Page) {
  */
 export const visualDiffRoutes: VisualDiffRoute[] = [
   ...[
-    { slug: 'onboarding-dual-goals', query: '' },
-    { slug: 'onboarding-dual-live-updates', query: '&otaProgress=1' },
-    { slug: 'onboarding-dual-builder', query: '&builderProgress=android' },
-  ].map(({ slug, query }): VisualDiffRoute => ({
+    { slug: 'onboarding-dual-goals', progress: null },
+    { slug: 'onboarding-dual-live-updates', progress: 'ota' },
+    { slug: 'onboarding-dual-builder', progress: 'builder' },
+  ].map(({ slug, progress }): VisualDiffRoute => ({
     slug,
-    path: `/playwright/fixtures/onboarding-setup.html?view=flow&assignment=both-builder&resume=com.example.onboarding-preview&step=setup${query}`,
+    path: '/apps',
+    auth: true,
     prepare: async (page) => {
+      const onboarding = { setup: {
+        todo_list_version: 4,
+        ota_todo_list_version: '1',
+        builder_todo_list_version: '1',
+        paths: ['ota', 'builder'],
+        selected_path: 'builder',
+        selected_builder_platform: progress === 'builder' ? 'android' : null,
+        source: 'manual',
+        outcome: 'in_progress',
+        steps: {
+          ota: Object.fromEntries(APP_ONBOARDING_OTA_V1_STEP_IDS.map(id => [id, { status: progress === 'ota' && id === 'login_cli_mcp' ? 'done' : 'pending' }])),
+          builder: Object.fromEntries((['ios', 'android'] as const).map(platform => [platform, Object.fromEntries(BUILDER_STEP_IDS[platform].map(id => [id, { status: progress === 'builder' && platform === 'android' && id === 'start_setup' ? 'done' : 'pending' }]))])),
+        },
+      } }
+      // The production preview excludes development-only component fixtures.
+      // Override read responses so base and head render the same assigned app.
+      await page.route('**/rest/v1/apps?*', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json().catch(() => null)
+        const override = (row: any) => row?.app_id === 'com.demo.app' ? { ...row, need_onboarding: true, onboarding } : row
+        await route.fulfill({ response, json: Array.isArray(json) ? json.map(override) : override(json) })
+      })
+      await page.route('**/rpc/verify_getting_started', route => route.fulfill({ json: onboarding }))
+      await page.route('**/private/onboarding_progress', route => route.fulfill({ json: { onboarding, hasChannel: false, checkErrors: [] } }))
+      await page.goto('/app/com.demo.app/getting-started')
       await page.locator('[data-test="dual-onboarding-checklists"], [data-test="builder-checklist"]').first().waitFor()
     },
   })),
