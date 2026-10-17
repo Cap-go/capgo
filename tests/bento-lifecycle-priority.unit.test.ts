@@ -55,8 +55,8 @@ describe('current sibling priority arbitration', () => {
     const orgId = randomUUID()
     const selected = await select(orgId, 'ota')
     selected.metadata.commercialOffer = true
-    await db.query(`INSERT INTO public.bento_event_dispatches(flow_key,context_key,recipient_key,tag,status,attempt_count,last_attempt_at,details)
-      VALUES($1,$2,$3,'summary:previous-success','accepted',1,CURRENT_TIMESTAMP-INTERVAL '2 days',$4::jsonb)`, [selected.flowKey, orgId, selected.recipientKey, JSON.stringify({ metadata: { orgId, recipientId: selected.metadata.recipientId, branch: 'first_update_success', commercialOffer: true } })])
+    await db.query(`INSERT INTO public.bento_event_dispatches(flow_key,context_key,recipient_key,tag,status,attempt_count,last_attempt_at,event_at,details)
+      VALUES($1,$2,$3,'summary:previous-success','accepted',1,CURRENT_TIMESTAMP-INTERVAL '2 days',CURRENT_TIMESTAMP-INTERVAL '2 days',$4::jsonb)`, [selected.flowKey, orgId, selected.recipientKey, JSON.stringify({ metadata: { orgId, recipientId: selected.metadata.recipientId, branch: 'first_update_success', commercialOffer: true } })])
     expect(await claimLifecycleBudget(client, selected)).toBe(false)
     const trial = await select(orgId, 'builder', 100)
     trial.tag = 'trial:deadline'
@@ -64,5 +64,14 @@ describe('current sibling priority arbitration', () => {
     trial.metadata.branch = 'today_ready'
     await db.query(`UPDATE public.bento_lifecycle_journeys SET candidate=$2::jsonb WHERE org_id=$1 AND product='builder'`, [orgId, JSON.stringify(trial.metadata)])
     expect(await claimLifecycleBudget(client, trial)).toBe(true)
+  })
+
+  it('measures the daily limit from confirmed acceptance rather than the earlier provider attempt', async () => {
+    const orgId = randomUUID()
+    const selected = await select(orgId, 'ota')
+    await db.query(`INSERT INTO public.bento_event_dispatches(flow_key,context_key,recipient_key,tag,status,attempt_count,last_attempt_at,event_at,details)
+      VALUES($1,$2,$3,'summary:just-inside-day','accepted',1,CURRENT_TIMESTAMP-INTERVAL '24 hours 10 seconds',
+        CURRENT_TIMESTAMP-INTERVAL '23 hours 59 minutes 55 seconds',$4::jsonb)`, [selected.flowKey, orgId, selected.recipientKey, JSON.stringify({ metadata: { orgId, recipientId: selected.metadata.recipientId, branch: 'progress_digest' } })])
+    expect(await claimLifecycleBudget(client, selected)).toBe(false)
   })
 })

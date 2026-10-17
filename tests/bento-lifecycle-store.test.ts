@@ -41,7 +41,7 @@ function fixture() {
     // The existing seed owner is read only. Every mutable org/journey/event
     // belongs exclusively to this fixture, with synthetic recipient metadata.
     await executeSQL(`INSERT INTO public.orgs(id,name,management_email,created_by)
-      VALUES($1,'Lifecycle storage fixture',$2,$3)`, [id, `lifecycle-store-${id}@example.com`, USER_ID])
+      VALUES($1,$2,$3,$4)`, [id, `Lifecycle storage fixture ${id}`, `lifecycle-store-${id}@example.com`, USER_ID])
     return id
   }
 

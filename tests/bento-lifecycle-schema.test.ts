@@ -104,6 +104,17 @@ describe('lifecycle schema on full PostgreSQL', () => {
       const creator = await seedUser(client)
       const currentOwner = await seedUser(client)
       const orgId = await seedOrg(client, creator)
+      // A transferred org must retain an active owner membership. Without it,
+      // deleting the last member correctly deletes the org and its provenance.
+      await client.query(`INSERT INTO public.org_users(user_id,org_id,rbac_role_name,is_invite)
+        VALUES($1,$2,'org_super_admin',false)`, [currentOwner, orgId])
+      await client.query(`INSERT INTO public.role_bindings
+        (principal_type,principal_id,role_id,scope_type,org_id,granted_by,reason,is_direct)
+        SELECT public.rbac_principal_user(),$1,roles.id,public.rbac_scope_org(),$2,$1,
+          'Lifecycle transfer fixture successor',true FROM public.roles roles
+        WHERE roles.name='org_super_admin' AND roles.scope_type=public.rbac_scope_org()
+        ON CONFLICT DO NOTHING`, [currentOwner, orgId])
+      expect((await client.query(`SELECT public.is_effective_active_org_super_admin_user($1,$2) AS active`, [orgId, currentOwner])).rows).toEqual([{ active: true }])
       await client.query('UPDATE public.orgs SET created_by=$2 WHERE id=$1', [orgId, currentOwner])
       await assign(client, currentOwner)
       await client.query('UPDATE public.orgs SET management_email=$2 WHERE id=$1', [orgId, 'other-owner@example.com'])
