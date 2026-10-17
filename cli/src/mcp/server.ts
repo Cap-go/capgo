@@ -16,6 +16,7 @@ import {
   mcpDeleteBundleInputSchema,
   mcpDeleteChannelInputSchema,
   mcpDoctorInputSchema,
+  mcpSearchDocsInputSchema,
   mcpGenerateEncryptionKeysInputSchema,
   mcpGetCurrentBundleInputSchema,
   mcpPromoteChannelInputSchema,
@@ -36,6 +37,7 @@ import {
   mcpUpdateOrganizationInputSchema,
 } from './tool-schemas'
 import { CapgoSDK } from '../sdk'
+import { searchCapgoDocs } from '../shared/docs-search'
 import { getConfigWriteTarget, setConfigWriteTarget } from '../config'
 import { clearSavedKey, getLoginState, loginSuccessMessage, logoutMessage, validateAndSaveKey, whoamiMessage } from '../auth/session'
 import { mcpLoginInputSchema, mcpLogoutInputSchema } from '../schemas/auth'
@@ -732,6 +734,32 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
           type: 'text' as const,
           text: JSON.stringify({ accountId: result.data }, null, 2),
         }],
+      }
+    },
+  )
+
+  server.registerTool(
+    'capgo_search_docs',
+    {
+      description: 'Search the Capgo documentation (capgo.app/docs) and get matching pages with their URLs. Use it to find how a feature, CLI command, plugin option or API route works before acting, then fetch the URL for full details.',
+      inputSchema: mcpSearchDocsInputSchema,
+      annotations: { readOnlyHint: true, openWorldHint: true },
+    },
+    async ({ query, limit }) => {
+      try {
+        const results = await searchCapgoDocs(query, limit)
+        return {
+          content: [{
+            type: 'text' as const,
+            text: results.length ? JSON.stringify(results, null, 2) : `No documentation matches "${query}". Try broader terms.`,
+          }],
+        }
+      }
+      catch (error) {
+        return {
+          content: [{ type: 'text' as const, text: `Docs search failed: ${error instanceof Error ? error.message : String(error)}` }],
+          isError: true,
+        }
       }
     },
   )

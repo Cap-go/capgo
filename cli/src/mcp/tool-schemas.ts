@@ -12,6 +12,7 @@ import {
   updateAppOptionsSchema,
   updateOrganizationOptionsSchema,
 } from '../schemas/sdk'
+import { DOCS_SEARCH_MAX_RESULTS } from '../shared/docs-search'
 
 const sdkAuthFields = { apikey: true, supaHost: true, supaAnon: true } as const
 
@@ -166,6 +167,11 @@ export const mcpRemoveOrganizationMemberInputSchema = organizationMemberSdkOptio
 export const mcpGetAccountInputSchema = getAccountOptionsSchema.omit(sdkAuthFields)
 
 export const mcpUpdateAccountInputSchema = updateAccountOptionsSchema.omit(sdkAuthFields)
+
+export const mcpSearchDocsInputSchema = z.object({
+  query: z.string().trim().min(1).max(200).describe('Search terms, e.g. "progressive rollout" or "encryption key"'),
+  limit: z.number().int().min(1).max(DOCS_SEARCH_MAX_RESULTS).optional().describe('Maximum results, default 8'),
+})
 
 export const mcpDoctorInputSchema = z.object({
   packageJson: z.string().describe('Path to package.json for monorepos').optional(),

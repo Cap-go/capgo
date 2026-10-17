@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DOCS_SEARCH_MAX_RESULTS, searchCapgoDocs } from '../utils/docs_search.ts'
 
 /**
  * Hosted Capgo MCP tools.
@@ -945,6 +946,33 @@ const notificationTools: McpTool[] = [
   }),
 ]
 
+// ---------------------------------------------------------------------------
+// Documentation
+// ---------------------------------------------------------------------------
+const docsTools: McpTool[] = [
+  {
+    name: 'capgo_search_docs',
+    title: 'Search Capgo docs',
+    description: 'Search the Capgo documentation (capgo.app/docs) and get matching pages with their URLs. '
+      + 'Use it to find how a feature, CLI command, plugin option or API route works before acting, then fetch the URL for full details.',
+    inputSchema: z.object({
+      query: z.string().trim().min(1).max(200).describe('Search terms, e.g. "progressive rollout" or "encryption key"'),
+      limit: z.number().int().min(1).max(DOCS_SEARCH_MAX_RESULTS).optional().describe('Maximum results, default 8'),
+    }) as unknown as z.ZodObject<z.ZodRawShape>,
+    annotations: { title: 'Search Capgo docs', ...READ, openWorldHint: true },
+    run: async (input) => {
+      const { query, limit } = input as { query: string, limit?: number }
+      try {
+        const results = await searchCapgoDocs(query, limit)
+        return textResult(results.length ? results : { results: [], message: `No documentation matches "${query}". Try broader terms.` })
+      }
+      catch (error) {
+        return textResult({ error: 'docs_search_failed', message: error instanceof Error ? error.message : String(error) }, true)
+      }
+    },
+  },
+]
+
 export const MCP_TOOLS: readonly McpTool[] = [
   ...accountTools,
   ...appTools,
@@ -955,6 +983,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
   ...buildTools,
   ...webhookTools,
   ...notificationTools,
+  ...docsTools,
 ]
 
 export const MCP_TOOLS_BY_NAME: ReadonlyMap<string, McpTool> = new Map(MCP_TOOLS.map(tool => [tool.name, tool]))

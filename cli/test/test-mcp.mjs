@@ -84,6 +84,7 @@ try {
     'capgo_remove_organization_member',
     'capgo_get_account',
     'capgo_update_account',
+    'capgo_search_docs',
   ]
   const missing = requiredTools.filter(name => !toolNames.has(name))
   if (missing.length > 0) {
