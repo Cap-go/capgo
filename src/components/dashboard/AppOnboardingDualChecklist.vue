@@ -33,13 +33,19 @@ const paths = ['ota', 'builder'] as const
 const label = (path: ChecklistPath) => t(path === 'ota' ? 'setup-goal-live-updates' : 'setup-goal-builder')
 
 watch(() => props.initialOnboarding, value => snapshot.value = value)
-watch(activePath, path => emit('pathChanged', path), { immediate: true })
+watch(activePath, (path) => {
+  emit('pathChanged', path)
+  if (path) {
+    preference.value = { ...preference.value, path }
+    saveChecklistPreference(props.userId, props.appId, preference.value)
+  }
+}, { immediate: true })
 
 function selectPath(path: ChecklistPath) {
+  if (path === 'builder' && !visited.value.builder)
+    platform.value = resume.value.platform
   activePath.value = path
   visited.value[path] = true
-  preference.value = { ...preference.value, path }
-  saveChecklistPreference(props.userId, props.appId, preference.value)
 }
 
 function selectPlatform(value: BuilderPlatform) {

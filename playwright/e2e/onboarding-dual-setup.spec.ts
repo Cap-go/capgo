@@ -134,3 +134,85 @@ test('copies commands and OTA AI instructions for the active tab rather than sig
   const prompt = await page.evaluate(() => (window as any).copiedSetupText as string)
   expect(prompt).not.toContain('start_capgo_builder_onboarding')
 })
+
+test('uses newly saved Builder progress when opening that tab for the first time', async ({ page }) => {
+  await page.clock.install()
+  await page.goto(`${fixture}&platform=ios`)
+  await page.getByRole('button', { name: /Live Updates/ }).click()
+  await page.evaluate(() => {
+    const state = (window as any).onboardingSetupPreview.state
+    state.builderSteps.android.start_setup.status = 'done'
+    state.selectedBuilderPlatform = 'android'
+  })
+  await page.clock.runFor(5000)
+  await page.getByRole('tab', { name: 'Builder', exact: true }).click()
+  await expect(page.locator('[data-test="builder-platform-android"]')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('[data-test="builder-step-prepare_keystore"]')).toContainText('Current task')
+
+  // Builder's own first refresh must also reconcile progress before the OTA poll.
+  await page.evaluate(() => {
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('capgo:onboarding-checklist:'))
+        localStorage.removeItem(key)
+    }
+  })
+  await page.goto(`${fixture}&platform=ios`)
+  await page.getByRole('button', { name: /Live Updates/ }).click()
+  await page.evaluate(() => {
+    const state = (window as any).onboardingSetupPreview.state
+    state.builderSteps.android.start_setup.status = 'done'
+    state.selectedBuilderPlatform = 'android'
+  })
+  await page.getByRole('tab', { name: 'Builder', exact: true }).click()
+  await expect(page.locator('[data-test="builder-platform-android"]')).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('persists the displayed platform while preserving inspection during the first Builder read', async ({ page }) => {
+  await page.clock.install()
+  await page.goto(`${fixture}&builderProgress=ios`)
+  await expect.poll(() => page.evaluate(() => Object.keys(localStorage)
+    .filter(key => key.startsWith('capgo:onboarding-checklist:'))
+    .map(key => JSON.parse(localStorage.getItem(key)!).platform))).toEqual(['ios'])
+  await page.goto(`${fixture}&platform=ios`)
+  await page.getByRole('button', { name: /Live Updates/ }).click()
+  await page.evaluate(() => {
+    const state = (window as any).onboardingSetupPreview.state
+    state.builderSteps.android.start_setup.status = 'done'
+    state.selectedBuilderPlatform = 'android'
+  })
+  await page.clock.runFor(5000)
+  await page.evaluate(() => {
+    const originalFetch = window.fetch
+    const firstRead = new Promise<void>((resolve) => {
+      (window as any).releaseBuilderRead = resolve
+    })
+    window.fetch = async (input, init) => {
+      const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.origin)
+      if (url.pathname.endsWith('/apps') && url.searchParams.get('select') === 'onboarding')
+        await firstRead
+      return originalFetch(input, init)
+    }
+  })
+  await page.getByRole('tab', { name: 'Builder', exact: true }).click()
+  await expect(page.locator('[data-test="builder-platform-android"]')).toHaveAttribute('aria-pressed', 'true')
+  await page.locator('[data-test="builder-step-successful_cloud_build"] button').click()
+  await page.evaluate(() => {
+    const state = (window as any).onboardingSetupPreview.state
+    state.builderSteps.ios.start_setup.status = 'done'
+    state.selectedBuilderPlatform = 'ios'
+    ;(window as any).releaseBuilderRead()
+  })
+  await expect(page.locator('[data-test="builder-checklist-instructions"] h2')).toHaveText('Run a successful cloud build')
+  await expect(page.locator('[data-test="builder-platform-android"]')).toHaveAttribute('aria-pressed', 'true')
+  await expect.poll(() => page.evaluate(() => Object.keys(localStorage)
+    .filter(key => key.startsWith('capgo:onboarding-checklist:'))
+    .map(key => JSON.parse(localStorage.getItem(key)!).platform))).toEqual(['android'])
+})
+
+test('remembers the automatically resumed path before both checklists gain progress', async ({ page }) => {
+  const otaDefaultFixture = fixture.replace('assignment=both-builder', 'assignment=both-ota')
+  await page.goto(`${otaDefaultFixture}&builderProgress=android`)
+  await expect(page.getByRole('tab', { name: 'Builder', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await page.goto(`${otaDefaultFixture}&builderProgress=android&otaProgress=1`)
+  await expect(page.getByRole('tab', { name: 'Builder', exact: true })).toHaveAttribute('aria-selected', 'true')
+})

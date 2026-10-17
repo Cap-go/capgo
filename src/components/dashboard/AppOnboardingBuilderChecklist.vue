@@ -14,6 +14,7 @@ import IconAndroid from '~icons/mdi/android'
 import IconApple from '~icons/mdi/apple'
 import { BUILDER_STEP_IDS, parseBuilderOnboarding } from '~/services/builderOnboardingChecklist'
 import { useSupabase } from '~/services/supabase'
+import { resolveDualChecklistResume } from '~/utils/dualOnboardingChecklists'
 
 const props = withDefaults(defineProps<{
   appId: string
@@ -51,6 +52,8 @@ const selectedId = computed({
 })
 const refreshError = ref(false)
 let refreshTimer: ReturnType<typeof setInterval> | undefined
+let hasLoadedPlatform = false
+let hasInteractedWithPlatform = false
 
 watch(() => props.initialOnboarding, (value) => {
   onboarding.value = parseBuilderOnboarding(value)
@@ -61,6 +64,8 @@ watch(() => props.appId, () => {
   onboarding.value = parseBuilderOnboarding(props.initialOnboarding)
   viewedPlatform.value = props.initialPlatform ?? onboarding.value.selectedPlatform
   selectedIds.value = {}
+  hasLoadedPlatform = false
+  hasInteractedWithPlatform = false
   void refreshOnboarding()
 })
 
@@ -106,6 +111,13 @@ async function refreshOnboarding() {
   refreshError.value = !!error
   if (!error && data) {
     onboarding.value = parseBuilderOnboarding(data.onboarding)
+    if (props.preserveSelection && !hasLoadedPlatform) {
+      if (!hasInteractedWithPlatform)
+        viewedPlatform.value = resolveDualChecklistResume(data.onboarding, { platform: props.initialPlatform ?? undefined }).platform
+      if (viewedPlatform.value)
+        emit('platformChanged', viewedPlatform.value)
+    }
+    hasLoadedPlatform = true
     viewedPlatform.value ??= onboarding.value.selectedPlatform
     emit('snapshot', data.onboarding)
   }
@@ -130,10 +142,16 @@ watch(() => props.active, (active) => {
 })
 
 function selectPlatform(platform: BuilderPlatform) {
+  hasInteractedWithPlatform = true
   viewedPlatform.value = platform
   if (!props.preserveSelection)
     selectedId.value = null
   emit('platformChanged', platform)
+}
+
+function selectStep(id: string) {
+  hasInteractedWithPlatform = true
+  selectedId.value = id
 }
 
 function statusLabel(status: BuilderStepStatus) {
@@ -216,7 +234,7 @@ function statusLabel(status: BuilderStepStatus) {
                 :class="selectedStep.id === step.id ? 'bg-azure-500/5 text-primary-500 dark:bg-azure-500/10 dark:text-azure-300' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'"
                 :aria-current="currentStep?.id === step.id ? 'step' : undefined"
                 :aria-label="t('setup-checklist-view-task', { task: step.title, status: statusLabel(step.status) })"
-                @click="selectedId = step.id"
+                @click="selectStep(step.id)"
               >
                 <IconCheck v-if="step.status === 'done'" class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" :aria-label="statusLabel(step.status)" />
                 <IconMinus v-else-if="step.status === 'skipped'" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="statusLabel(step.status)" />
@@ -295,7 +313,7 @@ function statusLabel(status: BuilderStepStatus) {
               <button v-if="refreshError" type="button" class="d-btn d-btn-ghost mt-2 min-h-11 text-sky-700 dark:text-azure-300" @click="refreshOnboarding">{{ t('setup-checklist-retry') }}</button>
             </output>
 
-            <button v-if="currentStep && currentStep.id !== selectedStep.id" type="button" class="d-btn d-btn-ghost mt-2 min-h-11 self-start text-sky-700 dark:text-azure-300" @click="selectedId = currentStep.id">
+            <button v-if="currentStep && currentStep.id !== selectedStep.id" type="button" class="d-btn d-btn-ghost mt-2 min-h-11 self-start text-sky-700 dark:text-azure-300" @click="selectStep(currentStep.id)">
               {{ t('setup-checklist-return-current') }}
               <IconArrowRight class="h-4 w-4" aria-hidden="true" />
             </button>

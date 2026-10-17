@@ -2602,7 +2602,7 @@ async function leaveSplashIfAlreadySetup() {
     // Reopening a completed dual setup keeps the existing completion panel.
     // A path completion must never dismiss its sibling checklist.
     if (data != null)
-      app.onboarding = data as Json
+      Object.assign(app, { onboarding: data })
     return false
   }
   const skip = data != null
