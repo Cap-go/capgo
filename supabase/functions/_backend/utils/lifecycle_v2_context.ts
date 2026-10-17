@@ -9,8 +9,9 @@ export async function selectLifecycleApp(c: Context, orgId: string, appId: strin
     || (product !== 'ota' && product !== 'builder')) {
     return false
   }
-  const pg = await getPgClient(c)
+  let pg: Awaited<ReturnType<typeof getPgClient>> | undefined
   try {
+    pg = await getPgClient(c)
     const result = await pg.query(`WITH selected AS (
       UPDATE public.bento_lifecycle_journeys j SET selected_app_incarnation = a.id,
         candidate = NULL, revision = j.revision + 1, next_evaluation_at = CURRENT_TIMESTAMP
@@ -30,6 +31,7 @@ export async function selectLifecycleApp(c: Context, orgId: string, appId: strin
     return false
   }
   finally {
-    await closeClient(c, pg)
+    if (pg)
+      await closeClient(c, pg)
   }
 }

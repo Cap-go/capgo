@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lifecycleAppSelection } from '../src/utils/lifecycleAppSelection'
 import { selectLifecycleApp } from '../supabase/functions/_backend/utils/lifecycle_v2_context.ts'
 
-const mocks = vi.hoisted(() => ({ query: vi.fn(), close: vi.fn() }))
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({ getPgClient: async () => ({ query: mocks.query }), closeClient: mocks.close }))
+const mocks = vi.hoisted(() => ({ get: vi.fn(), query: vi.fn(), close: vi.fn() }))
+vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({ getPgClient: mocks.get, closeClient: mocks.close }))
 vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({ cloudlog: vi.fn() }))
 const id = '11111111-1111-4111-8111-111111111111'
 const org = '22222222-2222-4222-8222-222222222222'
@@ -11,6 +11,7 @@ const app = { id, app_id: 'com.example.selection', owner_org: org, onboarding: {
 describe('lifecycle app context selection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.get.mockResolvedValue({ query: mocks.query })
     mocks.query.mockResolvedValue({ rowCount: 1 })
   })
   it('sends only app/product incarnation identity and org scope through authenticated tracking', () => {
@@ -35,5 +36,16 @@ describe('lifecycle app context selection', () => {
     expect(mocks.query).not.toHaveBeenCalled()
     mocks.query.mockResolvedValue({ rowCount: 0 })
     expect(await selectLifecycleApp({} as any, org, app.app_id, id, 'ota')).toBe(false)
+  })
+  it('keeps connection acquisition failure from failing an otherwise accepted tracking request', async () => {
+    mocks.get.mockRejectedValueOnce(new Error('connection unavailable'))
+    expect(await selectLifecycleApp({ get: () => 'test' } as any, org, app.app_id, id, 'ota')).toBe(false)
+    expect(mocks.query).not.toHaveBeenCalled()
+    expect(mocks.close).not.toHaveBeenCalled()
+  })
+  it('releases an acquired client after a query failure', async () => {
+    mocks.query.mockRejectedValueOnce(new Error('query unavailable'))
+    expect(await selectLifecycleApp({ get: () => 'test' } as any, org, app.app_id, id, 'ota')).toBe(false)
+    expect(mocks.close).toHaveBeenCalledOnce()
   })
 })
