@@ -84,9 +84,14 @@ describe('generic intent allocation', () => {
     expect(createABTestAssignments(user(intent), validateABTestsConfig(rawConfig))).not.toHaveProperty('new_emails_v2')
   })
 
-  it.each(['exploring', 'both'])('allocates legacy emails to 100%% of %s users only', (intent) => {
-    const result = createABTestAssignments(user(intent), validateABTestsConfig(rawConfig), () => 0.99)
-    expect(result.new_emails?.branch).toBe('A')
+  it.each(['exploring', 'both'].flatMap(intent => [
+    { intent, roll: 0, branch: 'A' },
+    { intent, roll: 0.4999, branch: 'A' },
+    { intent, roll: 0.5, branch: 'B' },
+    { intent, roll: 0.9999, branch: 'B' },
+  ]))('splits legacy emails 50/50 for $intent at random draw $roll', ({ intent, roll, branch }) => {
+    const result = createABTestAssignments(user(intent), validateABTestsConfig(rawConfig), () => roll)
+    expect(result.new_emails?.branch).toBe(branch)
     expect(result).not.toHaveProperty('new_emails_v2')
   })
 

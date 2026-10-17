@@ -3,7 +3,7 @@
     "audience": "self_signup",
     "intents": ["exploring", "both"],
     "label": "Email template",
-    "treatment_percentage": 100,
+    "treatment_percentage": 50,
     "treatment_branch": "A",
     "control_branch": "B",
     "branches": {

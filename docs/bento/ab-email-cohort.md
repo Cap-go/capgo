@@ -7,7 +7,7 @@ The generic allocator supports `treatment_percentage_by_intent`, common
 no cycles) and resolved in canonical topological order in the same locked user
 transaction. Intent-specific requirements extend common requirements.
 
-- `new_emails`: new allocations are 100% treatment for self-signup accounts with
+- `new_emails`: new allocations are 50% treatment for self-signup accounts with
   exact `exploring` or `both` intent. Eligible existing A/B branches are retained;
   OTA, Builder and unknown intents lose stale assignments and provider tags.
 - `new_emails_v2`: prospective signup enrollment only, including invited accounts.
