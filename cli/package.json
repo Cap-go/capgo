@@ -86,6 +86,7 @@
     "test:build-needed": "bun test/test-build-needed.mjs",
     "test:cli-help": "bun test/test-cli-help.mjs",
     "test:build-cache-payload": "bun test/test-build-cache-payload.mjs",
+    "test:build-log-view-golden": "bun test/test-build-log-view-golden.mjs",
     "test:build-cancellation": "bun test/test-build-cancellation.mjs",
     "test:ci-prompts": "bun test/test-ci-prompts.mjs",
     "test:capgo-app-id-prompt": "bun test/test-capgo-app-id-prompt.mjs",

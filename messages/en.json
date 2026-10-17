@@ -3538,6 +3538,8 @@
   "section-group-monitor": "Monitor & reach users",
   "section-group-workspace": "Workspace",
   "sidebar-group-help": "Help & community",
+  "sidebar-finish-first-update-confirm-description": "Capgo only starts working once a bundle is on a channel. Upload one (or start a Builder build) — it only takes a minute.",
+  "sidebar-finish-first-update-confirm-title": "Ship your first update?",
   "flow-label": "How a live update reaches users",
   "flow-step-bundle": "Bundle",
   "flow-step-channel": "Channel",

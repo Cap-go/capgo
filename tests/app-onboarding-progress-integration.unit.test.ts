@@ -1428,7 +1428,7 @@ describe('app onboarding progress analytics integration', () => {
     ])
     expect(handOff).not.toContain('persistOnboardingProgress(\'completed\')')
 
-    const dashboardExit = sourceBetween('function openDashboard()', 'onMounted(async () => {')
+    const dashboardExit = sourceBetween('async function openDashboardFromSetup(options: { liftHardGate: boolean })', 'async function skipOnboardingSplash()')
     expect(dashboardExit).toContain(`if (flowStep.value === 'setup')`)
     expect(dashboardExit).toContain('progressTracker?.completeStep(flowStep.value, {')
     expect(dashboardExit).toContain('appId: createdApp.value.app_id')
@@ -1436,7 +1436,12 @@ describe('app onboarding progress analytics integration', () => {
     expect(dashboardExit).toContain('router.push(`/app/')
     expect(dashboardExit).not.toContain('/getting-started')
     expect(dashboardExit.indexOf('completeStep')).toBeLessThan(dashboardExit.indexOf('router.push'))
-    expect(dashboardExit).toContain('window.dispatchEvent(new Event(ONBOARDING_DASHBOARD_EXPLORED_EVENT))')
+    expect(dashboardExit).toContain('if (options.liftHardGate)')
+    expect(dashboardExit).toContain('setPendingFirstUploadAppId(onboardingUserId.value, createdApp.value.app_id)')
+    expect(dashboardExit).toContain('clearPendingFirstUploadAppId(onboardingUserId.value)')
+    expect(dashboardExit).toContain('allowOnboardingDashboardExploration(onboardingUserId.value, createdApp.value.app_id)')
+    expect(dashboardExit.indexOf('if (options.liftHardGate)')).toBeLessThan(dashboardExit.indexOf('allowOnboardingDashboardExploration'))
+    expect(dashboardExit.indexOf('setPendingFirstUploadAppId')).toBeLessThan(dashboardExit.indexOf('router.push'))
     expect(onboardingSource).toContain('progressTracker?.trackDashboardExplored(createdApp.value?.app_id)')
     expect(onboardingSource).toContain('window.addEventListener(ONBOARDING_DASHBOARD_EXPLORED_EVENT, trackDashboardExplored)')
     expect(onboardingSource).toContain('window.removeEventListener(ONBOARDING_DASHBOARD_EXPLORED_EVENT, trackDashboardExplored)')
@@ -1448,7 +1453,13 @@ describe('app onboarding progress analytics integration', () => {
     expect(splashDismiss).toContain('updateAppOnboarding')
     expect(onboardingSource).toContain('data-test="app-onboarding-dont-show-again"')
 
-    const confirmedSidebarExit = sidebarSource.slice(sidebarSource.indexOf('if (requiresOnboardingExplorationConfirmation)'), sidebarSource.indexOf('if (tab.onClick)'))
-    expect(confirmedSidebarExit.indexOf(`lastButtonRole !== 'primary'`)).toBeLessThan(confirmedSidebarExit.indexOf('window.dispatchEvent(new Event(ONBOARDING_DASHBOARD_EXPLORED_EVENT))'))
+    expect(sidebarSource).toContain('confirmOnboardingDashboardExplorationNavigation')
+    const confirmServiceSource = readFileSync(new NodeUrl('../src/services/onboardingDashboardExplorationConfirm.ts', import.meta.url), 'utf8')
+    const confirmedExploreExit = confirmServiceSource.slice(
+      confirmServiceSource.indexOf('if (options.dialogStore.lastButtonRole === \'primary\')'),
+      confirmServiceSource.indexOf('window.dispatchEvent(new Event(ONBOARDING_DASHBOARD_EXPLORED_EVENT))'),
+    )
+    expect(confirmedExploreExit.length).toBeGreaterThan(0)
+    expect(confirmServiceSource.indexOf(`lastButtonRole !== 'secondary'`)).toBeLessThan(confirmServiceSource.indexOf('window.dispatchEvent(new Event(ONBOARDING_DASHBOARD_EXPLORED_EVENT))'))
   })
 })
