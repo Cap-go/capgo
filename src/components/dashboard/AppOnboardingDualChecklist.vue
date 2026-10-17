@@ -7,7 +7,7 @@ import IconArrowRight from '~icons/lucide/arrow-right'
 import IconLayers from '~icons/lucide/layers'
 import IconLoader from '~icons/lucide/loader-2'
 import IconRefresh from '~icons/lucide/refresh-cw'
-import { loadChecklistPreference, resolveDualChecklistResume, saveChecklistPreference } from '~/utils/dualOnboardingChecklists'
+import { isDualOtaChecklistComplete, loadChecklistPreference, resolveDualChecklistResume, saveChecklistPreference } from '~/utils/dualOnboardingChecklists'
 
 const props = defineProps<{
   appId: string
@@ -24,7 +24,11 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const id = useId()
 const preference = ref(loadChecklistPreference(props.userId, props.appId))
+const preferenceUserId = ref(props.userId)
+const hasInteracted = ref(false)
 const snapshot = ref(props.initialOnboarding)
+const observedChannel = ref<boolean | null>(null)
+const otaComplete = computed(() => isDualOtaChecklistComplete(snapshot.value, observedChannel.value ?? undefined))
 const resume = computed(() => resolveDualChecklistResume(snapshot.value, preference.value))
 const activePath = ref<ChecklistPath | null>(resume.value.path)
 const platform = ref<BuilderPlatform | null>(resume.value.platform)
@@ -33,13 +37,47 @@ const paths = ['ota', 'builder'] as const
 const label = (path: ChecklistPath) => t(path === 'ota' ? 'setup-goal-live-updates' : 'setup-goal-builder')
 
 watch(() => props.initialOnboarding, value => snapshot.value = value)
+watch(() => props.userId, (userId) => {
+  if (!userId)
+    return
+  const changedUser = !!preferenceUserId.value && preferenceUserId.value !== userId
+  const saved = loadChecklistPreference(userId, props.appId)
+  preferenceUserId.value = userId
+  if (!hasInteracted.value || changedUser) {
+    const next = resolveDualChecklistResume(snapshot.value, saved)
+    preference.value = {
+      ...saved,
+      ...(next.path ? { path: next.path } : {}),
+      ...(next.platform ? { platform: next.platform } : {}),
+    }
+    activePath.value = next.path
+    platform.value = next.platform
+    if (changedUser) {
+      hasInteracted.value = false
+      visited.value = { ota: next.path === 'ota', builder: next.path === 'builder' }
+    }
+    else if (next.path) {
+      visited.value[next.path] = true
+    }
+  }
+  else {
+    preference.value = { ...saved, ...preference.value }
+  }
+  persistPreference()
+})
 watch(activePath, (path) => {
   emit('pathChanged', path)
   if (path) {
     preference.value = { ...preference.value, path }
-    saveChecklistPreference(props.userId, props.appId, preference.value)
+    persistPreference()
   }
 }, { immediate: true })
+
+function persistPreference() {
+  // A late identity must load its saved preference before any automatic write.
+  if (activePath.value && props.userId === preferenceUserId.value)
+    saveChecklistPreference(props.userId, props.appId, preference.value)
+}
 
 function selectPath(path: ChecklistPath) {
   if (path === 'builder' && !visited.value.builder)
@@ -51,11 +89,13 @@ function selectPath(path: ChecklistPath) {
 function selectPlatform(value: BuilderPlatform) {
   platform.value = value
   preference.value = { ...preference.value, platform: value }
-  saveChecklistPreference(props.userId, props.appId, preference.value)
+  persistPreference()
 }
 
-function updateSnapshot(value: unknown) {
+function updateSnapshot(value: unknown, hasChannel?: boolean | null) {
   snapshot.value = value
+  if (typeof hasChannel === 'boolean')
+    observedChannel.value = hasChannel
 }
 
 function completePath() {
@@ -64,7 +104,7 @@ function completePath() {
     return
   }
   const other = activePath.value === 'ota' ? 'builder' : 'ota'
-  if (other === 'ota' ? !resume.value.otaComplete : !resume.value.builderComplete)
+  if (other === 'ota' ? !otaComplete.value : !resume.value.builderComplete)
     selectPath(other)
   else
     emit('explore')
@@ -75,7 +115,7 @@ function completionAction(path: ChecklistPath) {
     return t('setup-goal-continue-builder')
   if (path === 'ota' && !resume.value.builderComplete)
     return t('setup-goal-continue-builder')
-  if (path === 'builder' && !resume.value.otaComplete)
+  if (path === 'builder' && !otaComplete.value)
     return t('setup-goal-continue-live-updates')
   return undefined
 }
@@ -92,7 +132,7 @@ async function onTabKey(event: KeyboardEvent, path: ChecklistPath) {
 </script>
 
 <template>
-  <div class="mx-auto flex min-h-[calc(100dvh-10rem)] w-full max-w-[1080px] flex-col" data-test="dual-onboarding-checklists">
+  <div class="mx-auto flex min-h-[calc(100dvh-10rem)] w-full max-w-[1080px] flex-col" data-test="dual-onboarding-checklists" @click.capture="hasInteracted = true" @keydown.capture="hasInteracted = true">
     <div v-if="!activePath" data-test="setup-goal-chooser">
       <h1 class="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl dark:text-white">
         {{ t('setup-goal-title') }}

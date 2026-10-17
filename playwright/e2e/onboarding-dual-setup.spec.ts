@@ -216,3 +216,25 @@ test('remembers the automatically resumed path before both checklists gain progr
   await page.goto(`${otaDefaultFixture}&builderProgress=android&otaProgress=1`)
   await expect(page.getByRole('tab', { name: 'Builder', exact: true })).toHaveAttribute('aria-selected', 'true')
 })
+
+test('keeps completion actions consistent with observed channels without rewriting saved progress', async ({ page }) => {
+  await page.goto(`${fixture}&otaComplete=1&builderComplete=android`)
+  await page.evaluate(() => {
+    (window as any).onboardingSetupPreview.state.steps.add_channel.status = 'pending'
+  })
+  await page.getByRole('tab', { name: 'Live Updates', exact: true }).click()
+  await expect(page.locator('[data-test="setup-checklist-progress"]')).toContainText('7 of 7 complete')
+  await page.getByRole('tab', { name: 'Builder', exact: true }).click()
+  await expect(page.locator('[data-test="builder-checklist"]').getByRole('button', { name: 'Open your app', exact: true })).toBeVisible()
+
+  await page.evaluate(() => {
+    const state = (window as any).onboardingSetupPreview.state
+    state.steps.add_channel.status = 'done'
+    state.channels = []
+  })
+  await page.getByRole('tab', { name: 'Live Updates', exact: true }).click()
+  await expect(page.locator('[data-test="setup-checklist-progress"]')).toContainText('6 of 7 complete')
+  await page.getByRole('tab', { name: 'Builder', exact: true }).click()
+  await expect(page.locator('[data-test="builder-checklist"]').getByRole('button', { name: 'Continue Live Updates', exact: true })).toBeVisible()
+  expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites)).toEqual([])
+})

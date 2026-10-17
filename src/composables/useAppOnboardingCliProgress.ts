@@ -135,5 +135,5 @@ export function useAppOnboardingCliProgress(appId: MaybeRefOrGetter<string>, ini
     generation += 1
     stopPolling()
   })
-  return { onboarding, rawOnboarding, refreshError, refreshOnboarding }
+  return { onboarding, rawOnboarding, hasChannel, refreshError, refreshOnboarding }
 }

@@ -40,13 +40,13 @@ const emit = defineEmits<{
   inviteOpened: []
   inviteSucceeded: [invite: { email: string, firstName: string, lastName: string }]
   channelAnalytics: [event: OnboardingChannelEvent, properties: OnboardingChannelEventProperties]
-  snapshot: [onboarding: unknown]
+  snapshot: [onboarding: unknown, hasChannel: boolean | null]
 }>()
 
 const { t } = useI18n()
 const panelId = useId()
-const { onboarding, rawOnboarding, refreshError, refreshOnboarding } = useAppOnboardingCliProgress(() => props.appId, () => props.initialOnboarding, () => props.active !== false)
-watch(rawOnboarding, value => emit('snapshot', value))
+const { onboarding, rawOnboarding, hasChannel, refreshError, refreshOnboarding } = useAppOnboardingCliProgress(() => props.appId, () => props.initialOnboarding, () => props.active !== false)
+watch([rawOnboarding, hasChannel], ([value, observedChannel]) => emit('snapshot', value, observedChannel))
 const steps = computed(() => getAppOnboardingStepIds(onboarding.value.todo_list_version, onboarding.value.ota_todo_list_version).filter(isAppOnboardingChecklistStep).map((id, index) => ({
   id,
   index,

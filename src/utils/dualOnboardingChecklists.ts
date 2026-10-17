@@ -31,6 +31,15 @@ function progress(steps: Record<string, unknown>, ids: readonly string[]) {
   }
 }
 
+// The channel observation affects completion in this session only. Resume and
+// meaningful progress continue to use the saved step statuses below.
+export function isDualOtaChecklistComplete(value: unknown, hasChannel?: boolean) {
+  const ota = record(record(record(record(value).setup).steps).ota)
+  return APP_ONBOARDING_OTA_V1_STEP_IDS.every(id => id === 'add_channel' && hasChannel !== undefined
+    ? hasChannel
+    : ['done', 'skipped'].includes(String(record(ota[id]).status)))
+}
+
 export function resolveDualChecklistResume(value: unknown, preference: ChecklistPreference = {}) {
   const setup = record(record(value).setup)
   const steps = record(setup.steps)

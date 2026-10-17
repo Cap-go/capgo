@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../src/services/appOnboarding'
 import { BUILDER_STEP_IDS } from '../src/services/builderOnboardingChecklist'
 import { shouldShowGettingStartedNav, shouldSkipOnboardingResume } from '../src/utils/appOnboardingProgress'
-import { hasDualOnboardingChecklists, loadChecklistPreference, resolveDualChecklistResume, saveChecklistPreference } from '../src/utils/dualOnboardingChecklists'
+import { hasDualOnboardingChecklists, isDualOtaChecklistComplete, loadChecklistPreference, resolveDualChecklistResume, saveChecklistPreference } from '../src/utils/dualOnboardingChecklists'
 
 function fixture() {
   return { setup: {
@@ -108,6 +108,20 @@ describe('assigned dual checklists', () => {
     value.setup.steps.builder.ios.successful_cloud_build.status = 'skipped'
     expect(resolveDualChecklistResume(value).builderComplete).toBe(false)
   })
+
+  for (const hasChannel of [true, false]) {
+    it.concurrent(`uses observed channel=${hasChannel} only for session completion`, () => {
+      const value = fixture()
+      complete(value.setup.steps.ota)
+      value.setup.steps.ota.add_channel.status = hasChannel ? 'pending' : 'done'
+      const saved = structuredClone(value)
+      expect(isDualOtaChecklistComplete(value, hasChannel)).toBe(hasChannel)
+      expect(resolveDualChecklistResume(value).otaComplete).toBe(!hasChannel)
+      expect(value).toEqual(saved)
+      value.setup.steps.ota.test_update.status = 'pending'
+      expect(isDualOtaChecklistComplete(value, hasChannel)).toBe(false)
+    })
+  }
 })
 
 describe('browser checklist preference', () => {
