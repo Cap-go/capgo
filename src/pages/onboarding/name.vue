@@ -111,7 +111,7 @@ onBeforeUnmount(() => {
       </p>
       <button type="submit" :class="authPrimaryButtonClass" :disabled="!profileForm?.isValid || isSaving" data-test="onboarding-name-continue">
         <IconLoader v-if="isSaving" class="h-4 w-4 animate-spin" />
-        {{ t('button-continue') }}
+        {{ t('continue') }}
         <IconArrowRight v-if="!isSaving" class="h-4 w-4" />
       </button>
       <div class="flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-700">
@@ -119,7 +119,7 @@ onBeforeUnmount(() => {
           {{ t('onboarding-resume-restart') }}
         </button>
         <button type="button" :class="authGhostButtonClass" :disabled="isSaving" data-test="onboarding-logout" @click="logout">
-          {{ t('logout') }}
+          {{ t('sign-out') }}
         </button>
       </div>
     </form>
