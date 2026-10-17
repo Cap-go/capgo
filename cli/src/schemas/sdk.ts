@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { CLI_PROJECT_MODES } from '../framework/mode'
 import { buildCacheKeyOptionSchema, buildCacheOptionSchema, buildCredentialsSchema } from './build'
 import { localizedReleaseNotesSchema, rejectConflictingBooleanGroup } from './common'
+import { deviceDataCollectionOptionsSchema } from './deviceDataCollection'
 
 export const capacitorConfigOptionSchema = z.string().min(1).describe('Capacitor config source to update')
 
@@ -39,11 +40,21 @@ export const updateAppOptionsSchema = z.object({
   appId: z.string(),
   name: z.string().optional(),
   icon: z.string().optional(),
-  retention: z.number().optional(),
+  retention: z.number().optional().describe('Days to keep unused bundles (0 = infinite)'),
+  exposeMetadata: z.boolean().optional().describe('Expose bundle link and comment to the updater plugin'),
+  preview: z.boolean().optional().describe('Enable bundle and channel preview QR codes'),
+  allowDeviceCustomId: z.boolean().optional().describe('Let devices set a custom device ID'),
+  blockProviderInfraRequests: z.boolean().optional().describe('Block requests coming from cloud provider infrastructure'),
+  buildTimeoutMinutes: z.number().int().min(5).max(360).optional().describe('Native build timeout in minutes'),
+  iosStoreUrl: z.string().optional().describe('App Store URL (empty string clears it)'),
+  androidStoreUrl: z.string().optional().describe('Google Play URL (empty string clears it)'),
+  defaultUploadChannel: z.string().optional().describe('Channel new bundles are uploaded to by default'),
+  defaultDownloadChannel: z.string().optional().describe('Channel devices download from by default'),
+  disableDownloadChannels: z.boolean().optional().describe('Unset every default download channel'),
   apikey: z.string().optional(),
   supaHost: z.string().optional(),
   supaAnon: z.string().optional(),
-})
+}).merge(deviceDataCollectionOptionsSchema)
 
 export type UpdateAppOptions = z.infer<typeof updateAppOptionsSchema>
 
@@ -106,6 +117,9 @@ export const uploadOptionsSchema = z.object({
   acceptIncompatible: z.boolean().optional(),
   disableCodeCheck: z.boolean().optional(),
   useZip: z.boolean().optional(),
+  delta: z.boolean().optional(),
+  deltaOnly: z.boolean().optional(),
+  encryptDelta: z.boolean().optional(),
   capacitorConfig: capacitorConfigOptionSchema.optional(),
 }).superRefine((value, ctx) => {
   rejectConflictingBooleanGroup(value, ctx, ['acceptIncompatible', 'ignoreCompatibilityCheck'])
@@ -207,6 +221,9 @@ export const updateChannelOptionsBaseSchema = z.object({
   downgrade: z.boolean().optional(),
   ios: z.boolean().optional(),
   android: z.boolean().optional(),
+  electron: z.boolean().optional(),
+  pause: z.boolean().optional().describe('Pause every update on this channel'),
+  resume: z.boolean().optional().describe('Resume updates on a paused channel'),
   selfAssign: z.boolean().optional(),
   disableAutoUpdate: z.string().optional(),
   updatePackage: z.enum(['all', 'zip', 'delta', 'zip_from_builtin', 'delta_from_builtin']).optional(),
@@ -243,6 +260,7 @@ export const updateChannelOptionsSchema = updateChannelOptionsBaseSchema.superRe
   rejectConflictingBooleanGroup(value, ctx, ['rolloutEnable', 'rolloutDisable'])
   rejectConflictingBooleanGroup(value, ctx, ['rolloutPause', 'rolloutResume', 'rolloutRollback', 'rolloutPromote'])
   rejectConflictingBooleanGroup(value, ctx, ['autoPauseEnabled', 'autoPauseDisabled'])
+  rejectConflictingBooleanGroup(value, ctx, ['pause', 'resume'])
 })
 
 export type UpdateChannelOptions = z.infer<typeof updateChannelOptionsSchema>
@@ -288,13 +306,59 @@ export const addOrganizationOptionsSchema = accountIdOptionsSchema.extend({
 
 export type AddOrganizationOptions = z.infer<typeof addOrganizationOptionsSchema>
 
+const emailPreferencesSchema = z.record(z.string(), z.boolean())
+
 export const updateOrganizationOptionsSchema = accountIdOptionsSchema.extend({
   orgId: z.string(),
   name: z.string().optional(),
-  email: z.string().optional(),
+  email: z.string().optional().describe('Management email'),
+  website: z.string().nullable().optional(),
+  enforce2fa: z.boolean().optional(),
+  passwordPolicy: z.boolean().optional(),
+  minLength: z.number().int().min(6).max(128).optional(),
+  requireUppercase: z.boolean().optional(),
+  requireNumber: z.boolean().optional(),
+  requireSpecial: z.boolean().optional(),
+  requireApikeyExpiration: z.boolean().optional(),
+  maxApikeyExpirationDays: z.number().int().min(1).max(365).nullable().optional(),
+  enforceHashedApiKeys: z.boolean().optional(),
+  enforceEncryptedBundles: z.boolean().optional(),
+  requiredEncryptionKey: z.string().nullable().optional(),
+  emailPreferences: emailPreferencesSchema.optional().describe('Org email notification toggles, e.g. { weekly_stats: false }'),
 })
 
 export type UpdateOrganizationOptions = z.infer<typeof updateOrganizationOptionsSchema>
+
+export const organizationMemberSdkOptionsSchema = accountIdOptionsSchema.extend({
+  orgId: z.string(),
+  email: z.string().email(),
+})
+
+export type RemoveOrganizationMemberOptions = z.infer<typeof organizationMemberSdkOptionsSchema>
+
+export const organizationMemberRoleOptionsSchema = organizationMemberSdkOptionsSchema.extend({
+  role: z.enum(['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin']),
+})
+
+export type InviteOrganizationMemberOptions = z.infer<typeof organizationMemberRoleOptionsSchema>
+export type UpdateOrganizationMemberRoleOptions = z.infer<typeof organizationMemberRoleOptionsSchema>
+
+export const getAccountOptionsSchema = accountIdOptionsSchema
+
+export type GetAccountOptions = z.infer<typeof getAccountOptionsSchema>
+
+export const updateAccountOptionsSchema = accountIdOptionsSchema.extend({
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  country: z.string().optional(),
+  discordUsername: z.string().nullable().optional(),
+  formatLocale: z.string().nullable().optional(),
+  notifications: z.boolean().optional().describe('Master switch for email notifications'),
+  newsletter: z.boolean().optional(),
+  emailPreferences: emailPreferencesSchema.optional().describe('Account email notification toggles, e.g. { weekly_stats: false }'),
+})
+
+export type UpdateAccountOptions = z.infer<typeof updateAccountOptionsSchema>
 
 export const organizationInfoSchema = z.object({
   id: z.string(),

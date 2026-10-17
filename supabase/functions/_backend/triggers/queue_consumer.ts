@@ -24,7 +24,7 @@ const DEFAULT_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 120
 const VERSION_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 900
 const MANIFEST_QUEUE_VISIBILITY_TIMEOUT_SECONDS = 900
 const QUEUE_HTTP_TIMEOUT_MS = 15_000
-const VERSION_QUEUE_HTTP_TIMEOUT_MS = 300_000 // large deleted manifests: trash then DB delete
+const VERSION_QUEUE_HTTP_TIMEOUT_MS = 300_000 // database manifest cleanup and canonical ZIP trash
 // HARD RULE: no pgmq queue may retry more than 5 times. Do not raise this, and
 // do not add per-queue exceptions. Leftover work must be re-enqueued by a
 // sweeper/cron (e.g. sweep_deleted_version_manifests), never by burning reads.
@@ -278,9 +278,7 @@ function prepareQueueHttpBody(functionName: string, body: Record<string, unknown
 }
 
 function getQueueHttpTimeoutMs(functionName: string): number {
-  // Workers AI scoring of one app fame batch takes ~20s per attempt, so the
-  // default 15s abort canceled every run before anything was persisted.
-  if (isOnboardingQueue(functionName) || isAppFameQueue(functionName))
+  if (isOnboardingQueue(functionName))
     return 90_000
   if (isVersionQueueFunction(functionName))
     return VERSION_QUEUE_HTTP_TIMEOUT_MS
@@ -1104,15 +1102,11 @@ async function mass_edit_queue_messages_cf_ids(
 
 // --- Hono app setup ---
 function shouldRunQueueSyncInBackground(queueName: string): boolean {
-  return queueName !== 'on_manifest_create' && !isOnboardingQueue(queueName) && !isAppFameQueue(queueName)
+  return queueName !== 'on_manifest_create' && !isOnboardingQueue(queueName)
 }
 
 function isOnboardingQueue(queueName: string): boolean {
   return queueName === 'cron_onboarding_refresh_apps'
-}
-
-function isAppFameQueue(queueName: string): boolean {
-  return queueName === 'cron_app_fame'
 }
 
 async function runQueueSync(

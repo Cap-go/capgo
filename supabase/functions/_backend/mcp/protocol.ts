@@ -14,7 +14,7 @@ export const SUPPORTED_PROTOCOL_VERSIONS = [LATEST_PROTOCOL_VERSION, '2025-06-18
 export const SERVER_INSTRUCTIONS = 'Capgo Cloud MCP server: manage Capacitor live updates (OTA). '
   + 'List organizations and apps, inspect bundles, channels and devices, deploy a bundle by updating a channel, '
   + 'run progressive rollouts, read statistics and Observe health data, follow native builds, and manage webhooks and push notifications. '
-  + 'Start with capgo_whoami and capgo_list_apps. Uploading local bundle files and requesting native builds need the Capgo CLI (npx @capgo/cli@latest). '
+  + 'Search the docs with capgo_search_docs. Start with capgo_whoami and capgo_list_apps. Uploading local bundle files and requesting native builds need the Capgo CLI (npx @capgo/cli@latest). '
   + 'Always confirm destructive actions (delete tools) and push notifications with the user first.'
 
 export const JSON_RPC_ERRORS = {

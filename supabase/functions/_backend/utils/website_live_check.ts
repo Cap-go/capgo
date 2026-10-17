@@ -2,7 +2,7 @@
  * Web2App compatibility check. The app downloads the website root and its
  * same-origin assets and runs them offline, so the root must be the same static
  * app shell for every user. Rules come from the capacitor-website-updater CLI
- * check and the WebNativeApp domain checker.
+ * check and standard website-to-app domain checks.
  */
 
 export type WebsiteCheckStatus = 'pass' | 'warning' | 'fail'

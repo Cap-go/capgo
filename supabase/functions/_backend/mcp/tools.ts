@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { DOCS_SEARCH_MAX_RESULTS, searchCapgoDocs } from '../utils/docs_search.ts'
 
 /**
  * Hosted Capgo MCP tools.
@@ -35,6 +36,8 @@ export interface McpCaller {
 export interface McpToolContext {
   call: (request: McpApiRequest) => Promise<McpApiResponse>
   caller: McpCaller
+  /** The caller's own API key, for tools that hand a ready-to-run CLI command back to the agent. */
+  apikey?: string
 }
 
 export interface McpToolResult {
@@ -81,6 +84,7 @@ const WRITE = { readOnlyHint: false, destructiveHint: false, idempotentHint: fal
 // Deletes, cancellations and overwrites of existing settings. OpenAI plugin guidelines count
 // overwrites as destructive even when they can be undone, so clients ask before running them.
 const DESTRUCTIVE = { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false } satisfies McpToolAnnotations
+// Writes that reach a system outside Capgo: an email inbox, a third-party URL, devices or push providers.
 const EXTERNAL = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true } satisfies McpToolAnnotations
 
 const appId = z.string().min(1).describe('App ID in reverse-domain form, e.g. com.example.app')
@@ -90,6 +94,18 @@ const dateString = z.string().min(1).describe('Date, e.g. 2026-01-31 or an ISO t
 const webhookEvents = z.array(z.enum(['apps', 'app_versions', 'channels', 'org_users', 'orgs'])).min(1)
 const disableAutoUpdate = z.enum(['major', 'minor', 'patch', 'version_number', 'none'])
   .describe('Block automatic updates across this semver boundary (version_number = same native version only, none = allow all)')
+const orgRole = z.enum(['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin'])
+const emailPreferences = z.record(z.string(), z.boolean())
+const deviceDataCollection = z.object({
+  country: z.boolean().optional(),
+  platform: z.boolean().optional(),
+  os_version: z.boolean().optional(),
+  plugin_version: z.boolean().optional(),
+  version_build: z.boolean().optional(),
+  is_emulator: z.boolean().optional(),
+  is_prod: z.boolean().optional(),
+  install_source: z.boolean().optional(),
+}).strict().describe('Optional device fields to store (false = not persisted; update routing still uses the live request). Omitted keys keep their current value.')
 const notificationTarget = z.object({
   externalId: z.string().optional().describe('Your own user identifier bound to devices'),
   recipientKey: z.string().optional(),
@@ -129,6 +145,67 @@ function enc(value: string): string {
   return encodeURIComponent(value)
 }
 
+/** POSIX single-quote a shell argument. */
+function shellQuote(value: string): string {
+  return `'${value.replaceAll('\'', `'\\''`)}'`
+}
+
+const uploadCommandTool: McpTool = {
+  name: 'capgo_get_upload_command',
+  title: 'Get bundle upload command',
+  description: 'Get a ready-to-run Capgo CLI command that uploads a local web build (zip and, with delta=true, the per-file manifest for delta updates). '
+    + 'The command authenticates with the same API key this MCP connection uses, so run it in your own shell and do not share or log it. '
+    + 'Use this when you have a shell but the Capgo CLI is not logged in.',
+  inputSchema: z.object({
+    appId,
+    path: z.string().min(1).optional().describe('Folder of the web build to upload, e.g. dist. Defaults to webDir from capacitor.config.'),
+    bundle: z.string().min(1).optional().describe('Bundle version, e.g. 1.2.3. Defaults to the package.json version.'),
+    channel: z.string().min(1).optional().describe('Channel to link the uploaded bundle to'),
+    comment: z.string().min(1).optional(),
+    delta: z.boolean().optional().describe('Also upload the per-file manifest for delta updates'),
+    deltaOnly: z.boolean().optional().describe('Upload only the delta manifest files, no full zip'),
+  }) as unknown as z.ZodObject<z.ZodRawShape>,
+  annotations: { title: 'Get bundle upload command', ...READ },
+  run: async (input, ctx) => {
+    const { appId: id, path, bundle, channel, comment, delta, deltaOnly } = input as {
+      appId: string
+      path?: string
+      bundle?: string
+      channel?: string
+      comment?: string
+      delta?: boolean
+      deltaOnly?: boolean
+    }
+    if (!ctx.apikey)
+      return textResult({ error: 'no_apikey', message: 'This connection has no API key to hand to the CLI. Run: bunx @capgo/cli@latest login' }, true)
+
+    // Fail early when the key cannot see the app; upload rights are enforced again by the upload endpoints.
+    const app = await ctx.call({ method: 'GET', path: `/app/${enc(id)}` })
+    if (!app.ok)
+      return apiResult(app)
+
+    const args = ['bunx', '@capgo/cli@latest', 'bundle', 'upload', shellQuote(id)]
+    if (path)
+      args.push('--path', shellQuote(path))
+    if (bundle)
+      args.push('--bundle', shellQuote(bundle))
+    if (channel)
+      args.push('--channel', shellQuote(channel))
+    if (comment)
+      args.push('--comment', shellQuote(comment))
+    if (deltaOnly)
+      args.push('--delta-only')
+    else if (delta)
+      args.push('--delta')
+
+    return textResult({
+      command: `CAPGO_TOKEN=${shellQuote(ctx.apikey)} ${args.join(' ')}`,
+      apikeyExpiresAt: ctx.caller.apikeyExpiresAt,
+      note: 'Run from the project root after building the web assets. The key needs upload rights on this app.',
+    })
+  },
+}
+
 // ---------------------------------------------------------------------------
 // Account & organizations
 // ---------------------------------------------------------------------------
@@ -146,6 +223,32 @@ const accountTools: McpTool[] = [
       apikey_expires_at: ctx.caller.apikeyExpiresAt,
     }),
   },
+  apiTool({
+    name: 'capgo_get_account',
+    title: 'Get account settings',
+    description: 'Get the profile and email notification settings of the authenticated Capgo user.',
+    input: {},
+    annotations: READ,
+    request: () => ({ method: 'GET', path: '/user' }),
+  }),
+  apiTool({
+    name: 'capgo_update_account',
+    title: 'Update account settings',
+    description: 'Update the authenticated user profile (name, country, Discord, number format locale) and personal email notifications. '
+      + 'Email, password, 2FA and account deletion are only available in the Capgo web app.',
+    input: {
+      first_name: z.string().min(1).max(100).optional(),
+      last_name: z.string().min(1).max(100).optional(),
+      country: z.string().max(100).nullable().optional(),
+      discord_username: z.string().max(100).nullable().optional(),
+      format_locale: z.string().max(35).nullable().optional().describe('Locale used to format numbers and dates, e.g. en-US'),
+      enable_notifications: z.boolean().optional().describe('Receive product notification emails'),
+      opt_for_newsletters: z.boolean().optional().describe('Receive the newsletter'),
+      email_preferences: emailPreferences.optional().describe('Only the personal email toggles to change, e.g. {"weekly_stats":false}. Keys: usage_limit, credit_usage, bundle_created, bundle_deployed, deploy_stats_24h, weekly_stats, monthly_stats, billing_period_stats, device_error, channel_self_rejected, bundle_incompatible, cli_realtime_feed, onboarding, builder_onboarding'),
+    },
+    annotations: DESTRUCTIVE,
+    request: input => ({ method: 'PUT', path: '/user', body: compact(input) }),
+  }),
   apiTool({
     name: 'capgo_list_organizations',
     title: 'List organizations',
@@ -177,7 +280,7 @@ const accountTools: McpTool[] = [
   apiTool({
     name: 'capgo_update_organization',
     title: 'Update organization',
-    description: 'Update organization settings (name, website, management email, API key policies, bundle encryption and 2FA enforcement).',
+    description: 'Update organization settings (name, website, management email, API key policies, bundle encryption, 2FA enforcement, password policy and org email notifications).',
     input: {
       orgId,
       name: z.string().optional(),
@@ -189,6 +292,14 @@ const accountTools: McpTool[] = [
       enforce_encrypted_bundles: z.boolean().optional(),
       required_encryption_key: z.string().nullable().optional(),
       enforcing_2fa: z.boolean().optional(),
+      password_policy_config: z.object({
+        enabled: z.boolean(),
+        min_length: z.number().int().min(6).max(72),
+        require_uppercase: z.boolean(),
+        require_number: z.boolean(),
+        require_special: z.boolean(),
+      }).nullable().optional().describe('Password policy members must meet; null removes it'),
+      email_preferences: emailPreferences.optional().describe('Only the org email toggles to change, e.g. {"weekly_stats":false}. Keys: usage_limit, credit_usage, bundle_created, bundle_deployed, deploy_stats_24h, weekly_stats, monthly_stats, billing_period_stats, device_error, channel_self_rejected, onboarding, builder_onboarding'),
     },
     annotations: DESTRUCTIVE,
     request: input => ({ method: 'PUT', path: '/organization', body: compact(input) }),
@@ -212,14 +323,22 @@ const accountTools: McpTool[] = [
   apiTool({
     name: 'capgo_invite_organization_member',
     title: 'Invite organization member',
-    description: 'Invite a user to an organization by email.',
+    description: 'Invite a user to an organization by email. Capgo sends an invitation email to that address.',
     input: {
       orgId,
       email: z.string().email(),
-      invite_type: z.enum(['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin']).describe('Role granted to the invited user'),
+      invite_type: orgRole.describe('Role granted to the invited user'),
     },
-    annotations: WRITE,
+    annotations: EXTERNAL,
     request: input => ({ method: 'POST', path: '/organization/members', body: input }),
+  }),
+  apiTool({
+    name: 'capgo_update_organization_member_role',
+    title: 'Change organization member role',
+    description: 'Change the organization role of an existing member. You cannot change your own role, the owner role, or assign a role above your own.',
+    input: { orgId, email: z.string().email(), role: orgRole },
+    annotations: DESTRUCTIVE,
+    request: input => ({ method: 'PUT', path: '/organization/members', body: input }),
   }),
   apiTool({
     name: 'capgo_remove_organization_member',
@@ -309,13 +428,19 @@ const appTools: McpTool[] = [
   apiTool({
     name: 'capgo_update_app',
     title: 'Update app',
-    description: 'Update app settings such as name, bundle retention, metadata exposure and store URLs.',
+    description: 'Update app settings such as name, bundle retention, metadata exposure, preview, build timeout, default upload channel, store URLs and which optional device fields are collected. '
+      + 'The default download channel is a channel setting: use capgo_update_channel with public=true.',
     input: {
       appId,
       name: z.string().optional(),
       retention: z.number().int().min(0).max(63113903).optional().describe('Seconds to keep unused bundles before automatic deletion'),
       expose_metadata: z.boolean().optional(),
       allow_device_custom_id: z.boolean().optional(),
+      allow_preview: z.boolean().optional().describe('Allow bundle and channel previews with the Capgo preview app'),
+      block_provider_infra_requests: z.boolean().optional().describe('Block update requests coming from cloud provider infrastructure'),
+      build_timeout_seconds: z.number().int().min(300).max(21600).optional().describe('Native cloud build timeout in seconds (5 to 360 minutes)'),
+      default_upload_channel: z.string().min(1).optional().describe('Existing channel name that CLI uploads link to by default'),
+      device_data_collection: deviceDataCollection.optional(),
       ios_store_url: z.string().nullable().optional(),
       android_store_url: z.string().nullable().optional(),
     },
@@ -352,6 +477,7 @@ const appTools: McpTool[] = [
 // Bundles
 // ---------------------------------------------------------------------------
 const bundleTools: McpTool[] = [
+  uploadCommandTool,
   apiTool({
     name: 'capgo_list_bundles',
     title: 'List bundles',
@@ -372,16 +498,16 @@ const bundleTools: McpTool[] = [
   apiTool({
     name: 'capgo_create_bundle_from_url',
     title: 'Register external bundle',
-    description: 'Register a bundle hosted at an external https URL (zip). To upload local files use the Capgo CLI instead: npx @capgo/cli@latest bundle upload.',
+    description: 'Record a new bundle version for an app the user owns, pointing to a zip the user already hosts at an https URL. This only creates the version entry: no device receives it until a channel is set to this version with capgo_update_channel or capgo_set_bundle_channel. Only use a URL and checksum the user provided. To upload local files use capgo_get_upload_command.',
     input: {
       appId,
       version: z.string().min(1).describe('Semver version name, e.g. 1.2.3'),
-      external_url: z.string().url().describe('https URL of the bundle zip'),
+      external_url: z.string().url().startsWith('https://').describe('https URL of the bundle zip, provided by the user'),
       checksum: z.string().min(1).describe('Checksum of the zip as produced by the Capgo CLI'),
       session_key: z.string().optional().describe('Encryption session key when the bundle is encrypted'),
       key_id: z.string().optional(),
     },
-    annotations: WRITE,
+    annotations: EXTERNAL,
     request: ({ appId: id, ...rest }) => ({ method: 'POST', path: '/bundle', body: compact({ app_id: id, ...rest }) }),
   }),
   apiTool({
@@ -431,6 +557,8 @@ const channelSettings = {
   allow_device: z.boolean().optional().describe('Allow physical devices'),
   allow_dev: z.boolean().optional().describe('Allow development builds'),
   allow_prod: z.boolean().optional().describe('Allow production builds'),
+  updatePackage: z.enum(['all', 'zip', 'delta', 'zip_from_builtin', 'delta_from_builtin']).optional().describe('Which update packages devices may download'),
+  paused: z.boolean().optional().describe('Pause the channel: devices keep their current bundle and get no new update until resumed'),
 }
 
 const channelTools: McpTool[] = [
@@ -475,6 +603,8 @@ const channelTools: McpTool[] = [
       channel: z.string().min(1),
       rolloutVersion: z.union([z.string(), z.number().int()]).nullable().optional().describe('Bundle (name or id) being rolled out'),
       rolloutPercentage: z.number().min(0).max(100).optional().describe('Share of devices getting the rollout bundle'),
+      rolloutPercentageBps: z.number().int().min(0).max(10000).optional().describe('Same as rolloutPercentage in basis points (100 = 1%), for sub-percent precision'),
+      rolloutCacheTtlSeconds: z.number().int().min(60).max(31536000).optional().describe('How long devices keep their rollout assignment'),
       rolloutEnabled: z.boolean().optional(),
       rolloutPaused: z.boolean().optional(),
       rolloutPauseReason: z.string().nullable().optional(),
@@ -484,6 +614,7 @@ const channelTools: McpTool[] = [
       autoPauseEnabled: z.boolean().optional(),
       autoPauseWindowMinutes: z.number().int().min(1).max(10080).optional(),
       autoPauseFailureRateBps: z.number().int().min(0).max(10000).nullable().optional().describe('Failure rate threshold in basis points (100 = 1%)'),
+      autoPauseConfidence: z.number().gt(0).lt(1).optional().describe('Statistical confidence required before auto-pausing, e.g. 0.95'),
       autoPauseMinAttempts: z.number().int().min(0).nullable().optional(),
       autoPauseMinFailures: z.number().int().min(0).nullable().optional(),
       autoPauseAction: z.enum(['pause', 'rollback', 'notify']).optional(),
@@ -496,9 +627,9 @@ const channelTools: McpTool[] = [
     name: 'capgo_delete_channel',
     title: 'Delete channel',
     description: 'Delete a channel. Devices on it fall back to the default channel.',
-    input: { appId, channel: z.string().min(1) },
+    input: { appId, channel: z.string().min(1), delete_bundle: z.boolean().optional().describe('Also delete the bundle linked to this channel') },
     annotations: DESTRUCTIVE,
-    request: input => ({ method: 'DELETE', path: '/channel', body: { app_id: input.appId, channel: input.channel } }),
+    request: input => ({ method: 'DELETE', path: '/channel', body: compact({ app_id: input.appId, channel: input.channel, delete_bundle: input.delete_bundle }) }),
   }),
 ]
 
@@ -919,6 +1050,33 @@ const notificationTools: McpTool[] = [
   }),
 ]
 
+// ---------------------------------------------------------------------------
+// Documentation
+// ---------------------------------------------------------------------------
+const docsTools: McpTool[] = [
+  {
+    name: 'capgo_search_docs',
+    title: 'Search Capgo docs',
+    description: 'Search the Capgo documentation (capgo.app/docs) and get matching pages with their URLs. '
+      + 'Use it to find how a feature, CLI command, plugin option or API route works before acting, then fetch the URL for full details.',
+    inputSchema: z.object({
+      query: z.string().trim().min(1).max(200).describe('Search terms, e.g. "progressive rollout" or "encryption key"'),
+      limit: z.number().int().min(1).max(DOCS_SEARCH_MAX_RESULTS).optional().describe('Maximum results, default 8'),
+    }) as unknown as z.ZodObject<z.ZodRawShape>,
+    annotations: { title: 'Search Capgo docs', ...READ, openWorldHint: true },
+    run: async (input) => {
+      const { query, limit } = input as { query: string, limit?: number }
+      try {
+        const results = await searchCapgoDocs(query, limit)
+        return textResult(results.length ? results : { results: [], message: `No documentation matches "${query}". Try broader terms.` })
+      }
+      catch (error) {
+        return textResult({ error: 'docs_search_failed', message: error instanceof Error ? error.message : String(error) }, true)
+      }
+    },
+  },
+]
+
 export const MCP_TOOLS: readonly McpTool[] = [
   ...accountTools,
   ...appTools,
@@ -930,6 +1088,7 @@ export const MCP_TOOLS: readonly McpTool[] = [
   ...websiteLiveStoreTools,
   ...webhookTools,
   ...notificationTools,
+  ...docsTools,
 ]
 
 export const MCP_TOOLS_BY_NAME: ReadonlyMap<string, McpTool> = new Map(MCP_TOOLS.map(tool => [tool.name, tool]))

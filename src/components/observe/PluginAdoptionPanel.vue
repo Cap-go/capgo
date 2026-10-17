@@ -12,7 +12,9 @@ import IconExternalLink from '~icons/lucide/external-link'
 import IconLayers from '~icons/lucide/layers'
 import IconRocket from '~icons/lucide/rocket'
 import IconSmartphone from '~icons/lucide/smartphone'
+import DeviceDataCollectionGate from '~/components/dashboard/DeviceDataCollectionGate.vue'
 import InfoPopover from '~/components/InfoPopover.vue'
+import { useDeviceDataCollection } from '~/composables/useDeviceDataCollection'
 import { useNativeObserveStats } from '~/composables/useNativeObserveStats'
 import { formatNumberValue } from '~/services/formatLocale'
 import {
@@ -37,6 +39,7 @@ const packageId = computed(() => {
   const app = (route.params as Record<string, string | string[] | undefined>).app
   return Array.isArray(app) ? app[0] ?? '' : String(app ?? '')
 })
+const { collection } = useDeviceDataCollection(packageId)
 const { stats, statsLoading, fetchStats: fetchPluginStats } = useNativeObserveStats<NativeObservePluginStatsResponse>(
   packageId,
   () => ({ view: 'plugins' }),
@@ -141,7 +144,13 @@ watch(packageId, async () => {
         <Spinner size="w-12 h-12" />
       </div>
 
-      <template v-else>
+      <DeviceDataCollectionGate
+        v-else
+        :app-id="packageId"
+        :collection="collection"
+        :requires="['plugin_version', 'is_prod']"
+        data-test="observe-plugin-collection-gate"
+      >
         <section
           v-if="recommendation && (recommendation.unsupported || recommendation.recommendedVersion)"
           data-test="observe-plugin-upgrade"
@@ -388,7 +397,7 @@ watch(packageId, async () => {
             </div>
           </div>
         </section>
-      </template>
+      </DeviceDataCollectionGate>
     </div>
   </section>
 </template>

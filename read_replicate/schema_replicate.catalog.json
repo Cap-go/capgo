@@ -521,12 +521,22 @@
       "type": "jsonb"
     },
     {
+      "default": "jsonb_build_object('country', true, 'platform', true, 'os_version', true, 'plugin_version', true, 'version_build', true, 'is_emulator', true, 'is_prod', true, 'install_source', true)",
+      "generated": "",
+      "identity": "",
+      "name": "device_data_collection",
+      "notNull": true,
+      "position": 30,
+      "table": "apps",
+      "type": "jsonb"
+    },
+    {
       "default": "'capgo'::text",
       "generated": "",
       "identity": "",
       "name": "update_mode",
       "notNull": true,
-      "position": 30,
+      "position": 31,
       "table": "apps",
       "type": "text"
     },
@@ -536,7 +546,7 @@
       "identity": "",
       "name": "website_url",
       "notNull": false,
-      "position": 31,
+      "position": 32,
       "table": "apps",
       "type": "text"
     },
@@ -1869,6 +1879,16 @@
       "position": 27,
       "table": "stripe_info",
       "type": "bigint"
+    },
+    {
+      "default": "'ee'::text",
+      "generated": "",
+      "identity": "",
+      "name": "billing_account",
+      "notNull": true,
+      "position": 28,
+      "table": "stripe_info",
+      "type": "text"
     }
   ],
   "constraints": [
@@ -2146,6 +2166,13 @@
       "valid": true
     },
     {
+      "definition": "CHECK (billing_account = ANY (ARRAY['ee'::text, 'us'::text]))",
+      "name": "stripe_info_billing_account_check",
+      "table": "stripe_info",
+      "type": "c",
+      "valid": true
+    },
+    {
       "definition": "PRIMARY KEY (customer_id)",
       "name": "stripe_info_pkey",
       "table": "stripe_info",
@@ -2242,6 +2269,13 @@
       "constraintOwned": false,
       "definition": "CREATE INDEX idx_app_versions_deleted_at_id ON public.app_versions USING btree (deleted_at, id) WHERE (deleted = true)",
       "name": "idx_app_versions_deleted_at_id",
+      "table": "app_versions",
+      "valid": true
+    },
+    {
+      "constraintOwned": false,
+      "definition": "CREATE INDEX idx_app_versions_deleted_manifest_pending ON public.app_versions USING btree (updated_at NULLS FIRST, id) WHERE ((deleted = true) AND ((manifest_count > 0) OR (manifest IS NOT NULL)))",
+      "name": "idx_app_versions_deleted_manifest_pending",
       "table": "app_versions",
       "valid": true
     },

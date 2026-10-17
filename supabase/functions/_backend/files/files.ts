@@ -14,9 +14,9 @@ import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { getDotfileDeltaStorageCandidateKeys } from '../utils/manifest_encoding.ts'
 import { createManifestSizeReceipt, getManifestReceiptBucket, MANIFEST_SIZE_RECEIPT_HEADER, manifestSizeReceiptEvidenceFromR2, verifyManifestSizeReceiptFacts } from '../utils/manifest_size_receipt.ts'
 import { MANIFEST_UPLOAD_CAPABILITY_HEADER, verifyManifestUploadCapability } from '../utils/manifest_upload_capability.ts'
-import { closeClient, getAppByIdPg, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { throwDatabaseUnavailable } from '../utils/pg_auth_lookup.ts'
-import { getAppByAppIdPg, getUserIdFromApikey } from '../utils/pg_files.ts'
+import { closeClient, getPgClient } from '../utils/pg.ts'
+import { throwDatabaseLookupError } from '../utils/pg_auth_lookup.ts'
+import { getAppPlanStatePg, getUserIdFromApikey, withFreshPgRetry } from '../utils/pg_files.ts'
 import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
 import { buildRateLimitInfo, onPremiseAppResponse } from '../utils/rateLimitInfo.ts'
 import { checkPermissionPgFreshRetry } from '../utils/rbac.ts'
@@ -1184,13 +1184,12 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 
   // Use Postgres instead of Supabase SDK
   const pgClient = await getPgClient(c, false) // authz + plan gating must read primary
-  const drizzleClient = getDrizzleClient(pgClient)
 
   try {
     // Get user_id from apikey using Postgres
-    const userLookup = await getUserIdFromApikey(c, capgkey, drizzleClient)
+    const userLookup = await getUserIdFromApikey(c, capgkey, pgClient)
     if (userLookup.kind === 'db_error')
-      throwDatabaseUnavailable(c, 'checkWriteAppAccess.getUserIdFromApikey', userLookup.error, { app_id })
+      throwDatabaseLookupError(c, 'checkWriteAppAccess.getUserIdFromApikey', userLookup.error, { app_id })
 
     const userId = userLookup.kind === 'ok' ? userLookup.value : null
 
@@ -1250,10 +1249,10 @@ async function checkWriteAppAccess(c: Context, next: Next) {
       })
     }
 
-    // Get app using Postgres
-    const appLookup = await getAppByAppIdPg(c, app_id, drizzleClient)
+    // One primary read for ownership + plan gating
+    const appLookup = await getAppPlanStatePg(c, app_id, pgClient, ATTACHMENT_PLAN_LIMIT)
     if (appLookup.kind === 'db_error')
-      throwDatabaseUnavailable(c, 'checkWriteAppAccess.getAppByAppIdPg', appLookup.error, { app_id })
+      throwDatabaseLookupError(c, 'checkWriteAppAccess.getAppPlanStatePg', appLookup.error, { app_id })
 
     const app = appLookup.kind === 'ok' ? appLookup.value : null
 
@@ -1294,12 +1293,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
       })
     }
 
-    const appPlan = await getAppByIdPg(c, app_id, drizzleClient, ATTACHMENT_PLAN_LIMIT)
-    if (!appPlan) {
-      throw quickError(503, 'upstream_unavailable', 'App plan state temporarily unavailable', { app_id })
-    }
-
-    if (!appPlan.plan_valid) {
+    if (!app.plan_valid) {
       // Keep the explicit on_premise_app 429 (with Retry-After / Cache-Control) —
       // the edge cache contract depends on that error code and headers.
       return onPremiseAppResponse(c)
@@ -1307,19 +1301,25 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 
     // Ready bundle objects are immutable. Refuse resumable uploads that target a
     // finalized bundle path even if the caller has upload permission on the app.
-    const readyBundlePath = await pgClient.query<{ id: number }>(
-      `
-        SELECT id
-        FROM public.app_versions
-        WHERE owner_org = $1
-          AND app_id = $2
-          AND r2_path = $3
-          AND COALESCE(deleted, false) = false
-          AND storage_provider IS DISTINCT FROM 'r2-direct'
-        LIMIT 1
-      `,
-      [owner_org, app_id, requestId],
-    )
+    let readyBundlePath: { rows: { id: number }[] }
+    try {
+      readyBundlePath = await withFreshPgRetry(c, 'checkWriteAppAccess.readyBundlePath', pgClient, client => client.query<{ id: number }>(
+        `
+          SELECT id
+          FROM public.app_versions
+          WHERE owner_org = $1
+            AND app_id = $2
+            AND r2_path = $3
+            AND COALESCE(deleted, false) = false
+            AND storage_provider IS DISTINCT FROM 'r2-direct'
+          LIMIT 1
+        `,
+        [owner_org, app_id, requestId],
+      ))
+    }
+    catch (error) {
+      throwDatabaseLookupError(c, 'checkWriteAppAccess.readyBundlePath', error, { app_id })
+    }
 
     if (readyBundlePath.rows.length > 0) {
       cloudlog({
