@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
+import { getSupabaseStatus } from '../../scripts/supabase-worktree-status'
 import { getSupabaseWorktreeConfig } from '../../scripts/supabase-worktree-config'
 import { expect, test } from '../support/commands'
 
@@ -57,7 +58,15 @@ async function forceWebNativeOnboardingTreatments(email: string, password: strin
   if (signInError || !sessionData.user)
     throw signInError ?? new Error('Cannot sign in treatment user')
 
-  const { data: profile, error: profileError } = await supabase
+  // Experiment fixtures use a separate backend client; user sessions cannot
+  // override the server-managed assignment fields.
+  const configuredServiceKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY
+  const status = configuredServiceKey ? null : getSupabaseStatus()
+  const serviceKey = configuredServiceKey || status?.SERVICE_ROLE_KEY || status?.SECRET_KEY
+  if (!serviceKey)
+    throw new Error('Local Supabase service key is required for treatment fixtures')
+  const adminClient = createClient(localSupabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const { data: profile, error: profileError } = await adminClient
     .from('users')
     .select('onboarding')
     .eq('id', sessionData.user.id)
@@ -71,7 +80,7 @@ async function forceWebNativeOnboardingTreatments(email: string, password: strin
   const abtests = onboarding.abtests && typeof onboarding.abtests === 'object' && !Array.isArray(onboarding.abtests)
     ? onboarding.abtests
     : {}
-  const { error: updateError } = await supabase
+  const { error: updateError } = await adminClient
     .from('users')
     .update({
       onboarding: {
