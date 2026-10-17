@@ -12,6 +12,7 @@ import { deleteAppStatus } from '../../utils/appStatus.ts'
 import { trackBentoEvent } from '../../utils/bento.ts'
 import { createIfNotExistStoreInfo } from '../../utils/cloudflare.ts'
 import { lockOnboardingApp, unlockOnboardingApp } from '../../utils/demo.ts'
+import { DEVICE_DATA_COLLECTION_KEYS, mergeDeviceDataCollection } from '../../utils/deviceDataCollection.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { buildOnboardingIntentBentoEventData, parseOrgOnboardingIntent } from '../../utils/org_onboarding_intent.ts'
@@ -32,14 +33,28 @@ interface UpdateApp {
   need_onboarding?: boolean
   existing_app?: boolean
   block_provider_infra_requests?: boolean
+  device_data_collection?: unknown
   ios_store_url?: string | null
   android_store_url?: string | null
   onboarding?: unknown
 }
 
 type AppSettings = Pick<Database['public']['Tables']['apps']['Update'], 'name' | 'icon_url' | 'retention' | 'expose_metadata' | 'allow_device_custom_id'
-  | 'need_onboarding' | 'existing_app' | 'block_provider_infra_requests'
+  | 'need_onboarding' | 'existing_app' | 'block_provider_infra_requests' | 'device_data_collection'
   | 'ios_store_url' | 'android_store_url'>
+
+function validateDeviceDataCollectionPatch(patch: unknown): Record<string, boolean> {
+  if (patch === null || typeof patch !== 'object' || Array.isArray(patch))
+    throw simpleError('invalid_device_data_collection', 'device_data_collection must be an object')
+  const allowedKeys: readonly string[] = DEVICE_DATA_COLLECTION_KEYS
+  for (const [key, value] of Object.entries(patch)) {
+    if (!allowedKeys.includes(key))
+      throw simpleError('invalid_device_data_collection', `Unknown device_data_collection key: ${key}`, { key })
+    if (typeof value !== 'boolean')
+      throw simpleError('invalid_device_data_collection', `device_data_collection.${key} must be a boolean`, { key })
+  }
+  return patch as Record<string, boolean>
+}
 
 export async function persistAppOnboarding(
   c: Context<MiddlewareKeyVariables>,
@@ -201,7 +216,7 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     : supabaseAdmin(c)
   const { data: previousApp, error: previousAppError } = await previousAppClient
     .from('apps')
-    .select('need_onboarding, owner_org, name, app_id, onboarding')
+    .select('need_onboarding, owner_org, name, app_id, onboarding, device_data_collection')
     .eq('app_id', appId)
     .single()
 
@@ -235,6 +250,7 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     body.allow_device_custom_id,
     body.existing_app,
     body.block_provider_infra_requests,
+    body.device_data_collection,
     body.ios_store_url,
     body.android_store_url,
   ]
@@ -261,6 +277,10 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   }
   if (body.icon !== undefined && body.icon !== '' && !normalizedIcon)
     throw simpleError('invalid_icon_path', 'Icon path must belong to this app organization')
+  // Validate before taking the onboarding lock so a bad payload cannot leak it.
+  const deviceDataCollection = body.device_data_collection !== undefined
+    ? mergeDeviceDataCollection(previousApp.device_data_collection, validateDeviceDataCollectionPatch(body.device_data_collection))
+    : undefined
   const onboardingLock = shouldSerializeOnboardingCompletion
     ? await lockOnboardingApp(c, appId)
     : null
@@ -279,6 +299,7 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     need_onboarding: body.need_onboarding,
     existing_app: body.existing_app,
     block_provider_infra_requests: body.block_provider_infra_requests,
+    device_data_collection: deviceDataCollection,
     ios_store_url: body.ios_store_url,
     android_store_url: body.android_store_url,
   }
