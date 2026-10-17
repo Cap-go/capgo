@@ -25,5 +25,6 @@ describe('snippet-edge-stats:setup', () => {
     expect(logpushJobNeedsUpdate({ id: 1, ...current, filter: null })).toBe(true)
     expect(logpushJobNeedsUpdate({ id: 1, ...current, output_options: { ...current.output_options, field_names: ['ResponseHeaders'] } })).toBe(true)
     expect(logpushJobNeedsUpdate({ id: 1, ...current, enabled: false })).toBe(true)
+    expect(logpushJobNeedsUpdate({ id: 1, ...current, max_upload_records: 100_000 })).toBe(true)
   })
 })

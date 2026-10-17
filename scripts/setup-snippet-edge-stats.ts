@@ -42,6 +42,9 @@ export function logpushJobBody(destination: string) {
     enabled: true,
     destination_conf: destination,
     max_upload_interval_seconds: 30,
+    // The consumer holds a whole file in memory (128 MB): the 100k-line default would not fit.
+    max_upload_bytes: 5_000_000,
+    max_upload_records: 10_000,
     output_options: {
       output_type: 'ndjson',
       timestamp_format: 'unixnano',
@@ -124,6 +127,8 @@ interface LogpushJob {
   enabled?: boolean
   filter?: string | null
   max_upload_interval_seconds?: number
+  max_upload_bytes?: number
+  max_upload_records?: number
   output_options?: { output_type?: string, timestamp_format?: string, field_names?: string[] } | null
 }
 
@@ -134,6 +139,8 @@ export function logpushJobNeedsUpdate(job: LogpushJob) {
   return job.enabled !== wanted.enabled
     || job.filter !== wanted.filter
     || job.max_upload_interval_seconds !== wanted.max_upload_interval_seconds
+    || job.max_upload_bytes !== wanted.max_upload_bytes
+    || job.max_upload_records !== wanted.max_upload_records
     || job.output_options?.output_type !== wanted.output_options.output_type
     || job.output_options?.timestamp_format !== wanted.output_options.timestamp_format
     || wanted.output_options.field_names.some(field => !fields.includes(field))
