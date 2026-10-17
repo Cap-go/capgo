@@ -4007,6 +4007,91 @@ export type Database = {
           },
         ]
       }
+      website_live_store_configs: {
+        Row: {
+          app_id: string
+          app_name: string | null
+          created_at: string
+          icon_background_color: string
+          icon_storage_prefix: string | null
+          submit_for_review: boolean
+          updated_at: string
+          updated_by: string | null
+          version_name: string
+        }
+        Insert: {
+          app_id: string
+          app_name?: string | null
+          created_at?: string
+          icon_background_color?: string
+          icon_storage_prefix?: string | null
+          submit_for_review?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          version_name?: string
+        }
+        Update: {
+          app_id?: string
+          app_name?: string | null
+          created_at?: string
+          icon_background_color?: string
+          icon_storage_prefix?: string | null
+          submit_for_review?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          version_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_live_store_configs_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: true
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+        ]
+      }
+      website_live_store_credentials: {
+        Row: {
+          app_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          metadata: Json
+          platform: string
+          secret_ciphertext: string
+          updated_at: string
+        }
+        Insert: {
+          app_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metadata?: Json
+          platform: string
+          secret_ciphertext: string
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          metadata?: Json
+          platform?: string
+          secret_ciphertext?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_live_store_credentials_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+        ]
+      }
     }
     Views: {
       pg_buffercache: {

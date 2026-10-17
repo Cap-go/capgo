@@ -7,7 +7,7 @@ import PaymentRequiredModal from '~/components/PaymentRequiredModal.vue'
 import Tabs from '~/components/Tabs.vue'
 import UnpaidState from '~/components/UnpaidState.vue'
 import { appSettingsTabs } from '~/constants/appSettingsTabs'
-import { appTabs as baseAppTabs } from '~/constants/appTabs'
+import { appTabs as baseAppTabs, websiteLiveStoreTab } from '~/constants/appTabs'
 import { bundleTabs } from '~/constants/bundleTabs'
 import { channelTabs } from '~/constants/channelTabs'
 import { deviceTabs } from '~/constants/deviceTabs'
@@ -71,14 +71,18 @@ watch(appId, (targetAppId) => {
 
 // Web2App apps update from their website: bundles, channels, builds,
 // devices, notifications and stats do not exist for them, so only the
-// overview (Web2App status) and settings stay visible.
+// overview (Web2App status), the store app and settings stay visible.
 const isWebsiteMode = computed(() => !!appId.value && appUpdateModeStore.isWebsiteMode(appId.value))
 const WEBSITE_MODE_TAB_KEYS = new Set(['', '/settings'])
-const appTabs = computed<Tab[]>(() => isWebsiteMode.value
-  ? baseAppTabs
-      .filter(tab => WEBSITE_MODE_TAB_KEYS.has(tab.key))
-      .map(tab => tab.key === '' ? { ...tab, label: 'website-live', description: 'website-live-tab-description' } : tab)
-  : baseAppTabs)
+const appTabs = computed<Tab[]>(() => {
+  if (!isWebsiteMode.value)
+    return baseAppTabs
+  const tabs = baseAppTabs
+    .filter(tab => WEBSITE_MODE_TAB_KEYS.has(tab.key))
+    .map(tab => tab.key === '' ? { ...tab, label: 'website-live', description: 'website-live-tab-description' } : tab)
+  // The store app tab sits between the overview and settings.
+  return [tabs[0], websiteLiveStoreTab, ...tabs.slice(1)]
+})
 
 // Check if org payment has failed - only show settings tab in this case
 const isOrgUnpaid = computed(() => {
@@ -255,7 +259,7 @@ const activeSecondaryTab = computed(() => {
 
 // Hidden feature routes stay reachable by URL; send them to the overview.
 const isWebsiteModeAllowedRoute = computed(() => isAppOverviewPath.value
-  || /^\/app\/[^/]+\/settings(?:\/access)?\/?$/.test(route.path))
+  || /^\/app\/[^/]+\/(?:store|settings(?:\/access)?)\/?$/.test(route.path))
 const showWebsiteLiveOverview = computed(() => isWebsiteMode.value && isAppOverviewPath.value)
 watch([isWebsiteMode, () => route.path], ([websiteMode]) => {
   if (websiteMode && appRouteSegment.value && !isWebsiteModeAllowedRoute.value)
