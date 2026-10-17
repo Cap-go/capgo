@@ -1,8 +1,21 @@
 import { z } from 'zod'
 import { CLI_PROJECT_MODES } from '../framework/mode'
 import { buildCacheKeyOptionSchema, buildCacheOptionSchema } from '../schemas/build'
-import { deviceDataCollectionOptionsFields } from '../schemas/deviceDataCollection'
-import { capacitorConfigOptionSchema, observeOptionsObjectSchema, refineObserveDeviceId } from '../schemas/sdk'
+import {
+  capacitorConfigOptionSchema,
+  getAccountOptionsSchema,
+  observeOptionsObjectSchema,
+  organizationMemberRoleOptionsSchema,
+  organizationMemberSdkOptionsSchema,
+  refineObserveDeviceId,
+  updateAccountOptionsSchema,
+  updateAppOptionsSchema,
+  updateChannelOptionsBaseSchema,
+  updateOrganizationOptionsSchema,
+} from '../schemas/sdk'
+import { DOCS_SEARCH_MAX_RESULTS } from '../shared/docs-search'
+
+const sdkAuthFields = { apikey: true, supaHost: true, supaAnon: true } as const
 
 export const mcpAddAppInputSchema = z.object({
   appId: z.string(),
@@ -10,12 +23,10 @@ export const mcpAddAppInputSchema = z.object({
   icon: z.string().optional(),
 })
 
-export const mcpUpdateAppInputSchema = z.object({
-  appId: z.string(),
-  name: z.string().optional(),
-  icon: z.string().optional(),
-  retention: z.number().optional(),
-  ...deviceDataCollectionOptionsFields,
+export const mcpUpdateAppInputSchema = updateAppOptionsSchema.omit({
+  apikey: true,
+  supaHost: true,
+  supaAnon: true,
 })
 
 export const mcpDeleteAppInputSchema = z.object({
@@ -87,8 +98,12 @@ export const mcpUpdateChannelInputSchema = z.object({
   downgrade: z.boolean().optional(),
   ios: z.boolean().optional(),
   android: z.boolean().optional(),
+  electron: z.boolean().optional(),
+  pause: z.boolean().optional().describe('Pause every update on this channel; devices stay on their current bundle'),
+  resume: z.boolean().optional().describe('Resume updates on a paused channel'),
   selfAssign: z.boolean().optional(),
   disableAutoUpdate: z.string().optional(),
+  updatePackage: updateChannelOptionsBaseSchema.shape.updatePackage.describe('Which update package types devices may download'),
   dev: z.boolean().optional(),
   emulator: z.boolean().optional(),
   device: z.boolean().optional(),
@@ -138,6 +153,25 @@ export const mcpPromoteChannelInputSchema = z.object({
 export const mcpAddOrganizationInputSchema = z.object({
   name: z.string().describe('Organization name'),
   email: z.string().describe('Management email for the organization'),
+})
+
+export const mcpOrgIdInputSchema = z.object({
+  orgId: z.string().describe('Organization ID (use capgo_list_organizations to find it)'),
+})
+
+export const mcpUpdateOrganizationInputSchema = updateOrganizationOptionsSchema.omit(sdkAuthFields)
+
+export const mcpOrganizationMemberRoleInputSchema = organizationMemberRoleOptionsSchema.omit(sdkAuthFields)
+
+export const mcpRemoveOrganizationMemberInputSchema = organizationMemberSdkOptionsSchema.omit(sdkAuthFields)
+
+export const mcpGetAccountInputSchema = getAccountOptionsSchema.omit(sdkAuthFields)
+
+export const mcpUpdateAccountInputSchema = updateAccountOptionsSchema.omit(sdkAuthFields)
+
+export const mcpSearchDocsInputSchema = z.object({
+  query: z.string().trim().min(1).max(200).describe('Search terms, e.g. "progressive rollout" or "encryption key"'),
+  limit: z.number().int().min(1).max(DOCS_SEARCH_MAX_RESULTS).optional().describe('Maximum results, default 8'),
 })
 
 export const mcpDoctorInputSchema = z.object({

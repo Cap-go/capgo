@@ -5,7 +5,7 @@ import { toast } from 'vue-sonner'
 import { chartLabelCountForPeriodDays } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 
-export type UpdateDeliveryScope = 'app' | 'org' | 'platform'
+export type UpdateDeliveryScope = 'app' | 'org'
 
 export interface UpdateDeliveryStatsResponse {
   scope: UpdateDeliveryScope

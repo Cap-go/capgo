@@ -96,8 +96,8 @@ Load `skills/native-builds/SKILL.md` when working with:
 
 Load `skills/organization-management/SKILL.md` when working with:
 
-- `account whoami` (alias: `account id`)
-- `organization list`, `organization add`, `organization members`, `organization set`, `organization delete`
+- `account whoami` (alias: `account id`), `account get`, `account set`
+- `organization list`, `organization add`, `organization members`, `organization members-invite`, `organization members-role`, `organization members-remove`, `organization set`, `organization delete`
 - deprecated `organisation` aliases
 
 ## Common command examples
