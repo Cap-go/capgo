@@ -267,9 +267,9 @@ describe('website live template patching', () => {
       if (path.startsWith('node_modules/') || /\.(?:png|jar)$/.test(path))
         continue
       const text = strFromU8(data)
-      expect(text.includes(BUNDLE), path).toBe(false)
-      expect(text.includes(NAME), path).toBe(false)
-      expect(text.includes(URL_PLACEHOLDER), path).toBe(false)
+      expect(text, path).not.toContain(BUNDLE)
+      expect(text, path).not.toContain(NAME)
+      expect(text, path).not.toContain(URL_PLACEHOLDER)
     }
     expect(strFromU8(files['android/app/build.gradle'])).toContain(manifest.androidNamespace)
     expect(JSON.parse(strFromU8(files['capacitor.config.json'])).plugins.CapacitorUpdater.appId).toBe('com.example.shop-capgo')
