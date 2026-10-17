@@ -521,12 +521,22 @@
       "type": "jsonb"
     },
     {
+      "default": "jsonb_build_object('country', true, 'platform', true, 'os_version', true, 'plugin_version', true, 'version_build', true, 'is_emulator', true, 'is_prod', true, 'install_source', true)",
+      "generated": "",
+      "identity": "",
+      "name": "device_data_collection",
+      "notNull": true,
+      "position": 30,
+      "table": "apps",
+      "type": "jsonb"
+    },
+    {
       "default": "'capgo'::text",
       "generated": "",
       "identity": "",
       "name": "update_mode",
       "notNull": true,
-      "position": 30,
+      "position": 31,
       "table": "apps",
       "type": "text"
     },
@@ -536,7 +546,7 @@
       "identity": "",
       "name": "website_url",
       "notNull": false,
-      "position": 31,
+      "position": 32,
       "table": "apps",
       "type": "text"
     },
@@ -1869,6 +1879,16 @@
       "position": 27,
       "table": "stripe_info",
       "type": "bigint"
+    },
+    {
+      "default": "'ee'::text",
+      "generated": "",
+      "identity": "",
+      "name": "billing_account",
+      "notNull": true,
+      "position": 28,
+      "table": "stripe_info",
+      "type": "text"
     }
   ],
   "constraints": [
@@ -2143,6 +2163,13 @@
       "name": "unique_name_created_by",
       "table": "orgs",
       "type": "u",
+      "valid": true
+    },
+    {
+      "definition": "CHECK (billing_account = ANY (ARRAY['ee'::text, 'us'::text]))",
+      "name": "stripe_info_billing_account_check",
+      "table": "stripe_info",
+      "type": "c",
       "valid": true
     },
     {

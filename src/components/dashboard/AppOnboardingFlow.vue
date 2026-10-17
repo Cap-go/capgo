@@ -109,6 +109,7 @@ import AppOnboardingCliSteps from './AppOnboardingCliSteps.vue'
 import AppOnboardingIconInput from './AppOnboardingIconInput.vue'
 import AppOnboardingSetupChecklist from './AppOnboardingSetupChecklist.vue'
 import AppOnboardingWelcome from './AppOnboardingWelcome.vue'
+import BillingRegionChoice from './BillingRegionChoice.vue'
 import ChannelConsoleAssignOnboarding from './ChannelConsoleAssignOnboarding.vue'
 import ChannelCreateOnboarding from './ChannelCreateOnboarding.vue'
 import ChannelDefaultRoutingOnboarding from './ChannelDefaultRoutingOnboarding.vue'
@@ -230,6 +231,7 @@ const appIdSuggestions = ref<string[]>([])
 const appIdFeedback = ref('')
 const hasEditedAppId = ref(false)
 const storeAppIdLookupFailed = ref(false)
+const billingAccount = ref<'ee' | 'us' | undefined>()
 const selectedIntent = ref<OnboardingIntent | null>(null)
 const onboardingAnalyticsVersion = () => resolveOnboardingAnalyticsVersion(onboardingForABTests.value)
 const setupHandoff = props.setupAppId ? consumeSetupHandoff(props.setupAppId) : null
@@ -1999,6 +2001,7 @@ async function createOrganizationAndApp() {
         developmentEnvironment: 'skipped',
         website: websitePreview.value?.website,
         updateMode: websiteLive ? 'website' : 'capgo',
+        billingAccount: billingAccount.value,
       },
     })
 
@@ -3482,6 +3485,8 @@ defineExpose({
                   </label>
                 </div>
               </div>
+
+              <BillingRegionChoice v-model="billingAccount" />
 
               <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between dark:border-white/15">
                 <button type="button" class="d-btn min-h-12" :class="whiteCardSecondaryButtonClass()" @click="viewPreviousStep('details')">

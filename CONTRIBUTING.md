@@ -11,11 +11,10 @@ community looks forward to your contributions. 🎉
 
 ## Admin dashboard changes
 
-The admin dashboard is maintained in the private
+The admin dashboard lives in the private
 [`Cap-go/capgo_admin_dashboard`](https://github.com/Cap-go/capgo_admin_dashboard)
-repository. Do not modify dashboard code in this repository. Open dashboard pull
-requests in the private repository and read
-[`docs/admin-dashboard.md`](docs/admin-dashboard.md) for the ownership boundary.
+repository and reads the Capgo database read-only. Capgo carries no admin code;
+open dashboard pull requests in that repository.
 
 ## Do not break already-published CLI versions
 

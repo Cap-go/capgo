@@ -116,6 +116,7 @@ CREATE TABLE public.apps (
     created_from_onboarding boolean DEFAULT false NOT NULL,
     onboarding_completed_at timestamp with time zone,
     onboarding jsonb DEFAULT '{}'::jsonb NOT NULL,
+    device_data_collection jsonb DEFAULT jsonb_build_object('country', true, 'platform', true, 'os_version', true, 'plugin_version', true, 'version_build', true, 'is_emulator', true, 'is_prod', true, 'install_source', true) NOT NULL,
     update_mode text DEFAULT 'capgo'::text NOT NULL,
     website_url text,
     CONSTRAINT apps_build_timeout_seconds_check CHECK (((build_timeout_seconds >= 300) AND (build_timeout_seconds <= 21600))),
@@ -454,7 +455,9 @@ CREATE TABLE public.stripe_info (
     past_due_at timestamp with time zone,
     churn_reason text,
     is_above_plan boolean,
-    extra_mau bigint DEFAULT 0 NOT NULL
+    extra_mau bigint DEFAULT 0 NOT NULL,
+    billing_account text DEFAULT 'ee'::text NOT NULL,
+    CONSTRAINT stripe_info_billing_account_check CHECK ((billing_account = ANY (ARRAY['ee'::text, 'us'::text])))
 );
 
 ALTER TABLE ONLY public.stripe_info REPLICA IDENTITY FULL;

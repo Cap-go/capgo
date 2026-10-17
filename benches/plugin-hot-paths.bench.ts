@@ -6,7 +6,7 @@ import type { AppInfos, AppStats } from '../supabase/functions/_backend/utils/ty
 import { bench, describe } from 'vitest'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../supabase/functions/_backend/plugin_runtime/utils/plugin_parser.ts'
 import { channelSelfGetRequestSchema, channelSelfRequestSchema, statsRequestSchema, updateRequestSchema } from '../supabase/functions/_backend/plugin_runtime/utils/plugin_validation.ts'
-import { getUpdateResponseKind, resToVersion } from '../supabase/functions/_backend/plugin_runtime/utils/update.ts'
+import { getUpdateResponseKind, resToVersion } from '../supabase/functions/_backend/plugin_runtime/utils/update_response.ts'
 
 interface ChannelSelfPayload extends AppInfos {
   channel: string

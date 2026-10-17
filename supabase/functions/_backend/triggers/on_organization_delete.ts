@@ -4,6 +4,7 @@ import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { cancelSubscription } from '../utils/stripe.ts'
+import { BillingAccountUnavailableError } from '../utils/stripe_billing.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -19,14 +20,19 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'DELETE'), async (c)
 
   cloudlog({ requestId: c.get('requestId'), message: 'org delete', record })
 
+  // Keep stripe_info when its Stripe account is unreachable: it is the only record of which account still bills this customer.
+  let keepStripeInfo = false
   if (record.customer_id) {
     try {
       await cancelSubscription(c, record.customer_id)
     }
     catch (error) {
-      cloudlog({ requestId: c.get('requestId'), message: 'failed to cancel Stripe subscriptions during org delete', error, customer_id: record.customer_id })
+      keepStripeInfo = error instanceof BillingAccountUnavailableError
+      cloudlog({ requestId: c.get('requestId'), message: 'failed to cancel Stripe subscriptions during org delete', error, customer_id: record.customer_id, keepStripeInfo })
     }
+  }
 
+  if (record.customer_id && !keepStripeInfo) {
     const { error: stripeInfoDeleteError } = await supabaseAdmin(c)
       .from('stripe_info')
       .delete()

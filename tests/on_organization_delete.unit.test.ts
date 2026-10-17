@@ -88,4 +88,30 @@ describe('on_organization_delete', () => {
     expect(stripeInfoDeleteEq).toHaveBeenCalledWith('customer_id', customerId)
     expect(stripeInfoDeleteEq).toHaveBeenCalledWith('customer_id', `pending_${orgId}`)
   })
+
+  it('keeps stripe_info when the customer Stripe account is not configured', async () => {
+    const { BillingAccountUnavailableError } = await import('../supabase/functions/_backend/utils/stripe_billing.ts')
+    cancelSubscription.mockRejectedValueOnce(new BillingAccountUnavailableError('us'))
+    const { app } = await import('../supabase/functions/_backend/triggers/on_organization_delete.ts')
+    const orgId = 'org-delete-stripe-info-unreachable'
+    const customerId = 'cus_delete_stripe_info_unreachable'
+
+    const response = await app.request('http://localhost/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        table: 'orgs',
+        type: 'DELETE',
+        old_record: {
+          id: orgId,
+          customer_id: customerId,
+        },
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    // The row records which Stripe account still bills this customer: never drop it.
+    expect(stripeInfoDeleteEq).not.toHaveBeenCalledWith('customer_id', customerId)
+    expect(stripeInfoDeleteEq).toHaveBeenCalledWith('customer_id', `pending_${orgId}`)
+  })
 })
