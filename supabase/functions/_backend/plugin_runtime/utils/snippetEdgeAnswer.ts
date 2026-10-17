@@ -23,9 +23,10 @@ import { getEnv, isListedLimitedApp } from './utils.ts'
  * carries `X-Capgo-Edge-Stat`, Logpush ships it to R2 and the plugin worker's
  * queue consumer replays it (snippetEdgeReplay.ts).
  *
- * Switch: worker secret `SNIPPET_EDGE_ANSWER` (off | on | N% of devices). Only
- * turn it on once the Logpush -> R2 -> queue pipeline runs, otherwise the
- * stats of answered requests are lost. The secret only stops new fills:
+ * Switch: worker secret `SNIPPET_EDGE_ANSWER` (off | on | N% of devices,
+ * unset = SNIPPET_EDGE_ANSWER_DEFAULT_SHARE). Keep it off until the Logpush
+ * -> R2 -> queue pipeline runs, otherwise the stats of answered requests are
+ * lost. The secret only stops new fills:
  * `bun run snippet-edge-answer:set` also purges SNIPPET_EDGE_ANSWERS_TAG, and
  * so must a LIMITED_APPS change (`bun run snippet-edge-answer:purge`).
  */
@@ -33,6 +34,8 @@ export const SNIPPET_EDGE_FILL_HEADER = 'X-Capgo-Edge-Fill'
 /** On an update enumeration limit answer: unix seconds until the IP limit resets. */
 export const SNIPPET_EDGE_IP_LIMIT_HEADER = 'X-Capgo-Edge-Ip-Limit'
 export const SNIPPET_EDGE_ANSWER_DEFAULT_TTL_SECONDS = 900
+/** Share of devices answered by the snippet when the secret is unset. */
+export const SNIPPET_EDGE_ANSWER_DEFAULT_SHARE = '10%'
 const SNIPPET_EDGE_ANSWER_MIN_TTL_SECONDS = 10
 const SNIPPET_EDGE_ANSWER_MAX_TTL_SECONDS = 3600
 /** On every snippet entry: one purge drops them all. */
@@ -98,7 +101,7 @@ export function getSnippetEdgeAnswerBps(c: Context) {
   // snippet entries could only expire with their TTL.
   if (!hasUpdatesPurgeTarget(c))
     return 0
-  return parseEdgeShareBps(getEnv(c, 'SNIPPET_EDGE_ANSWER'))
+  return parseEdgeShareBps(getEnv(c, 'SNIPPET_EDGE_ANSWER').trim() || SNIPPET_EDGE_ANSWER_DEFAULT_SHARE)
 }
 
 export function getSnippetEdgeAnswerTtlSeconds(c: Context) {

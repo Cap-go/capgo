@@ -103,11 +103,16 @@ describe('snippet edge answer fills', () => {
 
   it('stay off without the switch, a purge target, or for apps the snippet cannot check', async () => {
     const write = (c: any) => setSnippetUpdatesFill(c, 'com.edge.app', ANSWER, { blockProviderInfraRequests: false, legacyChannelSelfStore: false })
-    expect(readFill(await fillFrom({ CF_CACHE_PURGE_TOKEN: 'token' }, write))).toBeNull()
+    expect(readFill(await fillFrom({ CF_CACHE_PURGE_TOKEN: 'token', SNIPPET_EDGE_ANSWER: 'off' }, write))).toBeNull()
     expect(readFill(await fillFrom({ SNIPPET_EDGE_ANSWER: 'on' }, write))).toBeNull()
     expect(readFill(await fillFrom({ ...ENABLED_ENV, LIMITED_APPS: JSON.stringify([{ id: 'com.edge.app', ignore: 0.5 }]) }, write))).toBeNull()
     expect(readFill(await fillFrom(ENABLED_ENV, c => setSnippetUpdatesFill(c, 'com.edge.app', ANSWER, { blockProviderInfraRequests: true, legacyChannelSelfStore: false })))).toBeNull()
     expect(readFill(await fillFrom(ENABLED_ENV, c => setSnippetStatsFill(c, 'com.edge.app', { ...STATS_FILL, blockProviderInfraRequests: true })))).toBeNull()
+  })
+
+  it('answer 10% of devices while the switch is unset', async () => {
+    const headers = await fillFrom({ CF_CACHE_PURGE_TOKEN: 'token' }, c => setSnippetStatsFill(c, 'com.edge.app', STATS_FILL))
+    expect(readFill(headers)).toMatchObject({ e: 'stats', bps: 1000 })
   })
 
   it('carry the share and TTL settings', async () => {
