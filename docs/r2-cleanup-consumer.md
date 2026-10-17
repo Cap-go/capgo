@@ -94,6 +94,14 @@ error type, HTTP status, timings and copy-response field presence. They never
 include object keys, raw provider errors or credentials, and do not change
 acknowledgement, retries or deletion decisions.
 
+Database/safety failures emit at most three distinct diagnostics per batch.
+They distinguish inspection, completion and batch setup, and report fixed reason
+labels (including unavailable replication evidence and connection/pool timeouts),
+allowlisted error types and known SQLSTATE/network codes. Wrapped database causes
+are inspected to a depth of three. Raw messages, SQL, parameters, stacks, object
+keys and connection strings are never logged. These diagnostics leave safety
+checks and acknowledgement/retry behavior unchanged.
+
 After confirmed DELETE/absence, acknowledge each corresponding source message
 **immediately, before any completion database connection/query**. Then perform
 one best-effort completion UPDATE per group. The update uses the snapshot taken
@@ -139,6 +147,17 @@ deadline, four-workflow limit, request budget and retry count do not increase.
 Measure net backlog change over several minutes against ongoing production,
 alongside batch issue counts and DLQ growth. A falling main queue alone does
 not prove successful cleanup if failures are instead exhausting into the DLQ.
+
+Size the Hyperdrive origin pool separately from consumer concurrency. A pool
+that cannot serve the scheduled health check within its five-second budget can
+prevent checkpoint refresh. Once the last published evidence is older than
+300 seconds, every inspection fails closed, even when replication itself is
+healthy. Check the checkpoint timestamp, scheduled health timeout reasons and
+Hyperdrive waiting clients together. Reserve database connection headroom when
+raising the origin limit; a low database CPU reading alone does not rule out
+pool starvation. During a systemic rollout failure, pause delivery with approval
+instead of exhausting messages into DLQ, and resume only after fresh health
+publication is verified. Verify checkpoint refresh remains healthy under load.
 
 Current Cloudflare limits are 15 minutes wall time per queue invocation, default
 30 seconds CPU configurable to five minutes (this Worker requests 300,000ms),

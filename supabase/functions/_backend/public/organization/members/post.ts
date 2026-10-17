@@ -29,7 +29,7 @@ const inviteRoleAliases: Record<string, RbacInviteRole> = {
 const allowedInviteRoles = [...rbacInviteRoles, ...Object.keys(inviteRoleAliases)]
 const allowedInviteRoleSet = new Set<string>(allowedInviteRoles)
 const rbacInviteRoleSet = new Set<string>(rbacInviteRoles)
-const inviteTypeSchema = z.enum(allowedInviteRoles as [string, ...string[]])
+export const inviteTypeSchema = z.enum(allowedInviteRoles as [string, ...string[]])
 
 const inviteBodySchema = z.object({
   orgId: z.string(),

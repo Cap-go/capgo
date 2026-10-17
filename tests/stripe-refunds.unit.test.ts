@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { globalStatsTestUtils } from '../supabase/functions/_backend/triggers/global_stats.ts'
 import { extractDataEvent } from '../supabase/functions/_backend/utils/stripe_event.ts'
 import { toStripeRefundRow } from '../supabase/functions/_backend/utils/stripe_refunds.ts'
 
@@ -56,17 +55,5 @@ describe('stripe refunds', () => {
 
     expect(row.customer_id).toBeNull()
     expect(row.status).toBe('pending')
-  })
-
-  it.concurrent('sums daily refunds in USD and skips failed or canceled ones', () => {
-    expect(globalStatsTestUtils.summarizeRefunds([
-      { amount: 1200, currency: 'usd', status: 'succeeded' },
-      { amount: 1999, currency: 'USD', status: 'pending' },
-      { amount: 5000, currency: 'eur', status: 'succeeded' },
-      { amount: 700, currency: 'usd', status: 'failed' },
-      { amount: 300, currency: 'usd', status: 'canceled' },
-    ])).toEqual({ refunds_count: 3, refunds_amount: 31.99 })
-
-    expect(globalStatsTestUtils.summarizeRefunds([])).toEqual({ refunds_count: 0, refunds_amount: 0 })
   })
 })

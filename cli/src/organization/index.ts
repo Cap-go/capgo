@@ -1,5 +1,6 @@
 export { addOrganization } from './add'
 export { deleteOrganization } from './delete'
 export { listOrganizations } from './list'
+export { inviteMember, removeMember, setMemberRole } from './member-manage'
 export { listMembers } from './members'
 export { setOrganization } from './set'
