@@ -105,6 +105,9 @@ REVOKE ALL ON FUNCTION public.process_function_queue(text, integer) FROM PUBLIC;
 -- /triggers/cron_app_fame routes or the dropped create-counter processor.
 -- Nothing else sends to these queues, so drop them instead of letting the
 -- messages fail and pile up.
+-- pgmq.drop_queue() runs ALTER EXTENSION pgmq DROP TABLE, which fails in
+-- production where queue tables are not extension members, so drop the
+-- tables and meta rows directly.
 DO $$
 DECLARE
   removed_queue text;
@@ -114,12 +117,14 @@ BEGIN
     'global_stats_creates',
     'cron_app_fame'
   ] LOOP
-    IF EXISTS (
-      SELECT 1
-      FROM pgmq.list_queues()
-      WHERE queue_name = removed_queue
-    ) THEN
-      PERFORM pgmq.drop_queue(removed_queue);
+    EXECUTE pg_catalog.format(
+      'DROP TABLE IF EXISTS pgmq.%I', 'q_' || removed_queue
+    );
+    EXECUTE pg_catalog.format(
+      'DROP TABLE IF EXISTS pgmq.%I', 'a_' || removed_queue
+    );
+    IF pg_catalog.to_regclass('pgmq.meta') IS NOT NULL THEN
+      DELETE FROM pgmq.meta WHERE queue_name = removed_queue;
     END IF;
   END LOOP;
 END;
