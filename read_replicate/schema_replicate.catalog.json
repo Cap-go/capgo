@@ -521,7 +521,7 @@
       "type": "jsonb"
     },
     {
-      "default": "jsonb_build_object('country', true, 'platform', true, 'os_version', true, 'plugin_version', true, 'version_build', true, 'is_emulator', true, 'is_prod', true, 'install_source', true)",
+      "default": "'{\"country\": true, \"is_prod\": true, \"platform\": true, \"os_version\": true, \"is_emulator\": true, \"version_build\": true, \"install_source\": true, \"plugin_version\": true}'::jsonb",
       "generated": "",
       "identity": "",
       "name": "device_data_collection",
