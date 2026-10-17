@@ -95,6 +95,16 @@ const disableAutoUpdate = z.enum(['major', 'minor', 'patch', 'version_number', '
   .describe('Block automatic updates across this semver boundary (version_number = same native version only, none = allow all)')
 const orgRole = z.enum(['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin'])
 const emailPreferences = z.record(z.string(), z.boolean())
+const deviceDataCollection = z.object({
+  country: z.boolean().optional(),
+  platform: z.boolean().optional(),
+  os_version: z.boolean().optional(),
+  plugin_version: z.boolean().optional(),
+  version_build: z.boolean().optional(),
+  is_emulator: z.boolean().optional(),
+  is_prod: z.boolean().optional(),
+  install_source: z.boolean().optional(),
+}).strict().describe('Optional device fields to store (false = not persisted; update routing still uses the live request). Omitted keys keep their current value.')
 const notificationTarget = z.object({
   externalId: z.string().optional().describe('Your own user identifier bound to devices'),
   recipientKey: z.string().optional(),
@@ -417,7 +427,7 @@ const appTools: McpTool[] = [
   apiTool({
     name: 'capgo_update_app',
     title: 'Update app',
-    description: 'Update app settings such as name, bundle retention, metadata exposure, preview, build timeout, default upload channel and store URLs. '
+    description: 'Update app settings such as name, bundle retention, metadata exposure, preview, build timeout, default upload channel, store URLs and which optional device fields are collected. '
       + 'The default download channel is a channel setting: use capgo_update_channel with public=true.',
     input: {
       appId,
@@ -429,6 +439,7 @@ const appTools: McpTool[] = [
       block_provider_infra_requests: z.boolean().optional().describe('Block update requests coming from cloud provider infrastructure'),
       build_timeout_seconds: z.number().int().min(300).max(21600).optional().describe('Native cloud build timeout in seconds (5 to 360 minutes)'),
       default_upload_channel: z.string().min(1).optional().describe('Existing channel name that CLI uploads link to by default'),
+      device_data_collection: deviceDataCollection.optional(),
       ios_store_url: z.string().nullable().optional(),
       android_store_url: z.string().nullable().optional(),
     },

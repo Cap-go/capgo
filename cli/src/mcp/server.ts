@@ -165,7 +165,7 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
   server.registerTool(
     'capgo_update_app',
     {
-      description: 'Update settings for an existing app in Capgo Cloud: name, icon, bundle retention, metadata exposure, preview QR codes, custom device IDs, provider-infrastructure blocking, build timeout, store URLs, and default upload/download channels',
+      description: 'Update settings for an existing app in Capgo Cloud: name, icon, bundle retention, metadata exposure, preview QR codes, custom device IDs, provider-infrastructure blocking, build timeout, store URLs, default upload/download channels, and which optional device fields are collected',
       inputSchema: mcpUpdateAppInputSchema,
     },
     async (input) => {
