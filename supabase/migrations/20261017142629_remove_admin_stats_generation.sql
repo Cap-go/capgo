@@ -105,24 +105,61 @@ REVOKE ALL ON FUNCTION public.process_function_queue(text, integer) FROM PUBLIC;
 -- /triggers/cron_app_fame routes or the dropped create-counter processor.
 -- Nothing else sends to these queues, so drop them instead of letting the
 -- messages fail and pile up.
--- pgmq.drop_queue() runs ALTER EXTENSION pgmq DROP TABLE, which fails in
--- production where queue tables are not extension members, so drop the
--- tables and meta rows directly.
+-- pgmq.drop_queue() always runs ALTER EXTENSION pgmq DROP TABLE, which fails
+-- in production where queue tables are not extension members. Local pgmq does
+-- register the queue tables and their msg_id sequences as members, and a plain
+-- DROP TABLE fails there. Detach only member relations, then drop the tables
+-- and meta rows directly.
 DO $$
 DECLARE
   removed_queue text;
+  queue_table text;
+  member record;
 BEGIN
   FOREACH removed_queue IN ARRAY ARRAY[
     'admin_stats',
     'global_stats_creates',
     'cron_app_fame'
   ] LOOP
-    EXECUTE pg_catalog.format(
-      'DROP TABLE IF EXISTS pgmq.%I', 'q_' || removed_queue
-    );
-    EXECUTE pg_catalog.format(
-      'DROP TABLE IF EXISTS pgmq.%I', 'a_' || removed_queue
-    );
+    FOREACH queue_table IN ARRAY ARRAY[
+      'q_' || removed_queue,
+      'a_' || removed_queue
+    ] LOOP
+      FOR member IN
+        SELECT c.oid::regclass AS relation, c.relkind
+        FROM pg_catalog.pg_class AS c
+        INNER JOIN pg_catalog.pg_depend AS ext
+          ON
+            ext.classid = 'pg_catalog.pg_class'::regclass
+            AND ext.objid = c.oid
+            AND ext.refclassid = 'pg_catalog.pg_extension'::regclass
+            AND ext.deptype = 'e'
+        INNER JOIN pg_catalog.pg_extension AS e
+          ON e.oid = ext.refobjid AND e.extname = 'pgmq'
+        WHERE
+          c.oid = pg_catalog.to_regclass(
+            pg_catalog.format('pgmq.%I', queue_table)
+          )
+          OR c.oid IN (
+            SELECT owned.objid
+            FROM pg_catalog.pg_depend AS owned
+            WHERE
+              owned.classid = 'pg_catalog.pg_class'::regclass
+              AND owned.refclassid = 'pg_catalog.pg_class'::regclass
+              AND owned.refobjid = pg_catalog.to_regclass(
+                pg_catalog.format('pgmq.%I', queue_table)
+              )
+              AND owned.deptype IN ('a', 'i')
+          )
+      LOOP
+        EXECUTE pg_catalog.format(
+          'ALTER EXTENSION pgmq DROP %s %s',
+          CASE member.relkind WHEN 'S' THEN 'SEQUENCE' ELSE 'TABLE' END,
+          member.relation
+        );
+      END LOOP;
+      EXECUTE pg_catalog.format('DROP TABLE IF EXISTS pgmq.%I', queue_table);
+    END LOOP;
     IF pg_catalog.to_regclass('pgmq.meta') IS NOT NULL THEN
       DELETE FROM pgmq.meta WHERE queue_name = removed_queue;
     END IF;
