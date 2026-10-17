@@ -16,6 +16,7 @@ import { clearWebsitePaidUserCookie } from '~/services/websiteAuthCookie'
 import { useMainStore } from '~/stores/main'
 import { isPendingOrganizationInvite, useOrganizationStore } from '~/stores/organization'
 import { shouldSkipOnboardingResume } from '~/utils/appOnboardingProgress'
+import { needsInitialOnboardingName } from '~/utils/onboardingProfile'
 import { getOnboardingResumeRedirect, isNewOnboardingUser } from '~/utils/onboardingRedirect'
 import { hasPendingInviteSkip } from '~/utils/pendingInviteSkip'
 import { validateRedirectPath } from '~/utils/safeRedirect'
@@ -47,7 +48,7 @@ async function updateUser(
           email: main.auth.email ?? '',
           first_name: main.auth.user_metadata?.first_name ?? '',
           last_name: main.auth.user_metadata?.last_name ?? '',
-          ...(!main.auth.user_metadata?.first_name || !main.auth.user_metadata?.last_name ? { onboarding: { version: 6 } } : {}),
+          onboarding: { version: 6 },
           country: null,
           enable_notifications: true,
           opt_for_newsletters: false,
@@ -230,8 +231,24 @@ async function guard(
     }
   }
 
+  function requiredNameRedirect(organizationsLoaded: boolean) {
+    if (!main.user)
+      return false
+    if (!needsInitialOnboardingName(main.user))
+      return null
+    // Scope is unknown after an org fetch failure. Retry rather than forcing
+    // an established member into initial onboarding or allowing a bypass.
+    if (!organizationsLoaded)
+      return false
+    if (to.path === '/onboarding/name' || organizationStore.hasOrganizations)
+      return null
+    return { path: '/onboarding/name', query: { to: to.fullPath } }
+  }
+
   function shouldRedirectToOrgOnboarding() {
     if (isCliLoginRoute)
+      return false
+    if (to.path === '/onboarding/name')
       return false
     if (to.path.startsWith('/onboarding/app'))
       return false
@@ -251,7 +268,7 @@ async function guard(
       return false
     if (isNativeAppStoreContext())
       return false
-    if (to.path.startsWith('/onboarding/invitation'))
+    if (to.path === '/onboarding/name' || to.path.startsWith('/onboarding/invitation'))
       return false
     if (hasPendingInviteSkip(sessionUser?.id ?? main.auth?.id))
       return false
@@ -259,6 +276,8 @@ async function guard(
   }
 
   async function getPendingOnboardingRedirect(organizationsLoaded: boolean) {
+    if (to.path === '/onboarding/name')
+      return null
     if (isCliLoginRoute)
       return null
     // Creating another organization must not bounce back to pending setup.
@@ -363,6 +382,15 @@ async function guard(
     await loadPlansIfNeeded()
 
     const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations(organizationFetchOptions))
+    const nameRedirect = requiredNameRedirect(organizationsLoaded)
+    if (nameRedirect === false) {
+      hideLoader()
+      return next(false)
+    }
+    if (nameRedirect) {
+      hideLoader()
+      return next(nameRedirect)
+    }
     if (shouldRedirectToPendingInviteOnboarding(organizationsLoaded)) {
       return next({
         path: '/onboarding/invitation',
@@ -410,9 +438,20 @@ async function guard(
       return next(getPostRestorePath(to))
     }
 
+    if (!main.user)
+      await updateUser(main, supabase)
     await loadPlansIfNeeded()
 
     let organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations(organizationFetchOptions))
+    const nameRedirect = requiredNameRedirect(organizationsLoaded)
+    if (nameRedirect === false) {
+      hideLoader()
+      return next(false)
+    }
+    if (nameRedirect) {
+      hideLoader()
+      return next(nameRedirect)
+    }
     if (shouldRedirectToPendingInviteOnboarding(organizationsLoaded)) {
       return next({
         path: '/onboarding/invitation',

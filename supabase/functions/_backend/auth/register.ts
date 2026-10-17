@@ -208,7 +208,7 @@ app.post('/', async (c) => {
     email: normalizedEmail,
     first_name: body.first_name ?? '',
     last_name: body.last_name ?? '',
-    ...(!body.first_name || !body.last_name ? { onboarding: { version: 6 } } : {}),
+    onboarding: { version: 6 },
     opt_for_newsletters: body.opt_for_newsletters,
   })
 

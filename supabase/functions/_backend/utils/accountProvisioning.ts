@@ -42,7 +42,7 @@ export function provisionUserProfile(c: Context, profile: ProfileInput, preserve
   const { onboarding, opt_for_newsletters, ...base } = profile
   return supabaseAdmin(c).from('users').upsert({
     ...base,
-    ...(onboarding !== undefined ? { onboarding } : {}),
+    onboarding: onboarding ?? { version: 6 },
     enable_notifications: true,
     opt_for_newsletters: opt_for_newsletters ?? false,
   }, { onConflict: 'id', ...(preserveExisting ? { ignoreDuplicates: true } : {}) })

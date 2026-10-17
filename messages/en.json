@@ -4132,5 +4132,8 @@
   "apple-login-name-save-failed": "You are signed in. You can add your name in account settings.",
   "apple-delete-reauth-required": "Your Apple authorization expired. Please sign in with Apple again to delete your account.",
   "apple-delete-account-hint": "Verify your email, then confirm with the same Apple account to delete your Capgo account.",
-  "apple-revoke-failed": "Could not disconnect your Apple account. Please sign in with Apple again and retry."
+  "apple-revoke-failed": "Could not disconnect your Apple account. Please sign in with Apple again and retry.",
+  "onboarding-name-kicker": "Let’s get to know you",
+  "onboarding-name-description": "Tell us your name before we set up your workspace.",
+  "onboarding-name-required": "Both your first and last name are required to continue."
 }

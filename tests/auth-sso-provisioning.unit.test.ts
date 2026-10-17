@@ -126,6 +126,7 @@ function createTestContext() {
   })
 
   return {
+    userRecord,
     mainStore,
     mockCreateSignedImageUrl,
     mockApps,
@@ -728,6 +729,68 @@ describe('auth guard SSO provisioning', () => {
 
       expect(next).toHaveBeenCalledWith(false)
       expect(next).not.toHaveBeenCalledWith('/login?message=sso_account_linked')
+    })
+  })
+})
+
+describe('mandatory V6 name navigation', () => {
+  for (const alreadyAuthenticated of [false, true]) {
+    for (const path of ['/dashboard', '/onboarding/app', '/onboarding/organization', '/onboarding/invitation', '/apikeys']) {
+      it.concurrent(`blocks ${path} before names are saved (authenticated: ${alreadyAuthenticated})`, async () => {
+        await withTestContext(async (context) => {
+          Object.assign(context.userRecord, { first_name: '', last_name: '', onboarding: { version: 6 } })
+          const noOrganizations = async () => { context.organizationStore.organizations = []; context.organizationStore.hasOrganizations = false }
+          context.organizationStore.fetchOrganizations.mockImplementation(noOrganizations)
+          context.organizationStore.dedupFetchOrganizations.mockImplementation(noOrganizations)
+          if (alreadyAuthenticated) {
+            context.mainStore.auth = { id: 'user-123' }
+            context.mainStore.user = context.userRecord
+          }
+          const guard = await getGuard()
+          const next = vi.fn()
+          await guard({ path, fullPath: path, meta: { middleware: 'auth' }, query: {} }, { path: '/login', meta: {}, query: {} }, next)
+          expect(next).toHaveBeenCalledWith({ path: '/onboarding/name', query: { to: path } })
+          expect(next).toHaveBeenCalledTimes(1)
+        })
+      })
+    }
+  }
+  it.concurrent('keeps the name screen accessible even with pending invitations or app setup', async () => {
+    await withTestContext(async (context) => {
+      Object.assign(context.userRecord, { first_name: '', last_name: '', onboarding: { version: 6 } })
+      context.mockApps.push({ app_id: 'com.pending', need_onboarding: true })
+      context.organizationStore.fetchOrganizations.mockImplementation(async () => {
+        context.organizationStore.organizations = [{ gid: 'org', role: 'invite_read' }]
+        context.organizationStore.hasOrganizations = false
+      })
+      const guard = await getGuard()
+      const next = vi.fn()
+      await guard({ path: '/onboarding/name', fullPath: '/onboarding/name', meta: { middleware: 'auth' }, query: {} }, { path: '/login', meta: {}, query: {} }, next)
+      expect(next).toHaveBeenCalledWith()
+    })
+  })
+})
+
+describe('initial profile gate failures and existing members', () => {
+  it.concurrent('blocks navigation if the profile cannot be loaded', async () => {
+    await withTestContext(async (context) => {
+      context.mockFrom.mockImplementation(() => ({
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { code: 'unavailable' } }) }) }),
+        insert: () => { throw new Error('profile unavailable') },
+      }) as any)
+      const guard = await getGuard()
+      const next = vi.fn()
+      await guard({ path: '/onboarding/app', fullPath: '/onboarding/app', meta: { middleware: 'auth' }, query: {} }, { path: '/login', meta: {}, query: {} }, next)
+      expect(next).toHaveBeenCalledWith(false)
+    })
+  })
+  it.concurrent('does not send an existing V6 organization member through initial names', async () => {
+    await withTestContext(async (context) => {
+      Object.assign(context.userRecord, { first_name: '', last_name: '', onboarding: { version: 6 } })
+      const guard = await getGuard()
+      const next = vi.fn()
+      await guard({ path: '/apps', fullPath: '/apps', meta: { middleware: 'auth' }, query: {} }, { path: '/login', meta: {}, query: {} }, next)
+      expect(next).toHaveBeenCalledWith()
     })
   })
 })

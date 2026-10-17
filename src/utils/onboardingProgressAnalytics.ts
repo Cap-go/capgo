@@ -18,7 +18,7 @@ export type OnboardingAnalyticsVersion
     | typeof NEW_CHANNEL_PUBLISH_INTENT_ANALYTICS_VERSION
 
 export type OnboardingAnalyticsFlow = 'pre_org' | 'existing_org'
-export type OnboardingAnalyticsStep = 'welcome' | 'intent' | 'publish_app_question' | 'details' | 'app_name' | 'app_id' | 'app_icon' | 'organization' | 'choice' | 'channel' | 'install' | 'setup'
+export type OnboardingAnalyticsStep = 'name' | 'welcome' | 'intent' | 'publish_app_question' | 'details' | 'app_name' | 'app_id' | 'app_icon' | 'organization' | 'choice' | 'channel' | 'install' | 'setup'
 export type OnboardingCopyEvent = 'onboarding_ai_instructions_copied' | 'onboarding_cli_command_copied'
 export type OnboardingDevelopmentEnvironment = 'hosted_builder' | 'ai_assistant' | 'hand_coded' | 'other' | 'local_project' | 'exploring' | 'skipped'
 export type OnboardingIntent = 'ota' | 'builder' | 'both' | 'exploring' | 'publish'

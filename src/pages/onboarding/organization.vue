@@ -18,7 +18,6 @@ import IconUsers from '~icons/lucide/users-round'
 import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import OnboardingSupportUsernames from '~/components/dashboard/OnboardingSupportUsernames.vue'
 import OrganizationOnboardingInvite from '~/components/dashboard/OrganizationOnboardingInvite.vue'
-import OnboardingProfile from '~/components/OnboardingProfile.vue'
 import { getCapgoApiErrorCode, invokeCapgoApi } from '~/services/capgoApi'
 import { formatNumberValue } from '~/services/formatLocale'
 import { createOnboardingAppFromDraft } from '~/services/onboardingAppCreate'
@@ -30,7 +29,6 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { clearOnboardingAppDraft, loadOnboardingAppDraft } from '~/utils/onboardingAppDraft'
 import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
-import { createOnboardingDetailsFieldDebouncer } from '~/utils/onboardingProgressAnalytics'
 import { validateRedirectPath } from '~/utils/safeRedirect'
 
 type OnboardingStep = 'details' | 'logo' | 'invite'
@@ -62,18 +60,6 @@ const step = ref<OnboardingStep>('details')
 const mode = ref<OnboardingMode>(null)
 const websiteInput = ref('')
 const orgNameInput = ref('')
-const profileForm = ref<InstanceType<typeof OnboardingProfile> | null>(null)
-const profileFieldTracker = createOnboardingDetailsFieldDebouncer((event, step, properties) => {
-  sendOnboardingEvent(event, { ...properties, step, onboarding_version: 6 })
-}, 500)
-function trackProfileInput(field: 'first_name' | 'last_name', value: string) {
-  profileFieldTracker.schedule(field === 'first_name' ? 'onboarding_first_name_entered' : 'onboarding_last_name_entered', field, 'organization', value)
-}
-function trackProfileSaved() {
-  profileFieldTracker.dispose()
-  sendOnboardingEvent('onboarding_profile_saved', { step: 'organization', onboarding_version: 6 })
-}
-onUnmounted(() => profileFieldTracker.dispose())
 const discordUsername = ref(main.user?.discord_username ?? '')
 watch(() => main.user?.discord_username, (value) => {
   if (!discordUsername.value && value)
@@ -175,7 +161,7 @@ const websiteHostname = computed(() => {
 const importedLogoUrl = computed(() => websitePreview.value?.icon ?? '')
 const canShowOrgDetails = computed(() => mode.value !== null)
 const canCreateOrganization = computed(() => {
-  if (!main.auth || !profileForm.value?.isValid || isSubmitting.value || isLoadingWebsitePreview.value || !mode.value)
+  if (!main.auth || isSubmitting.value || isLoadingWebsitePreview.value || !mode.value)
     return false
 
   return !!orgNameInput.value.trim() && !!selectedUserCountStop.value
@@ -400,7 +386,7 @@ async function saveSupportUsernames() {
 }
 
 async function createOrganization() {
-  if (isSubmitting.value || !main.auth || !profileForm.value?.isValid)
+  if (isSubmitting.value || !main.auth)
     return
 
   if (!mode.value) {
@@ -427,9 +413,6 @@ async function createOrganization() {
   isSubmitting.value = true
 
   try {
-    if (!await profileForm.value.save())
-      return
-
     try {
       await saveSupportUsernames()
     }
@@ -948,13 +931,6 @@ onUnmounted(() => {
               </div>
 
               <template v-if="canShowOrgDetails">
-                <OnboardingProfile
-                  ref="profileForm"
-                  :disabled="isSubmitting"
-                  @field-input="trackProfileInput"
-                  @saved="trackProfileSaved"
-                />
-
                 <div v-if="orgNameInput.trim() || importedLogoUrl" class="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/15 dark:bg-slate-950/90">
                   <div class="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-200 text-sm font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                     <img

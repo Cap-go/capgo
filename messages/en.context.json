@@ -4131,5 +4131,8 @@
   "your-api-key": "Used in Capgo web console areas: services. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "your-role-in-org": "Used in Capgo web console areas: pages. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "your-usage": "Used in Capgo web console areas: pages/settings/organization. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
-  "zip-bundle": "Used in Capgo web console areas: pages/app. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged."
+  "zip-bundle": "Used in Capgo web console areas: pages/app. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "onboarding-name-kicker": "Required initial name step in the Capgo console. Explain that both first and last name must be provided before onboarding can continue. Keep the tone welcoming and concise.",
+  "onboarding-name-description": "Required initial name step in the Capgo console. Explain that both first and last name must be provided before onboarding can continue. Keep the tone welcoming and concise.",
+  "onboarding-name-required": "Required initial name step in the Capgo console. Explain that both first and last name must be provided before onboarding can continue. Keep the tone welcoming and concise."
 }

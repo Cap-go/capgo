@@ -35,7 +35,7 @@ function mount() {
   const container = document.createElement('div')
   const fields = vi.fn()
   app = createApp(OnboardingProfile, { onFieldInput: fields })
-  const profile = app.mount(container) as unknown as { isValid: boolean, save: () => Promise<boolean> }
+  const profile = app.mount(container) as unknown as { isValid: boolean, save: () => Promise<boolean>, resetDraft: () => Promise<boolean> }
   return { container, profile, fields }
 }
 async function enter(container: HTMLElement, field: string, value: string) {
@@ -230,5 +230,30 @@ describe('profile onboarding V6', () => {
       ['onboarding_last_name_entered', 'intent', { field_length: 4 }],
     ])
     tracker.dispose()
+  })
+})
+
+describe('profile draft reset', () => {
+  it('cancels the debounce, clears the stored draft and stays cleared after refresh', async () => {
+    vi.useFakeTimers()
+    state.user.onboarding = { version: 6, profile_draft: { first_name: 'Old', last_name: 'Draft' }, abtests: { kept: true } }
+    const { container, profile } = mount()
+    await enter(container, 'first-name', 'Pending')
+    expect(await profile.resetDraft()).toBe(true)
+    await vi.advanceTimersByTimeAsync(600)
+    expect(state.user.onboarding).toEqual({ version: 6, abtests: { kept: true } })
+    expect(container.querySelector<HTMLInputElement>('[data-test="onboarding-first-name"]')?.value).toBe('')
+    app?.unmount()
+    const restored = mount().container
+    expect(restored.querySelector<HTMLInputElement>('[data-test="onboarding-first-name"]')?.value).toBe('')
+    expect(restored.querySelector<HTMLInputElement>('[data-test="onboarding-last-name"]')?.value).toBe('')
+  })
+  it('removes unfinished drafts during wizard restart without removing account identity or metadata', () => {
+    expect(mergeUserOnboardingProgress({ step: 'intent', status: 'in_progress' }, {
+      version: 6, app_name: 'Old app', app_id: 'com.old', intent: 'ota',
+      profile_draft: { first_name: 'Draft' }, abtests: { kept: true },
+    }, { clearIntent: true, clearProfileDraft: true })).toEqual({
+      version: 6, step: 'intent', status: 'in_progress', abtests: { kept: true },
+    })
   })
 })

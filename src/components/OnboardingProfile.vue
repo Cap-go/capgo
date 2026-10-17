@@ -23,6 +23,7 @@ const firstName = ref(main.user?.first_name ?? '')
 const lastName = ref(main.user?.last_name ?? '')
 const needsProfileName = computed(() => hasProfileOnboarding(main.user?.onboarding) && (!main.user?.first_name?.trim() || !main.user?.last_name?.trim()))
 const isValid = computed(() => !!main.user?.id && (!needsProfileName.value || (!!firstName.value.trim() && !!lastName.value.trim())))
+let draftGeneration = 0
 let draftTimer: ReturnType<typeof setTimeout> | undefined
 let draftUserId = main.user?.id
 let draftAuthGeneration = main.authGeneration
@@ -52,8 +53,9 @@ async function persistDraft() {
   const authGeneration = draftAuthGeneration
   if (!userId || main.user?.id !== userId || main.authGeneration !== authGeneration || !needsProfileName.value)
     return
+  const generation = draftGeneration
   const profileDraft = { first_name: firstName.value, last_name: lastName.value }
-  const isCurrentUser = () => main.user?.id === userId && main.authGeneration === authGeneration
+  const isCurrentUser = () => generation === draftGeneration && main.user?.id === userId && main.authGeneration === authGeneration
   try {
     await serializeUserOnboardingWrite(userId, async () => {
       if (!isCurrentUser() || !needsProfileName.value)
@@ -98,6 +100,39 @@ onBeforeUnmount(() => {
   }
 })
 
+async function resetDraft() {
+  draftGeneration++
+  clearTimeout(draftTimer)
+  draftTimer = undefined
+  edited.first_name = edited.last_name = false
+  firstName.value = main.user?.first_name ?? ''
+  lastName.value = main.user?.last_name ?? ''
+  const userId = main.user?.id
+  const authGeneration = main.authGeneration
+  if (!userId)
+    return false
+  try {
+    return await serializeUserOnboardingWrite(userId, async () => {
+      const isCurrentUser = () => main.user?.id === userId && main.authGeneration === authGeneration
+      if (!isCurrentUser())
+        return false
+      const result = await replaceUserOnboardingWithRetry(userId, main.user!.onboarding, (current) => {
+        const onboarding = { ...onboardingObject(current) }
+        delete onboarding.profile_draft
+        return onboarding
+      }, isCurrentUser)
+      if (result.status !== 'persisted' || !isCurrentUser())
+        return false
+      main.user = { ...main.user!, onboarding: result.onboarding }
+      return true
+    })
+  }
+  catch (error) {
+    console.warn('Cannot reset onboarding profile draft', error)
+    return false
+  }
+}
+
 async function save() {
   if (!isValid.value || !main.user)
     return false
@@ -117,7 +152,12 @@ async function save() {
     if (error || !data || main.user?.id !== userId || main.authGeneration !== authGeneration)
       throw error ?? new Error('onboarding_profile_save_failed')
 
+    clearTimeout(draftTimer)
+    draftTimer = undefined
+    draftGeneration++
     main.user = { ...main.user, ...data }
+    // A saved profile has no unfinished draft. Use the same queue as wizard writes.
+    await resetDraft()
     try {
       setUser(userId, {
         email: main.user.email,
@@ -141,7 +181,7 @@ async function save() {
   }
 }
 
-defineExpose({ isValid, save })
+defineExpose({ isValid, resetDraft, save })
 </script>
 
 <template>

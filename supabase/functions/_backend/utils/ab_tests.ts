@@ -17,6 +17,7 @@ export type ABTestIntent = typeof AB_TEST_INTENTS[number]
 export interface ABTestConfig {
   audience: ABTestAudience
   intents?: ABTestIntent[]
+  onboarding_version?: number
   label: string
   branches: Record<string, { bento_tag: string, label: string }>
   control_branch: ABTestBranch
@@ -36,9 +37,9 @@ interface ABTestBentoSyncState {
 }
 
 type ABTestsConfig = Record<string, ABTestConfig>
-type AssignmentAudienceUser = Pick<Database['public']['Tables']['users']['Row'], 'created_via_invite'> & { intent?: unknown }
+type AssignmentAudienceUser = Pick<Database['public']['Tables']['users']['Row'], 'created_via_invite'> & { intent?: unknown, onboarding_version?: unknown }
 type AssignmentUser = AssignmentAudienceUser & Record<string, unknown> & { abtests: unknown }
-type SyncUser = Pick<Database['public']['Tables']['users']['Row'], 'created_via_invite' | 'id'>
+type SyncUser = Pick<Database['public']['Tables']['users']['Row'], 'created_via_invite' | 'id'> & { onboarding?: unknown }
 const AB_TEST_BRANCHES = ['A', 'B', 'C', 'D'] as const
 const BENTO_AB_TEST_SYNC_MAX_ATTEMPTS = 3
 const BENTO_AB_TEST_SYNC_TIMEOUT_MS = 5_000
@@ -98,6 +99,9 @@ export function validateABTestsConfig(value: unknown): ABTestsConfig {
     const controlBranch = entry.control_branch
     const branches = entry.branches
     const intents = entry.intents
+    const onboardingVersion = entry.onboarding_version
+    if (onboardingVersion !== undefined && (!Number.isInteger(onboardingVersion) || Number(onboardingVersion) < 1))
+      invalidConfig(testName)
     if ((audience !== 'all' && audience !== 'self_signup')
       || typeof label !== 'string'
       || !label.trim()
@@ -144,6 +148,7 @@ export function validateABTestsConfig(value: unknown): ABTestsConfig {
 
     config[testName] = {
       audience,
+      ...(onboardingVersion === undefined ? {} : { onboarding_version: onboardingVersion as number }),
       label: label.trim(),
       ...(intents === undefined ? {} : { intents: [...intents] }),
       control_branch: controlBranch,
@@ -163,6 +168,8 @@ export const AB_TESTS_CONFIG = validateABTestsConfig(rawABTestsConfig)
 
 function isEligibleForTest(user: AssignmentAudienceUser, test: ABTestConfig) {
   if (test.audience === 'self_signup' && user.created_via_invite)
+    return false
+  if (test.onboarding_version !== undefined && Number(user.onboarding_version) !== test.onboarding_version)
     return false
   return test.intents === undefined
     || (isABTestIntent(user.intent) && test.intents.includes(user.intent))
@@ -261,6 +268,7 @@ async function readAssignmentUser(
         `SELECT created_via_invite,
                 email,
                 onboarding->'abtests_bento_sync' AS abtests_bento_sync,
+                onboarding->>'version' AS onboarding_version,
                 onboarding->>'intent' AS intent,
                 onboarding->'abtests' AS abtests
          FROM public.users
@@ -393,7 +401,8 @@ async function reconcileBentoSyncState(
       SELECT created_via_invite,
              onboarding->'abtests_bento_sync' AS abtests_bento_sync,
              email,
-             onboarding->>'intent' AS intent,
+             onboarding->>'version' AS onboarding_version,
+                onboarding->>'intent' AS intent,
              onboarding->'abtests' AS abtests
       FROM public.users
       WHERE id = ${userId}::uuid
@@ -528,7 +537,8 @@ export async function getOrCreateUserABTests(
         SELECT created_via_invite,
                onboarding->'abtests_bento_sync' AS abtests_bento_sync,
                email,
-               onboarding->>'intent' AS intent,
+               onboarding->>'version' AS onboarding_version,
+                onboarding->>'intent' AS intent,
                onboarding->'abtests' AS abtests
         FROM public.users
         WHERE id = ${userId}::uuid
@@ -609,7 +619,10 @@ export async function syncNewUserABTests(
   email: string,
   user: SyncUser,
 ) {
-  const candidates = createABTestAssignments(user)
+  const candidates = createABTestAssignments({
+    ...user,
+    onboarding_version: isRecord(user.onboarding) ? user.onboarding.version : undefined,
+  })
   const testNames = Object.keys(candidates)
   if (testNames.length === 0)
     return

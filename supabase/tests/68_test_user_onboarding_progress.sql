@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(12);
+SELECT plan(14);
 
 SELECT tests.create_supabase_user('onboarding_progress_user', 'onboarding_progress_user@test.local');
 
@@ -41,8 +41,8 @@ SELECT is(
     FROM public.users
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')
   ),
-  '{}'::jsonb,
-  'users.onboarding defaults to empty object'
+  '{"version":6}'::jsonb,
+  'new users default to onboarding V6'
 );
 
 SELECT lives_ok(
@@ -109,6 +109,20 @@ SELECT throws_ok(
   '23514',
   NULL,
   'json null onboarding status is rejected'
+);
+
+SELECT lives_ok(
+  $$UPDATE public.users
+    SET onboarding = '{"version":6,"profile_draft":{"first_name":"Partial","last_name":""}}'::jsonb
+    WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
+  'V6 partial profile drafts are accepted by the existing constraint'
+);
+
+SELECT lives_ok(
+  $$UPDATE public.users
+    SET onboarding = '{"version":4,"abtests":{"retained":{"branch":"A"}}}'::jsonb
+    WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
+  'legacy onboarding versions remain valid after the new-user default changes'
 );
 
 SELECT tests.authenticate_as('onboarding_progress_user');

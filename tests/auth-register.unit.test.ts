@@ -227,3 +227,11 @@ describe('pOST /auth/register unit', () => {
     expect(signUpMock).not.toHaveBeenCalled()
   })
 })
+
+it('assigns V6 even when an older self-signup client supplies complete names', async () => {
+  const response = await postRegister(validBody)
+  expect(response.status).toBe(200)
+  expect(usersUpsertMock).toHaveBeenLastCalledWith(expect.objectContaining({
+    first_name: 'Jane', last_name: 'Doe', onboarding: { version: 6 },
+  }), expect.anything())
+})
