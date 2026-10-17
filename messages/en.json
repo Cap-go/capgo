@@ -3289,6 +3289,7 @@
   "wrong-name-org-del": "You have not typed the organization name. You were supposed to type: %1",
   "x-hours-short": "{hours}h",
   "yearly": "Yearly",
+  "yearly-two-months-free": "2 months free",
   "yes": "yes",
   "you-are-deleting-unsafely": "$1Warning!!!$2 You are deleting this bundle unsafely, this cannot be undone. Learn more $3here$4",
   "you-are-deleting-unsafely-plural": "$1Warning!!!$2 You are deleting these bundles unsafely, this cannot be undone. Learn more $3here$4",
