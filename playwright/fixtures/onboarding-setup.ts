@@ -119,9 +119,10 @@ function previewOnboarding() {
         ...(hasBuilder ? { builder: state.builderSteps } : {}),
       },
       outcome: state.outcome,
+      source: params.has('checklistState') ? 'cli' : undefined,
     } }
   }
-  return { ...dismissal, features, setup: { todo_list_version: state.version, steps: state.steps, outcome: state.outcome } }
+  return { ...dismissal, features, setup: { todo_list_version: state.version, steps: state.steps, outcome: state.outcome, source: params.has('checklistState') ? 'cli' : undefined } }
 }
 
 // This isolated component fixture never sends requests to production.
@@ -130,7 +131,7 @@ window.fetch = async (input, init) => {
   const method = init?.method?.toUpperCase() ?? 'GET'
   if (url.pathname.endsWith('/users') && method === 'PATCH')
     state.userWrites.push(JSON.parse(String(init?.body)))
-  if (url.pathname.endsWith('/apps') && method !== 'GET' && method !== 'HEAD') {
+  if ((url.pathname.endsWith('/apps') || url.pathname.endsWith('/rpc/mark_onboarding_feature_started') || url.pathname.includes('/app/')) && method !== 'GET' && method !== 'HEAD') {
     state.appWrites.push({
       method,
       body: init?.body ? JSON.parse(String(init.body)) : undefined,
@@ -192,7 +193,7 @@ window.fetch = async (input, init) => {
     })
   }
   if (params.get('view') === 'flow' || navigationView) {
-    if (url.pathname.endsWith('/apps') && (params.get('unavailable') === '1' || url.searchParams.get('app_id') !== `eq.${previewAppId}`))
+    if (url.pathname.endsWith('/apps') && params.get('unavailable') === '1')
       return new Response(JSON.stringify({ message: 'App unavailable' }), { status: 406, headers: { 'Content-Type': 'application/json' } })
     const app = { id: '00000000-0000-4000-8000-000000000003', app_id: previewAppId, name: 'My Capacitor app', icon_url: '', owner_org: '00000000-0000-4000-8000-000000000002', need_onboarding: true, onboarding: previewOnboarding() }
     const user = { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', onboarding: previewUserOnboarding }

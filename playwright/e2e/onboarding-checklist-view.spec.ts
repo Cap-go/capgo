@@ -44,11 +44,20 @@ for (const preOrg of [false, true]) {
       await page.getByRole('button', { name: scenario.name === 'legacy OTA' ? 'Explore Capgo dashboard' : 'Open your app', exact: true }).click()
       await expect(page.locator('[data-test="preview-app-dashboard"]')).toBeVisible()
       expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.userWrites)).toEqual([])
+      expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites)).toEqual([])
     })
   }
 }
 
 for (const assignment of ['ota-only', 'builder-only']) {
+  test(`retains normal ${assignment} feature and outcome writes without the opt-in`, async ({ page }) => {
+    await page.goto(`${gettingStarted}?assignment=${assignment}&platform=android&checklistState=pending`)
+    await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites.some((write: any) => write.body?.p_feature_key))).toBe(true)
+    await page.getByRole('button', { name: 'Explore dashboard', exact: true }).click()
+    await expect(page.locator('[data-test="preview-app-dashboard"]')).toBeVisible()
+    expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites.some((write: any) => write.body?.onboarding?.outcome === 'switched_to_manual'))).toBe(true)
+  })
+
   test(`shows persisted done, skipped and pending ${assignment} tasks after dismissal`, async ({ page }) => {
     await page.goto(`${gettingStarted}?assignment=${assignment}&platform=android&checklistState=dismissed&showChecklist=1`)
     const builder = assignment === 'builder-only'
@@ -56,6 +65,9 @@ for (const assignment of ['ota-only', 'builder-only']) {
     await expect(step(builder ? 'start_setup' : 'login_cli_mcp')).toHaveAttribute('data-status', 'done')
     await expect(step(builder ? 'connect_google_play' : 'add_updater')).toHaveAttribute('data-status', 'skipped')
     await expect(step(builder ? 'successful_cloud_build' : 'test_update')).toHaveAttribute('data-status', 'pending')
+    expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites)).toEqual([])
+    await page.getByRole('button', { name: 'Explore dashboard', exact: true }).click()
+    await expect(page.locator('[data-test="preview-app-dashboard"]')).toBeVisible()
     expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites)).toEqual([])
   })
 

@@ -430,7 +430,7 @@ async function markOnboardingFeatureStarted(featureKey: 'cli_install' | 'ota' | 
 }
 
 watch([flowStep, createdApp, setupStage, usesBuilderSetupCommand], () => {
-  if (!createdApp.value)
+  if (!createdApp.value || props.showChecklist)
     return
   if (flowStep.value === 'setup' && setupStage.value === 'cli' && !usesBuilderSetupCommand.value)
     void markOnboardingFeatureStarted('cli_install')
@@ -610,6 +610,7 @@ function emitPendingAppOnboardingReady() {
     || (flowStep.value === 'setup' && setupStage.value === 'cli')
   if (
     !app
+    || props.showChecklist
     || isHandingOff.value
     || app.need_onboarding !== true
     || !orgId
@@ -2553,7 +2554,7 @@ async function openDashboard() {
     .maybeSingle()
   const current = parseAppOnboarding(data?.onboarding ?? app.onboarding)
   const source = reportedSetupSource.value ?? current.source
-  if (source !== 'manual' && current.outcome === 'in_progress')
+  if (!props.showChecklist && source !== 'manual' && current.outcome === 'in_progress')
     await reportOnboardingPatch({ outcome: 'switched_to_manual' })
   window.dispatchEvent(new Event(ONBOARDING_DASHBOARD_EXPLORED_EVENT))
   allowOnboardingDashboardExploration(onboardingUserId.value, createdApp.value.app_id)
