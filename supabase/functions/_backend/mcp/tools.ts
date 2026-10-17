@@ -93,6 +93,8 @@ const dateString = z.string().min(1).describe('Date, e.g. 2026-01-31 or an ISO t
 const webhookEvents = z.array(z.enum(['apps', 'app_versions', 'channels', 'org_users', 'orgs'])).min(1)
 const disableAutoUpdate = z.enum(['major', 'minor', 'patch', 'version_number', 'none'])
   .describe('Block automatic updates across this semver boundary (version_number = same native version only, none = allow all)')
+const orgRole = z.enum(['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin'])
+const emailPreferences = z.record(z.string(), z.boolean())
 const notificationTarget = z.object({
   externalId: z.string().optional().describe('Your own user identifier bound to devices'),
   recipientKey: z.string().optional(),
@@ -211,6 +213,32 @@ const accountTools: McpTool[] = [
     }),
   },
   apiTool({
+    name: 'capgo_get_account',
+    title: 'Get account settings',
+    description: 'Get the profile and email notification settings of the authenticated Capgo user.',
+    input: {},
+    annotations: READ,
+    request: () => ({ method: 'GET', path: '/user' }),
+  }),
+  apiTool({
+    name: 'capgo_update_account',
+    title: 'Update account settings',
+    description: 'Update the authenticated user profile (name, country, Discord, number format locale) and personal email notifications. '
+      + 'Email, password, 2FA and account deletion are only available in the Capgo web app.',
+    input: {
+      first_name: z.string().min(1).max(100).optional(),
+      last_name: z.string().min(1).max(100).optional(),
+      country: z.string().max(100).nullable().optional(),
+      discord_username: z.string().max(100).nullable().optional(),
+      format_locale: z.string().max(35).nullable().optional().describe('Locale used to format numbers and dates, e.g. en-US'),
+      enable_notifications: z.boolean().optional().describe('Receive product notification emails'),
+      opt_for_newsletters: z.boolean().optional().describe('Receive the newsletter'),
+      email_preferences: emailPreferences.optional().describe('Only the personal email toggles to change, e.g. {"weekly_stats":false}. Keys: usage_limit, credit_usage, bundle_created, bundle_deployed, deploy_stats_24h, weekly_stats, monthly_stats, billing_period_stats, device_error, channel_self_rejected, bundle_incompatible, cli_realtime_feed, onboarding, builder_onboarding'),
+    },
+    annotations: DESTRUCTIVE,
+    request: input => ({ method: 'PUT', path: '/user', body: compact(input) }),
+  }),
+  apiTool({
     name: 'capgo_list_organizations',
     title: 'List organizations',
     description: 'List the Capgo organizations this connection can access.',
@@ -241,7 +269,7 @@ const accountTools: McpTool[] = [
   apiTool({
     name: 'capgo_update_organization',
     title: 'Update organization',
-    description: 'Update organization settings (name, website, management email, API key policies, bundle encryption and 2FA enforcement).',
+    description: 'Update organization settings (name, website, management email, API key policies, bundle encryption, 2FA enforcement, password policy and org email notifications).',
     input: {
       orgId,
       name: z.string().optional(),
@@ -253,6 +281,14 @@ const accountTools: McpTool[] = [
       enforce_encrypted_bundles: z.boolean().optional(),
       required_encryption_key: z.string().nullable().optional(),
       enforcing_2fa: z.boolean().optional(),
+      password_policy_config: z.object({
+        enabled: z.boolean(),
+        min_length: z.number().int().min(6).max(72),
+        require_uppercase: z.boolean(),
+        require_number: z.boolean(),
+        require_special: z.boolean(),
+      }).nullable().optional().describe('Password policy members must meet; null removes it'),
+      email_preferences: emailPreferences.optional().describe('Only the org email toggles to change, e.g. {"weekly_stats":false}. Keys: usage_limit, credit_usage, bundle_created, bundle_deployed, deploy_stats_24h, weekly_stats, monthly_stats, billing_period_stats, device_error, channel_self_rejected, onboarding, builder_onboarding'),
     },
     annotations: DESTRUCTIVE,
     request: input => ({ method: 'PUT', path: '/organization', body: compact(input) }),
@@ -280,10 +316,18 @@ const accountTools: McpTool[] = [
     input: {
       orgId,
       email: z.string().email(),
-      invite_type: z.enum(['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin']).describe('Role granted to the invited user'),
+      invite_type: orgRole.describe('Role granted to the invited user'),
     },
     annotations: EXTERNAL,
     request: input => ({ method: 'POST', path: '/organization/members', body: input }),
+  }),
+  apiTool({
+    name: 'capgo_update_organization_member_role',
+    title: 'Change organization member role',
+    description: 'Change the organization role of an existing member. You cannot change your own role, the owner role, or assign a role above your own.',
+    input: { orgId, email: z.string().email(), role: orgRole },
+    annotations: DESTRUCTIVE,
+    request: input => ({ method: 'PUT', path: '/organization/members', body: input }),
   }),
   apiTool({
     name: 'capgo_remove_organization_member',
@@ -373,13 +417,18 @@ const appTools: McpTool[] = [
   apiTool({
     name: 'capgo_update_app',
     title: 'Update app',
-    description: 'Update app settings such as name, bundle retention, metadata exposure and store URLs.',
+    description: 'Update app settings such as name, bundle retention, metadata exposure, preview, build timeout, default upload channel and store URLs. '
+      + 'The default download channel is a channel setting: use capgo_update_channel with public=true.',
     input: {
       appId,
       name: z.string().optional(),
       retention: z.number().int().min(0).max(63113903).optional().describe('Seconds to keep unused bundles before automatic deletion'),
       expose_metadata: z.boolean().optional(),
       allow_device_custom_id: z.boolean().optional(),
+      allow_preview: z.boolean().optional().describe('Allow bundle and channel previews with the Capgo preview app'),
+      block_provider_infra_requests: z.boolean().optional().describe('Block update requests coming from cloud provider infrastructure'),
+      build_timeout_seconds: z.number().int().min(300).max(21600).optional().describe('Native cloud build timeout in seconds (5 to 360 minutes)'),
+      default_upload_channel: z.string().min(1).optional().describe('Existing channel name that CLI uploads link to by default'),
       ios_store_url: z.string().nullable().optional(),
       android_store_url: z.string().nullable().optional(),
     },
@@ -496,6 +545,8 @@ const channelSettings = {
   allow_device: z.boolean().optional().describe('Allow physical devices'),
   allow_dev: z.boolean().optional().describe('Allow development builds'),
   allow_prod: z.boolean().optional().describe('Allow production builds'),
+  updatePackage: z.enum(['all', 'zip', 'delta', 'zip_from_builtin', 'delta_from_builtin']).optional().describe('Which update packages devices may download'),
+  paused: z.boolean().optional().describe('Pause the channel: devices keep their current bundle and get no new update until resumed'),
 }
 
 const channelTools: McpTool[] = [
@@ -540,6 +591,8 @@ const channelTools: McpTool[] = [
       channel: z.string().min(1),
       rolloutVersion: z.union([z.string(), z.number().int()]).nullable().optional().describe('Bundle (name or id) being rolled out'),
       rolloutPercentage: z.number().min(0).max(100).optional().describe('Share of devices getting the rollout bundle'),
+      rolloutPercentageBps: z.number().int().min(0).max(10000).optional().describe('Same as rolloutPercentage in basis points (100 = 1%), for sub-percent precision'),
+      rolloutCacheTtlSeconds: z.number().int().min(60).max(31536000).optional().describe('How long devices keep their rollout assignment'),
       rolloutEnabled: z.boolean().optional(),
       rolloutPaused: z.boolean().optional(),
       rolloutPauseReason: z.string().nullable().optional(),
@@ -549,6 +602,7 @@ const channelTools: McpTool[] = [
       autoPauseEnabled: z.boolean().optional(),
       autoPauseWindowMinutes: z.number().int().min(1).max(10080).optional(),
       autoPauseFailureRateBps: z.number().int().min(0).max(10000).nullable().optional().describe('Failure rate threshold in basis points (100 = 1%)'),
+      autoPauseConfidence: z.number().gt(0).lt(1).optional().describe('Statistical confidence required before auto-pausing, e.g. 0.95'),
       autoPauseMinAttempts: z.number().int().min(0).nullable().optional(),
       autoPauseMinFailures: z.number().int().min(0).nullable().optional(),
       autoPauseAction: z.enum(['pause', 'rollback', 'notify']).optional(),
@@ -561,9 +615,9 @@ const channelTools: McpTool[] = [
     name: 'capgo_delete_channel',
     title: 'Delete channel',
     description: 'Delete a channel. Devices on it fall back to the default channel.',
-    input: { appId, channel: z.string().min(1) },
+    input: { appId, channel: z.string().min(1), delete_bundle: z.boolean().optional().describe('Also delete the bundle linked to this channel') },
     annotations: DESTRUCTIVE,
-    request: input => ({ method: 'DELETE', path: '/channel', body: { app_id: input.appId, channel: input.channel } }),
+    request: input => ({ method: 'DELETE', path: '/channel', body: compact({ app_id: input.appId, channel: input.channel, delete_bundle: input.delete_bundle }) }),
   }),
 ]
 

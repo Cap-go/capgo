@@ -3,6 +3,7 @@ import { confirm as confirmC, intro, isCancel, log, outro, text } from '@clack/p
 import { buildCliRequestHeaders } from '../analytics/cli-headers'
 import { checkAlerts } from '../api/update'
 import { CliUserError } from '../shared/cli-user-error'
+import { ORG_EMAIL_PREFERENCE_KEYS, parseEmailPreferenceFlags } from '../shared/email-preferences'
 import {
   assertOrgPermission,
   check2FAAccessForOrg,
@@ -23,6 +24,10 @@ interface OrganizationUpdatePayload {
   require_apikey_expiration?: boolean
   max_apikey_expiration_days?: number | null
   enforce_hashed_api_keys?: boolean
+  website?: string | null
+  enforce_encrypted_bundles?: boolean
+  required_encryption_key?: string | null
+  email_preferences?: Record<string, boolean>
 }
 
 interface OrganizationUpdateResponse {
@@ -124,6 +129,20 @@ export async function setOrganizationInternal(
   let { name, email, enforce2fa } = enrichedOptions
   const { passwordPolicy, minLength, requireUppercase, requireNumber, requireSpecial } = enrichedOptions
   const { requireApikeyExpiration, maxApikeyExpirationDays, enforceHashedApiKeys } = enrichedOptions
+  const { website, enforceEncryptedBundles, requiredEncryptionKey } = enrichedOptions
+  const flagEmailPreferences = parseEmailPreferenceFlags(enrichedOptions.emailPreference, ORG_EMAIL_PREFERENCE_KEYS)
+  const emailPreferences = enrichedOptions.emailPreferences || flagEmailPreferences
+    ? { ...enrichedOptions.emailPreferences, ...flagEmailPreferences }
+    : undefined
+  if (emailPreferences) {
+    const unknownKey = Object.keys(emailPreferences).find(key => !(ORG_EMAIL_PREFERENCE_KEYS as readonly string[]).includes(key))
+    if (unknownKey)
+      throw new CliUserError(`Unknown email preference "${unknownKey}". Allowed: ${ORG_EMAIL_PREFERENCE_KEYS.join(', ')}`)
+  }
+  const hasOrgSettings = website !== undefined
+    || enforceEncryptedBundles !== undefined
+    || requiredEncryptionKey !== undefined
+    || emailPreferences !== undefined
 
   // Handle 2FA enforcement changes
   if (enforce2fa !== undefined) {
@@ -237,6 +256,7 @@ export async function setOrganizationInternal(
       || requireApikeyExpiration !== undefined
       || maxApikeyExpirationDays !== undefined
       || enforceHashedApiKeys !== undefined
+      || hasOrgSettings
 
     if (name === undefined && email === undefined && !hasOtherSecuritySettings) {
       await sendEvent(enrichedOptions.apikey, {
@@ -334,7 +354,8 @@ export async function setOrganizationInternal(
       && enforce2fa === undefined
       && requireApikeyExpiration === undefined
       && maxApikeyExpirationDays === undefined
-      && enforceHashedApiKeys === undefined) {
+      && enforceHashedApiKeys === undefined
+      && !hasOrgSettings) {
       await sendEvent(enrichedOptions.apikey, {
         channel: 'organization',
         event: passwordPolicy ? 'Password Policy Enabled' : 'Password Policy Disabled',
@@ -407,7 +428,7 @@ export async function setOrganizationInternal(
     }
 
     // If only changing API key settings and no name/email, we're done
-    if (name === undefined && email === undefined && enforce2fa === undefined && passwordPolicy === undefined) {
+    if (name === undefined && email === undefined && enforce2fa === undefined && passwordPolicy === undefined && !hasOrgSettings) {
       await sendEvent(enrichedOptions.apikey, {
         channel: 'organization',
         event: 'API Key Settings Updated',
@@ -426,7 +447,9 @@ export async function setOrganizationInternal(
     }
   }
 
-  if (!silent && !name) {
+  // Only prompt for name/email when nothing else was requested, so flag-only runs stay non-interactive.
+  const handledOtherSettings = enforce2fa !== undefined || passwordPolicy !== undefined || hasApiKeySettings
+  if (!silent && name === undefined && email === undefined && !handledOtherSettings && !hasOrgSettings) {
     const nameInput = await text({
       message: 'New organization name:',
       placeholder: orgData.name || 'My Organization',
@@ -436,10 +459,8 @@ export async function setOrganizationInternal(
       log.warn('Canceled updating organization')
       throw new CliUserError('Organization update cancelled')
     }
-    name = nameInput as string
-  }
+    name = (nameInput as string) || undefined
 
-  if (!silent && !email) {
     const emailInput = await text({
       message: 'Management email:',
       placeholder: orgData.management_email || 'admin@example.com',
@@ -449,13 +470,32 @@ export async function setOrganizationInternal(
       log.warn('Canceled updating organization')
       throw new CliUserError('Organization update cancelled')
     }
-    email = emailInput as string
+    email = (emailInput as string) || undefined
   }
 
-  if (!name || !email) {
+  const updateFields: OrganizationUpdatePayload = { orgId }
+  if (name)
+    updateFields.name = name
+  if (email)
+    updateFields.management_email = email
+  if (website !== undefined)
+    updateFields.website = website === '' || website === 'null' ? null : website
+  if (enforceEncryptedBundles !== undefined)
+    updateFields.enforce_encrypted_bundles = enforceEncryptedBundles
+  if (requiredEncryptionKey !== undefined)
+    updateFields.required_encryption_key = requiredEncryptionKey === '' || requiredEncryptionKey === 'null' ? null : requiredEncryptionKey
+  if (emailPreferences)
+    updateFields.email_preferences = emailPreferences
+
+  if (Object.keys(updateFields).length === 1) {
+    if (handledOtherSettings) {
+      if (!silent)
+        outro('Done ✅')
+      return { orgId, name: orgData.name, email: orgData.management_email, enforce2fa }
+    }
     if (!silent)
-      log.error('Missing arguments, you need to provide an organization name and management email')
-    throw new Error('Missing organization name or management email')
+      log.error('Nothing to update, pass at least one setting')
+    throw new CliUserError('Nothing to update')
   }
 
   if (!silent)
@@ -463,11 +503,7 @@ export async function setOrganizationInternal(
 
   let updatedOrg: Awaited<ReturnType<typeof updateOrganizationViaApi>>
   try {
-    updatedOrg = await updateOrganizationViaApi(enrichedOptions.apikey, {
-      orgId,
-      name,
-      management_email: email,
-    }, silent, organizationApiHost)
+    updatedOrg = await updateOrganizationViaApi(enrichedOptions.apikey, updateFields, silent, organizationApiHost)
   }
   catch (dbError) {
     if (!silent)
@@ -481,7 +517,7 @@ export async function setOrganizationInternal(
     org_id: orgId,
     tracking_version: 2,
     tags: {
-      'org-name': name,
+      'org-name': updatedOrg.name,
     },
   }).catch(() => {})
 

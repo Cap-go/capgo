@@ -32,13 +32,20 @@ interface UpdateApp {
   need_onboarding?: boolean
   existing_app?: boolean
   block_provider_infra_requests?: boolean
+  allow_preview?: boolean
+  build_timeout_seconds?: number
+  default_upload_channel?: string
   ios_store_url?: string | null
   android_store_url?: string | null
   onboarding?: unknown
 }
 
+export const MIN_BUILD_TIMEOUT_SECONDS = 300
+export const MAX_BUILD_TIMEOUT_SECONDS = 21600
+
 type AppSettings = Pick<Database['public']['Tables']['apps']['Update'], 'name' | 'icon_url' | 'retention' | 'expose_metadata' | 'allow_device_custom_id'
   | 'need_onboarding' | 'existing_app' | 'block_provider_infra_requests'
+  | 'allow_preview' | 'build_timeout_seconds' | 'default_upload_channel'
   | 'ios_store_url' | 'android_store_url'>
 
 export async function persistAppOnboarding(
@@ -187,6 +194,14 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   else if (body.retention && body.retention < 0) {
     throw quickError(400, 'retention_to_small', 'Retention cannot be smaller than 0', { retention: body.retention })
   }
+  if (body.allow_preview !== undefined && typeof body.allow_preview !== 'boolean')
+    throw quickError(400, 'invalid_allow_preview', 'allow_preview must be a boolean', { allow_preview: body.allow_preview })
+  if (body.build_timeout_seconds !== undefined
+    && (!Number.isInteger(body.build_timeout_seconds) || body.build_timeout_seconds < MIN_BUILD_TIMEOUT_SECONDS || body.build_timeout_seconds > MAX_BUILD_TIMEOUT_SECONDS)) {
+    throw quickError(400, 'invalid_build_timeout', `build_timeout_seconds must be an integer between ${MIN_BUILD_TIMEOUT_SECONDS} and ${MAX_BUILD_TIMEOUT_SECONDS}`, { build_timeout_seconds: body.build_timeout_seconds })
+  }
+  if (body.default_upload_channel !== undefined && (typeof body.default_upload_channel !== 'string' || body.default_upload_channel.trim() === ''))
+    throw quickError(400, 'invalid_default_upload_channel', 'default_upload_channel must be a channel name', { default_upload_channel: body.default_upload_channel })
 
   const onboardingPatch = parseAppOnboardingPatch(body.onboarding)
   const canUpdateSettings = await checkPermission(c, 'app.update_settings', { appId })
@@ -235,6 +250,9 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     body.allow_device_custom_id,
     body.existing_app,
     body.block_provider_infra_requests,
+    body.allow_preview,
+    body.build_timeout_seconds,
+    body.default_upload_channel,
     body.ios_store_url,
     body.android_store_url,
   ]
@@ -261,6 +279,16 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   }
   if (body.icon !== undefined && body.icon !== '' && !normalizedIcon)
     throw simpleError('invalid_icon_path', 'Icon path must belong to this app organization')
+  if (body.default_upload_channel !== undefined) {
+    const { data: uploadChannel, error: uploadChannelError } = await callerClient
+      .from('channels')
+      .select('id')
+      .eq('app_id', appId)
+      .eq('name', body.default_upload_channel)
+      .maybeSingle()
+    if (uploadChannelError || !uploadChannel)
+      throw quickError(400, 'channel_not_found', 'default_upload_channel must be an existing channel of this app', { app_id: appId, channel: body.default_upload_channel })
+  }
   const onboardingLock = shouldSerializeOnboardingCompletion
     ? await lockOnboardingApp(c, appId)
     : null
@@ -279,6 +307,9 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     need_onboarding: body.need_onboarding,
     existing_app: body.existing_app,
     block_provider_infra_requests: body.block_provider_infra_requests,
+    allow_preview: body.allow_preview,
+    build_timeout_seconds: body.build_timeout_seconds,
+    default_upload_channel: body.default_upload_channel,
     ios_store_url: body.ios_store_url,
     android_store_url: body.android_store_url,
   }

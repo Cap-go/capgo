@@ -25,26 +25,32 @@ import type {
   DoctorOptions,
   EncryptBundleOptions,
   GenerateKeyOptions,
+  GetAccountOptions,
   GetStatsOptions,
+  InviteOrganizationMemberOptions,
   ListOrganizationsOptions,
   LoginOptions,
   ObserveOptions,
   OrganizationInfo,
   ProbeOptions,
   PromoteChannelOptions,
+  RemoveOrganizationMemberOptions,
   RequestBuildOptions,
   SaveKeyOptions,
   SDKResult,
   SetSettingOptions,
   StarAllRepositoriesOptions,
   StarRepoOptions,
+  UpdateAccountOptions,
   UpdateAppOptions,
   UpdateChannelOptions,
+  UpdateOrganizationMemberRoleOptions,
   UpdateOrganizationOptions,
   UploadOptions,
   UploadResult,
   ZipBundleOptions,
 } from './schemas/sdk'
+import type { AccountProfile } from './schemas/account'
 import type { Organization } from './utils'
 import { buildCliRequestHeaders } from './analytics/cli-headers'
 import { checkAppExistsAndHasPermissionOrgErr } from './api/app'
@@ -77,10 +83,13 @@ import { fetchObserve } from './observe/api'
 import { addOrganizationInternal } from './organization/add'
 import { deleteOrganizationInternal } from './organization/delete'
 import { listOrganizationsInternal } from './organization/list'
+import { inviteMemberInternal, removeMemberInternal, setMemberRoleInternal } from './organization/member-manage'
+import { listMembersInternal } from './organization/members'
 import { setOrganizationInternal } from './organization/set'
 import { promoteChannelOptionsSchema, requestBuildOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from './schemas/sdk'
 import { CliUserError } from './shared/cli-user-error'
 import { getUserIdInternal } from './user/account'
+import { getAccountInternal, setAccountInternal } from './user/settings'
 import { createSupabaseClient, findSavedKey, getConfig, getLocalConfig } from './utils'
 import { parseSecurityPolicyError } from './utils/security_policy_errors'
 import { normalizeAutoBumpInput } from './versionHelpers'
@@ -262,6 +271,16 @@ export class CapgoSDK {
         name: options.name,
         icon: options.icon,
         retention: options.retention,
+        exposeMetadata: options.exposeMetadata,
+        preview: options.preview,
+        allowDeviceCustomId: options.allowDeviceCustomId,
+        blockProviderInfraRequests: options.blockProviderInfraRequests,
+        buildTimeoutMinutes: options.buildTimeoutMinutes,
+        iosStoreUrl: options.iosStoreUrl,
+        androidStoreUrl: options.androidStoreUrl,
+        defaultUploadChannel: options.defaultUploadChannel,
+        defaultDownloadChannel: options.defaultDownloadChannel,
+        disableDownloadChannels: options.disableDownloadChannels,
       }
 
       await setAppInternal(options.appId, internalOptions, true)
@@ -893,6 +912,9 @@ export class CapgoSDK {
         downgrade: parsed.downgrade,
         ios: parsed.ios,
         android: parsed.android,
+        electron: parsed.electron,
+        pause: parsed.pause,
+        resume: parsed.resume,
         selfAssign: parsed.selfAssign,
         disableAutoUpdate: parsed.disableAutoUpdate ?? undefined,
         updatePackage: parsed.updatePackage,
@@ -1160,6 +1182,19 @@ export class CapgoSDK {
         supaAnon: options.supaAnon || this.supaAnon,
         name: options.name,
         email: options.email,
+        website: options.website,
+        enforce2fa: options.enforce2fa,
+        passwordPolicy: options.passwordPolicy,
+        minLength: options.minLength,
+        requireUppercase: options.requireUppercase,
+        requireNumber: options.requireNumber,
+        requireSpecial: options.requireSpecial,
+        requireApikeyExpiration: options.requireApikeyExpiration,
+        maxApikeyExpirationDays: options.maxApikeyExpirationDays,
+        enforceHashedApiKeys: options.enforceHashedApiKeys,
+        enforceEncryptedBundles: options.enforceEncryptedBundles,
+        requiredEncryptionKey: options.requiredEncryptionKey,
+        emailPreferences: options.emailPreferences,
       }
 
       const updated = await setOrganizationInternal(options.orgId, requestOptions, true)
@@ -1195,6 +1230,135 @@ export class CapgoSDK {
         success: true,
         data: { deleted },
       }
+    }
+    catch (error) {
+      return createErrorResult(error)
+    }
+  }
+
+  /**
+   * List the members of an organization with their role, invite state, and 2FA status
+   */
+  async listOrganizationMembers(orgId: string, options?: ListOrganizationsOptions): Promise<SDKResult<Awaited<ReturnType<typeof listMembersInternal>>>> {
+    try {
+      const data = await listMembersInternal(orgId, {
+        apikey: options?.apikey || this.apikey || findSavedKey(true),
+        supaHost: options?.supaHost || this.supaHost,
+        supaAnon: options?.supaAnon || this.supaAnon,
+      }, true)
+      return { success: true, data }
+    }
+    catch (error) {
+      return createErrorResult(error)
+    }
+  }
+
+  /**
+   * Invite a user to an organization by email
+   *
+   * @example
+   * ```typescript
+   * await sdk.inviteOrganizationMember({ orgId, email: 'teammate@example.com', role: 'org_admin' })
+   * ```
+   */
+  async inviteOrganizationMember(options: InviteOrganizationMemberOptions): Promise<SDKResult> {
+    try {
+      await inviteMemberInternal(options.orgId, {
+        apikey: options.apikey || this.apikey || findSavedKey(true),
+        supaHost: options.supaHost || this.supaHost,
+        supaAnon: options.supaAnon || this.supaAnon,
+        email: options.email,
+        role: options.role,
+      }, true)
+      return { success: true }
+    }
+    catch (error) {
+      return createErrorResult(error)
+    }
+  }
+
+  /**
+   * Change the role of an organization member or pending invite
+   */
+  async updateOrganizationMemberRole(options: UpdateOrganizationMemberRoleOptions): Promise<SDKResult> {
+    try {
+      await setMemberRoleInternal(options.orgId, {
+        apikey: options.apikey || this.apikey || findSavedKey(true),
+        supaHost: options.supaHost || this.supaHost,
+        supaAnon: options.supaAnon || this.supaAnon,
+        email: options.email,
+        role: options.role,
+      }, true)
+      return { success: true }
+    }
+    catch (error) {
+      return createErrorResult(error)
+    }
+  }
+
+  /**
+   * Remove a member from an organization
+   */
+  async removeOrganizationMember(options: RemoveOrganizationMemberOptions): Promise<SDKResult> {
+    try {
+      await removeMemberInternal(options.orgId, {
+        apikey: options.apikey || this.apikey || findSavedKey(true),
+        supaHost: options.supaHost || this.supaHost,
+        supaAnon: options.supaAnon || this.supaAnon,
+        email: options.email,
+      }, true)
+      return { success: true }
+    }
+    catch (error) {
+      return createErrorResult(error)
+    }
+  }
+
+  // ==========================================================================
+  // Account
+  // ==========================================================================
+
+  /**
+   * Get the profile and email notification settings of the account that owns the API key
+   */
+  async getAccount(options?: GetAccountOptions): Promise<SDKResult<AccountProfile>> {
+    try {
+      const data = await getAccountInternal({
+        apikey: options?.apikey || this.apikey || findSavedKey(true),
+        supaHost: options?.supaHost || this.supaHost,
+        supaAnon: options?.supaAnon || this.supaAnon,
+      }, true)
+      return { success: true, data }
+    }
+    catch (error) {
+      return createErrorResult(error)
+    }
+  }
+
+  /**
+   * Update the profile and email notification settings of the account that owns the API key
+   *
+   * @example
+   * ```typescript
+   * await sdk.updateAccount({ firstName: 'Ada', emailPreferences: { weekly_stats: false } })
+   * ```
+   */
+  async updateAccount(options: UpdateAccountOptions): Promise<SDKResult<AccountProfile>> {
+    try {
+      const data = await setAccountInternal({
+        apikey: options.apikey || this.apikey || findSavedKey(true),
+        supaHost: options.supaHost || this.supaHost,
+        supaAnon: options.supaAnon || this.supaAnon,
+        firstName: options.firstName,
+        lastName: options.lastName,
+        country: options.country,
+        discordUsername: options.discordUsername,
+        formatLocale: options.formatLocale,
+        notifications: options.notifications,
+        newsletter: options.newsletter,
+        emailPreferences: options.emailPreferences,
+      }, true)
+      return { success: true, data }
     }
     catch (error) {
       return createErrorResult(error)
@@ -1518,6 +1682,31 @@ export async function deleteOrganization(orgId: string, options?: DeleteOrganiza
   return sdk.deleteOrganization(orgId, options)
 }
 
+export async function inviteOrganizationMember(options: InviteOrganizationMemberOptions): Promise<SDKResult> {
+  const sdk = new CapgoSDK({ apikey: options.apikey, supaHost: options.supaHost, supaAnon: options.supaAnon })
+  return sdk.inviteOrganizationMember(options)
+}
+
+export async function updateOrganizationMemberRole(options: UpdateOrganizationMemberRoleOptions): Promise<SDKResult> {
+  const sdk = new CapgoSDK({ apikey: options.apikey, supaHost: options.supaHost, supaAnon: options.supaAnon })
+  return sdk.updateOrganizationMemberRole(options)
+}
+
+export async function removeOrganizationMember(options: RemoveOrganizationMemberOptions): Promise<SDKResult> {
+  const sdk = new CapgoSDK({ apikey: options.apikey, supaHost: options.supaHost, supaAnon: options.supaAnon })
+  return sdk.removeOrganizationMember(options)
+}
+
+export async function getAccount(options?: GetAccountOptions): Promise<SDKResult<AccountProfile>> {
+  const sdk = new CapgoSDK({ apikey: options?.apikey, supaHost: options?.supaHost, supaAnon: options?.supaAnon })
+  return sdk.getAccount(options)
+}
+
+export async function updateAccount(options: UpdateAccountOptions): Promise<SDKResult<AccountProfile>> {
+  const sdk = new CapgoSDK({ apikey: options.apikey, supaHost: options.supaHost, supaAnon: options.supaAnon })
+  return sdk.updateAccount(options)
+}
+
 /**
  * Add a new app to Capgo Cloud (functional API)
  *
@@ -1721,13 +1910,16 @@ export type {
   DoctorOptions,
   EncryptBundleOptions,
   GenerateKeyOptions,
+  GetAccountOptions,
   GetStatsOptions,
+  InviteOrganizationMemberOptions,
   ListOrganizationsOptions,
   LoginOptions,
   ObserveOptions,
   OrganizationInfo,
   ProbeOptions,
   PromoteChannelOptions,
+  RemoveOrganizationMemberOptions,
   RequestBuildOptions,
   SaveKeyOptions,
   SDKResult,
@@ -1735,13 +1927,16 @@ export type {
   StarAllRepositoriesOptions,
   StarRepoOptions,
   StatsOrder,
+  UpdateAccountOptions,
   UpdateAppOptions,
   UpdateChannelOptions,
+  UpdateOrganizationMemberRoleOptions,
   UpdateOrganizationOptions,
   UploadOptions,
   UploadResult,
   ZipBundleOptions,
 } from './schemas/sdk'
+export type { AccountProfile } from './schemas/account'
 export type { Database } from './types/supabase.types'
 export { createSupabaseClient } from './utils'
 export {

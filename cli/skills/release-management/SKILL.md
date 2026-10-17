@@ -238,6 +238,8 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - `--downgrade`, `--no-downgrade`
   - `--ios`, `--no-ios`
   - `--android`, `--no-android`
+  - `--electron`, `--no-electron`
+  - `--pause`, `--resume` (stop or restart every update on the channel)
   - `--self-assign`, `--no-self-assign`
   - `--disable-auto-update <disableAutoUpdate>`
   - `--dev`, `--no-dev`

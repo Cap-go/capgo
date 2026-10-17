@@ -28,6 +28,12 @@ import {
   mcpUpdateAppInputSchema,
   mcpUpdateChannelInputSchema,
   mcpUploadBundleInputSchema,
+  mcpGetAccountInputSchema,
+  mcpOrganizationMemberRoleInputSchema,
+  mcpOrgIdInputSchema,
+  mcpRemoveOrganizationMemberInputSchema,
+  mcpUpdateAccountInputSchema,
+  mcpUpdateOrganizationInputSchema,
 } from './tool-schemas'
 import { CapgoSDK } from '../sdk'
 import { getConfigWriteTarget, setConfigWriteTarget } from '../config'
@@ -159,11 +165,12 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
   server.registerTool(
     'capgo_update_app',
     {
-      description: 'Update settings for an existing app in Capgo Cloud',
+      description: 'Update settings for an existing app in Capgo Cloud: name, icon, bundle retention, metadata exposure, preview QR codes, custom device IDs, provider-infrastructure blocking, build timeout, store URLs, and default upload/download channels',
       inputSchema: mcpUpdateAppInputSchema,
     },
-    async ({ appId, name, icon, retention }) => {
-      const result = await sdk.updateApp({ appId, name, icon, retention })
+    async (input) => {
+      const { appId } = input
+      const result = await sdk.updateApp(input)
       if (!result.success) {
         return formatMcpError(result)
       }
@@ -445,45 +452,12 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
   server.registerTool(
     'capgo_update_channel',
     {
-      description: 'Update channel settings including linked bundle and targeting options',
+      description: 'Update channel settings including linked bundle, platform and device targeting, update package type, pausing all updates, progressive rollout, and auto-pause',
       inputSchema: mcpUpdateChannelInputSchema,
     },
-    async ({ appId, channelId, bundle, state, downgrade, ios, android, selfAssign, disableAutoUpdate, dev, emulator, device, prod, rolloutBundle, rolloutPercentage, rolloutPercentageBps, rolloutEnable, rolloutDisable, rolloutPause, rolloutResume, rolloutRollback, rolloutPromote, rolloutCacheTtlSeconds, autoPauseEnabled, autoPauseDisabled, autoPauseWindowMinutes, autoPauseFailureRateBps, autoPauseConfidence, autoPauseMinAttempts, autoPauseMinFailures, autoPauseAction, autoPauseCooldownMinutes, acceptIncompatible }) => {
-      const payload = parseSchema(updateChannelOptionsSchema, {
-        appId,
-        channelId,
-        bundle,
-        state,
-        downgrade,
-        ios,
-        android,
-        selfAssign,
-        disableAutoUpdate,
-        dev,
-        emulator,
-        device,
-        prod,
-        rolloutBundle,
-        rolloutPercentage,
-        rolloutPercentageBps,
-        rolloutEnable,
-        rolloutDisable,
-        rolloutPause,
-        rolloutResume,
-        rolloutRollback,
-        rolloutPromote,
-        rolloutCacheTtlSeconds,
-        autoPauseEnabled,
-        autoPauseDisabled,
-        autoPauseWindowMinutes,
-        autoPauseFailureRateBps,
-        autoPauseConfidence,
-        autoPauseMinAttempts,
-        autoPauseMinFailures,
-        autoPauseAction,
-        autoPauseCooldownMinutes,
-        acceptIncompatible,
-      })
+    async (input) => {
+      const { channelId } = input
+      const payload = parseSchema(updateChannelOptionsSchema, input)
       const result = await sdk.updateChannel(payload)
       if (!result.success) {
         return formatMcpError(result)
@@ -591,6 +565,150 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
             ...result.data,
           }, null, 2),
         }],
+      }
+    },
+  )
+
+  server.registerTool(
+    'capgo_update_organization',
+    {
+      description: 'Update organization settings: name, management email, website, 2FA enforcement, password policy, API key policies (expiration, hashed keys), encrypted bundle enforcement, and organization email notifications',
+      inputSchema: mcpUpdateOrganizationInputSchema,
+      annotations: { destructiveHint: true },
+    },
+    async (input) => {
+      const result = await sdk.updateOrganization(input)
+      if (!result.success) {
+        return formatMcpError(result)
+      }
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ message: 'Organization updated successfully', ...result.data }, null, 2) }],
+      }
+    },
+  )
+
+  server.registerTool(
+    'capgo_delete_organization',
+    {
+      description: 'Permanently delete an organization with all its apps, bundles and data. Irreversible: confirm with the user first.',
+      inputSchema: mcpOrgIdInputSchema,
+      annotations: { destructiveHint: true },
+    },
+    async ({ orgId }) => {
+      const result = await sdk.deleteOrganization(orgId, { autoConfirm: true })
+      if (!result.success) {
+        return formatMcpError(result)
+      }
+      return {
+        content: [{ type: 'text' as const, text: `Successfully deleted organization: ${orgId}` }],
+      }
+    },
+  )
+
+  server.registerTool(
+    'capgo_list_organization_members',
+    {
+      description: 'List organization members with their role, invite status and 2FA status',
+      inputSchema: mcpOrgIdInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    async ({ orgId }) => {
+      const result = await sdk.listOrganizationMembers(orgId)
+      if (!result.success) {
+        return formatMcpError(result)
+      }
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+      }
+    },
+  )
+
+  server.registerTool(
+    'capgo_invite_organization_member',
+    {
+      description: 'Invite a user to an organization by email with a role. Capgo sends an invitation email to that address.',
+      inputSchema: mcpOrganizationMemberRoleInputSchema,
+      annotations: { openWorldHint: true },
+    },
+    async (input) => {
+      const result = await sdk.inviteOrganizationMember(input)
+      if (!result.success) {
+        return formatMcpError(result)
+      }
+      return {
+        content: [{ type: 'text' as const, text: `Invitation sent to ${input.email} as ${input.role}` }],
+      }
+    },
+  )
+
+  server.registerTool(
+    'capgo_update_organization_member_role',
+    {
+      description: 'Change the role of an organization member or pending invite',
+      inputSchema: mcpOrganizationMemberRoleInputSchema,
+      annotations: { destructiveHint: true },
+    },
+    async (input) => {
+      const result = await sdk.updateOrganizationMemberRole(input)
+      if (!result.success) {
+        return formatMcpError(result)
+      }
+      return {
+        content: [{ type: 'text' as const, text: `${input.email} is now ${input.role}` }],
+      }
+    },
+  )
+
+  server.registerTool(
+    'capgo_remove_organization_member',
+    {
+      description: 'Remove a member from an organization',
+      inputSchema: mcpRemoveOrganizationMemberInputSchema,
+      annotations: { destructiveHint: true },
+    },
+    async (input) => {
+      const result = await sdk.removeOrganizationMember(input)
+      if (!result.success) {
+        return formatMcpError(result)
+      }
+      return {
+        content: [{ type: 'text' as const, text: `Removed ${input.email} from the organization` }],
+      }
+    },
+  )
+
+  server.registerTool(
+    'capgo_get_account',
+    {
+      description: 'Get the profile (name, country, Discord username, locale) and email notification settings of the account behind the current API key',
+      inputSchema: mcpGetAccountInputSchema,
+      annotations: { readOnlyHint: true },
+    },
+    async () => {
+      const result = await sdk.getAccount()
+      if (!result.success) {
+        return formatMcpError(result)
+      }
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result.data, null, 2) }],
+      }
+    },
+  )
+
+  server.registerTool(
+    'capgo_update_account',
+    {
+      description: 'Update the profile and email notification settings of the account behind the current API key. Email, password, 2FA and account deletion are only available in the web dashboard.',
+      inputSchema: mcpUpdateAccountInputSchema,
+      annotations: { destructiveHint: true },
+    },
+    async (input) => {
+      const result = await sdk.updateAccount(input)
+      if (!result.success) {
+        return formatMcpError(result)
+      }
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify({ message: 'Account updated successfully', ...result.data }, null, 2) }],
       }
     },
   )

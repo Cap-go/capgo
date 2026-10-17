@@ -58,13 +58,15 @@ import { setupNotifications } from './notifications/setup'
 import { startOnboardingChecks } from './onboarding/background'
 import { waitForOnboardingChecks } from './onboarding/background-shutdown'
 import { type ObserveCliOptions, observeCommand } from './observe/command'
-import { addOrganization, deleteOrganization, listMembers, listOrganizations, setOrganization } from './organization'
+import { addOrganization, deleteOrganization, inviteMember, listMembers, listOrganizations, removeMember, setMemberRole, setOrganization } from './organization'
 import { capturePosthogException, getCommandPath, shouldCapturePosthogException } from './posthog'
 import { getPreviewQr } from './preview/qr'
 import { probe } from './probe'
 import { testRunDeviceCommand } from './run/device'
 import { CliUserError } from './shared/cli-user-error'
+import { ORG_EMAIL_PREFERENCE_KEYS, USER_EMAIL_PREFERENCE_KEYS } from './shared/email-preferences'
 import { TwoFactorComplianceNetworkError } from './shared/two-factor-compliance'
+import { getAccount, setAccount } from './user/settings'
 import { whoami } from './user/whoami'
 import { formatError } from './utils'
 import { CLI_PROJECT_MODES } from './framework/mode'
@@ -662,6 +664,10 @@ Example: npx @capgo/cli@latest channel set production com.example.app --bundle 1
   .option('--no-ios', `Disable sending update to iOS devices`)
   .option('--android', `Allow sending update to Android devices`)
   .option('--no-android', `Disable sending update to Android devices`)
+  .option('--electron', `Allow sending update to Electron apps`)
+  .option('--no-electron', `Disable sending update to Electron apps`)
+  .option('--pause', `Pause all updates on this channel (devices stay on their current bundle)`)
+  .option('--resume', `Resume updates on a paused channel`)
   .option('--self-assign', `Allow device to self-assign to this channel`)
   .option('--no-self-assign', `Disable devices to self-assign to this channel`)
   .option('--disable-auto-update <disableAutoUpdate>', `Block updates by type: major, minor, metadata, patch, or none (allows all)`)
@@ -752,6 +758,39 @@ Example: npx @capgo/cli@latest account whoami`)
   .action(whoami)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
 
+account.command('get')
+  .alias('g')
+  .description(`📇 Show your account profile and email notification settings.
+
+Example: npx @capgo/cli@latest account get`)
+  .action(getAccount)
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+
+account.command('set')
+  .alias('s')
+  .description(`✏️ Update your account profile and email notification settings.
+
+Email, password, 2FA and account deletion stay in the web dashboard because they need an interactive sign-in.
+
+Example: npx @capgo/cli@latest account set --first-name Ada --last-name Lovelace
+Example: npx @capgo/cli@latest account set --no-newsletter --email-preference weekly_stats=false`)
+  .action(setAccount)
+  .option('--first-name <firstName>', `First name`)
+  .option('--last-name <lastName>', `Last name`)
+  .option('--country <country>', `Country`)
+  .option('--discord-username <username>', `Discord username (empty or null to clear)`)
+  .option('--format-locale <locale>', `Locale used to format dates and numbers, e.g. en-US (empty or null to clear)`)
+  .option('--notifications', `Enable email notifications`)
+  .option('--no-notifications', `Disable all email notifications`)
+  .option('--newsletter', `Subscribe to the newsletter`)
+  .option('--no-newsletter', `Unsubscribe from the newsletter`)
+  .option('--email-preference <key=bool>', `Email notification toggle (repeatable), e.g. --email-preference weekly_stats=false. Keys: ${USER_EMAIL_PREFERENCE_KEYS.join(', ')}`, collect, [])
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+
 const organization = program
   .command('organization')
   .description(`🏢 Manage your organizations in Capgo Cloud for team collaboration and app management.`)
@@ -792,6 +831,43 @@ Note: Viewing 2FA status requires super_admin rights in the organization.
 
 Example: npx @capgo/cli@latest organization members ORG_ID`)
   .action(listMembers)
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+
+const memberRoleDescription = `Role: org_member, org_billing_admin, org_admin or org_super_admin`
+
+organization
+  .command('members-invite [orgId]')
+  .description(`✉️ Invite a user to an organization by email with a role.
+
+Example: npx @capgo/cli@latest organization members-invite ORG_ID --email teammate@example.com --role org_admin`)
+  .action(inviteMember)
+  .option('-e, --email <email>', `Email of the user to invite`)
+  .option('-r, --role <role>', memberRoleDescription)
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+
+organization
+  .command('members-role [orgId]')
+  .description(`🎚️ Change the role of an organization member or pending invite.
+
+Example: npx @capgo/cli@latest organization members-role ORG_ID --email teammate@example.com --role org_member`)
+  .action(setMemberRole)
+  .option('-e, --email <email>', `Email of the member`)
+  .option('-r, --role <role>', memberRoleDescription)
+  .option('-a, --apikey <apikey>', optionDescriptions.apikey)
+  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
+  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+
+organization
+  .command('members-remove [orgId]')
+  .description(`🚪 Remove a member from an organization.
+
+Example: npx @capgo/cli@latest organization members-remove ORG_ID --email teammate@example.com`)
+  .action(removeMember)
+  .option('-e, --email <email>', `Email of the member to remove`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
@@ -839,6 +915,11 @@ Example: npx @capgo/cli@latest organization set ORG_ID --enforce-hashed-api-keys
   })
   .option('--enforce-hashed-api-keys', `Enforce hashed/secure API keys (key value stored as hash, shown only once)`)
   .option('--no-enforce-hashed-api-keys', `Allow plain-text API keys`)
+  .option('--website <url>', `Organization website URL (empty or null to clear)`)
+  .option('--enforce-encrypted-bundles', `Require every uploaded bundle to be encrypted`)
+  .option('--no-enforce-encrypted-bundles', `Allow unencrypted bundles`)
+  .option('--required-encryption-key <key>', `Only accept bundles encrypted with this public key fingerprint (null to clear)`)
+  .option('--email-preference <key=bool>', `Organization email notification toggle (repeatable), e.g. --email-preference weekly_stats=false. Keys: ${ORG_EMAIL_PREFERENCE_KEYS.join(', ')}`, collect, [])
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
@@ -921,6 +1002,11 @@ organisation
   })
   .option('--enforce-hashed-api-keys', `Enforce hashed/secure API keys (key value stored as hash, shown only once)`)
   .option('--no-enforce-hashed-api-keys', `Allow plain-text API keys`)
+  .option('--website <url>', `Organization website URL (empty or null to clear)`)
+  .option('--enforce-encrypted-bundles', `Require every uploaded bundle to be encrypted`)
+  .option('--no-enforce-encrypted-bundles', `Allow unencrypted bundles`)
+  .option('--required-encryption-key <key>', `Only accept bundles encrypted with this public key fingerprint (null to clear)`)
+  .option('--email-preference <key=bool>', `Organization email notification toggle (repeatable), e.g. --email-preference weekly_stats=false. Keys: ${ORG_EMAIL_PREFERENCE_KEYS.join(', ')}`, collect, [])
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
@@ -1533,10 +1619,11 @@ Selected tools exposed via MCP:
   - capgo_upload_bundle, capgo_list_bundles, capgo_delete_bundle, capgo_cleanup_bundles
   - capgo_list_channels, capgo_add_channel, capgo_update_channel, capgo_delete_channel
   - capgo_get_current_bundle, capgo_promote_channel, capgo_check_compatibility
-  - capgo_list_organizations, capgo_add_organization
+  - capgo_list_organizations, capgo_add_organization, capgo_update_organization, capgo_delete_organization
+  - capgo_list_organization_members, capgo_invite_organization_member, capgo_update_organization_member_role, capgo_remove_organization_member
   - capgo_star_repository
   - capgo_star_all_repositories
-  - capgo_get_account_id, capgo_doctor, capgo_get_stats, capgo_observe
+  - capgo_get_account_id, capgo_get_account, capgo_update_account, capgo_doctor, capgo_get_stats, capgo_observe
   - capgo_request_build, capgo_generate_encryption_keys
 
 Example usage with Claude Desktop:
