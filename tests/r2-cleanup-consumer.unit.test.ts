@@ -201,6 +201,75 @@ describe('cleanup delivery isolation', () => {
     expect(f.batch.messages[20].retry).toHaveBeenCalledOnce()
   })
 
+  it('identifies stale health evidence without logging private exception details', async () => {
+    const f = fixture(Array.from({ length: 100 }, (_, i) => value(String(i))))
+    vi.mocked(inspectCleanupGroup).mockRejectedValue(new Error('Manifest replication evidence unavailable'))
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await consumeCleanupBatch(f.batch, f.env, f.deps)
+      const entries = log.mock.calls.map(([entry]) => JSON.parse(entry))
+      expect(entries.filter(entry => entry.event === 'r2_cleanup_database_failure')).toEqual([
+        { event: 'r2_cleanup_database_failure', stage: 'inspection', reason: 'replication_evidence_unavailable', errorType: 'Error' },
+      ])
+      expect(f.remove).not.toHaveBeenCalled()
+      expect(f.batch.messages.every(m => vi.mocked(m.retry).mock.calls.length === 1)).toBe(true)
+      expect(entries.at(-1)).toEqual({ event: 'r2_cleanup_batch', received: 100, counts: { safety: 100 } })
+    }
+    finally {
+      log.mockRestore()
+    }
+  })
+
+  it('bounds distinct database diagnostics and only exposes allowlisted error fields', async () => {
+    const f = fixture(Array.from({ length: 100 }, (_, i) => value(String(i))))
+    const privateDetail = 'postgres://synthetic-secret@example.invalid/private-object'
+    const failures = [
+      new Error('Failed query with private parameters', { cause: Object.assign(new Error(privateDetail), { code: '53300', name: 'error' }) }),
+      new Error(`Failed to acquire a connection from the pool. ${privateDetail}`),
+      new Error(`timeout expired ${privateDetail}`),
+      Object.assign(new Error(privateDetail), { name: privateDetail, code: privateDetail }),
+      new Error('Inventory database binding missing'),
+    ]
+    let index = 0
+    f.deps.database = async () => {
+      throw failures[index++]
+    }
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await consumeCleanupBatch(f.batch, f.env, f.deps)
+      const entries = log.mock.calls.map(([entry]) => JSON.parse(entry))
+      expect(entries.filter(entry => entry.event === 'r2_cleanup_database_failure')).toEqual([
+        { event: 'r2_cleanup_database_failure', stage: 'inspection', reason: 'connection_capacity', errorType: 'DatabaseError', sqlState: '53300' },
+        { event: 'r2_cleanup_database_failure', stage: 'inspection', reason: 'pool_exhausted', errorType: 'Error' },
+        { event: 'r2_cleanup_database_failure', stage: 'inspection', reason: 'connection_timeout', errorType: 'Error' },
+      ])
+      expect(JSON.stringify(entries)).not.toContain(privateDetail)
+      expect(JSON.stringify(entries)).not.toContain('private parameters')
+      expect(f.batch.messages.every(m => vi.mocked(m.retry).mock.calls.length === 1)).toBe(true)
+    }
+    finally {
+      log.mockRestore()
+    }
+  })
+
+  it('diagnoses post-ACK completion errors without retrying completed storage work', async () => {
+    const f = fixture([value()])
+    vi.mocked(completeCleanupGroup).mockRejectedValue(Object.assign(new Error('synthetic private SQL'), { code: '55P03' }))
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await consumeCleanupBatch(f.batch, f.env, f.deps)
+      expect(log.mock.calls.map(([entry]) => JSON.parse(entry)).filter(entry => entry.event === 'r2_cleanup_database_failure')).toEqual([
+        { event: 'r2_cleanup_database_failure', stage: 'completion', reason: 'lock_timeout', errorType: 'Error', sqlState: '55P03' },
+      ])
+      expect(f.batch.messages[0].ack).toHaveBeenCalledOnce()
+      expect(f.batch.messages[0].retry).not.toHaveBeenCalled()
+      expect(JSON.stringify(log.mock.calls)).not.toContain('synthetic private SQL')
+    }
+    finally {
+      log.mockRestore()
+    }
+  })
+
   it('stops starting storage with insufficient batch or health budget', async () => {
     const f = fixture([value()])
     let calls = 0
