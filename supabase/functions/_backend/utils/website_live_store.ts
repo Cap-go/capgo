@@ -97,7 +97,9 @@ interface WebsiteLiveApp {
 const textEncoder = new TextEncoder()
 
 function getStoreSecretKeyMaterial(c: Context): string {
-  const secret = getEnv(c, 'STORE_CREDENTIALS_SECRET') || getEnv(c, 'API_SECRET')
+  // Dedicated key: store keys must not depend on a secret that is shared or
+  // rotated for other reasons. No fallback, so a missing key fails loudly.
+  const secret = getEnv(c, 'STORE_CREDENTIALS_SECRET')
   if (!secret)
     throw simpleError('missing_store_credentials_secret', 'Store credential encryption is not configured')
   return secret
@@ -549,6 +551,8 @@ export async function saveAndroidCredentials(c: Context, input: {
       sha256: fingerprints.sha256 ?? (secret === existing ? existingSummary?.metadata.sha256 ?? null : null),
       play_client_email: play?.clientEmail ?? null,
       play_project_id: play?.projectId ?? null,
+      // The console reminds users to download a generated key until they do.
+      exported_at: secret === existing ? existingSummary?.metadata.exported_at ?? null : null,
     },
   })
   return { summary, generatedKeystore }
@@ -558,6 +562,11 @@ export async function exportAndroidKeystore(c: Context, appId: string) {
   const secret = await getStoreSecret<AndroidStoreSecret>(c, appId, 'android')
   if (!secret)
     throw quickError(404, 'android_keystore_not_found', 'No Android upload key is stored for this app')
+  await withDb(c, db => db.execute(sql`
+    UPDATE public.website_live_store_credentials
+    SET metadata = metadata || jsonb_build_object('exported_at', now())
+    WHERE app_id = ${appId} AND platform = 'android'
+  `))
   return {
     keystore_base64: secret.keystoreBase64,
     key_alias: secret.keyAlias,

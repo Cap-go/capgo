@@ -4242,6 +4242,7 @@
   "store-publish-keystore-password": "Keystore password",
   "store-publish-key-password": "Key password",
   "store-publish-key-password-placeholder": "Same as the keystore password",
+  "store-publish-keystore-export-reminder": "Capgo holds the only copy of this app's upload key. Download it and keep it with its password somewhere safe.",
   "store-publish-keystore-warning": "Download your upload key and keep it with its password somewhere safe. Google Play needs this exact key for every future version of your app.",
   "store-publish-download-keystore": "Download upload key",
   "store-publish-keystore-downloaded": "Upload key downloaded",

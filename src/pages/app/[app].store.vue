@@ -730,10 +730,16 @@ onBeforeUnmount(() => {
           <p class="mt-2 font-mono text-xs break-all">
             {{ t('store-publish-key-alias') }}: {{ generatedKeystore.key_alias }} · {{ t('store-publish-keystore-password') }}: {{ generatedKeystore.password }}
           </p>
-          <button type="button" class="mt-3 d-btn d-btn-sm d-btn-warning" @click="downloadKeystore(generatedKeystore)">
+          <button type="button" class="mt-3 d-btn d-btn-sm d-btn-warning" :disabled="busy !== null" @click="exportKeystore">
             <IconDownload class="w-4 h-4" aria-hidden="true" />
             {{ t('store-publish-download-keystore') }}
           </button>
+        </div>
+
+        <div v-if="androidCredentials?.metadata.generated && !androidCredentials.metadata.exported_at && !generatedKeystore" class="p-4 mt-4 text-sm border rounded-lg border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700" role="alert" data-test="store-keystore-export-reminder">
+          <p class="font-medium text-amber-900 dark:text-amber-100">
+            {{ t('store-publish-keystore-export-reminder') }}
+          </p>
         </div>
 
         <div v-if="androidCredentials" class="grid gap-2 p-3 mt-4 text-sm border rounded-lg sm:grid-cols-2 bg-slate-50 border-slate-200 dark:bg-slate-900/40 dark:border-slate-700" data-test="store-android-summary">
