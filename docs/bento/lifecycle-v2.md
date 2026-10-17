@@ -16,8 +16,12 @@ row cannot be changed, including by later ownership changes; deleting the
 original user does not replace that identity. Older organizations without this
 capture remain outside this cohort. The original creator must still resolve to
 a protected signup marker, a valid persisted v2 treatment A, the configured
-creation cutoff, current OTA/Builder intent, and the Builder treatment
+self-signup audience and original creator's persisted `created_via_invite = false`,
+the creation cutoff, current OTA/Builder intent, and the Builder treatment
 prerequisite where applicable. No evaluation calls the allocator.
+Invited creators stay excluded even with a stale treatment. Signup provenance
+comes from the original user row; the recipient's invitation or membership and
+client-provided onboarding JSON cannot establish self-signup eligibility.
 
 The recipient is the current owner with an unexpired direct organization
 membership and enabled organization/personal onboarding preferences and
@@ -159,7 +163,7 @@ recipient expression indexes and bounded weekly counts. The migration test
 executes `EXPLAIN (ANALYZE, BUFFERS)` with the normal planner over 100,000
 additional synthetic users, organizations and creator rows. The measured keyed
 lookup returned one row, used `org_lifecycle_original_creator`, `orgs_pkey` and
-`users_pkey`, and had no sequential scan: 0.241 ms execution, 13 buffer hits and
+`users_pkey`, and had no sequential scan: 0.183 ms execution, 13 buffer hits and
 zero reads in embedded PostgreSQL. These are fixture measurements, not
 production-machine latency.
 

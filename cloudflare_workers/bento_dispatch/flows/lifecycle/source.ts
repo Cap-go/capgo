@@ -20,6 +20,7 @@ interface SourceRow extends Record<string, unknown> {
   org_preferences: Record<string, unknown>
   creator_onboarding: { abtests?: Record<string, { branch?: string, assigned_at?: string }>, abtests_enrolled?: string[] }
   creator_created_at: string | Date
+  creator_created_via_invite: boolean | null
   recipient_id: string | null
   email: string | null
   recipient_preferences: Record<string, unknown> | null
@@ -46,6 +47,7 @@ interface SourceRow extends Record<string, unknown> {
 export const LIFECYCLE_SOURCE_SQL = `
 SELECT j.*, o.name AS org_name, o.onboarding AS org_onboarding, o.email_preferences AS org_preferences,
   original.onboarding AS creator_onboarding, original.created_at AS creator_created_at,
+  original.created_via_invite AS creator_created_via_invite,
   recipient.id AS recipient_id, LOWER(recipient.email) AS email, recipient.email_preferences AS recipient_preferences,
   recipient.enable_notifications, recipient.opt_for_newsletters,
   EXISTS (SELECT 1 FROM public.role_bindings rb WHERE rb.principal_type = 'user' AND rb.principal_id = recipient.id
@@ -167,7 +169,7 @@ export async function loadLifecycleInput(ctx: ReadOnlyContext, orgId: string, pr
     product,
     recipientId: row.recipient_id ?? '',
     email: row.email ?? '',
-    creatorTreatment: originalCreatorHasTreatment(row.creator_onboarding, row.creator_created_at),
+    creatorTreatment: originalCreatorHasTreatment(row.creator_onboarding, row.creator_created_at, row.creator_created_via_invite),
     consent: !!consent,
     selected,
     shippingIntent: selected,

@@ -13,7 +13,7 @@ import { loadLifecycleInput, originalCreatorHasTreatment, readAcceptedPurposes, 
 import contract from '../docs/bento/lifecycle-v2-contract.json' with { type: 'json' }
 import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../supabase/functions/_backend/utils/appOnboarding.ts'
 
-vi.mock('../supabase/functions/_backend/utils/ab_tests.json', () => ({ default: { new_emails_v2: { enroll_new_users_after: '2026-10-17T00:00:00Z' } } }))
+vi.mock('../supabase/functions/_backend/utils/ab_tests.json', () => ({ default: { new_emails_v2: { audience: 'self_signup', enroll_new_users_after: '2026-10-17T00:00:00Z' } } }))
 
 const CREATED = '2026-10-17T10:00:00.000Z'
 const DONE = '2026-10-17T11:00:00.000Z'
@@ -83,6 +83,7 @@ function sourceRow(overrides: Record<string, unknown> = {}) {
     org_preferences: {},
     creator_onboarding: profile(),
     creator_created_at: CREATED,
+    creator_created_via_invite: false,
     recipient_id: RECIPIENT,
     email: 'lifecycle@example.com',
     recipient_preferences: {},
@@ -278,15 +279,21 @@ describe('lifecycle cross-repository sender contract', () => {
 
 describe('creator enrollment and dispatch readiness', () => {
   it.concurrent('reads the original creator treatment with current intent, prerequisites, marker and signup cutoff', () => {
-    expect(originalCreatorHasTreatment(profile(), CREATED)).toBe(true)
-    expect(originalCreatorHasTreatment(profile('builder'), CREATED)).toBe(true)
-    expect(originalCreatorHasTreatment(profile('both'), CREATED)).toBe(false)
-    expect(originalCreatorHasTreatment(profile(), '2026-10-16T23:59:59Z')).toBe(false)
-    expect(originalCreatorHasTreatment({ ...profile(), abtests_enrolled: [] }, CREATED)).toBe(false)
-    expect(originalCreatorHasTreatment({ ...profile('builder'), abtests: { new_emails_v2: { branch: 'A', assigned_at: CREATED }, builder_todo_list_v4: { branch: 'B', assigned_at: CREATED } } }, CREATED)).toBe(false)
-    expect(originalCreatorHasTreatment({ ...profile(), abtests: { new_emails_v2: { branch: 'B', assigned_at: CREATED } } }, CREATED)).toBe(false)
-    expect(originalCreatorHasTreatment({ ...profile(), abtests: { new_emails_v2: { branch: 'A', assigned_at: 'yesterday' } } }, CREATED)).toBe(false)
-    expect(originalCreatorHasTreatment({ ...profile(), abtests: { new_emails_v2: { branch: 'A', assigned_at: '2026-10-17T09:59:59Z' } } }, CREATED)).toBe(false)
+    expect(originalCreatorHasTreatment(profile(), CREATED, false)).toBe(true)
+    expect(originalCreatorHasTreatment(profile('builder'), CREATED, false)).toBe(true)
+    expect(originalCreatorHasTreatment(profile('both'), CREATED, false)).toBe(false)
+    expect(originalCreatorHasTreatment(profile(), '2026-10-16T23:59:59Z', false)).toBe(false)
+    expect(originalCreatorHasTreatment({ ...profile(), abtests_enrolled: [] }, CREATED, false)).toBe(false)
+    expect(originalCreatorHasTreatment({ ...profile('builder'), abtests: { new_emails_v2: { branch: 'A', assigned_at: CREATED }, builder_todo_list_v4: { branch: 'B', assigned_at: CREATED } } }, CREATED, false)).toBe(false)
+    expect(originalCreatorHasTreatment({ ...profile(), abtests: { new_emails_v2: { branch: 'B', assigned_at: CREATED } } }, CREATED, false)).toBe(false)
+    expect(originalCreatorHasTreatment({ ...profile(), abtests: { new_emails_v2: { branch: 'A', assigned_at: 'yesterday' } } }, CREATED, false)).toBe(false)
+    expect(originalCreatorHasTreatment({ ...profile(), abtests: { new_emails_v2: { branch: 'A', assigned_at: '2026-10-17T09:59:59Z' } } }, CREATED, false)).toBe(false)
+  })
+
+  it.concurrent.each([true, null, undefined, 'false'])('excludes invited or unproven original signup provenance %j despite a protected treatment', (createdViaInvite) => {
+    expect(originalCreatorHasTreatment(profile(), CREATED, createdViaInvite)).toBe(false)
+    expect(originalCreatorHasTreatment(profile('builder'), CREATED, createdViaInvite)).toBe(false)
+    expect(originalCreatorHasTreatment({ ...profile(), created_via_invite: false }, CREATED, createdViaInvite)).toBe(false)
   })
 
   it('fails closed when the prerequisite engine configuration has not merged', async () => {
@@ -294,7 +301,19 @@ describe('creator enrollment and dispatch readiness', () => {
     vi.doMock('../supabase/functions/_backend/utils/ab_tests.json', () => ({ default: {} }))
     try {
       const unconfigured = await import('../supabase/functions/_backend/utils/lifecycle_v2_cohort.ts')
-      expect(unconfigured.isLifecycleV2Creator(profile(), CREATED)).toBe(false)
+      expect(unconfigured.isLifecycleV2Creator(profile(), CREATED, false)).toBe(false)
+    }
+    finally {
+      vi.doUnmock('../supabase/functions/_backend/utils/ab_tests.json')
+    }
+  })
+
+  it.each([undefined, 'all', 'unknown'])('fails closed when the prerequisite engine audience is not self_signup: %j', async (audience) => {
+    vi.resetModules()
+    vi.doMock('../supabase/functions/_backend/utils/ab_tests.json', () => ({ default: { new_emails_v2: { audience, enroll_new_users_after: '2026-10-17T00:00:00Z' } } }))
+    try {
+      const unconfigured = await import('../supabase/functions/_backend/utils/lifecycle_v2_cohort.ts')
+      expect(unconfigured.isLifecycleV2Creator(profile(), CREATED, false)).toBe(false)
     }
     finally {
       vi.doUnmock('../supabase/functions/_backend/utils/ab_tests.json')
@@ -323,6 +342,8 @@ describe('creator enrollment and dispatch readiness', () => {
     expect(await resolveLifecycle(replacement.ctx, user(), 'ota', READY)).toEqual({ action: 'skip', reason: 'lifecycle_context_changed' })
     const declined = reader(sourceRow({ creator_onboarding: profile('exploring') }))
     expect(await resolveLifecycle(declined.ctx, user(), 'ota', READY)).toEqual({ action: 'skip', reason: 'lifecycle_selection_stale' })
+    const invitedOriginal = reader(sourceRow({ creator_created_via_invite: true }))
+    expect(await resolveLifecycle(invitedOriginal.ctx, user(), 'ota', READY)).toEqual({ action: 'skip', reason: 'lifecycle_selection_stale' })
   })
 
   it.concurrent('builds a matching provider event only after re-reading current eligible evidence and exact candidate identity', async () => {
@@ -345,6 +366,20 @@ describe('creator enrollment and dispatch readiness', () => {
 })
 
 describe('current source evidence and accepted purposes', () => {
+  it.concurrent.each([true, null, undefined])('excludes original creators with persisted invited or unknown provenance %j without inferring from org membership', async (creatorCreatedViaInvite) => {
+    const { ctx, query } = reader(sourceRow({ creator_created_via_invite: creatorCreatedViaInvite, authorized: true }))
+    const loaded = await loadLifecycleInput(ctx, ORG, 'ota')
+    expect(loaded?.input.creatorTreatment).toBe(false)
+    expect(loaded?.input.consent).toBe(true)
+    expect(query.mock.calls[0][0]).toContain('original.created_via_invite AS creator_created_via_invite')
+  })
+
+  it.concurrent('keeps an eligible original self-signup creator independent from the current recipient’s invite history', async () => {
+    const { ctx } = reader(sourceRow({ creator_created_via_invite: false, recipient_created_via_invite: true }))
+    const loaded = await loadLifecycleInput(ctx, ORG, 'ota')
+    expect(loaded?.input.creatorTreatment).toBe(true)
+  })
+
   it.concurrent.each([null, undefined])('delivers Builder platform guidance through current source, recovery and Trial adapters (%s)', async (platform) => {
     const setup: Record<string, unknown> = { todo_list_version: 4, builder_todo_list_version: '1', paths: ['builder'], selected_path: 'builder', steps: { builder: {} } }
     if (platform === null)

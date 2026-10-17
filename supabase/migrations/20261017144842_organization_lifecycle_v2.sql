@@ -68,10 +68,11 @@ ALTER FUNCTION public.lifecycle_v2_parse_timestamp(text) OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.lifecycle_v2_parse_timestamp(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.lifecycle_v2_parse_timestamp(text) TO service_role;
 
-CREATE FUNCTION public.lifecycle_v2_user_eligible(p_onboarding jsonb, p_created_at timestamptz) RETURNS boolean
+CREATE FUNCTION public.lifecycle_v2_user_eligible(p_onboarding jsonb, p_created_at timestamptz, p_created_via_invite boolean) RETURNS boolean
 LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
   SELECT COALESCE(
-    p_created_at >= '2026-10-17T14:24:00Z'::pg_catalog.timestamptz
+    p_created_via_invite IS FALSE
+    AND p_created_at >= '2026-10-17T14:24:00Z'::pg_catalog.timestamptz
     AND pg_catalog.jsonb_typeof(p_onboarding->'abtests_enrolled') = 'array'
     AND (p_onboarding->'abtests_enrolled') ? 'new_emails_v2'
     AND p_onboarding->>'intent' IN ('ota', 'builder')
@@ -84,9 +85,9 @@ LANGUAGE sql IMMUTABLE SET search_path = '' AS $$
     false
   );
 $$;
-ALTER FUNCTION public.lifecycle_v2_user_eligible(jsonb, timestamptz) OWNER TO postgres;
-REVOKE ALL ON FUNCTION public.lifecycle_v2_user_eligible(jsonb, timestamptz) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.lifecycle_v2_user_eligible(jsonb, timestamptz) TO service_role;
+ALTER FUNCTION public.lifecycle_v2_user_eligible(jsonb, timestamptz, boolean) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.lifecycle_v2_user_eligible(jsonb, timestamptz, boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.lifecycle_v2_user_eligible(jsonb, timestamptz, boolean) TO service_role;
 
 -- Mirrors the canonical console checklist, independently checking every flag.
 -- An outcome label is not completion; intentional skips establish readiness but
@@ -213,7 +214,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE p text;
 BEGIN
   IF EXISTS (SELECT 1 FROM public.org_lifecycle_creators c JOIN public.users u ON u.id = c.original_creator_id
-    WHERE c.org_id = NEW.id AND public.lifecycle_v2_user_eligible(u.onboarding, u.created_at)) THEN
+    WHERE c.org_id = NEW.id AND public.lifecycle_v2_user_eligible(u.onboarding, u.created_at, u.created_via_invite)) THEN
     FOREACH p IN ARRAY ARRAY['ota', 'builder'] LOOP
       IF NEW.onboarding->>'intent' IN (p, 'both') THEN
         INSERT INTO public.bento_lifecycle_journeys(org_id, product, selected_app_incarnation)
@@ -241,8 +242,8 @@ FOR EACH ROW EXECUTE FUNCTION public.enroll_lifecycle_org_products();
 CREATE FUNCTION public.enroll_lifecycle_creator_products() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
-  IF public.lifecycle_v2_user_eligible(NEW.onboarding, NEW.created_at)
-    AND NOT public.lifecycle_v2_user_eligible(OLD.onboarding, OLD.created_at) THEN
+  IF public.lifecycle_v2_user_eligible(NEW.onboarding, NEW.created_at, NEW.created_via_invite)
+    AND NOT public.lifecycle_v2_user_eligible(OLD.onboarding, OLD.created_at, OLD.created_via_invite) THEN
     INSERT INTO public.bento_lifecycle_journeys(org_id, product, selected_app_incarnation)
       SELECT c.org_id, p.product, public.lifecycle_v2_initial_app(c.org_id, p.product)
       FROM public.org_lifecycle_creators c
@@ -252,7 +253,9 @@ BEGIN
         AND o.onboarding->>'intent' IN (p.product, 'both')
       ON CONFLICT DO NOTHING;
   END IF;
-  IF NEW.onboarding IS DISTINCT FROM OLD.onboarding THEN
+  IF NEW.onboarding IS DISTINCT FROM OLD.onboarding
+    OR NEW.created_via_invite IS DISTINCT FROM OLD.created_via_invite
+    OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
     UPDATE public.bento_lifecycle_journeys j
       SET candidate = NULL, revision = revision + 1, next_evaluation_at = pg_catalog.now()
       FROM public.org_lifecycle_creators c
@@ -264,7 +267,7 @@ $$;
 ALTER FUNCTION public.enroll_lifecycle_creator_products() OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.enroll_lifecycle_creator_products() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.enroll_lifecycle_creator_products() TO service_role;
-CREATE TRIGGER enroll_lifecycle_creator_products AFTER UPDATE OF onboarding ON public.users
+CREATE TRIGGER enroll_lifecycle_creator_products AFTER UPDATE OF onboarding, created_via_invite, created_at ON public.users
 FOR EACH ROW EXECUTE FUNCTION public.enroll_lifecycle_creator_products();
 
 -- At most two org/product rows per statement, never a plugin request path. Ignore

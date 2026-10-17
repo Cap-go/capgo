@@ -29,9 +29,9 @@ function checklist(product: 'ota' | 'builder', platform: 'ios' | 'android' = 'io
   } }
 }
 
-async function user(onboarding: unknown = {}, created = createdAt) {
+async function user(onboarding: unknown = {}, created = createdAt, invited = false) {
   const id = randomUUID()
-  await db.query('INSERT INTO public.users(id, onboarding, created_at) VALUES ($1, $2::jsonb, $3)', [id, JSON.stringify(onboarding), created])
+  await db.query('INSERT INTO public.users(id, onboarding, created_at, created_via_invite) VALUES ($1, $2::jsonb, $3, $4)', [id, JSON.stringify(onboarding), created, invited])
   return id
 }
 
@@ -55,7 +55,7 @@ beforeAll(async () => {
   // supplies every lifecycle table, function, privilege, index and trigger.
   await db.exec(`
     CREATE TABLE public.users(id uuid PRIMARY KEY, created_at timestamptz NOT NULL, onboarding jsonb NOT NULL DEFAULT '{}',
-      email_preferences jsonb NOT NULL DEFAULT '{}', enable_notifications boolean NOT NULL DEFAULT true,
+      created_via_invite boolean NOT NULL DEFAULT false, email_preferences jsonb NOT NULL DEFAULT '{}', enable_notifications boolean NOT NULL DEFAULT true,
       opt_for_newsletters boolean NOT NULL DEFAULT true, email text);
     CREATE TABLE public.orgs(id uuid PRIMARY KEY, created_by uuid NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
       onboarding jsonb NOT NULL DEFAULT '{}', email_preferences jsonb NOT NULL DEFAULT '{}', management_email text,
@@ -79,6 +79,23 @@ beforeAll(async () => {
 afterAll(async () => db?.close())
 
 describe('organization lifecycle PostgreSQL triggers', () => {
+  it('denies invited original creators with stale treatment and wakes stored journeys if signup provenance changes', async () => {
+    const invited = await user(treatment(), createdAt, true)
+    const invitedOrg = await org(invited)
+    await assign(invited)
+    expect(await journeys(invitedOrg)).toEqual([])
+    const creator = await user(treatment())
+    const orgId = await org(creator, 'ota')
+    expect(await journeys(orgId)).toHaveLength(1)
+    await db.query(`UPDATE public.bento_lifecycle_journeys SET next_evaluation_at='2099-01-01T00:00:00Z',candidate='{"branch":"old"}'::jsonb WHERE org_id=$1`, [orgId])
+    await db.query('UPDATE public.users SET created_via_invite=true WHERE id=$1', [creator])
+    expect((await journeys(orgId))[0].candidate).toBeNull()
+    expect(new Date((await journeys(orgId))[0].next_evaluation_at).getUTCFullYear()).toBeLessThan(2099)
+    for (const provenance of [true, null]) {
+      expect((await db.query('SELECT public.lifecycle_v2_user_eligible($1::jsonb,$2::timestamptz,$3::boolean) AS eligible', [JSON.stringify(treatment()), createdAt, provenance])).rows).toEqual([{ eligible: false }])
+    }
+  })
+
   it('enrolls default organizations when protected signup allocation arrives later', async () => {
     const creator = await user()
     const orgId = await org(creator)
@@ -133,7 +150,7 @@ describe('organization lifecycle PostgreSQL triggers', () => {
     await assign(creator, { ...treatment(), intent: 'exploring' })
     expect((await journeys(orgId))[0].candidate).toBeNull()
     expect(new Date((await journeys(orgId))[0].next_evaluation_at).getUTCFullYear()).toBeLessThan(2099)
-    const { rows } = await db.query('SELECT public.lifecycle_v2_user_eligible($1::jsonb,$2::timestamptz) AS eligible', [JSON.stringify({
+    const { rows } = await db.query('SELECT public.lifecycle_v2_user_eligible($1::jsonb,$2::timestamptz,false) AS eligible', [JSON.stringify({
       ...treatment(),
       intent: 'builder',
       abtests: { ...treatment().abtests, builder_todo_list_v4: { branch: 'A', assigned_at: 'invalid' } },
@@ -423,7 +440,7 @@ describe('lifecycle private schema and bounded lookup indexes', () => {
         JOIN public.orgs o ON o.id=c.org_id
         JOIN public.users u ON u.id=c.original_creator_id
         WHERE c.original_creator_id=$1::uuid
-          AND public.lifecycle_v2_user_eligible(u.onboarding,u.created_at)`, [target.id])
+          AND public.lifecycle_v2_user_eligible(u.onboarding,u.created_at,u.created_via_invite)`, [target.id])
       const analyzed = rows[0]['QUERY PLAN'][0]
       const plan = JSON.stringify(analyzed.Plan)
       expect(plan).toContain('org_lifecycle_original_creator')

@@ -26,13 +26,14 @@ async function transaction(run: (client: PoolClient) => Promise<void>) {
   }
 }
 
-async function seedUser(client: PoolClient, onboarding: unknown = {}) {
+async function seedUser(client: PoolClient, onboarding: unknown = {}, invited = false) {
   const id = randomUUID()
   const email = `lifecycle-schema-${id}@example.com`
   await client.query(`INSERT INTO auth.users(id,email,encrypted_password,email_confirmed_at,created_at,updated_at,raw_user_meta_data)
     VALUES ($1,$2,$3,$4,$4,$4,'{}'::jsonb)`, [id, email, USER_PASSWORD_HASH, createdAt])
-  await client.query(`INSERT INTO public.users(id,email,created_at,onboarding) VALUES ($1,$2,$3,$4::jsonb)
-    ON CONFLICT(id) DO UPDATE SET created_at = EXCLUDED.created_at, onboarding = EXCLUDED.onboarding`, [id, email, createdAt, JSON.stringify(onboarding)])
+  await client.query(`INSERT INTO public.users(id,email,created_at,onboarding,created_via_invite) VALUES ($1,$2,$3,$4::jsonb,$5)
+    ON CONFLICT(id) DO UPDATE SET created_at = EXCLUDED.created_at, onboarding = EXCLUDED.onboarding,
+      created_via_invite = EXCLUDED.created_via_invite`, [id, email, createdAt, JSON.stringify(onboarding), invited])
   return id
 }
 
@@ -58,6 +59,17 @@ function completedChecklist() {
 }
 
 describe('lifecycle schema on full PostgreSQL', () => {
+  it.concurrent('excludes an invited original creator even with a stale treatment marker', async () => {
+    await transaction(async (client) => {
+      const creator = await seedUser(client, {}, true)
+      const orgId = await seedOrg(client, creator, 'both')
+      await assign(client, creator)
+      expect((await client.query('SELECT product FROM public.bento_lifecycle_journeys WHERE org_id=$1', [orgId])).rows).toEqual([])
+      expect((await client.query(`SELECT public.lifecycle_v2_user_eligible(onboarding,created_at,created_via_invite) AS eligible
+        FROM public.users WHERE id=$1`, [creator])).rows).toEqual([{ eligible: false }])
+    })
+  })
+
   it.concurrent('keeps prospective creator provenance immutable to users and restricts every lifecycle table', async () => {
     await transaction(async (client) => {
       const creator = await seedUser(client)

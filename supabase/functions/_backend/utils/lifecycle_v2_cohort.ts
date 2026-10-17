@@ -15,11 +15,14 @@ export function validLifecycleTreatment(value: unknown): value is { branch: 'A',
 // PR1 owns allocation and protects these stored fields from user writes. This
 // reader never allocates or backfills. Missing dependency configuration closes
 // both lifecycle dispatch and its matching legacy suppression.
-export function isLifecycleV2Creator(onboarding: unknown, createdAt: string | Date | null): boolean {
-  const config = (rawConfig as Record<string, unknown>).new_emails_v2 as { enroll_new_users_after?: string } | undefined
+export function isLifecycleV2Creator(onboarding: unknown, createdAt: string | Date | null, createdViaInvite: unknown): boolean {
+  const config = (rawConfig as Record<string, unknown>).new_emails_v2 as { audience?: unknown, enroll_new_users_after?: string } | undefined
   const cutoff = Date.parse(config?.enroll_new_users_after ?? '')
   const created = createdAt instanceof Date ? createdAt.getTime() : Date.parse(createdAt ?? '')
-  if (!Number.isFinite(cutoff) || !Number.isFinite(created) || created < cutoff
+  // Signup provenance belongs to the original creator's persisted user row.
+  // A stale treatment, invited membership or missing provenance cannot enroll.
+  if (config?.audience !== 'self_signup' || createdViaInvite !== false
+    || !Number.isFinite(cutoff) || !Number.isFinite(created) || created < cutoff
     || !onboarding || typeof onboarding !== 'object' || Array.isArray(onboarding)) {
     return false
   }

@@ -65,8 +65,8 @@ export async function shouldUseLifecycleV2(c: Context, orgId: string): Promise<b
     if (Object.entries(REQUIRED_SETTINGS).some(([key, expected]) => settings[key] !== expected))
       return false
 
-    const result = await pg.query<{ onboarding: unknown, created_at: string | Date }>(
-      `SELECT users.onboarding, users.created_at
+    const result = await pg.query<{ onboarding: unknown, created_at: string | Date, created_via_invite: boolean | null }>(
+      `SELECT users.onboarding, users.created_at, users.created_via_invite
        FROM public.org_lifecycle_creators AS creators
        JOIN public.users AS users ON users.id = creators.original_creator_id
        WHERE creators.org_id = $1::uuid
@@ -78,7 +78,7 @@ export async function shouldUseLifecycleV2(c: Context, orgId: string): Promise<b
       [orgId],
     )
     const row = result.rows[0]
-    return !!row && isLifecycleV2Creator(row.onboarding, row.created_at)
+    return !!row && isLifecycleV2Creator(row.onboarding, row.created_at, row.created_via_invite)
   }
   catch {
     cloudlog({ requestId: c.get('requestId'), message: 'Lifecycle v2 handoff unavailable; retaining legacy delivery' })

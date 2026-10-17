@@ -19,10 +19,10 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
   getEnv: (c: { env: Record<string, string> }, key: string) => c.env[key] ?? '',
 }))
 
-vi.mock('../supabase/functions/_backend/utils/ab_tests.json', () => ({ default: { new_emails_v2: { enroll_new_users_after: '2026-10-17T14:24:00.000Z' } } }))
+vi.mock('../supabase/functions/_backend/utils/ab_tests.json', () => ({ default: { new_emails_v2: { audience: 'self_signup', enroll_new_users_after: '2026-10-17T14:24:00.000Z' } } }))
 
 const treatment = { branch: 'A', assigned_at: '2026-10-17T15:01:00.000Z' }
-const profile = (assignment: unknown = treatment) => ({ created_at: '2026-10-17T15:00:00.000Z', onboarding: { intent: 'ota', abtests_enrolled: ['new_emails_v2'], abtests: { new_emails_v2: assignment } } })
+const profile = (assignment: unknown = treatment) => ({ created_at: '2026-10-17T15:00:00.000Z', created_via_invite: false, onboarding: { intent: 'ota', abtests_enrolled: ['new_emails_v2'], abtests: { new_emails_v2: assignment } } })
 const ready = {
   BENTO_EVENT_DISPATCH_ENABLED: 'true',
   BENTO_LIFECYCLE_V2_SENDER_CONTRACT: LIFECYCLE_V2_CONTRACT,
@@ -47,6 +47,7 @@ describe('lifecycle v2 legacy handoff', () => {
     expect(mocks.query).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('FROM public.org_lifecycle_creators AS creators'), [orgId])
     const sql = mocks.query.mock.calls[0][0]
     expect(sql).toContain('users.id = creators.original_creator_id')
+    expect(sql).toContain('users.created_via_invite')
     expect(sql).toContain('journeys.org_id = creators.org_id')
     expect(sql).toContain('LIMIT 1')
     expect(sql).not.toContain('orgs.created_by')
@@ -90,6 +91,12 @@ describe('lifecycle v2 legacy handoff', () => {
   it('retains legacy when the original creator was deleted or no immutable provenance/journey exists', async () => {
     mocks.query.mockResolvedValueOnce({ rows: [] })
     expect(await shouldUseLifecycleV2(context(), orgId)).toBe(false)
+  })
+
+  it.each([true, null, undefined])('retains legacy for invited or unknown original signup provenance %j despite stale protected treatment', async (createdViaInvite) => {
+    mocks.query.mockResolvedValueOnce({ rows: [{ ...profile(), created_via_invite: createdViaInvite }] })
+    expect(await shouldUseLifecycleV2(context(), orgId)).toBe(false)
+    expect(mocks.closeClient).toHaveBeenCalledOnce()
   })
 
   it('retains legacy when any readiness or creator read fails', async () => {
