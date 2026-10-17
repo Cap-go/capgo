@@ -5,6 +5,8 @@ import type {
 } from '~/utils/onboardingProgressAnalytics'
 
 export const USER_ONBOARDING_STATUSES = ['in_progress', 'completed', 'abandoned'] as const
+// `publish_app_question` belongs to a retired question; it stays parseable so
+// saved progress resumes on the intent step.
 export const USER_ONBOARDING_STEPS = ['intent', 'publish_app_question', 'details', 'organization', 'choice', 'channel', 'install', 'setup'] as const
 export const USER_ONBOARDING_FLOWS = ['pre_org', 'existing_org'] as const
 export const USER_ONBOARDING_DEVELOPMENT_ENVIRONMENTS = ['hosted_builder', 'ai_assistant', 'hand_coded', 'other', 'local_project', 'exploring', 'skipped'] as const satisfies readonly OnboardingDevelopmentEnvironment[]
@@ -76,7 +78,6 @@ export interface UserOnboardingProgressInput {
   flow: OnboardingAnalyticsFlow
   developmentEnvironment?: OnboardingDevelopmentEnvironment | null
   intent?: OnboardingIntent | null
-  publishAppQuestion?: boolean
   detailsStep?: UserOnboardingDetailsStep
   finalStep?: 'setup' | 'install'
   setupStage?: UserOnboardingSetupStage
@@ -271,9 +272,6 @@ export function buildUserOnboardingProgress(input: UserOnboardingProgressInput):
   if (input.intent)
     progress.intent = input.intent
 
-  if (input.publishAppQuestion || input.step === 'publish_app_question')
-    progress.publish_app_question = true
-
   if (input.detailsStep)
     progress.details_step = input.detailsStep
 
@@ -343,32 +341,14 @@ export function clampResumableOnboardingStep(
 export function resumableOnboardingFlowStep(
   progress: UserOnboardingProgress,
   flow: OnboardingAnalyticsFlow,
-): UserOnboardingStep {
+): Exclude<UserOnboardingStep, 'publish_app_question'> {
   const step = clampResumableOnboardingStep(progress.step, flow)
   if ((step === 'setup' || step === 'install') && (progress.setup_stage !== 'cli' || !progress.final_step))
     return 'channel'
-  if (progress.publish_app_question === true && (step === 'intent' || step === 'publish_app_question'))
-    return 'publish_app_question'
+  // The retired development-environment question resumes on the intent step.
+  if (step === 'publish_app_question')
+    return 'intent'
   return step
-}
-
-export function fallbackUsersOnboardingProgressForLegacyConstraint(
-  progress: UserOnboardingProgress,
-): UserOnboardingProgress {
-  if (progress.step !== 'publish_app_question')
-    return progress
-  return {
-    ...progress,
-    step: 'intent',
-    publish_app_question: true,
-  }
-}
-
-export function isUsersOnboardingCheckConstraintError(error: { code?: string, message?: string } | null | undefined): boolean {
-  if (!error)
-    return false
-  return error.code === '23514'
-    || (typeof error.message === 'string' && error.message.includes('users_onboarding_valid'))
 }
 
 export function shouldPromptOnboardingResume(
