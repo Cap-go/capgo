@@ -2,146 +2,151 @@ BEGIN;
 
 SELECT plan(15);
 
-SELECT tests.create_supabase_user('onboarding_progress_user', 'onboarding_progress_user@test.local');
+SELECT tests.create_supabase_user(
+    'onboarding_progress_user',
+    'onboarding_progress_user@test.local'
+);
 
 INSERT INTO public.users (id, email, first_name, last_name)
 VALUES (
-  tests.get_supabase_uid('onboarding_progress_user'),
-  'onboarding_progress_user@test.local',
-  'Onboard',
-  'Progress'
+    tests.get_supabase_uid('onboarding_progress_user'),
+    'onboarding_progress_user@test.local',
+    'Onboard',
+    'Progress'
 );
 
 SELECT ok(
-  EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'users'
-      AND column_name = 'onboarding'
-  ),
-  'users.onboarding exists'
+    EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE
+            table_schema = 'public'
+            AND table_name = 'users'
+            AND column_name = 'onboarding'
+    ),
+    'users.onboarding exists'
 );
 
 SELECT is(
-  (
-    SELECT data_type
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = 'users'
-      AND column_name = 'onboarding'
-  ),
-  'jsonb',
-  'users.onboarding is jsonb'
+    (
+        SELECT data_type
+        FROM information_schema.columns
+        WHERE
+            table_schema = 'public'
+            AND table_name = 'users'
+            AND column_name = 'onboarding'
+    ),
+    'jsonb',
+    'users.onboarding is jsonb'
 );
 
 SELECT is(
-  (
-    SELECT onboarding
-    FROM public.users
-    WHERE id = tests.get_supabase_uid('onboarding_progress_user')
-  ),
-  '{"version":6}'::jsonb,
-  'new users default to onboarding V6'
+    (
+        SELECT onboarding
+        FROM public.users
+        WHERE id = tests.get_supabase_uid('onboarding_progress_user')
+    ),
+    '{"version":6}'::jsonb,
+    'new users default to onboarding V6'
 );
 
 SELECT lives_ok(
-  $$UPDATE public.users
+    $$UPDATE public.users
     SET onboarding = '{"status":"in_progress","step":"organization","flow":"pre_org","intent":"ota","app_name":"Acme"}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-  'valid onboarding progress is accepted'
+    'valid onboarding progress is accepted'
 );
 
 SELECT throws_ok(
-  $$UPDATE public.users
+    $$UPDATE public.users
     SET onboarding = '{"status":"nope","step":"details","flow":"pre_org"}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-  '23514',
-  NULL,
-  'invalid onboarding status is rejected'
+    '23514',
+    NULL,
+    'invalid onboarding status is rejected'
 );
 
 SELECT throws_ok(
-  $$UPDATE public.users
+    $$UPDATE public.users
     SET onboarding = '{"status":"in_progress","step":"unknown","flow":"pre_org"}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-  '23514',
-  NULL,
-  'invalid onboarding step is rejected'
+    '23514',
+    NULL,
+    'invalid onboarding step is rejected'
 );
 
 SELECT lives_ok(
-  $$UPDATE public.users
+    $$UPDATE public.users
     SET onboarding = '{"status":"in_progress","step":"setup","flow":"pre_org","setup_stage":"channel-create"}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-  'valid onboarding setup stage is accepted'
+    'valid onboarding setup stage is accepted'
 );
 
 SELECT throws_ok(
-  $$UPDATE public.users
+    $$UPDATE public.users
     SET onboarding = '{"status":"in_progress","step":"setup","flow":"pre_org","setup_stage":"unknown"}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-  '23514',
-  NULL,
-  'invalid onboarding setup stage is rejected'
+    '23514',
+    NULL,
+    'invalid onboarding setup stage is rejected'
 );
 
 SELECT lives_ok(
-  $$UPDATE public.users
+    $$UPDATE public.users
     SET onboarding = jsonb_build_object('pad', repeat('x', 65525))
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-  'onboarding jsonb at the 65536-byte limit is accepted'
+    'onboarding jsonb at the 65536-byte limit is accepted'
 );
 
 SELECT throws_ok(
-  $$UPDATE public.users
+    $$UPDATE public.users
     SET onboarding = jsonb_build_object('pad', repeat('x', 65526))
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-  '23514',
-  NULL,
-  'onboarding jsonb above the 65536-byte limit is rejected'
+    '23514',
+    NULL,
+    'onboarding jsonb above the 65536-byte limit is rejected'
 );
 
 SELECT throws_ok(
-  $$UPDATE public.users
+    $$UPDATE public.users
     SET onboarding = '{"status":null,"step":"details","flow":"pre_org"}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-  '23514',
-  NULL,
-  'json null onboarding status is rejected'
+    '23514',
+    NULL,
+    'json null onboarding status is rejected'
 );
 
 SELECT lives_ok(
-  $$UPDATE public.users
+    $$UPDATE public.users
     SET onboarding = '{"version":6,"profile_draft":{"first_name":"Partial","last_name":""}}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-  'V6 partial profile drafts are accepted by the existing constraint'
+    'V6 partial profile drafts are accepted by the existing constraint'
 );
 
 SELECT lives_ok(
-  $$UPDATE public.users
+    $$UPDATE public.users
     SET onboarding = '{"version":4,"abtests":{"retained":{"branch":"A"}}}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-  'legacy onboarding versions remain valid after the new-user default changes'
+    'legacy onboarding versions remain valid after the new-user default changes'
 );
 
 SELECT tests.authenticate_as('onboarding_progress_user');
 
 SELECT lives_ok(
-  $$UPDATE public.users
+    $$UPDATE public.users
     SET onboarding = '{"version":6,"status":"in_progress","step":"intent","flow":"pre_org","profile_completed_at":"2026-10-17T10:00:00.000Z"}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-  'owner can update own onboarding progress through RLS'
+    'owner can update own onboarding progress through RLS'
 );
 
 SELECT is(
-  (
-    SELECT onboarding ->> 'profile_completed_at'
-    FROM public.users
-    WHERE id = tests.get_supabase_uid('onboarding_progress_user')
-  ),
-  '2026-10-17T10:00:00.000Z',
-  'owner can persist name confirmation through RLS and onboarding triggers'
+    (
+        SELECT onboarding ->> 'profile_completed_at'
+        FROM public.users
+        WHERE id = tests.get_supabase_uid('onboarding_progress_user')
+    ),
+    '2026-10-17T10:00:00.000Z',
+    'owner can persist name confirmation through RLS and onboarding triggers'
 );
 
 SELECT tests.clear_authentication();
