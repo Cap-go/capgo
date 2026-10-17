@@ -1265,8 +1265,8 @@ code, and where code is used.
 Rules:
 - When the user types `/graphify`, follow the project skill before doing
   anything else.
-- `graphify-out/graph.json` is committed and refreshed during release version
-  bumps. Prefer `graphify query "<question>"`, `graphify affected "<node>"`,
+- `graphify-out/graph.json` is committed and refreshed by a
+  `chore(auto-sync)` commit after each release. Prefer `graphify query "<question>"`, `graphify affected "<node>"`,
   `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` before broad
   source searches.
 - Use `bun run graphify:generate` to refresh the committed code graph. The

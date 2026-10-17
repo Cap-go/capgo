@@ -2,8 +2,10 @@ import type { ExecutionContext, ScheduledController } from '@cloudflare/workers-
 import type { Context } from 'hono'
 import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as register } from '../../supabase/functions/_backend/auth/register.ts'
+import { app as apple } from '../../supabase/functions/_backend/auth/apple.ts'
 import { createMcpApp } from '../../supabase/functions/_backend/mcp/index.ts'
 import { app as accept_invitation } from '../../supabase/functions/_backend/private/accept_invitation.ts'
+import { app as billing_region } from '../../supabase/functions/_backend/private/billing_region.ts'
 import { app as bundle_install_stats } from '../../supabase/functions/_backend/private/bundle_install_stats.ts'
 import { app as channel_device } from '../../supabase/functions/_backend/private/channel_device.ts'
 import { app as channel_stats } from '../../supabase/functions/_backend/private/channel_stats.ts'
@@ -34,6 +36,7 @@ import { app as publicStats } from '../../supabase/functions/_backend/private/pu
 import { app as release_live } from '../../supabase/functions/_backend/private/release_live.ts'
 import { app as replay } from '../../supabase/functions/_backend/private/replay.ts'
 import { app as request_manifest_upload } from '../../supabase/functions/_backend/private/request_manifest_upload.ts'
+import { app as revoke_apple_authorization } from '../../supabase/functions/_backend/private/revoke_apple_authorization.ts'
 import { app as role_bindings } from '../../supabase/functions/_backend/private/role_bindings.ts'
 // Manifest finalization validates size receipts issued by the files worker.
 import { app as set_manifest } from '../../supabase/functions/_backend/private/set_manifest.ts'
@@ -102,6 +105,7 @@ import { app as on_version_update } from '../../supabase/functions/_backend/trig
 import { app as pluginNotifications } from '../../supabase/functions/_backend/triggers/plugin_notifications.ts'
 import { app as queue_consumer } from '../../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
+import { app as stripe_event_us } from '../../supabase/functions/_backend/triggers/stripe_event_us.ts'
 import { app as updates_cache_purge } from '../../supabase/functions/_backend/triggers/updates_cache_purge.ts'
 import { app as webhook_delivery } from '../../supabase/functions/_backend/triggers/webhook_delivery.ts'
 import { app as webhook_dispatcher } from '../../supabase/functions/_backend/triggers/webhook_dispatcher.ts'
@@ -144,6 +148,7 @@ app.route('/check_cpu_usage', check_cpu_usage)
 app.route('/translation', translation)
 app.route('/plugin_regions', pluginRegions)
 app.route('/auth/register', register)
+app.route('/auth/apple', apple)
 // Hosted MCP server (POST /mcp) + OAuth discovery/endpoints. Tools replay public API requests
 // through this same worker with the caller's API key, so RBAC and rate limits apply unchanged.
 app.route('/', createMcpApp((request, c) => app.fetch(request, c.env, getExecutionContext(c))))
@@ -155,6 +160,7 @@ appPrivate.route('/plans', plans)
 appPrivate.route('/credits', credits)
 appPrivate.route('/store_top', storeTop)
 appPrivate.route('/website_stats', publicStats)
+appPrivate.route('/billing_region', billing_region)
 appPrivate.route('/config', config)
 appPrivate.route('/config/builder', configBuilder)
 appPrivate.route('/custom_domains', customDomains)
@@ -183,6 +189,7 @@ appPrivate.route('/stripe_checkout', stripe_checkout)
 appPrivate.route('/stripe_portal', stripe_portal)
 appPrivate.route('/stripe_past_due', stripe_past_due)
 appPrivate.route('/verify_email_otp', verify_email_otp)
+appPrivate.route('/revoke_apple_authorization', revoke_apple_authorization)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/request_manifest_upload', request_manifest_upload)
 appPrivate.route('/set_manifest', set_manifest)
@@ -231,6 +238,7 @@ appTriggers.route('/on_version_delete', on_version_delete)
 appTriggers.route('/on_manifest_create', on_manifest_create)
 appTriggers.route('/on_deploy_history_create', on_deploy_history_create)
 appTriggers.route('/stripe_event', stripe_event)
+appTriggers.route('/stripe_event_us', stripe_event_us)
 appTriggers.route('/updates_cache_purge', updates_cache_purge)
 appTriggers.route('/on_organization_create', on_organization_create)
 appTriggers.route('/cron_stat_app', cron_stat_app)
