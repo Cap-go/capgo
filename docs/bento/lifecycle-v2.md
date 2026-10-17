@@ -53,6 +53,10 @@ UUID. Analytics reads are bounded by current app creation/capture time and a
 90-day lookback, with grouped version results validated against finalized real
 bundles; an earlier demo result cannot hide a later genuine applied update.
 Unknown coverage suppresses abandonment.
+A supported Builder checklist with an omitted/null platform has the known next
+task “Choose my platform”; it can receive recovery and unfinished Trial guidance
+without earning iOS/Android facts, checklist readiness or real value. Invalid
+platform values and unknown platform-specific steps remain unhealthy.
 
 One genuinely new fact opens a fixed 15-minute batch. More facts join that batch
 without moving its due time. A separately verified running build can hold it.

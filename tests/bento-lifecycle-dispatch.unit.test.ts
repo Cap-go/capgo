@@ -345,6 +345,38 @@ describe('creator enrollment and dispatch readiness', () => {
 })
 
 describe('current source evidence and accepted purposes', () => {
+  it.concurrent.each([null, undefined])('delivers Builder platform guidance through current source, recovery and Trial adapters (%s)', async (platform) => {
+    const setup: Record<string, unknown> = { todo_list_version: 4, builder_todo_list_version: '1', paths: ['builder'], selected_path: 'builder', steps: { builder: {} } }
+    if (platform === null)
+      setup.selected_builder_platform = null
+    const row = sourceRow({ product: 'builder', org_onboarding: { intent: 'builder' }, creator_onboarding: profile('builder'), app: appRow({ onboarding: { setup } }), now_at: '2026-10-18T10:00:00.000Z', verified_at: '2026-10-18T10:00:00.000Z', trial_at: '2026-11-01T10:00:00.000Z' })
+    const loaded = await loadLifecycleInput(reader(row).ctx, ORG, 'builder')
+    const current = loaded!.input
+    expect(current.evidence).toMatchObject({ platform: null, healthy: true, facts: [], tasks: {}, checklistComplete: false, firstValue: null })
+    const first = evaluateLifecycle(current)!
+    expect(first.branch).toBe('stall_24h')
+    const event = buildLifecycleEvent(current, first, 'platform-help', WEBAPP)
+    expect(event.data).toMatchObject({ cta_label: 'Choose my platform', platform_label: '', completed_steps_summary: '', checklist_complete: false, first_value_verified: false })
+    expect(new URL(String(event.data.continue_url)).pathname).toBe('/app/com.example.lifecycle/getting-started')
+    const second = evaluateLifecycle({ ...current, now: '2026-10-19T10:00:00.000Z', accepted: [{ purpose: first.purpose, acceptedAt: current.now, context: first.context, product: 'builder' }] })!
+    expect(second.branch).toBe('help_48h')
+    expect(buildLifecycleEvent(current, second, 'platform-help-48h', WEBAPP).data.cta_label).toBe('Choose my platform')
+    const trialInput = { ...current, now: '2026-10-29T10:00:00.000Z' }
+    const trial = evaluateLifecycle(trialInput)!
+    expect(trial.branch).toBe('trial3_unfinished')
+    expect(buildLifecycleEvent(trialInput, trial, 'platform-trial', WEBAPP).data).toMatchObject({ cta_label: 'Choose my platform', platform_label: '', next_action_title: 'Choose your build platform' })
+  })
+
+  it.concurrent('keeps malformed Builder platform evidence out of recovery and specific task copy', async () => {
+    const row = sourceRow({ product: 'builder', org_onboarding: { intent: 'builder' }, creator_onboarding: profile('builder'), app: appRow({ onboarding: { setup: { todo_list_version: 4, builder_todo_list_version: '1', paths: ['builder'], selected_builder_platform: 'web' } } }), now_at: '2026-10-18T10:00:00.000Z', verified_at: '2026-10-18T10:00:00.000Z', trial_at: '2026-11-01T10:00:00.000Z' })
+    const loaded = await loadLifecycleInput(reader(row).ctx, ORG, 'builder')
+    expect(loaded?.input.evidence?.healthy).toBe(false)
+    expect(evaluateLifecycle(loaded!.input)).toBeNull()
+    const trialInput = { ...loaded!.input, now: '2026-10-29T10:00:00.000Z' }
+    const trial = evaluateLifecycle(trialInput)!
+    expect(buildLifecycleEvent(trialInput, trial, 'unknown-platform', WEBAPP).data.cta_label).not.toBe('Choose my platform')
+  })
+
   it.concurrent('loads verified current device and finalized upload without manufacturing canonical checklist completion', async () => {
     const row = appRow()
     Object.assign(row.onboarding.setup.steps.ota, Object.fromEntries(['login_cli_mcp', 'add_channel', 'add_updater', 'add_code'].map(id => [id, { status: 'done', at: DONE }])))

@@ -103,6 +103,21 @@ describe('organization lifecycle app evidence', () => {
     expect(evidence.fundingBlocked).toBe(false)
   })
 
+  it.concurrent.each([null, undefined])('recognizes a valid Builder platform-selection task without inventing completion (%s)', (platform) => {
+    const row = builder(null)
+    const setup = (row.onboarding as { setup: Record<string, unknown> }).setup
+    if (platform === undefined)
+      delete setup.selected_builder_platform
+    const evidence = buildAppEvidence(row, 'builder')!
+    expect(evidence.healthy).toBe(true)
+    expect(evidence.platform).toBeNull()
+    expect(evidence.tasks).toEqual({})
+    expect(evidence.facts).toEqual([])
+    expect(evidence.firstValue).toBeNull()
+    expect(evidence.checklistComplete).toBe(false)
+    expect(nextTask(evidence)?.ctaLabel).toBe('Choose my platform')
+  })
+
   it.concurrent('allows a verified real Builder result while the OTA demo splash remains pending', () => {
     const row = { ...builder('android'), need_onboarding: true }
     const verified = { builderSucceededAt: DONE, builderJobId: 'job-real-23' }

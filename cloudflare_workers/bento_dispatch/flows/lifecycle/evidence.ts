@@ -104,6 +104,7 @@ export function buildAppEvidence(row: LifecycleAppRow, product: Product, verifie
   const platform = product === 'builder' && (setup.selected_builder_platform === 'ios' || setup.selected_builder_platform === 'android')
     ? setup.selected_builder_platform
     : null
+  const platformNotChosen = product === 'builder' && setup.selected_builder_platform == null
   const stepPaths = record(setup.steps)
   const rawSteps = product === 'ota'
     ? setup.todo_list_version === 3 ? stepPaths : record(stepPaths.ota)
@@ -164,7 +165,9 @@ export function buildAppEvidence(row: LifecycleAppRow, product: Product, verifie
     product,
     platform,
     selected: setup.todo_list_version === 3 || setup.selected_path === product || (paths.length === 1 && paths[0] === product),
-    healthy: stepIds.length > 0 && Object.values(tasks).every(value => value !== 'unknown'),
+    // An omitted/null platform is the valid first Builder task. An invalid
+    // platform or unknown platform-specific checklist remains unhealthy.
+    healthy: platformNotChosen || (stepIds.length > 0 && Object.values(tasks).every(value => value !== 'unknown')),
     activeUntil: timestamp(verified.runningUntil, createdMs),
     facts,
     tasks,
