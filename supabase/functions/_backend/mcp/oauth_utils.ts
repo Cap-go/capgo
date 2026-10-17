@@ -199,9 +199,8 @@ interface PinnedClientMetadata {
   redirect_uris: string[]
 }
 
-// Pinned copies of well-known Client ID Metadata Documents. chatgpt.com, connect.smithery.ai and mcp.so sit
-// behind protection that rejects server-side fetches from Workers, so their live documents cannot be
-// resolved there. Used only when the live fetch fails; keep in sync with the client_id URLs below.
+// Pinned copies of well-known Client ID Metadata Documents, used only when the live fetch fails
+// (origin outage or bot protection). Keep in sync with the client_id URLs below.
 const PINNED_CLIENT_METADATA: Record<string, PinnedClientMetadata> = {
   'https://chatgpt.com/oauth/client.json': {
     client_name: 'ChatGPT',
