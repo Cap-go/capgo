@@ -10,7 +10,8 @@ transaction. Intent-specific requirements extend common requirements.
 - `new_emails`: new allocations are 50% treatment for self-signup accounts with
   exact `exploring` or `both` intent. Eligible existing A/B branches are retained;
   OTA, Builder and unknown intents lose stale assignments and provider tags.
-- `new_emails_v2`: prospective signup enrollment only, including invited accounts.
+- `new_emails_v2`: prospective self-signup enrollment only. Invited accounts do
+  not enroll or receive v2 assignments; stale v2 assignments and tags are removed.
   OTA selects 50% by a stable hash of experiment name and user ID. Other OTA users
   have **no assignment and neither v2 tag**, rather than a control assignment.
   Builder selects 100% of enrolled accounts whose resolved
@@ -48,9 +49,10 @@ The persisted assignment representation remains:
 ```
 
 Lifecycle evaluation must **read** the original organization's creator and that
-person's current protected enrollment and assignment. Require v2 branch A, a
-valid assignment timestamp, the prospective creation cutoff and exact matching
-intent; Builder also requires current checklist treatment A. Fail closed when
+person's current protected enrollment and assignment. Require a self-signup
+creator, v2 branch A, a valid assignment timestamp, the prospective creation
+cutoff and exact matching intent; Builder also requires current checklist
+treatment A. Fail closed when
 creator or assignment cannot be resolved. Do not call the enrollment API from a
 scheduler, interpret a Bento tag as authority, or use the current caller/app
 creator/billing owner in place of the original creator. Recipient consent and

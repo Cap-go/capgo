@@ -113,11 +113,23 @@ describe('generic intent allocation', () => {
     expect(treatmentCount).toBeLessThan(5500)
   })
 
-  it.each([false, true])('enrolls new builder treatment users (invited=%s) and excludes checklist controls', (invited) => {
+  it('enrolls new self-signup builder treatment users and excludes checklist controls', () => {
     const config = validateABTestsConfig(rawConfig)
-    const account = user('builder', { created_via_invite: invited })
+    const account = user('builder')
     expect(createABTestAssignments(account, config, () => 0).new_emails_v2?.branch).toBe('A')
     expect(createABTestAssignments(account, config, () => 0.99)).not.toHaveProperty('new_emails_v2')
+  })
+
+  it.each(['ota', 'builder'])('excludes invited %s users from new and stored v2 assignments', (intent) => {
+    const config = validateABTestsConfig(rawConfig)
+    const eligible = Array.from({ length: 100 }, (_, index) => user(intent, { id: `self-signup-${index}` }))
+      .find(account => createABTestAssignments(account, config, () => 0).new_emails_v2)
+    expect(eligible).toBeDefined()
+    const invited = { ...eligible!, created_via_invite: true }
+    expect(createABTestAssignments(invited, config, () => 0)).not.toHaveProperty('new_emails_v2')
+    const result = resolveABTestAssignments(invited, { builder_todo_list_v4: assignment(), new_emails_v2: assignment() }, config)
+    expect(result.assignments).not.toHaveProperty('new_emails_v2')
+    expect(result.nextAssignments).not.toHaveProperty('new_emails_v2')
   })
 
   it('never backfills prior users through recomputation even with builder treatment', () => {

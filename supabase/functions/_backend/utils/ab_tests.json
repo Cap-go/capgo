@@ -62,7 +62,7 @@
   },
   "new_emails_v2": {
     "comment": "Prospective signup enrollment only. Intent may be selected later. OTA non-treatment has no assignment or tag.",
-    "audience": "all",
+    "audience": "self_signup",
     "intents": [
       "ota",
       "builder"

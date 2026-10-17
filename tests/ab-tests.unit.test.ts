@@ -1263,6 +1263,15 @@ describe('prospective email cohort persistence', () => {
     expect(syncBentoSubscriberTagsMock).not.toHaveBeenCalled()
   })
 
+  it.each(['ota', 'builder'])('never enrolls an invited %s signup in v2', async (intent) => {
+    const module = await loadABTestsModule()
+    const abtests = intent === 'builder' ? { builder_todo_list_v4: intentAssignment() } : {}
+    drizzleExecuteMock.mockResolvedValueOnce({ rows: [{ id: USER_ID, created_at: createdAt, created_via_invite: true, intent, abtests }] })
+    await module.syncNewUserABTests(context, 'signup@example.com', { id: USER_ID, created_via_invite: true })
+    expect(drizzleExecuteMock).toHaveBeenCalledOnce()
+    expect(syncBentoSubscriberTagsMock).not.toHaveBeenCalled()
+  })
+
   it('does not mark enrollment from an on-demand lookup of a new account', async () => {
     const module = await loadABTestsModule()
     const abtests = { builder_todo_list_v4: intentAssignment() }
@@ -1277,13 +1286,13 @@ describe('prospective email cohort persistence', () => {
     vi.setSystemTime(FIXED_DATE)
     vi.spyOn(Math, 'random').mockReturnValue(0)
     const abtests = { builder_todo_list_v4: intentAssignment(), new_emails_v2: intentAssignment() }
-    const current = { id: USER_ID, created_at: createdAt, created_via_invite: true, email: 'signup@example.com', intent: 'builder', abtests, abtests_enrolled: ['new_emails_v2'] }
+    const current = { id: USER_ID, created_at: createdAt, created_via_invite: false, email: 'signup@example.com', intent: 'builder', abtests, abtests_enrolled: ['new_emails_v2'] }
     drizzleExecuteMock
       .mockResolvedValueOnce({ rows: [{ ...current, abtests: {}, abtests_enrolled: undefined }] })
       .mockResolvedValueOnce({ rows: [{ abtests }] })
     queueBentoSnapshot(current)
     queueBentoSnapshot(current, true)
-    await module.syncNewUserABTests(context, 'stale-address@example.com', { id: USER_ID, created_via_invite: true })
+    await module.syncNewUserABTests(context, 'stale-address@example.com', { id: USER_ID, created_via_invite: false })
     const parameters = collectSqlParameterValues(drizzleExecuteMock.mock.calls[1]?.[0])
     expect(parameters).toContain(JSON.stringify(abtests))
     expect(parameters).toContain('["new_emails_v2"]')
@@ -1293,6 +1302,23 @@ describe('prospective email cohort persistence', () => {
     }), expect.any(AbortSignal))
     expect(backgroundTaskMock).not.toHaveBeenCalled()
     expect(pgQueryMock).not.toHaveBeenCalled()
+  })
+
+  it.each(['ota', 'builder'])('removes persisted v2 assignments and both provider tags for invited %s users', async (intent) => {
+    const module = await loadABTestsModule()
+    const abtests = intent === 'builder' ? { builder_todo_list_v4: intentAssignment() } : {}
+    const current = { id: USER_ID, created_at: createdAt, created_via_invite: true, email: 'signup@example.com', intent, abtests, abtests_enrolled: ['new_emails_v2'] }
+    drizzleExecuteMock
+      .mockResolvedValueOnce({ rows: [{ ...current, abtests: { ...abtests, new_emails_v2: intentAssignment() } }] })
+      .mockResolvedValueOnce({ rows: [{ abtests }] })
+    queueBentoSnapshot(current)
+    queueBentoSnapshot(current, true)
+    expect(await module.getOrCreateUserABTests(context, USER_ID)).toEqual(abtests)
+    expect(collectSqlParameterValues(drizzleExecuteMock.mock.calls[1]?.[0])).toContain(JSON.stringify(abtests))
+    expect(syncBentoSubscriberTagsMock).toHaveBeenCalledWith(context, expect.objectContaining({
+      segments: intent === 'builder' ? ['ab:builder_todo_list_v4'] : [],
+      deleteSegments: expect.arrayContaining(['ab:new_emails_v2', 'ab:no_new_emails_v2']),
+    }), expect.any(AbortSignal))
   })
 
   it('reconciles both v2 tags away when the builder prerequisite becomes control', async () => {
@@ -1363,7 +1389,7 @@ describe('prospective email cohort persistence', () => {
 
   it('serializes concurrent intent resolution and preserves one prerequisite decision', async () => {
     const module = await loadABTestsModule()
-    const row: Record<string, unknown> = { id: USER_ID, created_at: createdAt, created_via_invite: true, email: null, intent: 'builder', abtests: {}, abtests_enrolled: ['new_emails_v2'] }
+    const row: Record<string, unknown> = { id: USER_ID, created_at: createdAt, created_via_invite: false, email: null, intent: 'builder', abtests: {}, abtests_enrolled: ['new_emails_v2'] }
     let lock = Promise.resolve()
     drizzleTransactionMock.mockImplementation(async (callback) => {
       const previous = lock
