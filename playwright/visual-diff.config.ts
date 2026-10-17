@@ -220,13 +220,18 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.route('**/rest/v1/apps?*', async (route) => {
         const response = await route.fetch()
         const json = await response.json().catch(() => null)
-        const override = (row: any) => row?.app_id === 'com.demo.app' ? { ...row, need_onboarding: true, onboarding } : row
+        const matchesApp = new URL(route.request().url()).searchParams.get('app_id') === 'eq.com.demo.app'
+        const override = (row: any) => row?.app_id === 'com.demo.app' || (matchesApp && row?.onboarding !== undefined)
+          ? { ...row, need_onboarding: true, onboarding }
+          : row
         await route.fulfill({ response, json: Array.isArray(json) ? json.map(override) : override(json) })
       })
       await page.route('**/rpc/verify_getting_started', route => route.fulfill({ json: onboarding }))
       await page.route('**/private/onboarding_progress', route => route.fulfill({ json: { onboarding, hasChannel: false, checkErrors: [] } }))
       await page.goto('/app/com.demo.app/getting-started')
       await page.locator('[data-test="dual-onboarding-checklists"], [data-test="builder-checklist"]').first().waitFor()
+      if (progress === 'builder')
+        await page.locator('[data-test="builder-step-start_setup"][data-status="done"]').waitFor()
     },
   })),
   { slug: 'login', path: '/login/', auth: false },
