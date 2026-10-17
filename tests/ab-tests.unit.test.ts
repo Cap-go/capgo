@@ -277,7 +277,7 @@ describe('new-user A/B test assignment', () => {
   it('does not persist or tag a new user for an eligible 0% test', async () => {
     const module = await loadABTestsModule()
     const configured = module.AB_TESTS_CONFIG[BUILDER_TODO_TEST_NAME]
-    expect(configured).toMatchObject({ audience: 'all', intents: ['builder'], treatment_percentage: 50 })
+    expect(configured).toMatchObject({ audience: 'all', intents: ['builder'], treatment_percentage: 100 })
     const disabled = { ...configured, intents: undefined, treatment_percentage: 0 }
     expect(module.createABTestAssignments(
       { created_via_invite: false, intent: 'builder' },
