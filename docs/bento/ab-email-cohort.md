@@ -37,8 +37,11 @@ transaction. Intent-specific requirements extend common requirements.
 Apply `20261017143015_protect_user_ab_test_enrollment.sql` before treating these
 fields as trusted. It prevents authenticated/anonymous INSERT/UPDATE from
 creating, changing or deleting `onboarding.abtests`, `abtests_enrolled` or
-`abtests_bento_sync`, and preserves `users.created_at` on client updates. Intent
-and normal onboarding progress remain editable. JWT and SET ROLE context are
+`abtests_bento_sync`, and preserves `users.created_at` and
+`users.created_via_invite` on client updates, including provenance-only updates
+and upserts. Normal client-created profiles retain self-signup provenance;
+backend invitation inserts retain invited provenance. Intent and normal
+onboarding progress remain editable. JWT and SET ROLE context are
 checked even when a user-facing SECURITY DEFINER wrapper owns the write.
 Backend database/service-role writes remain authorized.
 
@@ -72,7 +75,7 @@ The sender event contract is owned by the lifecycle PR.
 ## Database execution model
 
 The new invoker trigger runs once per inserted/updated user row, only when an
-INSERT or an UPDATE naming `onboarding`/`created_at` occurs. Reachable roles are
+INSERT or an UPDATE naming `onboarding`/`created_at`/`created_via_invite` occurs. Reachable roles are
 anon, authenticated, service_role and the backend connection role. It reads only
 NEW/OLD row values and connection settings; it scans no tables, calls no RBAC or
 identity RPC, and performs three bounded JSON-key operations. Existing user
@@ -89,9 +92,10 @@ On-demand delivery is bounded to three provider calls and five seconds, with a
 persisted pending state; signup rejection fails the creation queue for retry.
 
 Local PostgreSQL 17 evidence with 100,000 synthetic user rows: each protected
-UPDATE used `users_pkey` with `rows=1`, no table scan. Trigger time was 0.116 ms
-for authenticated, 0.009 ms for anon and 0.011 ms for service_role (one call each);
-statement execution was 2.029 / 0.029 / 0.034 ms respectively. These measurements
+provenance-only UPDATE used `users_pkey` with `rows=1`, no table scan. Trigger time
+was 1.207 ms for the first authenticated call, 0.017 ms for anon and 0.009 ms for
+service_role (one call each); statement execution was 1.843 / 0.041 / 0.029 ms
+respectively. These measurements
 cover the new trigger, not production RLS performance. Public/invalid-key/broad
 API-key/many-org/unfiltered SELECT cases execute no new function because this PR
 adds no read-policy function call; their existing permission/query paths remain

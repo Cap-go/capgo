@@ -1,4 +1,4 @@
--- Experiment assignments, enrollment and synchronization are backend-managed.
+-- Experiment state and existing signup provenance are backend-managed.
 -- This trigger performs constant work on the single row being written, with no
 -- table lookups, RPC calls or changes to profile/onboarding editing permissions.
 CREATE OR REPLACE FUNCTION public.protect_users_ab_test_state()
@@ -24,8 +24,12 @@ BEGIN
     IF TG_OP = 'UPDATE' THEN
       v_previous := COALESCE(OLD.onboarding, '{}'::jsonb);
       NEW.created_at := OLD.created_at;
+      NEW.created_via_invite := OLD.created_via_invite;
     ELSE
       NEW.created_at := pg_catalog.now();
+      -- Normal self-signups create their profile through the client. Invitation
+      -- profiles are inserted by the backend, which may set this flag to true.
+      NEW.created_via_invite := false;
     END IF;
 
     NEW.onboarding := COALESCE(NEW.onboarding, '{}'::jsonb)
@@ -45,5 +49,5 @@ REVOKE ALL ON FUNCTION public.protect_users_ab_test_state() FROM PUBLIC, anon, a
 GRANT EXECUTE ON FUNCTION public.protect_users_ab_test_state() TO service_role;
 
 CREATE TRIGGER protect_users_ab_test_state
-BEFORE INSERT OR UPDATE OF onboarding, created_at ON public.users
+BEFORE INSERT OR UPDATE OF onboarding, created_at, created_via_invite ON public.users
 FOR EACH ROW EXECUTE FUNCTION public.protect_users_ab_test_state();
