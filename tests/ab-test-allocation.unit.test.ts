@@ -117,7 +117,8 @@ describe('generic intent allocation', () => {
     const config = validateABTestsConfig(rawConfig)
     const account = user('builder')
     expect(createABTestAssignments(account, config, () => 0).new_emails_v2?.branch).toBe('A')
-    expect(createABTestAssignments(account, config, () => 0.99)).not.toHaveProperty('new_emails_v2')
+    expect(createABTestAssignments(account, config, () => 0.99).new_emails_v2?.branch).toBe('A')
+    expect(resolveABTestAssignments(account, { builder_todo_list_v4: assignment('B') }, config).assignments).not.toHaveProperty('new_emails_v2')
   })
 
   it.each(['ota', 'builder'])('excludes invited %s users from new and stored v2 assignments', (intent) => {
