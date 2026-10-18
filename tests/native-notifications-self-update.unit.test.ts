@@ -139,9 +139,9 @@ describe('capgo app native notifications', () => {
     }))
     const pending = registerNativeNotifications('user-4')
     await vi.waitFor(() => expect(releaseProof).toBeDefined())
-    await unregisterNativeNotifications()
+    const unregisterPromise = unregisterNativeNotifications()
     releaseProof()
-    await pending
+    await Promise.all([pending, unregisterPromise])
     expect(mocks.register).not.toHaveBeenCalled()
   })
 
