@@ -39,7 +39,7 @@ import { appendInternalLog, getInternalLogPath, startInternalLog } from '../supp
 import { uploadSupportLogs } from '../support/support-upload'
 import { canPromptInteractively, consoleWebUrl, createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKeySilent, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getConfigForWrite, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, setPMAndCommand, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
 import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-conflict'
-import { readBuilderOnlyAssignment, tryBuilderOnlyInit } from './builder-setup'
+import { readBuilderOnlyInitAssignment, tryBuilderOnlyInit } from './builder-setup'
 import { loginInitInBrowser, shouldStartInitBrowserLogin } from './browser-login'
 import { selectOnboardingChannel } from './channel-selection'
 import { createMissingExecutableError, getAvailablePackageManagers, getMissingPackageManagerExecutable, getPackageManagerInfo, preparePackageManagerCommandEnvironment, probeExecutable, probePackageManagerCommand, resolveExecutableProbeError, waitForCommandResult } from './command-execution'
@@ -2215,7 +2215,7 @@ async function maybeReusePendingOnboardingApp(
   }
 
   const selectedAppId = selectedApp.app_id
-  if (await readBuilderOnlyAssignment(selectedAppId, { ...options, apikey })) {
+  if (await readBuilderOnlyInitAssignment(selectedAppId, { ...options, apikey }, undefined, pLog.warn)) {
     return { appId: selectedAppId, pendingApp: selectedApp, reusedPendingApp: false, builderOnly: true }
   }
   pLog.info(`Using pending onboarding app ${selectedAppId}`)
@@ -5453,6 +5453,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   activeInitTelemetry?.setAuth('', options.apikey)
 
   const handoffBuilderOnlySetup = (targetAppId: string | undefined, projectDir = initialCwd) => tryBuilderOnlyInit(targetAppId, options, {
+    warn: pLog.warn,
     beforeLaunch: async () => {
       await finishActiveCliReplay()
       stopInitInkSession({ text: 'Continuing with the assigned Builder checklist.', tone: 'green' })

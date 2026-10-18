@@ -125,4 +125,19 @@ for (const status of ['pending', 'warning', 'done', 'skipped', 'invalid']) {
   const actual = getAppTodoSteps({ onboarding: { setup: value } }).steps.find(step => step.id === 'builder.android.successful_cloud_build')
   assert.equal(actual.status, status === 'invalid' ? 'pending' : status)
 }
+const selectedComplete = structuredClone(setup)
+selectedComplete.steps.builder.android = Object.fromEntries(BUILDER_STEP_IDS.android.map(id => [id, { status: id === 'prepare_keystore' ? 'skipped' : 'done' }]))
+const continueOther = formatAppTodoList('com.example.builder', { onboarding: { setup: selectedComplete } })
+assert.match(continueOther, /Continue with 🍎 iOS/)
+assert.match(continueOther, /build init --platform ios/)
+assert.doesNotMatch(continueOther, /build init --platform android/)
+assert.equal(selectedComplete.selected_builder_platform, 'android', 'guidance does not rewrite the saved selection')
+for (const selected of [undefined, 'ios', 'android']) {
+  const allComplete = structuredClone(selectedComplete)
+  allComplete.selected_builder_platform = selected
+  allComplete.steps.builder.ios = Object.fromEntries(BUILDER_STEP_IDS.ios.map(id => [id, { status: 'done' }]))
+  const output = formatAppTodoList('com.example.builder', { onboarding: { setup: allComplete } })
+  assert.match(output, /Both platform checklists are complete/)
+  assert.doesNotMatch(output, /--platform|Next step:|other platform|Choose a platform/)
+}
 console.log('Builder-only assignment, per-platform progress, annotations, authoritative outcomes and OTA compatibility passed')

@@ -99,15 +99,21 @@ export function formatBuilderOnlyChecklist(appId: string, checklist: NonNullable
       }
     }
   }
-  const next = checklist.selectedPlatform ? checklist.steps.find(step => step.platform === checklist.selectedPlatform && (step.status === 'pending' || step.status === 'warning')) : undefined
+  const openSteps = checklist.steps.filter(step => step.status === 'pending' || step.status === 'warning')
+  const next = checklist.selectedPlatform
+    ? openSteps.find(step => step.platform === checklist.selectedPlatform) ?? openSteps[0]
+    : undefined
   lines.push('')
-  if (next)
-    lines.push(colorize(`Next step: ${next.title}`, '1;36'))
-  else if (!checklist.selectedPlatform)
+  if (!openSteps.length)
+    lines.push('Both platform checklists are complete.')
+  else if (!next)
     lines.push('Choose a platform to start or resume Builder setup.')
-  else
-    lines.push('You can return to set up the other platform.')
-  lines.push(`Run from your Capacitor app folder: ${colorize(`npx @capgo/cli@latest build init${checklist.selectedPlatform ? ` --platform ${checklist.selectedPlatform}` : ''}`, '36')}`)
+  else {
+    if (next.platform !== checklist.selectedPlatform)
+      lines.push(`Continue with ${next.platform === 'ios' ? '🍎 iOS' : '🤖 Android'} to finish the remaining tasks.`)
+    lines.push(colorize(`Next step: ${next.title}`, '1;36'))
+  }
+  lines.push(`Run from your Capacitor app folder: ${colorize(`npx @capgo/cli@latest build init${next ? ` --platform ${next.platform}` : ''}`, '36')}`)
   lines.push('The checklist finishes when Capgo reports a successful cloud build for that platform.', 'Run this command again to recheck progress.')
   return lines.join('\n')
 }

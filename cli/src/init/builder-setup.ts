@@ -1,6 +1,7 @@
 import type { OnboardingBuilderOptions } from '../build/onboarding/command'
+import { log } from '@clack/prompts'
 import { getBuilderOnlyChecklist } from '../app/builder-checklist'
-import { formatCapgoCliInvokeError, getCapgoCliHttpStatus, invokeCapgoCliApi } from '../utils'
+import { formatCapgoCliInvokeError, getCapgoCliHttpStatus, formatError, invokeCapgoCliApi } from '../utils'
 
 type SetupOptions = { apikey: string } & Pick<OnboardingBuilderOptions, 'supaHost' | 'supaAnon' | 'analytics'>
 
@@ -19,18 +20,36 @@ export async function readBuilderOnlyAssignment(appId: string, options: SetupOpt
   return data?.app_id === appId ? getBuilderOnlyChecklist(data.onboarding) : null
 }
 
+export async function readBuilderOnlyInitAssignment(
+  appId: string,
+  options: SetupOptions,
+  request = invokeCapgoCliApi,
+  warn: (message: string) => void = log.warn,
+) {
+  try {
+    return await readBuilderOnlyAssignment(appId, options, request)
+  }
+  catch (error) {
+    // Assignment detection is optional: only a positive response changes init.
+    // A lookup outage or inaccessible suggested app must preserve the prior flow.
+    warn(`Could not check the onboarding assignment; continuing with the existing setup. ${formatError(error)}`)
+    return null
+  }
+}
+
 export async function tryBuilderOnlyInit(
   appId: string | undefined,
   options: SetupOptions,
   dependencies: {
     request?: typeof invokeCapgoCliApi
+    warn?: (message: string) => void
     beforeLaunch?: () => Promise<void>
     launch?: (options: OnboardingBuilderOptions) => Promise<void>
   } = {},
 ): Promise<boolean> {
   if (!appId)
     return false
-  const checklist = await readBuilderOnlyAssignment(appId, options, dependencies.request)
+  const checklist = await readBuilderOnlyInitAssignment(appId, options, dependencies.request, dependencies.warn)
   if (!checklist)
     return false
   await dependencies.beforeLaunch?.()

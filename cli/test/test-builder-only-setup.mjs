@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { loadProgress, saveProgress } from '../src/build/onboarding/progress.ts'
 import { getIosResumeStep } from '../src/build/onboarding/ios/progress.ts'
 import { getAndroidResumeStep, loadAndroidProgress, saveAndroidProgress } from '../src/build/onboarding/android/progress.ts'
-import { readBuilderOnlyAssignment, tryBuilderOnlyInit, resolveBuilderChecklistPlatform } from '../src/init/builder-setup.ts'
+import { readBuilderOnlyAssignment, readBuilderOnlyInitAssignment, tryBuilderOnlyInit, resolveBuilderChecklistPlatform } from '../src/init/builder-setup.ts'
 
 const appId = 'com.example.builder'
 const setup = { todo_list_version: 4, builder_todo_list_version: '1', paths: ['builder'], selected_path: 'builder', selected_builder_platform: 'android', steps: { builder: { ios: {}, android: {} } } }
@@ -43,6 +43,26 @@ assert.equal(await readBuilderOnlyAssignment(appId, options, async () => ({ data
 await assert.rejects(readBuilderOnlyAssignment(appId, options, async () => { throw new Error('offline') }), /offline/)
 assert.equal((await resolveBuilderChecklistPlatform(appId, options, undefined, 'ios', async () => { throw new Error('offline') })).platform, 'ios', 'standalone build setup remains available without a checklist lookup')
 assert.equal(await tryBuilderOnlyInit(undefined, options, { request: async () => assert.fail('no app to look up') }), false)
+for (const request of [
+  async () => { throw new Error('offline') },
+  async () => { throw new DOMException('timed out', 'TimeoutError') },
+  ...[401, 403, 500].map(status => async () => ({ data: null, error: { message: 'lookup failed', context: { status } } })),
+]) {
+  const warnings = []
+  assert.equal(await tryBuilderOnlyInit(appId, options, {
+    request, warn: message => warnings.push(message),
+    beforeLaunch: async () => assert.fail('lookup failure must keep existing setup'),
+    launch: async () => assert.fail('lookup failure must not launch Builder'),
+  }), false)
+  assert.equal(warnings.length, 1, 'failed optional assignment lookup explains its fallback')
+  assert.match(warnings[0], /Could not check.*continuing with the existing setup/)
+  const pendingWarnings = []
+  assert.equal(await readBuilderOnlyInitAssignment(appId, options, request, message => pendingWarnings.push(message)), null)
+  assert.equal(pendingWarnings.length, 1, 'pending-app lookup uses the same safe fallback')
+}
+await assert.rejects(tryBuilderOnlyInit(appId, options, {
+  request, launch: async () => { throw new Error('Builder launch failed') },
+}), /Builder launch failed/, 'a real Builder failure must not restart OTA setup')
 console.log('Builder-only setup dispatch, exact app, platform precedence and unchanged OTA/dual setup passed')
 
 const directory = mkdtempSync(join(tmpdir(), 'capgo-builder-only-resume-'))
