@@ -1,14 +1,15 @@
--- Capgo no longer keeps admin-only data models. The admin dashboard
--- (Cap-go/capgo_admin_dashboard) copied these tables into its D1 database and
--- now produces them itself from read-only Capgo reads, the Stripe API and the
--- builder:
--- - daily_revenue_metrics and trial_extension_events, from stripe_info changes;
+-- The admin dashboard (Cap-go/capgo_admin_dashboard) owns active reporting.
+-- It produces history from read-only Capgo reads, the Stripe API and builder:
+-- - revenue and trial extension history, from stripe_info changes;
 -- - stripe_refunds, from the Stripe refunds API;
 -- - builder_capacity_events, from the builder's own endpoints.
 -- cli_usage was only the non-Workers fallback of the CLI_USAGE Analytics Engine
 -- dataset and is empty in production.
--- No view, function, foreign key or publication depends on these tables apart
--- from the trial extension trigger dropped here. processed_stripe_events stays:
+-- daily_revenue_metrics stays as a frozen reconciliation source until its
+-- dashboard copy is verified. Capgo no longer writes it. Drop it only in a
+-- later migration after the remaining revenue differences are resolved.
+-- No view, function, foreign key or publication depends on the dropped tables
+-- apart from the trial trigger dropped here. processed_stripe_events stays:
 -- it deduplicates Stripe webhook side effects.
 SET LOCAL lock_timeout = '2s';
 
@@ -17,7 +18,6 @@ ON public.stripe_info;
 DROP FUNCTION IF EXISTS public.record_trial_extension_event();
 
 DROP TABLE IF EXISTS public.trial_extension_events;
-DROP TABLE IF EXISTS public.daily_revenue_metrics;
 DROP TABLE IF EXISTS public.stripe_refunds;
 DROP TABLE IF EXISTS public.builder_capacity_events;
 DROP TABLE IF EXISTS public.cli_usage;

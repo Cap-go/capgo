@@ -1260,6 +1260,69 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_revenue_metrics: {
+        Row: {
+          churn_mrr: number
+          churn_mrr_enterprise: number
+          churn_mrr_maker: number
+          churn_mrr_solo: number
+          churn_mrr_team: number
+          churn_reason: string | null
+          contraction_mrr: number
+          contraction_mrr_enterprise: number
+          contraction_mrr_maker: number
+          contraction_mrr_solo: number
+          contraction_mrr_team: number
+          created_at: string
+          customer_id: string
+          date_id: string
+          expansion_mrr: number
+          new_business_mrr: number
+          opening_mrr: number
+          updated_at: string
+        }
+        Insert: {
+          churn_mrr?: number
+          churn_mrr_enterprise?: number
+          churn_mrr_maker?: number
+          churn_mrr_solo?: number
+          churn_mrr_team?: number
+          churn_reason?: string | null
+          contraction_mrr?: number
+          contraction_mrr_enterprise?: number
+          contraction_mrr_maker?: number
+          contraction_mrr_solo?: number
+          contraction_mrr_team?: number
+          created_at?: string
+          customer_id: string
+          date_id: string
+          expansion_mrr?: number
+          new_business_mrr?: number
+          opening_mrr?: number
+          updated_at?: string
+        }
+        Update: {
+          churn_mrr?: number
+          churn_mrr_enterprise?: number
+          churn_mrr_maker?: number
+          churn_mrr_solo?: number
+          churn_mrr_team?: number
+          churn_reason?: string | null
+          contraction_mrr?: number
+          contraction_mrr_enterprise?: number
+          contraction_mrr_maker?: number
+          contraction_mrr_solo?: number
+          contraction_mrr_team?: number
+          created_at?: string
+          customer_id?: string
+          date_id?: string
+          expansion_mrr?: number
+          new_business_mrr?: number
+          opening_mrr?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       daily_storage: {
         Row: {
           app_id: string

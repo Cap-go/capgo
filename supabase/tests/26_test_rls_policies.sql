@@ -1,7 +1,7 @@
 -- Test RLS Policies
 -- This file tests all Row Level Security policies in the database
 BEGIN;
-SELECT plan(69);
+SELECT plan(71);
 SELECT
     policies_are(
         'public',
@@ -451,6 +451,15 @@ SELECT
         'stripe_info should have correct policies'
     );
 
+-- Test daily_revenue_metrics policies
+SELECT
+    policies_are(
+        'public',
+        'daily_revenue_metrics',
+        ARRAY['Deny all access'],
+        'daily_revenue_metrics should deny all user-context access'
+    );
+
 -- Test processed_stripe_events policies
 SELECT
     policies_are(
@@ -458,6 +467,18 @@ SELECT
         'processed_stripe_events',
         ARRAY['Deny all access'],
         'processed_stripe_events should deny all user-context access'
+    );
+
+SELECT
+    ok(
+        (
+            SELECT c.relrowsecurity
+            FROM pg_class AS c
+            JOIN pg_namespace AS n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public'
+              AND c.relname = 'daily_revenue_metrics'
+        ),
+        'daily_revenue_metrics should have RLS enabled'
     );
 
 SELECT

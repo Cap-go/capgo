@@ -1,10 +1,10 @@
 BEGIN;
 SELECT plan(9);
 
-SELECT hasnt_table(
+SELECT has_table(
     'public',
     'daily_revenue_metrics',
-    'Revenue history is owned by the admin dashboard'
+    'Revenue history remains available until reconciliation is verified'
 );
 SELECT hasnt_table(
     'public',
