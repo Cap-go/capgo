@@ -2847,7 +2847,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, iosBundleIdInitial, initialProgres
         defaultExportPath,
         generateWorkflow,
         writeWorkflowFile,
-        // Merge the --api-host override into the build request options — the
+        // Merge the --api-host override into the build request options; the
         // shared tail builds the options itself (apikey/platform/caller-handled),
         // so the driver injects the gateway override here (parity with main's
         // bespoke requesting-build body).

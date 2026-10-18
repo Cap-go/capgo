@@ -34,7 +34,7 @@ export interface OnboardingBuilderOptions {
   appId?: string
   apikey?: string
   platform?: string
-  // Capgo API gateway override (--api-host) — threaded to the wizard so its
+  // Capgo API gateway override (--api-host), threaded to the wizard so its
   // build request AND AI analysis hit the same host as the plain CLI flow
   /** Capgo API override (--api-host); Capgo cloud when omitted. */
   apiHost?: string

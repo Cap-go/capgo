@@ -28,7 +28,7 @@ export async function runOnboardingCheck(prepared: PreparedOnboardingCheck, chec
         timestamp: new Date(timestamp),
         tags: { app_id: project.appId },
         nonPersonTags: { attempt_id: attemptId, command_path: command, ...tags },
-      }, false, AbortSignal.timeout(500), apiHost, 'error')
+      }, false, AbortSignal.timeout(2_000), apiHost, 'error')
     }
     catch {
       // Scan telemetry must never prevent onboarding detection or todo reporting.
