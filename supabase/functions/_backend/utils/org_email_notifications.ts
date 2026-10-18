@@ -784,6 +784,12 @@ export async function sendNotifToOrgMembersOnceWithResult(
     if (unresolvedResults.length > 0)
       return 'failed'
 
+    // Do not write the aggregate org claim when this run did not deliver mail.
+    // Recipient-level claims may already exist from a concurrent attempt; the
+    // exact org uniq_id must not be created without a fresh send (retention gates).
+    if (sentEmails.length === 0)
+      return 'already_claimed'
+
     const orgClaim = await claimNotifOrgOnceWithResult(c, eventName, orgId, uniqId, writeClient)
     if (orgClaim === 'failed')
       return 'failed'
