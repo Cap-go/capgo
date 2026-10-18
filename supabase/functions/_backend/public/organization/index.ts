@@ -7,6 +7,7 @@ import { get } from './get.ts'
 import { deleteMember } from './members/delete.ts'
 import { get as getMembers } from './members/get.ts'
 import { post as inviteUser } from './members/post.ts'
+import { updateMemberRole } from './members/put.ts'
 import { post } from './post.ts'
 import { put } from './put.ts'
 
@@ -49,6 +50,11 @@ app.post('/members', middlewareKey(), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return inviteUser(c, body, apikey)
+})
+
+app.put('/members', middlewareAuth(), async (c) => {
+  const body = await getBodyOrQuery<any>(c)
+  return updateMemberRole(c, body)
 })
 
 app.delete('/members', middlewareAuth(), async (c) => {

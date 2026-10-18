@@ -397,8 +397,14 @@ async function teardown() {
       console.log(String(error))
     }
   }
-  if (state.logpushJobId)
-    await cf(`/zones/${zone}/logpush/jobs/${state.logpushJobId}`, { method: 'DELETE' })
+  if (state.logpushJobId) {
+    try {
+      await cf(`/zones/${zone}/logpush/jobs/${state.logpushJobId}`, { method: 'DELETE' })
+    }
+    catch (error) {
+      console.log(String(error))
+    }
+  }
   wrangler(['delete', '--force'])
   console.log(`Left in place: custom log field ${STAT_HEADER} (additive, needed by the rollout) and R2 bucket ${BUCKET} (delete with: bunx wrangler r2 bucket delete ${BUCKET} after emptying it).`)
   saveState({ secret: state.secret })

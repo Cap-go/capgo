@@ -13,7 +13,7 @@ permit; it must not be treated as a disabled deletion rollout.
 ## Delivery and safety
 
 `capgo-r2-inventory-prod-cleanup` delivers up to 100 messages after a ten-second
-batch timeout, with at most five concurrent batches, two retries (three deliveries total), a
+batch timeout, with at most 40 concurrent batches, two retries (three deliveries total), a
 30-second retry delay and dedicated `capgo-r2-inventory-prod-cleanup-dlq`.
 Existing notification/repair delivery settings remain unchanged. The existing
 release job runs the extended queue-provisioning script before Worker deployment;
@@ -94,6 +94,14 @@ error type, HTTP status, timings and copy-response field presence. They never
 include object keys, raw provider errors or credentials, and do not change
 acknowledgement, retries or deletion decisions.
 
+Database/safety failures emit at most three distinct diagnostics per batch.
+They distinguish inspection, completion and batch setup, and report fixed reason
+labels (including unavailable replication evidence and connection/pool timeouts),
+allowlisted error types and known SQLSTATE/network codes. Wrapped database causes
+are inspected to a depth of three. Raw messages, SQL, parameters, stacks, object
+keys and connection strings are never logged. These diagnostics leave safety
+checks and acknowledgement/retry behavior unchanged.
+
 After confirmed DELETE/absence, acknowledge each corresponding source message
 **immediately, before any completion database connection/query**. Then perform
 one best-effort completion UPDATE per group. The update uses the snapshot taken
@@ -106,14 +114,23 @@ retry acknowledged messages. Existing notifications are fallback recovery.
 ## Budgets and capacity
 
 Each batch runs four workflows concurrently, at most one storage request each.
-Five concurrent batches therefore allow up to 20 storage workflows across five
+Forty concurrent batches therefore allow up to 160 storage workflows across 40
 independent invocations, each with its own six-connection limit. Each batch
 releases its DB connection before storage and never opens a per-file connection.
-Cleanup adds at most five active application DB connections to the existing
+Cleanup adds at most 40 active application DB clients to the existing
 notification and repair consumers' combined two. The independently scheduled
 upstream producer/health invocation can add one inventory and one source-database
-connection: at most eight inventory connections and one source connection across
-these paths. Hyperdrive pools and API traffic have additional budgets.
+client: at most 43 inventory clients and one source client across these paths.
+These inventory clients connect through Hyperdrive; they are not 43 dedicated
+PlanetScale origin connections. Hyperdrive shares origin connections across Worker
+invocations using transaction pooling. Its separately configured
+`origin_connection_limit` is a soft target shared with other users of the same
+Hyperdrive configuration, including API traffic; this queue change does not raise
+that target or the database server's connection limit. See
+[Hyperdrive connection pooling](https://developers.cloudflare.com/hyperdrive/configuration/tune-connection-pool/).
+The higher consumer cap can increase query volume and pool wait time. Verify
+database CPU, query latency, pool pressure, safety retries and storage errors
+under the higher load; do not equate the client count with spare origin capacity.
 Transactions use two-second statements, 500ms locks and five-second
 idle limits. Connection establishment is limited to three seconds.
 
@@ -125,11 +142,22 @@ than 120 seconds. The simple worst-case storage budget is
 `100 / 4 * 20s = 500s`, leaving 100 seconds for database/publication/alert overhead;
 these are enforced starting bounds, **not measured latency or throughput guarantees**.
 A capped batch can leave unfinished messages for its configured retries/DLQ.
-Five batches can hold up to 500 delivered messages at once; the per-batch
+Forty batches can hold up to 4,000 delivered messages at once; the per-batch
 deadline, four-workflow limit, request budget and retry count do not increase.
 Measure net backlog change over several minutes against ongoing production,
 alongside batch issue counts and DLQ growth. A falling main queue alone does
 not prove successful cleanup if failures are instead exhausting into the DLQ.
+
+Size the Hyperdrive origin pool separately from consumer concurrency. A pool
+that cannot serve the scheduled health check within its five-second budget can
+prevent checkpoint refresh. Once the last published evidence is older than
+300 seconds, every inspection fails closed, even when replication itself is
+healthy. Check the checkpoint timestamp, scheduled health timeout reasons and
+Hyperdrive waiting clients together. Reserve database connection headroom when
+raising the origin limit; a low database CPU reading alone does not rule out
+pool starvation. During a systemic rollout failure, pause delivery with approval
+instead of exhausting messages into DLQ, and resume only after fresh health
+publication is verified. Verify checkpoint refresh remains healthy under load.
 
 Current Cloudflare limits are 15 minutes wall time per queue invocation, default
 30 seconds CPU configurable to five minutes (this Worker requests 300,000ms),

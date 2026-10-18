@@ -7,6 +7,7 @@ import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { safeParseSchema } from '../../utils/schema_validation.ts'
+import { emailPreferencesPatchSchema, ORG_SETTINGS_EMAIL_PREFERENCE_KEYS } from '../../utils/settings_email_preferences.ts'
 import { createSignedImageUrl, getStorageAllowedOrigins, resolveWritableImageValue } from '../../utils/storage.ts'
 import { getStripeCustomerName, isDeterministicStripeCustomerUpdateError, updateCustomerOrganizationName } from '../../utils/stripe.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
@@ -38,6 +39,7 @@ const bodySchema = z.object({
   required_encryption_key: z.string().nullable().optional(),
   enforcing_2fa: z.boolean().optional(),
   password_policy_config: passwordPolicyConfigSchema.nullable().optional(),
+  email_preferences: emailPreferencesPatchSchema(ORG_SETTINGS_EMAIL_PREFERENCE_KEYS).optional(),
 })
 
 type OrgRow = Database['public']['Tables']['orgs']['Row']
@@ -57,6 +59,7 @@ interface OrganizationPutBody {
   required_encryption_key?: string | null
   enforcing_2fa?: boolean
   password_policy_config?: PasswordPolicyConfig | null
+  email_preferences?: Record<string, boolean>
 }
 
 interface PgTransactionClient {
@@ -75,7 +78,11 @@ const ORGANIZATION_UPDATE_COLUMNS = {
   required_encryption_key: 'required_encryption_key',
   enforcing_2fa: 'enforcing_2fa',
   password_policy_config: 'password_policy_config', // NOSONAR: SQL column identifier, not a credential.
+  email_preferences: 'email_preferences',
 } as const
+
+// JSONB columns patched by merging into the stored object instead of replacing it.
+const ORGANIZATION_MERGE_COLUMNS = new Set<string>(['email_preferences'])
 
 function getOrganizationUpdateColumn(field: string) {
   const column = ORGANIZATION_UPDATE_COLUMNS[field as keyof typeof ORGANIZATION_UPDATE_COLUMNS]
@@ -87,15 +94,22 @@ function getOrganizationUpdateColumn(field: string) {
 function buildOrganizationUpdateQuery(
   orgId: string,
   updateFields: OrgUpdateFields,
-  options?: { expectedCurrentName?: string, expectedCurrentFields?: OrgUpdateFields },
+  options?: { expectedCurrentName?: string, expectedCurrentFields?: OrgUpdateFields, replaceMergedColumns?: boolean },
 ) {
   const params: unknown[] = []
   const assignments: string[] = []
   for (const [field, value] of Object.entries(updateFields)) {
     if (value === undefined)
       continue
+    const column = getOrganizationUpdateColumn(field)
+    // Rollbacks restore the exact previous value, so they must not merge into the current one.
+    if (ORGANIZATION_MERGE_COLUMNS.has(field) && !options?.replaceMergedColumns) {
+      params.push(JSON.stringify(value))
+      assignments.push(`${column} = COALESCE(${column}, '{}'::jsonb) || $${params.length}::jsonb`)
+      continue
+    }
     params.push(value)
-    assignments.push(`${getOrganizationUpdateColumn(field)} = $${params.length}`)
+    assignments.push(`${column} = $${params.length}`)
   }
 
   params.push(orgId)
@@ -262,6 +276,8 @@ function buildUpdateFields(
     updateFields.enforcing_2fa = body.enforcing_2fa
   if (body.password_policy_config !== undefined)
     updateFields.password_policy_config = body.password_policy_config
+  if (body.email_preferences !== undefined)
+    updateFields.email_preferences = body.email_preferences
   return updateFields
 }
 
@@ -317,7 +333,7 @@ async function updateOrg(
   auth: AuthInfo,
   orgId: string,
   updateFields: OrgUpdateFields,
-  options?: { expectedCurrentName?: string, expectedCurrentFields?: OrgUpdateFields },
+  options?: { expectedCurrentName?: string, expectedCurrentFields?: OrgUpdateFields, replaceMergedColumns?: boolean },
 ) {
   let pgPool: Awaited<ReturnType<typeof getPgClient>> | null = null
   let dbClient: PgTransactionClient | null = null
@@ -485,6 +501,7 @@ export async function put(
           await updateOrg(c, auth, body.orgId, rollbackFields, {
             expectedCurrentName: dataOrg.name,
             expectedCurrentFields: buildExpectedCurrentFields(dataOrg, updateFields),
+            replaceMergedColumns: true,
           })
         }
         catch (rollbackError) {

@@ -11,6 +11,10 @@ function json(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...headers } })
 }
 
+function probeErrorMessage(error) {
+  return error instanceof Error ? error.message : 'probe failed'
+}
+
 function entryKey(hostname, kind, key) {
   return `https://${hostname}/__probe__/${kind}/${encodeURIComponent(key)}`
 }
@@ -39,7 +43,7 @@ export default {
           }
         }
         catch (e) {
-          results.push({ i: i + 1, op: useFetch ? 'fetch' : 'match', ok: false, error: String(e?.message ?? e) })
+          results.push({ i: i + 1, op: useFetch ? 'fetch' : 'match', ok: false, error: probeErrorMessage(e) })
         }
       }
       return json({ colo, kind, n, results })
@@ -83,7 +87,7 @@ export default {
         return json({ ok: true, colo })
       }
       catch (e) {
-        return json({ ok: false, error: String(e?.message ?? e), colo })
+        return json({ ok: false, error: probeErrorMessage(e), colo })
       }
     }
 

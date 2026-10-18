@@ -13,12 +13,11 @@ import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { closeClient, getPgClient, logPgError } from '../utils/pg.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { getRollingStatsPeriod } from '../utils/statsPeriod.ts'
-import { supabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
+import { supabaseAdmin } from '../utils/supabase.ts'
 
 dayjs.extend(utc)
 
 const maxPeriodDays = 365
-const maxPlatformDeliveryPeriodDays = 90
 const maxDeliveryMs = 7_200_000
 const pairingLookbackMs = 2 * 60 * 60 * 1000
 const DELIVERY_CF_CHUNK_CONCURRENCY = 4
@@ -26,7 +25,7 @@ const MAX_DELIVERY_CHUNK_PAGES = 20
 const UPDATE_DELIVERY_STATS_CACHE_TTL_SECONDS = 300
 const UPDATE_DELIVERY_STATS_CACHE_PATH = '/.update-delivery-stats'
 type UpdateDeliveryPeriodDays = number
-type UpdateDeliveryScope = 'app' | 'org' | 'platform'
+type UpdateDeliveryScope = 'app' | 'org'
 
 interface UpdateDeliveryStatsRequest {
   scope?: UpdateDeliveryScope
@@ -83,34 +82,7 @@ END`
 function buildScopedDeliveriesCte(scope: UpdateDeliveryScope) {
   const appFilter = scope === 'app'
     ? 'AND s.app_id = $1'
-    : scope === 'org'
-      ? 'AND s.app_id IN (SELECT apps.app_id FROM public.apps WHERE apps.owner_org = $1)'
-      : ''
-
-  // Platform stays metadata-only to avoid unbounded start/end pairing across all apps.
-  if (scope === 'platform') {
-    return `WITH deliveries AS (
-  SELECT
-    to_char(date_trunc('day', s.created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day,
-    s.app_id,
-    s.device_id,
-    duration_ms
-  FROM (
-    SELECT
-      s.created_at,
-      s.app_id,
-      s.device_id,
-      ${durationExpression} AS duration_ms
-    FROM public.stats s
-    WHERE s.created_at >= $1::timestamptz
-      AND s.created_at < $2::timestamptz
-      AND s.action = ANY($3::public.stats_action[])
-  ) s
-  WHERE duration_ms IS NOT NULL
-    AND duration_ms >= 0
-    AND duration_ms <= 7200000
-)`
-  }
+    : 'AND s.app_id IN (SELECT apps.app_id FROM public.apps WHERE apps.owner_org = $1)'
 
   return `WITH scoped AS (
   SELECT
@@ -174,7 +146,7 @@ deliveries AS (
 }
 
 function buildStatsQuery(scope: UpdateDeliveryScope) {
-  // One deliveries CTE shared by daily + overview so platform/org/app avoid a second full scan.
+  // One deliveries CTE shared by daily + overview so org/app avoid a second full scan.
   return `${buildScopedDeliveriesCte(scope)},
 daily AS (
   SELECT
@@ -224,7 +196,7 @@ function normalizePeriodDays(days: number | undefined = 7): UpdateDeliveryPeriod
 function normalizeScope(value: unknown): UpdateDeliveryScope | null {
   if (value === undefined || value === 'app')
     return 'app'
-  if (value === 'org' || value === 'platform')
+  if (value === 'org')
     return value
   return null
 }
@@ -402,28 +374,6 @@ function aggregateDeliverySamples(samples: DeliverySample[]): {
   }
 }
 
-function normalizePlatformPeriodDays(days: UpdateDeliveryPeriodDays): UpdateDeliveryPeriodDays {
-  return Math.min(days, maxPlatformDeliveryPeriodDays) as UpdateDeliveryPeriodDays
-}
-
-function buildEmptyUpdateDeliveryResponse(input: {
-  labels: string[]
-  days: UpdateDeliveryPeriodDays
-  start: string
-  end: string
-  scope: UpdateDeliveryScope
-}) {
-  return buildUpdateDeliveryResponse({
-    labels: input.labels,
-    days: input.days,
-    start: input.start,
-    end: input.end,
-    scope: input.scope,
-    dailyRows: [],
-    overviewRow: undefined,
-  })
-}
-
 function buildUpdateDeliveryResponse(input: {
   labels: string[]
   days: UpdateDeliveryPeriodDays
@@ -487,21 +437,6 @@ function buildUpdateDeliveryResponse(input: {
   }
 }
 
-async function assertPlatformAdmin(c: Context<MiddlewareKeyVariables>) {
-  const authToken = c.req.header('authorization')
-  if (!authToken)
-    throw simpleError('not_authorized', 'Not authorized')
-
-  const supabaseClient = useSupabaseClient(c, authToken)
-  const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_platform_admin')
-  if (adminError) {
-    cloudlog({ requestId: c.get('requestId'), message: 'is_admin_error', error: adminError })
-    throw simpleError('is_admin_error', 'Is admin error', { adminError })
-  }
-  if (!isAdmin)
-    throw simpleError('not_admin', 'Not admin - only admin users can access platform delivery latency')
-}
-
 async function listOrgAppIds(c: Context<MiddlewareKeyVariables>, orgId: string): Promise<string[]> {
   const limit = 1000
   let page = 0
@@ -544,9 +479,7 @@ async function readUpdateDeliveryStatsSB(
 
   try {
     const query = buildStatsQuery(scope)
-    const params = scope === 'platform'
-      ? [start.toISOString(), endExclusive.toISOString(), [...endActions]]
-      : [scopeId, start.toISOString(), endExclusive.toISOString(), [...timingActions], [...endActions], [...startActions]]
+    const params = [scopeId, start.toISOString(), endExclusive.toISOString(), [...timingActions], [...endActions], [...startActions]]
 
     const result = await db.query<{
       daily: UpdateDeliveryDailyRow[] | string
@@ -590,22 +523,6 @@ function buildDeliveryDayChunks(start: Dayjs, endExclusive: Dayjs) {
     cursor = end
   }
   return chunks
-}
-
-function resolveDeliveryChunkFailures(
-  failures: unknown[],
-  chunkCount: number,
-  swallowChunkErrors: boolean,
-): number {
-  if (failures.length === chunkCount && chunkCount > 0)
-    throw failures[0]
-  if (failures.length > 0 && !swallowChunkErrors)
-    throw failures[0]
-  return failures.length
-}
-
-function shouldCacheUpdateDeliveryStats(sampleCount: number, failedChunks: number): boolean {
-  return sampleCount > 0 && failedChunks === 0
 }
 
 async function mapSettledInBatches<T, R>(
@@ -760,12 +677,11 @@ async function readUpdateDeliverySamplesCF(
     endExclusive: Dayjs
     appIds?: string[]
     concurrency: number
-    swallowChunkErrors: boolean
   },
 ) {
-  // Same pairing as app/org: raw start+complete events, then JS pair.
-  // Daily windows stay under AE's 50k row cap; pair per chunk so platform
-  // does not hold 30 days of raw events. Each chunk overlaps 2h for midnight pairs.
+  // Raw start+complete events, then JS pair. Daily windows stay under AE's
+  // 50k row cap; pair per chunk so long periods do not hold every raw event.
+  // Each chunk overlaps 2h for midnight pairs.
   const chunks = buildDeliveryDayChunks(params.start, params.endExclusive)
   const settled = await mapSettledInBatches(chunks, params.concurrency, async (chunk) => {
     const { samples, incomplete } = await readUpdateDeliveryChunkEventsCF(c, {
@@ -773,20 +689,16 @@ async function readUpdateDeliverySamplesCF(
       windowEnd: chunk.end,
       appIds: params.appIds,
     })
-    if (incomplete && !params.swallowChunkErrors)
+    if (incomplete)
       throw simpleError('fetch_error', 'Update delivery sample set too large for this period')
-    return { samples, incomplete }
+    return samples
   })
 
   const samples: DeliverySample[] = []
   const failures: unknown[] = []
-  let incompleteChunks = 0
   for (const [index, result] of settled.entries()) {
     if (result.status === 'fulfilled') {
-      if (result.value.incomplete)
-        incompleteChunks += 1
-      else
-        samples.push(...result.value.samples)
+      samples.push(...result.value)
       continue
     }
     failures.push(result.reason)
@@ -799,9 +711,9 @@ async function readUpdateDeliverySamplesCF(
     })
   }
 
-  const failedChunks = resolveDeliveryChunkFailures(failures, chunks.length, params.swallowChunkErrors)
-    + incompleteChunks
-  return { samples, failedChunks }
+  if (failures.length > 0)
+    throw failures[0]
+  return samples
 }
 
 async function readUpdateDeliveryStatsCF(
@@ -826,12 +738,11 @@ async function readUpdateDeliveryStatsCF(
     appIds = await listOrgAppIds(c, scopeId)
   }
 
-  const { samples, failedChunks } = await readUpdateDeliverySamplesCF(c, {
+  const samples = await readUpdateDeliverySamplesCF(c, {
     start,
     endExclusive,
     appIds,
     concurrency: DELIVERY_CF_CHUNK_CONCURRENCY,
-    swallowChunkErrors: scope === 'platform',
   })
   const { dailyRows, overviewRow } = aggregateDeliverySamples(samples)
 
@@ -841,7 +752,6 @@ async function readUpdateDeliveryStatsCF(
       message: 'update_delivery_stats CF produced zero samples',
       scope,
       sample_count: samples.length,
-      failed_chunks: failedChunks,
       app_count: appIds?.length ?? null,
       allow_pairing: true,
       start: start.toISOString(),
@@ -849,18 +759,15 @@ async function readUpdateDeliveryStatsCF(
     })
   }
 
-  return {
-    failedChunks,
-    response: buildUpdateDeliveryResponse({
-      labels,
-      days,
-      start: start.toISOString(),
-      end: endInclusive.toISOString(),
-      scope,
-      dailyRows,
-      overviewRow,
-    }),
-  }
+  return buildUpdateDeliveryResponse({
+    labels,
+    days,
+    start: start.toISOString(),
+    end: endInclusive.toISOString(),
+    scope,
+    dailyRows,
+    overviewRow,
+  })
 }
 
 async function readUpdateDeliveryStats(
@@ -869,18 +776,17 @@ async function readUpdateDeliveryStats(
   days: UpdateDeliveryPeriodDays,
   scopeId?: string,
 ) {
-  const effectiveDays = scope === 'platform' ? normalizePlatformPeriodDays(days) : days
   const cache = new CacheHelper(c)
   const cacheKey = cache.buildRequest(UPDATE_DELIVERY_STATS_CACHE_PATH, {
     scope,
     scopeId: scopeId ?? '',
-    days: String(effectiveDays),
+    days: String(days),
   })
   const cached = await cache.matchJson<ReturnType<typeof buildUpdateDeliveryResponse>>(cacheKey)
   if (cached)
     return cached
 
-  const period = getRollingStatsPeriod(effectiveDays)
+  const period = getRollingStatsPeriod(days)
   const start = dayjs(period.start)
   const endExclusive = dayjs(period.endExclusive)
   const endInclusive = dayjs(period.endInclusive)
@@ -889,18 +795,18 @@ async function readUpdateDeliveryStats(
   // Same dual-path pattern as private/stats: Analytics Engine in prod, Postgres locally.
   if (c.env.APP_LOG) {
     try {
-      const { response: cfResponse, failedChunks } = await readUpdateDeliveryStatsCF(
+      const cfResponse = await readUpdateDeliveryStatsCF(
         c,
         scope,
-        effectiveDays,
+        days,
         scopeId,
         labels,
         start,
         endExclusive,
         endInclusive,
       )
-      // Avoid caching empty windows or partial platform reads from failed AE chunks.
-      if (shouldCacheUpdateDeliveryStats(cfResponse.overview.samples, failedChunks))
+      // Avoid caching empty windows.
+      if (cfResponse.overview.samples > 0)
         await cache.putJson(cacheKey, cfResponse, UPDATE_DELIVERY_STATS_CACHE_TTL_SECONDS)
       return cfResponse
     }
@@ -911,22 +817,13 @@ async function readUpdateDeliveryStats(
         error: serializeError(error),
         scope,
       })
-      if (scope === 'platform') {
-        return buildEmptyUpdateDeliveryResponse({
-          labels,
-          days: effectiveDays,
-          start: start.toISOString(),
-          end: endInclusive.toISOString(),
-          scope,
-        })
-      }
     }
   }
 
   const pgResponse = await readUpdateDeliveryStatsSB(
     c,
     scope,
-    effectiveDays,
+    days,
     scopeId,
     labels,
     start,
@@ -948,17 +845,11 @@ app.post('/', middlewareAuth, async (c) => {
 
   const scope = normalizeScope(body.scope)
   if (!scope)
-    throw simpleError('invalid_scope', 'scope must be app, org, or platform')
+    throw simpleError('invalid_scope', 'scope must be app or org')
 
   const days = normalizePeriodDays(body.days)
   if (!days)
     throw simpleError('invalid_days', `days must be an integer from 1 to ${maxPeriodDays}`)
-
-  if (scope === 'platform') {
-    await assertPlatformAdmin(c)
-    // 90-day cap is applied inside readUpdateDeliveryStats for platform scope only.
-    return c.json(await readUpdateDeliveryStats(c, scope, days))
-  }
 
   if (scope === 'app') {
     if (!body.app_id)
@@ -990,16 +881,12 @@ app.post('/', middlewareAuth, async (c) => {
 
 export const updateDeliveryStatsTestUtils = {
   buildUpdateDeliveryResponse,
-  buildEmptyUpdateDeliveryResponse,
   buildDeliveriesFromEvents,
   buildDeliveryDayChunks,
   aggregateDeliverySamples,
-  resolveDeliveryChunkFailures,
-  shouldCacheUpdateDeliveryStats,
   paginateUpdateDeliveryChunkSamples,
   generateDateLabels,
   normalizePeriodDays,
-  normalizePlatformPeriodDays,
   normalizeScope,
   parseMetaDurationMs,
   resolveEventDurationMs,

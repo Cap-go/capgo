@@ -26,8 +26,11 @@ const props = withDefaults(defineProps<{
   hidePeriodSelector?: boolean
   // Chart-only card for dense pages such as Observe > Releases.
   dense?: boolean
+  // False when the app does not store plugin_version/is_prod, so the outdated-plugin hint has no data to use.
+  pluginVersionsCollected?: boolean
 }>(), {
   appId: '',
+  pluginVersionsCollected: true,
   orgId: '',
   forceDemo: false,
   hidePeriodSelector: false,
@@ -57,7 +60,7 @@ const effectiveStats = computed<UpdateDeliveryStatsResponse | null>(() => {
 const hasData = computed(() => (effectiveStats.value?.overview.samples ?? 0) > 0)
 
 // App scope only: the plugin versions in the DB tell whether devices can report delivery timing at all.
-const pluginCheckAppId = computed(() => props.scope === 'app' && !props.forceDemo ? props.appId : '')
+const pluginCheckAppId = computed(() => props.scope === 'app' && !props.forceDemo && props.pluginVersionsCollected ? props.appId : '')
 const { stats: pluginStats, fetchStats: fetchPluginStats } = useNativeObserveStats<{ pluginVersions: PluginVersionRow[] }>(
   pluginCheckAppId,
   () => ({ view: 'plugins' }),

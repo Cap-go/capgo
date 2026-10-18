@@ -317,9 +317,35 @@ export interface SnippetEdgeStatsEnv {
 /** Delay before failed records are replayed again, or a failed file send resumes. */
 const REPLAY_RETRY_DELAY_SECONDS = 60
 
+function snippetEdgeFileProgressKey(logKey: string) {
+  return `.snippet-edge-progress/${logKey}`
+}
+
+async function readSnippetEdgeFileProgress(env: SnippetEdgeStatsEnv, logKey: string) {
+  const object = await env.SNIPPET_EDGE_STATS_LOGS!.get(snippetEdgeFileProgressKey(logKey))
+  if (!object)
+    return 0
+  try {
+    const parsed = JSON.parse(await object.text()) as { groupsSent?: number }
+    return typeof parsed.groupsSent === 'number' && parsed.groupsSent > 0 ? parsed.groupsSent : 0
+  }
+  catch {
+    return 0
+  }
+}
+
+async function writeSnippetEdgeFileProgress(env: SnippetEdgeStatsEnv, logKey: string, groupsSent: number) {
+  await env.SNIPPET_EDGE_STATS_LOGS!.put(snippetEdgeFileProgressKey(logKey), JSON.stringify({ groupsSent }))
+}
+
+async function deleteSnippetEdgeFileProgress(env: SnippetEdgeStatsEnv, logKey: string) {
+  await env.SNIPPET_EDGE_STATS_LOGS!.delete(snippetEdgeFileProgressKey(logKey)).catch(() => undefined)
+}
+
 /**
  * Logpush file -> replay messages. Chunking is deterministic, so a failed send
  * resumes from its group instead of queuing the groups already sent again.
+ * Progress in R2 keeps a retried files message from re-sending earlier groups.
  * The file is deleted once fully queued: a repeated R2 notification then finds
  * nothing to replay.
  */
@@ -335,17 +361,19 @@ export async function enqueueSnippetEdgeStatsFile(env: SnippetEdgeStatsEnv, key:
     records.push(record)
   const chunks = chunkSnippetEdgeRecords(records)
   const groups = groupForSendBatch(chunks)
-  for (let index = fromGroup; index < groups.length; index++) {
+  const startGroup = Math.max(fromGroup, await readSnippetEdgeFileProgress(env, key))
+  for (let index = startGroup; index < groups.length; index++) {
     try {
       await env.SNIPPET_EDGE_STATS_REPLAY.sendBatch(groups[index]!.map(chunk => ({ body: { snippetEdgeStats: chunk } })))
+      await writeSnippetEdgeFileProgress(env, key, index + 1)
     }
     catch (error) {
-      // A throw here retries the whole message: the groups before `index` would be sent twice.
       const resume: SnippetEdgeFileResumeMessage = { snippetEdgeStatsFile: key, fromGroup: index }
       await env.SNIPPET_EDGE_STATS_REPLAY.send(resume, { delaySeconds: REPLAY_RETRY_DELAY_SECONDS })
       return { missing: false, records: records.length, chunks: chunks.length, invalid: stats.invalid, resumeFromGroup: index, error: String(error) }
     }
   }
+  await deleteSnippetEdgeFileProgress(env, key)
   await env.SNIPPET_EDGE_STATS_LOGS.delete(key).catch(() => undefined)
   return { missing: false, records: records.length, chunks: chunks.length, invalid: stats.invalid }
 }

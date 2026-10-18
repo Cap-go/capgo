@@ -5,22 +5,22 @@ BEGIN;
 
 SELECT plan(9);
 
-SELECT pgmq.purge_queue('cron_app_fame');
+SELECT pgmq.purge_queue('cron_reconcile_build_status');
 
 SELECT
     public.enqueue_cron_tick(
-        'cron_app_fame',
-        '{"function_name":"cron_app_fame","function_type":"cloudflare"}'::jsonb
+        'cron_reconcile_build_status',
+        '{"function_name":"cron_reconcile_build_status","function_type":"cloudflare"}'::jsonb
     );
 SELECT
     public.enqueue_cron_tick(
-        'cron_app_fame',
-        '{"function_name":"cron_app_fame","function_type":"cloudflare"}'::jsonb
+        'cron_reconcile_build_status',
+        '{"function_name":"cron_reconcile_build_status","function_type":"cloudflare"}'::jsonb
     );
 
 SELECT
     is(
-        (SELECT count(*)::int FROM pgmq.q_cron_app_fame),
+        (SELECT count(*)::int FROM pgmq.q_cron_reconcile_build_status),
         1,
         'an identical unread tick is not enqueued twice'
     );
@@ -28,30 +28,30 @@ SELECT
 -- A different payload is a different message and still goes through.
 SELECT
     public.enqueue_cron_tick(
-        'cron_app_fame', '{"function_name":"cron_app_fame"}'::jsonb
+        'cron_reconcile_build_status', '{"function_name":"cron_reconcile_build_status"}'::jsonb
     );
 
 SELECT
     is(
-        (SELECT count(*)::int FROM pgmq.q_cron_app_fame),
+        (SELECT count(*)::int FROM pgmq.q_cron_reconcile_build_status),
         2,
         'a tick with a different payload is enqueued'
     );
 
 -- Once the pending ticks are read (in flight or retrying), the next tick is
 -- enqueued so a slow or failing run still gets a fresh tick afterwards.
-SELECT count(*) FROM pgmq.read('cron_app_fame', 120, 10);
+SELECT count(*) FROM pgmq.read('cron_reconcile_build_status', 120, 10);
 
 SELECT
     public.enqueue_cron_tick(
-        'cron_app_fame',
-        '{"function_name":"cron_app_fame","function_type":"cloudflare"}'::jsonb
+        'cron_reconcile_build_status',
+        '{"function_name":"cron_reconcile_build_status","function_type":"cloudflare"}'::jsonb
     );
 
 SELECT
     is(
         (
-            SELECT count(*)::int FROM pgmq.q_cron_app_fame
+            SELECT count(*)::int FROM pgmq.q_cron_reconcile_build_status
             WHERE read_ct = 0
         ),
         1,

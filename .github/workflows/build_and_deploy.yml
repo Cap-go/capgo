@@ -237,7 +237,7 @@ jobs:
                 exit "$exit_code"
               fi
           - name: Build
-            run: bun ${{ env.ENV == 'prod' && 'build' || 'build:dev' }}
+            run: bun run ${{ env.ENV == 'prod' && 'build' || 'build:dev' }}
             env:
               VITE_VAPID_KEY: ${{ secrets.VITE_VAPID_KEY }}
               VITE_FIREBASE_CONFIG: ${{ secrets.VITE_FIREBASE_CONFIG }}

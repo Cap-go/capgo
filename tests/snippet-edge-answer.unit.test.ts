@@ -215,7 +215,7 @@ describe('snippet edge stats replay', () => {
     )
     expect(result).toEqual({ replayed: 1, failed: [], rejected: 0 })
     // Owner and custom id setting come from the owner cache, not from the header.
-    expect(getAppOwnerWithEdgeCache).toHaveBeenCalledWith(expect.anything(), 'com.edge.app', expect.anything(), ['mau', 'bandwidth'])
+    expect(getAppOwnerWithEdgeCache).toHaveBeenCalledWith(expect.anything(), 'com.edge.app', expect.anything(), ['mau', 'bandwidth'], { rethrowReadOnlyConnectionErrors: true })
     expect(createStatsMau).toHaveBeenCalledWith(expect.anything(), body.device_id.toLowerCase(), 'com.edge.app', 'org-1', 'ios', '2.0.0')
     expect(sendStatsAndDevice).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ device_id: body.device_id.toLowerCase(), custom_id: undefined }), [{ action: 'noNew', versionName: '1.2.3' }])
   })
@@ -284,7 +284,10 @@ describe('snippet edge stats queue', () => {
     const sent: unknown[] = []
     const env = {
       SNIPPET_EDGE_STATS_LOGS: {
-        get: vi.fn(async (key: string) => objects.has(key) ? { body: new Response(objects.get(key)).body } : null),
+        get: vi.fn(async (key: string) => objects.has(key) ? { body: new Response(objects.get(key)).body, text: async () => objects.get(key)! } : null),
+        put: vi.fn(async (key: string, value: string) => {
+          objects.set(key, value)
+        }),
         delete: vi.fn(async (key: string) => {
           objects.delete(key)
         }),
@@ -313,6 +316,21 @@ describe('snippet edge stats queue', () => {
     expect(sent.flatMap(message => (message as any).snippetEdgeStats)).toHaveLength(120)
   })
 
+  it('skips groups already queued when the files message is retried', async () => {
+    const { env, objects, sent } = buildEnv(logFile(6000))
+    await handleSnippetEdgeStatsMessage(env, 'm-full', notification, vi.fn())
+    const fullCount = sent.flatMap(message => (message as any).snippetEdgeStats).length
+    sent.length = 0
+    objects.set('20261014/a.log', logFile(6000))
+    objects.set('.snippet-edge-progress/20261014/a.log', JSON.stringify({ groupsSent: 1 }))
+    await handleSnippetEdgeStatsMessage(env, 'm-retry', notification, vi.fn())
+    const retryCount = sent.flatMap(message => (message as any).snippetEdgeStats).length
+    expect(retryCount).toBeGreaterThan(0)
+    expect(retryCount).toBeLessThan(fullCount)
+    expect(objects.has('20261014/a.log')).toBe(false)
+    expect(objects.has('.snippet-edge-progress/20261014/a.log')).toBe(false)
+  })
+
   it('resumes a file from the group whose send failed, without sending earlier groups again', async () => {
     const { env, objects, sent } = buildEnv(logFile(6000))
     let calls = 0
@@ -324,13 +342,14 @@ describe('snippet edge stats queue', () => {
     await handleSnippetEdgeStatsMessage(env, 'm1', notification, vi.fn())
     const resume = sent.find(message => isSnippetEdgeFileResumeMessage(message))
     expect(resume).toEqual({ snippetEdgeStatsFile: '20261014/a.log', fromGroup: 1 })
-    expect(objects.size).toBe(1)
+    expect(objects.has('20261014/a.log')).toBe(true)
 
     await handleSnippetEdgeStatsMessage(env, 'm2', resume, vi.fn())
     const replayed = sent.flatMap(message => (message as any).snippetEdgeStats ?? []).map((record: any) => record.b)
     expect(replayed).toHaveLength(6000)
     expect(new Set(replayed).size).toBe(6000)
-    expect(objects.size).toBe(0)
+    expect(objects.has('20261014/a.log')).toBe(false)
+    expect(objects.has('.snippet-edge-progress/20261014/a.log')).toBe(false)
     // Group 0, the failed group 1, then only group 1 again on resume.
     expect(calls).toBe(3)
   })

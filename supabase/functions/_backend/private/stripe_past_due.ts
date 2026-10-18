@@ -6,6 +6,7 @@ import { middlewareAuth } from '../utils/hono_jwt.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { getLatestOpenSubscriptionInvoice } from '../utils/stripe.ts'
+import { normalizeBillingAccount } from '../utils/stripe_billing.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 
 interface PastDueBody {
@@ -49,7 +50,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   const { data: stripeInfo, error: stripeInfoError } = await supabaseAdmin(c)
     .from('stripe_info')
-    .select('status, past_due_at')
+    .select('status, past_due_at, billing_account')
     .eq('customer_id', org.customer_id)
     .maybeSingle()
   if (stripeInfoError) {
@@ -61,7 +62,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (!stripeInfo?.past_due_at && stripeInfo?.status !== 'failed')
     return c.json(notPastDue)
 
-  const invoice = await getLatestOpenSubscriptionInvoice(c, org.customer_id)
+  const invoice = await getLatestOpenSubscriptionInvoice(c, org.customer_id, normalizeBillingAccount(stripeInfo.billing_account))
   // A failed one-off charge (credits) leaves no open subscription invoice: not past due.
   if (!stripeInfo.past_due_at && !invoice)
     return c.json(notPastDue)

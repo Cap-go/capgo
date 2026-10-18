@@ -9,24 +9,17 @@ import {
   countInstallSourcesCF,
   countUpdatesFromLogsCF,
   countUpdatesFromLogsExternalCF,
-  getPluginBreakdownCF,
   getPublicLiveUpdateMetricsCF,
-  getUpdateStatsCF,
-  readActiveAppsCF,
   readBandwidthUsageCF,
   readDevicesCF,
   readDeviceUsageCF,
   readDeviceVersionCountsCF,
-  readLastMonthDevicesByPlatformCF,
-  readLastMonthDevicesCF,
-  readLastMonthUpdatesCF,
   readNativeVersionUsageCF,
   readStatsCF,
   readStatsVersionCF,
   readUpdateDeliveryTimingEventsCF,
 } from '../../supabase/functions/_backend/utils/cloudflare.ts'
 import {
-  buildGlobalNotificationStatsQuery,
   buildNotificationStatsQuery,
 } from '../../supabase/functions/_backend/utils/nativeNotifications.ts'
 
@@ -246,14 +239,6 @@ export async function collectAnalyticsEngineSqlFixtures(): Promise<AnalyticsEngi
         }),
       },
       {
-        name: 'buildGlobalNotificationStatsQuery.dayWindow',
-        query: buildGlobalNotificationStatsQuery({
-          dataset: 'notification_events',
-          since: new Date('2026-06-30T00:00:00.000Z'),
-          until: SAMPLE_REFERENCE_DATE,
-        }),
-      },
-      {
         name: 'buildUpdateDeliveryTimingEventsCFQuery.app',
         query: buildUpdateDeliveryTimingEventsCFQuery({
           start_date: SAMPLE_START,
@@ -358,12 +343,6 @@ export async function collectAnalyticsEngineSqlFixtures(): Promise<AnalyticsEngi
     }))
     await captureCall('countUpdatesFromLogsCF', () => countUpdatesFromLogsCF(context, SAMPLE_REFERENCE_DATE))
     await captureCall('countUpdatesFromLogsExternalCF', () => countUpdatesFromLogsExternalCF(context, SAMPLE_REFERENCE_DATE))
-    await captureCall('readActiveAppsCF', () => readActiveAppsCF(context, SAMPLE_REFERENCE_DATE))
-    await captureCall('readLastMonthUpdatesCF', () => readLastMonthUpdatesCF(context, SAMPLE_REFERENCE_DATE))
-    await captureCall('readLastMonthDevicesCF', () => readLastMonthDevicesCF(context, SAMPLE_REFERENCE_DATE))
-    await captureCall('readLastMonthDevicesByPlatformCF', () => readLastMonthDevicesByPlatformCF(context, SAMPLE_REFERENCE_DATE))
-    await captureCall('getUpdateStatsCF', () => getUpdateStatsCF(context))
-    await captureCall('getPluginBreakdownCF', () => getPluginBreakdownCF(context, SAMPLE_REFERENCE_DATE))
     await captureCall('getPublicLiveUpdateMetricsCF', () => getPublicLiveUpdateMetricsCF(context, SAMPLE_REFERENCE_DATE))
 
     return [...staticFixtures, ...capture.fixtures]

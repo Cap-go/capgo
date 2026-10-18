@@ -15,7 +15,9 @@
  * updated when its settings differ.
  *
  * Env:
- *   CLOUDFLARE_API_TOKEN   Logs Edit + Zone Read + Zone WAF/Rulesets Edit (custom log fields)
+ *   CLOUDFLARE_API_TOKEN   Logs Edit + Zone Read + Zone WAF/Rulesets Edit (custom log fields);
+ *                          Workers R2 Storage Write (create bucket) + Queues Write or Workers Scripts Write (queues)
+ *   (Separate from R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY below: those are only for the Logpush destination.)
  *   CLOUDFLARE_ACCOUNT_ID
  *   R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY   R2 token able to write the bucket (Logpush destination)
  *   ZONE_NAME              default capgo.app

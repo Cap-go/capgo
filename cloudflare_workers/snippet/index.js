@@ -1114,11 +1114,12 @@ export default {
     // Budget order: a fetch for every worker left, then the /updates IP limit
     // write (it keeps edge answers away from a limited IP), then the breaker.
     const hintReserve = endpoint === 'updates' ? 1 : 0
+    const fallbackReserve = 1
 
     for (let index = 0; index < fallbackUrls.length; index++) {
       const workerUrl = fallbackUrls[index]
       const fetchesLeft = fallbackUrls.length - index
-      const circuit = canSpend(budget, 1, fetchesLeft + (index > 0 ? hintReserve : 0))
+      const circuit = canSpend(budget, 1, fetchesLeft + (index > 0 ? hintReserve : 0) + fallbackReserve)
         ? await readCircuit(budget, hostname, colo, workerUrl)
         : { healthy: true, hasEntry: false }
       // Skip unhealthy workers (circuit is open)
@@ -1127,7 +1128,7 @@ export default {
         console.log(`Skipping ${workerUrl} (circuit open for ${colo})`)
         continue
       }
-      if (!canSpend(budget))
+      if (!canSpend(budget, 1, fallbackReserve))
         break
 
       try {
@@ -1148,13 +1149,13 @@ export default {
         if (response.status >= 500) {
           fallbackFailure = true
           console.log(`${workerUrl} returned ${response.status}, marking unhealthy`)
-          if (canSpend(budget, 1, fetchesLeft - 1 + hintReserve))
+          if (canSpend(budget, 1, fetchesLeft - 1 + hintReserve + fallbackReserve))
             await markUnhealthy(budget, hostname, colo, workerUrl)
           continue // try fallback
         }
 
         // Success (2xx, 3xx, 4xx) - worker is healthy
-        if (circuit.hasEntry && canSpend(budget, 1, hintReserve))
+        if (circuit.hasEntry && canSpend(budget, 1, hintReserve + fallbackReserve))
           await cacheDelete(budget, getCircuitBreakerCacheKey(hostname, colo, workerUrl))
         console.log(`Request served by ${workerUrl}`)
 
@@ -1203,13 +1204,13 @@ export default {
         // Network failure or timeout - mark unhealthy
         fallbackFailure = true
         console.log(`${workerUrl} failed: ${error.message}, marking unhealthy`)
-        if (canSpend(budget, 1, fetchesLeft - 1 + hintReserve))
+        if (canSpend(budget, 1, fetchesLeft - 1 + hintReserve + fallbackReserve))
           await markUnhealthy(budget, hostname, colo, workerUrl)
         // continue to next fallback
       }
     }
 
-    if (!canSpend(budget)) {
+    if (!canSpend(budget, 1, 0)) {
       console.log('Subrequest budget exhausted, no worker answered')
       return new Response(JSON.stringify({ error: 'service_unavailable', message: 'Service temporarily unavailable' }), {
         status: 503,
