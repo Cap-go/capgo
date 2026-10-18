@@ -64,10 +64,10 @@ describe('dual-checklist identity hydration', () => {
 
   it('loads saved path and platform when identity arrives after mount', async () => {
     const { host, userId } = mountChecklist()
-    expect(host.querySelector('[aria-selected="true"]')?.textContent).toBe('setup-goal-live-updates')
+    expect(host.querySelector('[aria-selected="true"]')?.textContent?.trim()).toBe('setup-goal-live-updates')
     userId.value = user
     await nextTick()
-    expect(host.querySelector('[aria-selected="true"]')?.textContent).toBe('setup-goal-builder')
+    expect(host.querySelector('[aria-selected="true"]')?.textContent?.trim()).toBe('setup-goal-builder')
     expect(host.querySelector('[data-test="builder"]')?.getAttribute('data-platform')).toBe('android')
     expect(loadChecklistPreference(user, appId)).toEqual({ path: 'builder', platform: 'android' })
   })
@@ -92,7 +92,7 @@ describe('dual-checklist identity hydration', () => {
     await nextTick()
     userId.value = user
     await nextTick()
-    expect(host.querySelector('[aria-selected="true"]')?.textContent).toBe('setup-goal-builder')
+    expect(host.querySelector('[aria-selected="true"]')?.textContent?.trim()).toBe('setup-goal-builder')
     expect(host.querySelector('[data-test="builder"]')?.getAttribute('data-platform')).toBe('ios')
     expect(host.querySelector('[data-test="inspect"]')?.textContent).toBe('inspected')
     expect(loadChecklistPreference(user, appId)).toEqual({ path: 'builder', platform: 'ios' })
@@ -114,7 +114,7 @@ describe('dual-checklist identity hydration', () => {
     const reopened = mountChecklist(true, 'builder')
     reopened.userId.value = user
     await nextTick()
-    expect(reopened.host.querySelector('[aria-selected="true"]')?.textContent).toBe('setup-goal-live-updates')
+    expect(reopened.host.querySelector('[aria-selected="true"]')?.textContent?.trim()).toBe('setup-goal-live-updates')
   })
 
   it('persists an unchanged Builder resume with its actually started platform', async () => {

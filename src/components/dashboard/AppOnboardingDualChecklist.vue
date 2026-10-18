@@ -4,9 +4,11 @@ import type { ChecklistPath } from '~/utils/dualOnboardingChecklists'
 import { computed, nextTick, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconArrowRight from '~icons/lucide/arrow-right'
+import IconBlocks from '~icons/lucide/blocks'
 import IconLayers from '~icons/lucide/layers'
 import IconLoader from '~icons/lucide/loader-2'
 import IconRefresh from '~icons/lucide/refresh-cw'
+import IconZap from '~icons/lucide/zap'
 import { isDualOtaChecklistComplete, loadChecklistPreference, resolveDualChecklistResume, saveChecklistPreference } from '~/utils/dualOnboardingChecklists'
 
 const props = defineProps<{
@@ -167,11 +169,12 @@ async function onTabKey(event: KeyboardEvent, path: ChecklistPath) {
           :aria-selected="activePath === path"
           :aria-controls="`${id}-panel-${path}`"
           :tabindex="activePath === path ? 0 : -1"
-          class="min-h-12 border-b-2 px-1 text-base font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azure-500"
+          class="inline-flex min-h-12 items-center gap-2 border-b-2 px-1 text-base font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azure-500"
           :class="activePath === path ? 'border-primary-500 text-sky-700 dark:text-azure-300' : 'border-transparent text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'"
           @click="selectPath(path)"
           @keydown="onTabKey($event, path)"
         >
+          <component :is="path === 'ota' ? IconZap : IconBlocks" class="h-5 w-5 shrink-0" aria-hidden="true" />
           {{ label(path) }}
         </button>
       </div>
