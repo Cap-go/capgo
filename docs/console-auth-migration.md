@@ -106,7 +106,7 @@ an indexed domain lookup. The existing recovery permission check receives one
 verified user UUID and one provider org UUID; it does not enumerate users or
 organizations. Members of enforced SSO domains must sign in through their IdP.
 
-The console normally serves roughly 500–1,000 end users. Local
+The console normally serves roughly 500 to 1,000 end users. Local
 `EXPLAIN (ANALYZE, BUFFERS)` checks with 10,000 additional native identities, 100 caller-owned orgs, and 1,000 apps
 showed an index scan on `console_auth_user_pkey` (0.024 ms). Unfiltered and
 filtered org reads were checked for anonymous, invalid API key, broad API key,

@@ -2,7 +2,7 @@ import type { MaybeRefOrGetter } from 'vue'
 import type { DeviceDataCollection } from '~/services/deviceDataCollection'
 import { ref, toValue, watch } from 'vue'
 import { DEVICE_DATA_COLLECTION_KEYS, parseAppRowDeviceDataCollection } from '~/services/deviceDataCollection'
-import { useSupabase } from '~/services/supabase'
+import { useConsole } from '~/services/console'
 
 function hiddenDeviceDataCollection(): DeviceDataCollection {
   return Object.fromEntries(
@@ -11,7 +11,7 @@ function hiddenDeviceDataCollection(): DeviceDataCollection {
 }
 
 export function useDeviceDataCollection(appId: MaybeRefOrGetter<string>) {
-  const supabase = useSupabase()
+  const supabase = useConsole()
   const collection = ref<DeviceDataCollection>(hiddenDeviceDataCollection())
   let loadGeneration = 0
 
