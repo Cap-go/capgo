@@ -1,8 +1,8 @@
 import type { MaybeRefOrGetter } from 'vue'
 import type { DeviceDataCollection } from '~/services/deviceDataCollection'
 import { ref, toValue, watch } from 'vue'
-import { DEVICE_DATA_COLLECTION_KEYS, parseAppRowDeviceDataCollection } from '~/services/deviceDataCollection'
 import { useConsole } from '~/services/console'
+import { DEVICE_DATA_COLLECTION_KEYS, parseAppRowDeviceDataCollection } from '~/services/deviceDataCollection'
 
 function hiddenDeviceDataCollection(): DeviceDataCollection {
   return Object.fromEntries(
