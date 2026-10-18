@@ -69,6 +69,9 @@ export const optionsSetChannelSchema = optionsBaseSchema.extend({
   latestRemote: z.boolean().optional(),
   ios: z.boolean().optional(),
   android: z.boolean().optional(),
+  electron: z.boolean().optional(),
+  pause: z.boolean().optional(),
+  resume: z.boolean().optional(),
   selfAssign: z.boolean().optional(),
   disableAutoUpdate: z.string().optional(),
   updatePackage: z.enum(['all', 'zip', 'delta', 'zip_from_builtin', 'delta_from_builtin']).optional(),
@@ -105,6 +108,7 @@ export const optionsSetChannelSchema = optionsBaseSchema.extend({
   rejectConflictingBooleanGroup(value, ctx, ['rolloutPause', 'rolloutResume', 'rolloutRollback', 'rolloutPromote'])
   rejectConflictingBooleanGroup(value, ctx, ['autoPauseEnabled', 'autoPauseDisabled'])
   rejectConflictingBooleanGroup(value, ctx, ['acceptIncompatible', 'ignoreMetadataCheck'])
+  rejectConflictingBooleanGroup(value, ctx, ['pause', 'resume'])
 })
 
 export type OptionsSetChannel = z.infer<typeof optionsSetChannelSchema>

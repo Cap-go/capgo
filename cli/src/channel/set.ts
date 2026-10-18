@@ -160,6 +160,9 @@ export async function setChannelInternal(channel: string, appId: string, options
     latestRemote,
     ios,
     android,
+    electron,
+    pause,
+    resume,
     selfAssign,
     disableAutoUpdate,
     updatePackage,
@@ -216,6 +219,9 @@ export async function setChannelInternal(channel: string, appId: string, options
     && downgrade == null
     && ios == null
     && android == null
+    && electron == null
+    && pause == null
+    && resume == null
     && selfAssign == null
     && dev == null
     && emulator == null
@@ -270,6 +276,9 @@ export async function setChannelInternal(channel: string, appId: string, options
     || downgrade != null
     || ios != null
     || android != null
+    || electron != null
+    || pause != null
+    || resume != null
     || selfAssign != null
     || disableAutoUpdate != null
     || updatePackage != null
@@ -606,6 +615,21 @@ export async function setChannelInternal(channel: string, appId: string, options
     channelPayload.android = !!android
   }
 
+  if (electron != null) {
+    if (!silent)
+      log.info(`Set ${appId} channel: ${channel} to ${electron ? 'allow' : 'disallow'} electron update`)
+    channelPayload.electron = !!electron
+  }
+
+  if (pause && resume) {
+    if (!silent)
+      log.error('Cannot use --pause and --resume at the same time')
+    throw new CliUserError('Cannot use --pause and --resume at the same time')
+  }
+  const channelPaused = pause ? true : resume ? false : undefined
+  if (channelPaused !== undefined && !silent)
+    log.info(`${channelPaused ? 'Pause' : 'Resume'} updates on ${appId} channel: ${channel}`)
+
   if (selfAssign != null) {
     if (!silent)
       log.info(`Set ${appId} channel: ${channel} to ${selfAssign ? 'allow' : 'disallow'} self assign to this channel`)
@@ -716,6 +740,10 @@ export async function setChannelInternal(channel: string, appId: string, options
       channelBody.ios = channelPayload.ios
     if (channelPayload.android !== undefined)
       channelBody.android = channelPayload.android
+    if (channelPayload.electron !== undefined)
+      channelBody.electron = channelPayload.electron
+    if (channelPaused !== undefined)
+      channelBody.paused = channelPaused
     if (channelPayload.allow_device_self_set !== undefined)
       channelBody.allow_device_self_set = channelPayload.allow_device_self_set
     if (channelPayload.allow_emulator !== undefined)

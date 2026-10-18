@@ -3,18 +3,9 @@
 This file provides guidance to AI agents (Claude Code, Cursor, Copilot, etc.)
 when working with code in this repository.
 
-## MUST NOT — modify the admin dashboard in this repository
+## Admin dashboard
 
-The admin dashboard is maintained in the private
-[`Cap-go/capgo_admin_dashboard`](https://github.com/Cap-go/capgo_admin_dashboard)
-repository and deployed at `admin.capgo.app`. The web app only links to it. Do
-not add dashboard code or open dashboard pull requests here.
-
-For admin dashboard work, load
-`.agents/skills/modify-admin-dashboard/SKILL.md` and make the change and pull
-request in `Cap-go/capgo_admin_dashboard`. Shared backend producers that serve
-other Capgo features can still be changed here when the requested work genuinely
-belongs to shared infrastructure. See `docs/admin-dashboard.md`.
+The admin dashboard lives in [`Cap-go/capgo_admin_dashboard`](https://github.com/Cap-go/capgo_admin_dashboard) and reads the Capgo database read-only; Capgo carries no admin code.
 
 ## MUST NOT — never publish private customer data
 
@@ -677,8 +668,6 @@ Platform admin is **NOT** a general-purpose superuser capability.
 
 - The only allowed platform-admin user action is spoofing/impersonating another
   user.
-- The admin dashboard must stay read-only and limited to admin statistics,
-  observability, and similar reporting.
 - Never build a platform-admin write path that can change org membership, RBAC
   bindings, roles, permissions, billing state, app ownership, or any other
   privilege-bearing state.
@@ -1276,8 +1265,8 @@ code, and where code is used.
 Rules:
 - When the user types `/graphify`, follow the project skill before doing
   anything else.
-- `graphify-out/graph.json` is committed and refreshed during release version
-  bumps. Prefer `graphify query "<question>"`, `graphify affected "<node>"`,
+- `graphify-out/graph.json` is committed and refreshed by a
+  `chore(auto-sync)` commit after each release. Prefer `graphify query "<question>"`, `graphify affected "<node>"`,
   `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` before broad
   source searches.
 - Use `bun run graphify:generate` to refresh the committed code graph. The

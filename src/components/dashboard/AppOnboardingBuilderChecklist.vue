@@ -14,29 +14,46 @@ import IconAndroid from '~icons/mdi/android'
 import IconApple from '~icons/mdi/apple'
 import { BUILDER_STEP_IDS, parseBuilderOnboarding } from '~/services/builderOnboardingChecklist'
 import { useSupabase } from '~/services/supabase'
+import { resolveDualChecklistResume } from '~/utils/dualOnboardingChecklists'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   appId: string
   initialOnboarding?: unknown
   command: string
   hiding: boolean
   leaving: boolean
-}>()
+  active?: boolean
+  hideFooter?: boolean
+  initialPlatform?: BuilderPlatform | null
+  completionAction?: string
+  preserveSelection?: boolean
+}>(), { active: true })
 
 const emit = defineEmits<{
   copyCommand: [platform: BuilderPlatform]
   hide: []
   explore: []
   complete: []
+  snapshot: [onboarding: unknown]
+  platformChanged: [platform: BuilderPlatform]
 }>()
 
 const { t } = useI18n()
 const supabase = useSupabase()
 const onboarding = ref(parseBuilderOnboarding(props.initialOnboarding))
-const viewedPlatform = ref<BuilderPlatform | null>(onboarding.value.selectedPlatform)
-const selectedId = ref<string | null>(null)
+const viewedPlatform = ref<BuilderPlatform | null>(props.initialPlatform ?? onboarding.value.selectedPlatform)
+const selectedIds = ref<Partial<Record<BuilderPlatform, string | null>>>({})
+const selectedId = computed({
+  get: () => viewedPlatform.value ? selectedIds.value[viewedPlatform.value] ?? null : null,
+  set: (id: string | null) => {
+    if (viewedPlatform.value)
+      selectedIds.value[viewedPlatform.value] = id
+  },
+})
 const refreshError = ref(false)
 let refreshTimer: ReturnType<typeof setInterval> | undefined
+let hasLoadedPlatform = false
+let hasInteractedWithPlatform = false
 
 watch(() => props.initialOnboarding, (value) => {
   onboarding.value = parseBuilderOnboarding(value)
@@ -45,8 +62,10 @@ watch(() => props.initialOnboarding, (value) => {
 
 watch(() => props.appId, () => {
   onboarding.value = parseBuilderOnboarding(props.initialOnboarding)
-  viewedPlatform.value = onboarding.value.selectedPlatform
-  selectedId.value = null
+  viewedPlatform.value = props.initialPlatform ?? onboarding.value.selectedPlatform
+  selectedIds.value = {}
+  hasLoadedPlatform = false
+  hasInteractedWithPlatform = false
   void refreshOnboarding()
 })
 
@@ -63,7 +82,7 @@ const steps = computed(() => {
   }))
 })
 const doneCount = computed(() => steps.value.filter(step => step.status === 'done' || step.status === 'skipped').length)
-const currentStep = computed(() => steps.value.find(step => step.status === 'pending'))
+const currentStep = computed(() => steps.value.find(step => step.status !== 'done' && step.status !== 'skipped'))
 const selectedStep = computed(() => steps.value.find(step => step.id === selectedId.value) ?? currentStep.value ?? steps.value.at(-1))
 const isFirstStep = computed(() => selectedStep.value?.index === 0)
 const completed = computed(() => steps.value.length > 0
@@ -72,16 +91,19 @@ const completed = computed(() => steps.value.length > 0
 const platformCommand = computed(() => viewedPlatform.value && props.command ? `${props.command} --platform ${viewedPlatform.value}` : '')
 const guideHref = computed(() => viewedPlatform.value ? `https://capgo.app/docs/cli/cloud-build/${viewedPlatform.value}/` : '')
 
-watch(viewedPlatform, () => {
-  selectedId.value = null
+watch(() => props.initialPlatform, (platform) => {
+  if (platform)
+    viewedPlatform.value = platform
 })
 
-watch(() => currentStep.value?.id, (id, previous) => {
-  if (selectedId.value === null || selectedId.value === previous)
+watch([viewedPlatform, () => currentStep.value?.id], ([platform, id], [previousPlatform, previous]) => {
+  if (selectedId.value === null || (platform === previousPlatform && selectedId.value === previous))
     selectedId.value = id ?? null
 }, { immediate: true })
 
 async function refreshOnboarding() {
+  if (props.active === false)
+    return
   const appId = props.appId
   const { data, error } = await supabase.from('apps').select('onboarding').eq('app_id', appId).maybeSingle()
   if (appId !== props.appId)
@@ -89,14 +111,22 @@ async function refreshOnboarding() {
   refreshError.value = !!error
   if (!error && data) {
     onboarding.value = parseBuilderOnboarding(data.onboarding)
+    if (props.preserveSelection && !hasLoadedPlatform) {
+      if (!hasInteractedWithPlatform)
+        viewedPlatform.value = resolveDualChecklistResume(data.onboarding, { platform: props.initialPlatform ?? undefined }).platform
+      if (viewedPlatform.value)
+        emit('platformChanged', viewedPlatform.value)
+    }
+    hasLoadedPlatform = true
     viewedPlatform.value ??= onboarding.value.selectedPlatform
+    emit('snapshot', data.onboarding)
   }
 }
 
 onMounted(() => {
   void refreshOnboarding()
   refreshTimer = setInterval(() => {
-    if (document.visibilityState === 'visible' && !completed.value)
+    if (document.visibilityState === 'visible' && props.active !== false && !completed.value)
       void refreshOnboarding()
   }, 5000)
 })
@@ -106,9 +136,22 @@ onUnmounted(() => {
     clearInterval(refreshTimer)
 })
 
+watch(() => props.active, (active) => {
+  if (active)
+    void refreshOnboarding()
+})
+
 function selectPlatform(platform: BuilderPlatform) {
+  hasInteractedWithPlatform = true
   viewedPlatform.value = platform
-  selectedId.value = null
+  if (!props.preserveSelection)
+    selectedId.value = null
+  emit('platformChanged', platform)
+}
+
+function selectStep(id: string) {
+  hasInteractedWithPlatform = true
+  selectedId.value = id
 }
 
 function statusLabel(status: BuilderStepStatus) {
@@ -191,7 +234,7 @@ function statusLabel(status: BuilderStepStatus) {
                 :class="selectedStep.id === step.id ? 'bg-azure-500/5 text-primary-500 dark:bg-azure-500/10 dark:text-azure-300' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'"
                 :aria-current="currentStep?.id === step.id ? 'step' : undefined"
                 :aria-label="t('setup-checklist-view-task', { task: step.title, status: statusLabel(step.status) })"
-                @click="selectedId = step.id"
+                @click="selectStep(step.id)"
               >
                 <IconCheck v-if="step.status === 'done'" class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" :aria-label="statusLabel(step.status)" />
                 <IconMinus v-else-if="step.status === 'skipped'" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="statusLabel(step.status)" />
@@ -216,7 +259,7 @@ function statusLabel(status: BuilderStepStatus) {
               {{ t('builder-checklist-complete-description') }}
             </p>
             <button type="button" class="d-btn mt-6 min-h-12 self-start border-primary-500 bg-primary-500 text-white hover:border-primary-600 hover:bg-primary-600" :disabled="hiding || leaving" @click="emit('complete')">
-              {{ t('setup-checklist-open-app') }}
+              {{ completionAction || t('setup-checklist-open-app') }}
               <IconArrowRight class="h-4 w-4" aria-hidden="true" />
             </button>
           </template>
@@ -270,7 +313,7 @@ function statusLabel(status: BuilderStepStatus) {
               <button v-if="refreshError" type="button" class="d-btn d-btn-ghost mt-2 min-h-11 text-sky-700 dark:text-azure-300" @click="refreshOnboarding">{{ t('setup-checklist-retry') }}</button>
             </output>
 
-            <button v-if="currentStep && currentStep.id !== selectedStep.id" type="button" class="d-btn d-btn-ghost mt-2 min-h-11 self-start text-sky-700 dark:text-azure-300" @click="selectedId = currentStep.id">
+            <button v-if="currentStep && currentStep.id !== selectedStep.id" type="button" class="d-btn d-btn-ghost mt-2 min-h-11 self-start text-sky-700 dark:text-azure-300" @click="selectStep(currentStep.id)">
               {{ t('setup-checklist-return-current') }}
               <IconArrowRight class="h-4 w-4" aria-hidden="true" />
             </button>
@@ -293,7 +336,7 @@ function statusLabel(status: BuilderStepStatus) {
       </p>
     </div>
 
-    <footer class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
+    <footer v-if="!hideFooter" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
       <button type="button" class="d-btn min-h-12 shrink-0 border-slate-300 bg-white px-4 text-slate-700 hover:border-slate-400 hover:bg-slate-50 dark:border-white/20 dark:bg-slate-900 dark:text-slate-200" :disabled="hiding || leaving" @click="emit('hide')">
         <IconLoader v-if="hiding" class="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
         {{ t('app-onboarding-dont-show-again') }}

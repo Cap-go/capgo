@@ -7,6 +7,7 @@ import { render } from 'ink'
 import React from 'react'
 import { resolveOwnerOrgId } from '../../analytics/org-resolver.js'
 import { flushDeferredCommandInvocation, trackEvent } from '../../analytics/track.js'
+import { resolveBuilderChecklistPlatform } from '../../init/builder-setup.js'
 import { getConfig } from '../../utils.js'
 import { createBuilderAppSelectionServices, getAppSelectionSuggestion } from './app-selection.js'
 import { appendInternalLog, startInternalLog } from '../../support/internal-log.js'
@@ -29,6 +30,8 @@ import type { OnboardingResult, OnboardingStep } from './types.js'
 import type { AppSelectionEvent } from './ui/app-selection-gate.js'
 export interface OnboardingBuilderOptions {
   analytics?: boolean
+  /** Exact app selected by a caller handing off an assigned Builder checklist. */
+  appId?: string
   apikey?: string
   platform?: string
   // Capgo API gateway override (--api-host) — threaded to the wizard so its
@@ -259,8 +262,8 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
 
   try {
     const suggestion = getAppSelectionSuggestion(extConfig.config)
-    appId = suggestion.appId
-    suggestedSource = suggestion.source
+    appId = options.appId ?? suggestion.appId
+    suggestedSource = options.appId ? 'builder' : suggestion.source
   }
   catch (error) {
     await stopInk(projectDiscoveryInk)
@@ -340,7 +343,9 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   // entrypoint — so both `build init` and the `bundle upload` → launch-onboarding
   // handoff each get exactly one.
   const journeyId = newBuilderJourneyId()
-  const analyticsEnabled = options.enableSelfUpdate === true && options.analytics !== false
+  // A verified Builder-only init handoff uses the same progress events, while
+  // leaving self-update disabled so it cannot re-execute the wrapping init.
+  const analyticsEnabled = (options.enableSelfUpdate === true || options.appId !== undefined) && options.analytics !== false
   const candidateApiKey = resolveBuilderCandidateKey(options.apikey)
   const loginServices = createBuilderLoginServices({ apiHost: options.apiHost })
   const appSelectionServices = createBuilderAppSelectionServices({ apiHost: options.apiHost })
@@ -368,6 +373,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   // WHERE the user dropped off regardless of HOW they left (keypress, Ctrl+C,
   // or a fatal error that exits) — none of which run React cleanup reliably.
   let lastStep: string | undefined
+  let builderOnlyChecklist = false
   let appSelectionConfirmed = false
   let startSetupLookupInFlight = false
   let startSetupStep: OnboardingStep | AndroidOnboardingStep | undefined
@@ -387,6 +393,11 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       apiHost: options.apiHost,
       journeyId,
       initialPlatform,
+      resolveChecklistPlatform: async (key: string, selectedId: string) => {
+        const assignment = await resolveBuilderChecklistPlatform(selectedId, { ...options, apikey: key }, options.platform, initialPlatform)
+        builderOnlyChecklist = assignment.checklist !== null
+        return assignment.platform
+      },
       // Whether the iOS flow may offer guided ASC-key creation (see the probe
       // above). The shell threads it into the iOS OnboardingApp only.
       guidedHelperUsable,
@@ -502,7 +513,9 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   // message, not application logging).
   if (result.outcome === 'completed') {
     const platformSuffix = resolvedPlatform ? ` (${resolvedPlatform})` : ''
-    process.stdout.write(`\n✔ Capgo onboarding complete for ${appId}${platformSuffix}.\n`)
+    process.stdout.write(builderOnlyChecklist
+      ? `\nBuilder setup finished for ${appId}${platformSuffix}.\nCheck cloud build progress with: npx @capgo/cli@latest app todo ${appId}\nThe checklist completes only after Capgo reports a successful cloud build.\n`
+      : `\n✔ Capgo onboarding complete for ${appId}${platformSuffix}.\n`)
     const s = result.summary
     if (s) {
       if (s.buildUrl)

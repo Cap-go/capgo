@@ -51,6 +51,22 @@ const state = {
   appWrites: [] as Array<{ method: string, body: unknown }>,
 }
 const events: string[] = []
+if (params.get('otaProgress') === '1')
+  state.steps.login_cli_mcp = { status: 'done' }
+for (const platform of ['ios', 'android'] as const) {
+  if (params.get('builderProgress') === platform)
+    state.builderSteps[platform].start_setup = { status: 'done' }
+  if (params.get('builderComplete') === platform) {
+    for (const step of Object.values(state.builderSteps[platform]))
+      step.status = 'done'
+  }
+}
+if (params.get('otaComplete') === '1') {
+  for (const id of ['login_cli_mcp', 'add_channel', 'add_updater', 'add_code', 'run_device', 'upload_bundle', 'test_update'])
+    state.steps[id] = { status: 'done' }
+  state.outcome = 'completed'
+  state.channels.push({ id: 1, app_id: previewAppId, name: 'staging', public: true })
+}
 const channelEvents: Array<{ event: OnboardingChannelEvent, properties: OnboardingChannelEventProperties }> = []
 const preview = { state, events, channelEvents, appId: ref(previewAppId), command: ref('npx @capgo/cli@latest i [API_KEY]'), hiding: ref(false), selectedOrgId: ref('') }
 const previewUserOnboarding = {
@@ -234,7 +250,7 @@ Object.defineProperty(useMainStore(pinia), 'user', { value: { id: '00000000-0000
 Object.defineProperty(useMainStore(pinia), 'auth', { value: { id: '00000000-0000-4000-8000-000000000001' } })
 useMainStore(pinia).awaitInitialLoad = async () => true
 const organization = useOrganizationStore(pinia)
-const previewOrganization = { gid: '00000000-0000-4000-8000-000000000002' }
+const previewOrganization = { gid: '00000000-0000-4000-8000-000000000002', name: 'Preview organization' }
 const selectedOrganization = ref(params.get('wrongOrg') === '1' ? { gid: '00000000-0000-4000-8000-000000000099' } : previewOrganization)
 preview.selectedOrgId.value = selectedOrganization.value.gid
 Object.defineProperty(organization, 'currentOrganization', { get: () => selectedOrganization.value })

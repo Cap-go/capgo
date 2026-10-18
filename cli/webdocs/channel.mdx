@@ -177,6 +177,10 @@ npx @capgo/cli@latest channel set production com.example.app --bundle 1.0.0 --st
 | **--no-ios** | <code>boolean</code> | Disable sending update to iOS devices |
 | **--android** | <code>boolean</code> | Allow sending update to Android devices |
 | **--no-android** | <code>boolean</code> | Disable sending update to Android devices |
+| **--electron** | <code>boolean</code> | Allow sending update to Electron apps |
+| **--no-electron** | <code>boolean</code> | Disable sending update to Electron apps |
+| **--pause** | <code>boolean</code> | Pause all updates on this channel (devices stay on their current bundle) |
+| **--resume** | <code>boolean</code> | Resume updates on a paused channel |
 | **--self-assign** | <code>boolean</code> | Allow device to self-assign to this channel |
 | **--no-self-assign** | <code>boolean</code> | Disable devices to self-assign to this channel |
 | **--disable-auto-update** | <code>string</code> | Block updates by type: major, minor, metadata, patch, or none (allows all) |

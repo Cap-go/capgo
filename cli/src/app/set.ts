@@ -22,6 +22,17 @@ import {
 const MIN_BUILD_TIMEOUT_MINUTES = 5
 const MAX_BUILD_TIMEOUT_MINUTES = 360
 
+function parseBooleanOption(value: unknown, flag: string): boolean {
+  if (typeof value === 'boolean')
+    return value
+  const normalized = String(value).trim().toLowerCase()
+  if (normalized === 'true')
+    return true
+  if (normalized === 'false')
+    return false
+  throw new CliUserError(`${flag} must be true or false`)
+}
+
 export async function setAppInternal(appId: string, options: Options, silent = false) {
   if (!silent)
     intro('Set app')
@@ -53,6 +64,14 @@ export async function setAppInternal(appId: string, options: Options, silent = f
     exposeMetadata,
     preview,
     allowDeviceCustomId,
+    collectCountry,
+    collectPlatform,
+    collectOsVersion,
+    collectPluginVersion,
+    collectVersionBuild,
+    collectIsEmulator,
+    collectIsProd,
+    collectInstallSource,
     blockProviderInfraRequests,
     buildTimeoutMinutes,
     iosStoreUrl,
@@ -159,9 +178,32 @@ export async function setAppInternal(appId: string, options: Options, silent = f
   if (retention != null)
     putBody.retention = retention * 24 * 60 * 60
   if (exposeMetadata != null)
-    putBody.expose_metadata = exposeMetadata
+    putBody.expose_metadata = parseBooleanOption(exposeMetadata, '--expose-metadata')
+  if (preview != null)
+    putBody.allow_preview = preview
+  if (buildTimeoutMinutes != null)
+    putBody.build_timeout_seconds = Math.trunc(Number(buildTimeoutMinutes)) * 60
+  if (defaultUploadChannel != null)
+    putBody.default_upload_channel = defaultUploadChannel
   if (allowDeviceCustomId != null)
     putBody.allow_device_custom_id = allowDeviceCustomId
+  const deviceDataCollection: Record<string, boolean> = {}
+  const collectPatches: Array<[string, boolean | null | undefined]> = [
+    ['country', collectCountry],
+    ['platform', collectPlatform],
+    ['os_version', collectOsVersion],
+    ['plugin_version', collectPluginVersion],
+    ['version_build', collectVersionBuild],
+    ['is_emulator', collectIsEmulator],
+    ['is_prod', collectIsProd],
+    ['install_source', collectInstallSource],
+  ]
+  for (const [key, value] of collectPatches) {
+    if (value != null)
+      deviceDataCollection[key] = value
+  }
+  if (Object.keys(deviceDataCollection).length > 0)
+    putBody.device_data_collection = deviceDataCollection
   if (blockProviderInfraRequests != null)
     putBody.block_provider_infra_requests = blockProviderInfraRequests
   if (preview != null)

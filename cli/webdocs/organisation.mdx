@@ -83,6 +83,11 @@ npx @capgo/cli@latest organisation set
 | **--max-apikey-expiration-days** | <code>string</code> | Maximum days before API key expiration (1-365, null for no limit) |
 | **--enforce-hashed-api-keys** | <code>boolean</code> | Enforce hashed/secure API keys (key value stored as hash, shown only once) |
 | **--no-enforce-hashed-api-keys** | <code>boolean</code> | Allow plain-text API keys |
+| **--website** | <code>string</code> | Organization website URL (empty or null to clear) |
+| **--enforce-encrypted-bundles** | <code>boolean</code> | Require every uploaded bundle to be encrypted |
+| **--no-enforce-encrypted-bundles** | <code>boolean</code> | Allow unencrypted bundles |
+| **--required-encryption-key** | <code>string</code> | Only accept bundles encrypted with this public key fingerprint (null to clear) |
+| **--email-preference** | <code>string</code> | Organization email notification toggle (repeatable), e.g. --email-preference weekly_stats=false. Keys: usage_limit, credit_usage, bundle_created, bundle_deployed, deploy_stats_24h, weekly_stats, monthly_stats, billing_period_stats, device_error, channel_self_rejected, onboarding, builder_onboarding |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--api-host** | <code>string</code> | Custom Capgo API URL for self-hosting or testing, e.g. https://<project>.supabase.co/functions/v1 or http://127.0.0.1:8787 (env: CAPGO_API_HOST) |
 | **--files-host** | <code>string</code> | Custom Capgo files API URL when it differs from --api-host (env: CAPGO_FILES_HOST) |

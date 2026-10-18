@@ -113,6 +113,7 @@ export interface OnboardingShellProps {
   journeyId: string
   /** Pre-resolved platform (--platform flag or the single existing native dir); skips the picker. */
   initialPlatform?: Platform
+  resolveChecklistPlatform?: (apikey: string, appId: string) => Promise<string | undefined>
   /**
    * Set when a newer @capgo/cli is published. Drives the self-update prompt
    * shown as the FIRST wizard screen (before platform selection / auto-load).
@@ -145,11 +146,12 @@ const AnalyticsNotice: FC = () => (
   </Box>
 )
 
-const OnboardingShell: FC<OnboardingShellProps> = ({ appId, suggestedSource, appSelectionServices, iosBundleIdInitial, appflowPackageName, iosDir, androidDir, guidedHelperUsable, apikey, loginServices, apiHost, journeyId, initialPlatform, updateInfo, analyticsNotice, onResolvePlatform, onStep, onResult, onBeforeExit, onAuthenticated, onAppSelected, onAppSelectionEvent }) => {
+const OnboardingShell: FC<OnboardingShellProps> = ({ appId, suggestedSource, appSelectionServices, iosBundleIdInitial, appflowPackageName, iosDir, androidDir, guidedHelperUsable, apikey, loginServices, apiHost, journeyId, initialPlatform, resolveChecklistPlatform, updateInfo, analyticsNotice, onResolvePlatform, onStep, onResult, onBeforeExit, onAuthenticated, onAppSelected, onAppSelectionEvent }) => {
   const { exit } = useApp()
   const { cols, rows } = useTerminalSize()
   const [ready, setReady] = useState<ReadyApp | null>(null)
   const [authenticatedKey, setAuthenticatedKey] = useState<string | undefined>()
+  const [checklistPlatform, setChecklistPlatform] = useState<Platform | undefined>(initialPlatform)
   const [selectedAppId, setSelectedAppId] = useState<string | undefined>()
   const [switchingKey, setSwitchingKey] = useState(false)
   // Set when progress loading fails (e.g. corrupt saved-progress JSON). loadProgress
@@ -215,9 +217,9 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, suggestedSource, app
   useEffect(() => {
     // Hold the auto-load until the update prompt (if any) is answered, so the
     // update offer is the first screen even when --platform pre-resolves.
-    if (authenticatedKey && selectedAppId && initialPlatform && (!updateInfo || updateAnswered))
-      choose(initialPlatform)
-  }, [authenticatedKey, selectedAppId, initialPlatform, choose, updateInfo, updateAnswered])
+    if (authenticatedKey && selectedAppId && checklistPlatform && (!updateInfo || updateAnswered))
+      choose(checklistPlatform)
+  }, [authenticatedKey, selectedAppId, checklistPlatform, choose, updateInfo, updateAnswered])
 
   useEffect(() => {
     if (authenticatedKey && !selectedAppId && !switchingKey)
@@ -328,7 +330,9 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, suggestedSource, app
         cols={cols}
         rows={rows}
         footer={analyticsNotice ? <AnalyticsNotice /> : undefined}
-        onSelected={(chosenId) => {
+        onSelected={async (chosenId) => {
+          const platform = await resolveChecklistPlatform?.(authenticatedKey, chosenId)
+          setChecklistPlatform(platform === 'ios' || platform === 'android' ? platform : initialPlatform)
           setSelectedAppId(chosenId)
           onAppSelected?.(chosenId)
         }}

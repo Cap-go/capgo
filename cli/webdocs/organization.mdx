@@ -93,6 +93,77 @@ npx @capgo/cli@latest organization members ORG_ID
 | **--supa-host** | <code>string</code> | Deprecated: use --api-host <supaHost>/functions/v1 |
 | **--supa-anon** | <code>string</code> | Deprecated: no longer needed |
 
+### <a id="organization-members-invite"></a> 🔹 **Members-invite**
+
+```bash
+npx @capgo/cli@latest organization members-invite
+```
+
+✉️ Invite a user to an organization by email with a role.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest organization members-invite ORG_ID --email teammate@example.com --role org_admin
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-e** | <code>string</code> | Email of the user to invite |
+| **-r** | <code>string</code> | Role: org_member, org_billing_admin, org_admin or org_super_admin |
+| **-a** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+### <a id="organization-members-role"></a> 🔹 **Members-role**
+
+```bash
+npx @capgo/cli@latest organization members-role
+```
+
+🎚️ Change the role of an organization member or pending invite.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest organization members-role ORG_ID --email teammate@example.com --role org_member
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-e** | <code>string</code> | Email of the member |
+| **-r** | <code>string</code> | Role: org_member, org_billing_admin, org_admin or org_super_admin |
+| **-a** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+### <a id="organization-members-remove"></a> 🔹 **Members-remove**
+
+```bash
+npx @capgo/cli@latest organization members-remove
+```
+
+🚪 Remove a member from an organization.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest organization members-remove ORG_ID --email teammate@example.com
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-e** | <code>string</code> | Email of the member to remove |
+| **-a** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
 ### <a id="organization-set"></a> ⚙️ **Set**
 
 **Alias:** `s`
@@ -132,6 +203,11 @@ npx @capgo/cli@latest organization set ORG_ID --name "New Name"
 | **--max-apikey-expiration-days** | <code>string</code> | Maximum days before API key expiration (1-365, null for no limit) |
 | **--enforce-hashed-api-keys** | <code>boolean</code> | Enforce hashed/secure API keys (key value stored as hash, shown only once) |
 | **--no-enforce-hashed-api-keys** | <code>boolean</code> | Allow plain-text API keys |
+| **--website** | <code>string</code> | Organization website URL (empty or null to clear) |
+| **--enforce-encrypted-bundles** | <code>boolean</code> | Require every uploaded bundle to be encrypted |
+| **--no-enforce-encrypted-bundles** | <code>boolean</code> | Allow unencrypted bundles |
+| **--required-encryption-key** | <code>string</code> | Only accept bundles encrypted with this public key fingerprint (null to clear) |
+| **--email-preference** | <code>string</code> | Organization email notification toggle (repeatable), e.g. --email-preference weekly_stats=false. Keys: usage_limit, credit_usage, bundle_created, bundle_deployed, deploy_stats_24h, weekly_stats, monthly_stats, billing_period_stats, device_error, channel_self_rejected, onboarding, builder_onboarding |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--api-host** | <code>string</code> | Custom Capgo API URL for self-hosting or testing, e.g. https://<project>.supabase.co/functions/v1 or http://127.0.0.1:8787 (env: CAPGO_API_HOST) |
 | **--files-host** | <code>string</code> | Custom Capgo files API URL when it differs from --api-host (env: CAPGO_FILES_HOST) |

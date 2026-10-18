@@ -165,10 +165,15 @@ Capgo continues to load the root config while writing only the selected source. 
   - [Delete_old](#key-delete_old)
 - 👤 [Account](#account)
   - [Whoami](#account-whoami)
+  - [Get](#account-get)
+  - [Set](#account-set)
 - 🔹 [Organization](#organization)
   - [List](#organization-list)
   - [Add](#organization-add)
   - [Members](#organization-members)
+  - [Members-invite](#organization-members-invite)
+  - [Members-role](#organization-members-role)
+  - [Members-remove](#organization-members-remove)
   - [Set](#organization-set)
   - [Delete](#organization-delete)
 - 🔹 [Organisation](#organisation)
@@ -885,6 +890,22 @@ npx @capgo/cli@latest app set com.example.app --name "Updated App" --retention 3
 | **--no-preview** | <code>boolean</code> | Disable bundle and channel preview QR codes for this app |
 | **--allow-device-custom-id** | <code>boolean</code> | Allow devices to set a custom device ID for this app |
 | **--no-allow-device-custom-id** | <code>boolean</code> | Disallow custom device IDs for this app |
+| **--collect-country** | <code>boolean</code> | Store the request country on device records and stats |
+| **--no-collect-country** | <code>boolean</code> | Do not store country on device records or stats |
+| **--collect-platform** | <code>boolean</code> | Store device platform on device records and stats |
+| **--no-collect-platform** | <code>boolean</code> | Do not store device platform on device records or stats |
+| **--collect-os-version** | <code>boolean</code> | Store device OS version on device records and stats |
+| **--no-collect-os-version** | <code>boolean</code> | Do not store device OS version on device records or stats |
+| **--collect-plugin-version** | <code>boolean</code> | Store the updater plugin version on device records and stats |
+| **--no-collect-plugin-version** | <code>boolean</code> | Do not store the updater plugin version on device records or stats |
+| **--collect-version-build** | <code>boolean</code> | Store the native app version on device records and stats |
+| **--no-collect-version-build** | <code>boolean</code> | Do not store the native app version on device records or stats |
+| **--collect-is-emulator** | <code>boolean</code> | Store whether the client reported itself as an emulator |
+| **--no-collect-is-emulator** | <code>boolean</code> | Do not store the emulator flag |
+| **--collect-is-prod** | <code>boolean</code> | Store whether the client reported a production build |
+| **--no-collect-is-prod** | <code>boolean</code> | Do not store the production / development flag |
+| **--collect-install-source** | <code>boolean</code> | Store App Store, Play Store, TestFlight, or other install source |
+| **--no-collect-install-source** | <code>boolean</code> | Do not store install source |
 | **--block-provider-infra-requests** | <code>boolean</code> | Block provider infrastructure requests for this app |
 | **--no-block-provider-infra-requests** | <code>boolean</code> | Allow provider infrastructure requests for this app |
 | **--build-timeout-minutes** | <code>string</code> | Native build timeout in minutes (5-360, default: 15) |
@@ -1071,6 +1092,10 @@ npx @capgo/cli@latest channel set production com.example.app --bundle 1.0.0 --st
 | **--no-ios** | <code>boolean</code> | Disable sending update to iOS devices |
 | **--android** | <code>boolean</code> | Allow sending update to Android devices |
 | **--no-android** | <code>boolean</code> | Disable sending update to Android devices |
+| **--electron** | <code>boolean</code> | Allow sending update to Electron apps |
+| **--no-electron** | <code>boolean</code> | Disable sending update to Electron apps |
+| **--pause** | <code>boolean</code> | Pause all updates on this channel (devices stay on their current bundle) |
+| **--resume** | <code>boolean</code> | Resume updates on a paused channel |
 | **--self-assign** | <code>boolean</code> | Allow device to self-assign to this channel |
 | **--no-self-assign** | <code>boolean</code> | Disable devices to self-assign to this channel |
 | **--disable-auto-update** | <code>string</code> | Block updates by type: major, minor, metadata, patch, or none (allows all) |
@@ -1213,6 +1238,65 @@ npx @capgo/cli@latest account whoami
 | -------------- | ------------- | -------------------- |
 | **-a** | <code>string</code> | API key to link to your account |
 
+### <a id="account-get"></a> 🔹 **Get**
+
+**Alias:** `g`
+
+```bash
+npx @capgo/cli@latest account get
+```
+
+📇 Show your account profile and email notification settings.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest account get
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-a** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+### <a id="account-set"></a> ⚙️ **Set**
+
+**Alias:** `s`
+
+```bash
+npx @capgo/cli@latest account set
+```
+
+✏️ Update your account profile and email notification settings.
+Email, password, 2FA and account deletion stay in the web dashboard because they need an interactive sign-in.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest account set --first-name Ada --last-name Lovelace
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--first-name** | <code>string</code> | First name |
+| **--last-name** | <code>string</code> | Last name |
+| **--country** | <code>string</code> | Country |
+| **--discord-username** | <code>string</code> | Discord username (empty or null to clear) |
+| **--format-locale** | <code>string</code> | Locale used to format dates and numbers, e.g. en-US (empty or null to clear) |
+| **--notifications** | <code>boolean</code> | Enable email notifications |
+| **--no-notifications** | <code>boolean</code> | Disable all email notifications |
+| **--newsletter** | <code>boolean</code> | Subscribe to the newsletter |
+| **--no-newsletter** | <code>boolean</code> | Unsubscribe from the newsletter |
+| **--email-preference** | <code>string</code> | Email notification toggle (repeatable), e.g. --email-preference weekly_stats=false. Keys: usage_limit, credit_usage, bundle_created, bundle_deployed, deploy_stats_24h, weekly_stats, monthly_stats, billing_period_stats, device_error, channel_self_rejected, onboarding, builder_onboarding, bundle_incompatible, cli_realtime_feed |
+| **-a** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
 
 ## <a id="organization"></a> 🔹 **Organization**
 
@@ -1302,6 +1386,77 @@ npx @capgo/cli@latest organization members ORG_ID
 | **--supa-host** | <code>string</code> | Deprecated: use --api-host <supaHost>/functions/v1 |
 | **--supa-anon** | <code>string</code> | Deprecated: no longer needed |
 
+### <a id="organization-members-invite"></a> 🔹 **Members-invite**
+
+```bash
+npx @capgo/cli@latest organization members-invite
+```
+
+✉️ Invite a user to an organization by email with a role.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest organization members-invite ORG_ID --email teammate@example.com --role org_admin
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-e** | <code>string</code> | Email of the user to invite |
+| **-r** | <code>string</code> | Role: org_member, org_billing_admin, org_admin or org_super_admin |
+| **-a** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+### <a id="organization-members-role"></a> 🔹 **Members-role**
+
+```bash
+npx @capgo/cli@latest organization members-role
+```
+
+🎚️ Change the role of an organization member or pending invite.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest organization members-role ORG_ID --email teammate@example.com --role org_member
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-e** | <code>string</code> | Email of the member |
+| **-r** | <code>string</code> | Role: org_member, org_billing_admin, org_admin or org_super_admin |
+| **-a** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+### <a id="organization-members-remove"></a> 🔹 **Members-remove**
+
+```bash
+npx @capgo/cli@latest organization members-remove
+```
+
+🚪 Remove a member from an organization.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest organization members-remove ORG_ID --email teammate@example.com
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-e** | <code>string</code> | Email of the member to remove |
+| **-a** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
 ### <a id="organization-set"></a> ⚙️ **Set**
 
 **Alias:** `s`
@@ -1341,6 +1496,11 @@ npx @capgo/cli@latest organization set ORG_ID --name "New Name"
 | **--max-apikey-expiration-days** | <code>string</code> | Maximum days before API key expiration (1-365, null for no limit) |
 | **--enforce-hashed-api-keys** | <code>boolean</code> | Enforce hashed/secure API keys (key value stored as hash, shown only once) |
 | **--no-enforce-hashed-api-keys** | <code>boolean</code> | Allow plain-text API keys |
+| **--website** | <code>string</code> | Organization website URL (empty or null to clear) |
+| **--enforce-encrypted-bundles** | <code>boolean</code> | Require every uploaded bundle to be encrypted |
+| **--no-enforce-encrypted-bundles** | <code>boolean</code> | Allow unencrypted bundles |
+| **--required-encryption-key** | <code>string</code> | Only accept bundles encrypted with this public key fingerprint (null to clear) |
+| **--email-preference** | <code>string</code> | Organization email notification toggle (repeatable), e.g. --email-preference weekly_stats=false. Keys: usage_limit, credit_usage, bundle_created, bundle_deployed, deploy_stats_24h, weekly_stats, monthly_stats, billing_period_stats, device_error, channel_self_rejected, onboarding, builder_onboarding |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--api-host** | <code>string</code> | Custom Capgo API URL for self-hosting or testing, e.g. https://<project>.supabase.co/functions/v1 or http://127.0.0.1:8787 (env: CAPGO_API_HOST) |
 | **--files-host** | <code>string</code> | Custom Capgo files API URL when it differs from --api-host (env: CAPGO_FILES_HOST) |
@@ -1453,6 +1613,11 @@ npx @capgo/cli@latest organisation set
 | **--max-apikey-expiration-days** | <code>string</code> | Maximum days before API key expiration (1-365, null for no limit) |
 | **--enforce-hashed-api-keys** | <code>boolean</code> | Enforce hashed/secure API keys (key value stored as hash, shown only once) |
 | **--no-enforce-hashed-api-keys** | <code>boolean</code> | Allow plain-text API keys |
+| **--website** | <code>string</code> | Organization website URL (empty or null to clear) |
+| **--enforce-encrypted-bundles** | <code>boolean</code> | Require every uploaded bundle to be encrypted |
+| **--no-enforce-encrypted-bundles** | <code>boolean</code> | Allow unencrypted bundles |
+| **--required-encryption-key** | <code>string</code> | Only accept bundles encrypted with this public key fingerprint (null to clear) |
+| **--email-preference** | <code>string</code> | Organization email notification toggle (repeatable), e.g. --email-preference weekly_stats=false. Keys: usage_limit, credit_usage, bundle_created, bundle_deployed, deploy_stats_24h, weekly_stats, monthly_stats, billing_period_stats, device_error, channel_self_rejected, onboarding, builder_onboarding |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--api-host** | <code>string</code> | Custom Capgo API URL for self-hosting or testing, e.g. https://<project>.supabase.co/functions/v1 or http://127.0.0.1:8787 (env: CAPGO_API_HOST) |
 | **--files-host** | <code>string</code> | Custom Capgo files API URL when it differs from --api-host (env: CAPGO_FILES_HOST) |
@@ -1533,7 +1698,7 @@ Set up build credentials interactively (iOS: certificates + profiles automated; 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
 | **-a** | <code>string</code> | API key to link to your account |
-| **-p** | <code>string</code> | Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise. |
+| **-p** | <code>string</code> | Platform to onboard (ios or android). If omitted, uses the saved platform for Builder-only checklists, then auto-detects a single native folder or prompts. |
 | **--api-host** | <code>string</code> | Custom Capgo API URL for self-hosting or testing, e.g. https://<project>.supabase.co/functions/v1 or http://127.0.0.1:8787 (env: CAPGO_API_HOST) |
 | **--files-host** | <code>string</code> | Custom Capgo files API URL when it differs from --api-host (env: CAPGO_FILES_HOST) |
 | **--supa-host** | <code>string</code> | Deprecated: use --api-host <supaHost>/functions/v1 |
@@ -2272,11 +2437,13 @@ Selected tools exposed via MCP:
   - capgo_upload_bundle, capgo_list_bundles, capgo_delete_bundle, capgo_cleanup_bundles
   - capgo_list_channels, capgo_add_channel, capgo_update_channel, capgo_delete_channel
   - capgo_get_current_bundle, capgo_promote_channel, capgo_check_compatibility
-  - capgo_list_organizations, capgo_add_organization
+  - capgo_list_organizations, capgo_add_organization, capgo_update_organization, capgo_delete_organization
+  - capgo_list_organization_members, capgo_invite_organization_member, capgo_update_organization_member_role, capgo_remove_organization_member
   - capgo_star_repository
   - capgo_star_all_repositories
-  - capgo_get_account_id, capgo_doctor, capgo_get_stats, capgo_observe
+  - capgo_get_account_id, capgo_get_account, capgo_update_account, capgo_doctor, capgo_get_stats, capgo_observe
   - capgo_request_build, capgo_generate_encryption_keys
+  - capgo_search_docs
 Example usage with Claude Desktop:
   Add to claude_desktop_config.json:
   {
