@@ -3,6 +3,7 @@ import type { BuilderPlatform } from '~/services/builderOnboardingChecklist'
 import type { CliAiPromptOrganization } from '~/services/cliAiPrompt'
 import type { OrganizationApp } from '~/stores/organization'
 import type { Database, Json } from '~/types/supabase.types'
+import type { ChecklistPath } from '~/utils/dualOnboardingChecklists'
 import type { OnboardingABTestAssignment } from '~/utils/onboardingABTests'
 import type { OnboardingChannelEvent, OnboardingChannelEventProperties, OnboardingChannelStage } from '~/utils/onboardingChannelAnalytics'
 import type {
@@ -65,6 +66,7 @@ import { useOrganizationStore } from '~/stores/organization'
 import { isValidAppId } from '~/utils/appId'
 import { shouldSkipOnboardingResume } from '~/utils/appOnboardingProgress'
 import { useBeforeUnloadWarning } from '~/utils/beforeUnloadWarning'
+import { hasDualOnboardingChecklists } from '~/utils/dualOnboardingChecklists'
 import {
   hasNewChannelTreatment,
   hasWebNativeDevelopmentEnvironmentTreatment,
@@ -110,9 +112,11 @@ import {
 } from '~/utils/userOnboardingProgress'
 import AppOnboardingBuilderChecklist from './AppOnboardingBuilderChecklist.vue'
 import AppOnboardingCliSteps from './AppOnboardingCliSteps.vue'
+import AppOnboardingDualChecklist from './AppOnboardingDualChecklist.vue'
 import AppOnboardingIconInput from './AppOnboardingIconInput.vue'
 import AppOnboardingSetupChecklist from './AppOnboardingSetupChecklist.vue'
 import AppOnboardingWelcome from './AppOnboardingWelcome.vue'
+import BillingRegionChoice from './BillingRegionChoice.vue'
 import ChannelConsoleAssignOnboarding from './ChannelConsoleAssignOnboarding.vue'
 import ChannelCreateOnboarding from './ChannelCreateOnboarding.vue'
 import ChannelDefaultRoutingOnboarding from './ChannelDefaultRoutingOnboarding.vue'
@@ -240,6 +244,7 @@ const hasEditedAppId = ref(false)
 const storeAppIdLookupFailed = ref(false)
 const selectedDevelopmentEnvironment = ref<OnboardingDevelopmentEnvironment | null>(null)
 const skippedPublishAppQuestion = ref(false)
+const billingAccount = ref<'ee' | 'us' | undefined>()
 const selectedIntent = ref<OnboardingIntent | null>(null)
 const onboardingAnalyticsVersion = () => resolveOnboardingAnalyticsVersion(onboardingForABTests.value, selectedIntent.value)
 const setupHandoff = props.setupAppId ? consumeSetupHandoff(props.setupAppId) : null
@@ -300,7 +305,9 @@ const planNameOrder = ['Solo', 'Maker', 'Team', 'Enterprise'] as const
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
 // TODO(2027-03-19): Remove v3 compatibility after all existing OTA checklists have migrated.
 const usesOtaTodoList = computed(() => !!createdApp.value && hasSupportedOtaTodoList(parseAppOnboarding(createdApp.value.onboarding)))
-const usesBuilderTodoList = computed(() => !!createdApp.value && isBuilderTodoListSelected(createdApp.value.onboarding))
+const usesDualTodoList = computed(() => !!createdApp.value && hasDualOnboardingChecklists(createdApp.value.onboarding))
+const activeChecklistPath = ref<ChecklistPath | null>(null)
+const usesBuilderTodoList = computed(() => usesDualTodoList.value ? activeChecklistPath.value === 'builder' : !!createdApp.value && isBuilderTodoListSelected(createdApp.value.onboarding))
 const usesBuilderSetupCommand = computed(() => usesBuilderTodoList.value || (!usesOtaTodoList.value && (selectedIntent.value === 'builder' || selectedIntent.value === 'publish')))
 const markedOnboardingFeatures = new Set<string>()
 let onboardingABTestsRequest: Promise<void> | null = null
@@ -424,8 +431,10 @@ async function markOnboardingFeatureStarted(featureKey: 'cli_install' | 'ota' | 
   }
 }
 
-watch([flowStep, createdApp, setupStage, usesBuilderSetupCommand], () => {
+watch([flowStep, createdApp, setupStage, usesBuilderSetupCommand, activeChecklistPath], () => {
   if (!createdApp.value)
+    return
+  if (usesDualTodoList.value && !activeChecklistPath.value)
     return
   if (flowStep.value === 'setup' && setupStage.value === 'cli' && !usesBuilderSetupCommand.value)
     void markOnboardingFeatureStarted('cli_install')
@@ -533,7 +542,7 @@ function createAiHelpPrompt() {
         }],
       }]
     : []
-  const promptIntent = selectedIntent.value === 'publish' ? 'builder' : selectedIntent.value
+  const promptIntent = usesDualTodoList.value ? activeChecklistPath.value ?? 'ota' : selectedIntent.value === 'publish' ? 'builder' : selectedIntent.value
 
   return buildCliAiSetupPrompt({
     apiKey: apiKey.value,
@@ -594,6 +603,7 @@ const canCreatePreOrgOrganization = computed(() => {
 })
 const setupTitle = computed(() => usesBuilderSetupCommand.value ? t('unified-onboarding-setup-builder-title') : t('unified-onboarding-setup-ota-title'))
 const setupSubtitle = computed(() => usesBuilderSetupCommand.value ? t('unified-onboarding-setup-builder-subtitle') : t('unified-onboarding-setup-ota-subtitle'))
+const showDualChecklist = computed(() => flowStep.value === 'setup' && usesDualTodoList.value)
 const showBuilderChecklist = computed(() => flowStep.value === 'setup' && !!createdApp.value && usesBuilderTodoList.value)
 const showSetupChecklist = computed(() => flowStep.value === 'setup' && usesOtaTodoList.value && !showBuilderChecklist.value)
 
@@ -2078,6 +2088,7 @@ async function createOrganizationAndApp() {
         startingOut: selectedStop.startingOut === true,
         developmentEnvironment: selectedDevelopmentEnvironment.value ?? 'skipped',
         website: websitePreview.value?.website,
+        billingAccount: billingAccount.value,
       },
     })
 
@@ -2543,7 +2554,7 @@ async function openDashboard() {
     .maybeSingle()
   const current = parseAppOnboarding(data?.onboarding ?? app.onboarding)
   const source = reportedSetupSource.value ?? current.source
-  if (source !== 'manual' && current.outcome === 'in_progress')
+  if (!usesDualTodoList.value && source !== 'manual' && current.outcome === 'in_progress')
     await reportOnboardingPatch({ outcome: 'switched_to_manual' })
   window.dispatchEvent(new Event(ONBOARDING_DASHBOARD_EXPLORED_EVENT))
   allowOnboardingDashboardExploration(onboardingUserId.value, createdApp.value.app_id)
@@ -2586,6 +2597,14 @@ async function leaveSplashIfAlreadySetup() {
   const { data } = await supabase.rpc('verify_getting_started', { p_app_id: app.app_id })
   if (data != null)
     organizationStore.updateAppOnboarding(app.app_id, data)
+  const latestOnboarding = data ?? app.onboarding
+  if (hasDualOnboardingChecklists(latestOnboarding) && isRecord(latestOnboarding) && !latestOnboarding.getting_started_dismissed_at) {
+    // Reopening a completed dual setup keeps the existing completion panel.
+    // A path completion must never dismiss its sibling checklist.
+    if (data != null)
+      Object.assign(app, { onboarding: data })
+    return false
+  }
   const skip = data != null
     ? shouldSkipOnboardingResume(data as unknown)
     : shouldSkipOnboardingResume(app.onboarding)
@@ -2816,13 +2835,13 @@ defineExpose({
       'onboarding-flow-details-icon': flowStep === 'details' && appDetailsStep === 'icon',
     }"
   >
-    <div class="mx-auto w-full" :class="showSetupChecklist || showBuilderChecklist || flowStep === 'channel' ? 'max-w-6xl' : 'max-w-3xl'">
+    <div class="mx-auto w-full" :class="showDualChecklist || showSetupChecklist || showBuilderChecklist || flowStep === 'channel' ? 'max-w-6xl' : 'max-w-3xl'">
       <div v-if="isLoading || isHandingOff" class="flex min-h-[50vh] items-center justify-center">
         <Spinner size="w-32 h-32" />
       </div>
 
       <div v-else class="onboarding-flow-content space-y-6">
-        <header v-if="!showSetupChecklist && !showBuilderChecklist && (!props.setupAppId || showSetupBackButton)" class="onboarding-flow-header">
+        <header v-if="!showDualChecklist && !showSetupChecklist && !showBuilderChecklist && (!props.setupAppId || showSetupBackButton)" class="onboarding-flow-header">
           <div class="flex items-center gap-2">
             <button
               v-if="showSetupBackButton"
@@ -3436,6 +3455,8 @@ defineExpose({
                 </div>
               </div>
 
+              <BillingRegionChoice v-model="billingAccount" />
+
               <div v-if="showWebNativeRecommendation" class="rounded-2xl border border-primary-500/30 bg-primary-500/5 p-5 dark:border-primary-400/30 dark:bg-primary-400/10" data-test="onboarding-webnative-recommendation">
                 <div class="flex gap-3">
                   <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-500 text-white"><IconSparkles class="h-5 w-5" /></span>
@@ -3479,6 +3500,57 @@ defineExpose({
             </div>
           </div>
         </template>
+
+        <AppOnboardingDualChecklist
+          v-else-if="showDualChecklist && createdApp"
+          :key="createdApp.app_id"
+          :app-id="createdApp.app_id"
+          :user-id="onboardingUserId"
+          :initial-onboarding="createdApp.onboarding"
+          :hiding="isHidingSplash"
+          :leaving="isHandingOff"
+          @path-changed="activeChecklistPath = $event"
+          @hide="skipOnboardingSplash"
+          @explore="openDashboard"
+        >
+          <template #ota="panel">
+            <AppOnboardingSetupChecklist
+              :app-id="createdApp.app_id"
+              :initial-onboarding="createdApp.onboarding"
+              :command="apiKey ? `npx @capgo/cli@latest i ${apiKey}${localCommand}` : ''"
+              :active="panel.active"
+              :completion-action="panel.completionAction"
+              :hiding="isHidingSplash"
+              :leaving="isHandingOff"
+              hide-footer
+              @snapshot="panel.snapshot"
+              @copy-command="copyCliCommand"
+              @copy-ai="copyAiInstructions"
+              @complete="panel.complete"
+              @invite-opened="onTechnicalInviteOpened"
+              @invite-succeeded="onTechnicalInviteSucceeded"
+              @channel-analytics="trackChannelEvent"
+            />
+          </template>
+          <template #builder="panel">
+            <AppOnboardingBuilderChecklist
+              :app-id="createdApp.app_id"
+              :initial-onboarding="createdApp.onboarding"
+              :command="builderCliCommand"
+              :active="panel.active"
+              :initial-platform="panel.platform"
+              preserve-selection
+              :completion-action="panel.completionAction"
+              :hiding="isHidingSplash"
+              :leaving="isHandingOff"
+              hide-footer
+              @snapshot="panel.snapshot"
+              @platform-changed="panel.selectPlatform"
+              @copy-command="copyBuilderCliCommand"
+              @complete="panel.complete"
+            />
+          </template>
+        </AppOnboardingDualChecklist>
 
         <AppOnboardingBuilderChecklist
           v-else-if="showBuilderChecklist && createdApp"

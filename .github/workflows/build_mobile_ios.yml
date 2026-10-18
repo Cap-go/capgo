@@ -77,4 +77,4 @@ jobs:
           if [ "$SUBMIT_TO_STORE_REVIEW" = "true" ]; then
             submit_args=(--submit-to-store-review --ios-automatic-release --store-release-notes "Bug fixes and performance improvements.")
           fi
-          bunx @capgo/cli@latest build request --platform ios --path . --sync-ios-version --ai-analytics "${submit_args[@]}"
+          bunx @capgo/cli@latest build request --platform ios --path . --sync-ios-version --xcode-version 27 --ai-analytics "${submit_args[@]}"
