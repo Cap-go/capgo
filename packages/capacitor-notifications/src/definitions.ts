@@ -192,8 +192,8 @@ export interface CapgoNotificationsNativePlugin {
 export interface CapgoNotificationsPlugin {
   configure: (config: CapgoNotificationsConfig) => Promise<void>
   register: (options: CapgoNotificationRegisterOptions) => Promise<CapgoNotificationRegistration>
-  /** Deactivate this device's registration, forget the stored identity and drop the native push token. */
-  unregister: () => Promise<void>
+  /** Deactivate this device's registration and forget the stored identity. Pass dropToken to remove the shared native push token. */
+  unregister: (options?: { dropToken?: boolean }) => Promise<void>
   setExternalId: (externalId: string, identityProof?: string) => Promise<void>
   setTags: (tags: string[]) => Promise<void>
   setBadge: (count: number) => Promise<void>

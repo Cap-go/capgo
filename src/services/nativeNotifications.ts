@@ -18,6 +18,13 @@ let registeredUserId: string | null = null
 let registeringUserId: string | null = null
 // Bumped on sign-out so an in-flight registration for the previous user is discarded.
 let registrationGeneration = 0
+let nativeNotificationOpQueue: Promise<unknown> = Promise.resolve()
+
+function enqueueNativeNotificationOp<T>(op: () => Promise<T>): Promise<T> {
+  const next = nativeNotificationOpQueue.then(op, op)
+  nativeNotificationOpQueue = next.catch(() => undefined)
+  return next
+}
 
 function getStringData(data: Record<string, unknown> | undefined, ...keys: string[]) {
   for (const key of keys) {
@@ -126,39 +133,41 @@ export async function registerNativeNotifications(userId: string) {
     return
   registeringUserId = userId
   const generation = registrationGeneration
-  try {
-    const appId = await setupNativeNotifications()
-    if (!appId || generation !== registrationGeneration)
-      return
-    const { data, error } = await invokeCapgoApi<SelfProofResponse>('private/notification_self_proof', {
-      method: 'POST',
-      body: { appId },
-    })
-    if (generation !== registrationGeneration)
-      return
-    if (error || !data?.identityProof || data.externalId !== userId)
-      throw error ?? new Error('Missing notification identity proof')
-    await CapgoNotifications.register({
-      appId,
-      serverUrl: defaultApiHost,
-      externalId: data.externalId,
-      identityProof: data.identityProof,
-      consent: true,
-    })
-    if (generation !== registrationGeneration) {
-      // Signed out while registering: undo the registration that just landed.
-      await CapgoNotifications.unregister()
-      return
+  return enqueueNativeNotificationOp(async () => {
+    try {
+      const appId = await setupNativeNotifications()
+      if (!appId || generation !== registrationGeneration)
+        return
+      const { data, error } = await invokeCapgoApi<SelfProofResponse>('private/notification_self_proof', {
+        method: 'POST',
+        body: { appId },
+      })
+      if (generation !== registrationGeneration)
+        return
+      if (error || !data?.identityProof || data.externalId !== userId)
+        throw error ?? new Error('Missing notification identity proof')
+      await CapgoNotifications.register({
+        appId,
+        serverUrl: defaultApiHost,
+        externalId: data.externalId,
+        identityProof: data.identityProof,
+        consent: true,
+      })
+      if (generation !== registrationGeneration) {
+        // Signed out while registering: undo the registration that just landed.
+        await CapgoNotifications.unregister()
+        return
+      }
+      registeredUserId = userId
     }
-    registeredUserId = userId
-  }
-  catch (error) {
-    console.warn('Capgo notifications registration failed', error)
-  }
-  finally {
-    if (registeringUserId === userId)
-      registeringUserId = null
-  }
+    catch (error) {
+      console.warn('Capgo notifications registration failed', error)
+    }
+    finally {
+      if (registeringUserId === userId)
+        registeringUserId = null
+    }
+  })
 }
 
 /** Stop pushes for the signed-out user: deactivate the server registration and forget the local identity. */
@@ -171,11 +180,13 @@ export async function unregisterNativeNotifications(force = false) {
   registeringUserId = null
   if (!hadRegistration && !force)
     return
-  try {
-    await setupNativeNotifications()
-    await CapgoNotifications.unregister()
-  }
-  catch (error) {
-    console.warn('Capgo notifications unregister failed', error)
-  }
+  return enqueueNativeNotificationOp(async () => {
+    try {
+      await setupNativeNotifications()
+      await CapgoNotifications.unregister()
+    }
+    catch (error) {
+      console.warn('Capgo notifications unregister failed', error)
+    }
+  })
 }

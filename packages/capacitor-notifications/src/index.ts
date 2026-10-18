@@ -806,7 +806,10 @@ async function syncBadgeWithServer(appId?: string): Promise<CapgoNotificationSyn
 }
 
 async function maybeRunUpdateCheck(notification?: CapgoPushNotificationSchema) {
-  if (!isUpdateCheckNotification(notification) || !state.updater.enabled)
+  if (!isUpdateCheckNotification(notification))
+    return
+  const nativeStatus = nativeUpdateCheckStatus(notification)
+  if (!nativeStatus && !state.updater.enabled)
     return
   const key = updateNotificationKey(notification)
   if (key) {
@@ -822,8 +825,6 @@ async function maybeRunUpdateCheck(notification?: CapgoPushNotificationSchema) {
         state.handledUpdateNotifications.delete(oldest)
     }
   }
-
-  const nativeStatus = nativeUpdateCheckStatus(notification)
   const updateCheck = (async () => {
     const startedEvent = eventFromNotification(notification, 'background_started')
     await trackEvent('background_started', startedEvent)
@@ -986,7 +987,7 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
     return registerToken(options, token)
   },
 
-  async unregister() {
+  async unregister(options: { dropToken?: boolean } = {}) {
     const appId = state.config?.appId
     const registration = hydrateStoredRegistration(appId)
     const externalId = registration?.externalId || state.externalId
@@ -1020,7 +1021,8 @@ export const CapgoNotifications: CapgoNotificationsPlugin = {
       }
     }
     finally {
-      await NativeCapgoNotifications.unregisterPush().catch(() => undefined)
+      if (options.dropToken)
+        await NativeCapgoNotifications.unregisterPush().catch(() => undefined)
     }
   },
 
