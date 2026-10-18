@@ -40,6 +40,24 @@ export const organizationSetOptionsSchema = optionsBaseSchema.extend({
   requireApikeyExpiration: z.boolean().optional(),
   maxApikeyExpirationDays: z.number().nullable().optional(),
   enforceHashedApiKeys: z.boolean().optional(),
+  website: z.string().nullable().optional(),
+  enforceEncryptedBundles: z.boolean().optional(),
+  requiredEncryptionKey: z.string().nullable().optional(),
+  /** Raw repeatable `key=true|false` CLI flags. */
+  emailPreference: z.array(z.string()).optional(),
+  /** Org email notification toggles patch (merged with emailPreference). */
+  emailPreferences: z.record(z.string(), z.boolean()).optional(),
 })
 
 export type OrganizationSetOptions = z.infer<typeof organizationSetOptionsSchema>
+
+export const organizationMemberRoleSchema = z.enum(['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin'])
+
+export type OrganizationMemberRole = z.infer<typeof organizationMemberRoleSchema>
+
+export const organizationMemberOptionsSchema = optionsBaseSchema.extend({
+  email: z.string().optional(),
+  role: z.string().optional(),
+})
+
+export type OrganizationMemberOptions = z.infer<typeof organizationMemberOptionsSchema>

@@ -21,7 +21,9 @@ async function routePreviewLink(router: Router, url: string) {
 
 async function routeWebLink(router: Router, url: URL) {
   try {
-    await router.push(`${url.pathname}${url.search}${url.hash}`)
+    const sanitizedUrl = new URL(url.toString())
+    sanitizedUrl.searchParams.delete('nativeConfirmedPreview')
+    await router.push(`${sanitizedUrl.pathname}${sanitizedUrl.search}${sanitizedUrl.hash}`)
     return true
   }
   catch (error) {

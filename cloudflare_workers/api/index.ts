@@ -5,6 +5,7 @@ import { app as register } from '../../supabase/functions/_backend/auth/register
 import { app as apple } from '../../supabase/functions/_backend/auth/apple.ts'
 import { createMcpApp } from '../../supabase/functions/_backend/mcp/index.ts'
 import { app as accept_invitation } from '../../supabase/functions/_backend/private/accept_invitation.ts'
+import { app as billing_region } from '../../supabase/functions/_backend/private/billing_region.ts'
 import { app as bundle_install_stats } from '../../supabase/functions/_backend/private/bundle_install_stats.ts'
 import { app as channel_device } from '../../supabase/functions/_backend/private/channel_device.ts'
 import { app as channel_stats } from '../../supabase/functions/_backend/private/channel_stats.ts'
@@ -72,11 +73,11 @@ import { app as queue_health } from '../../supabase/functions/_backend/public/qu
 import { app as replication } from '../../supabase/functions/_backend/public/replication.ts'
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
 import { app as translation } from '../../supabase/functions/_backend/public/translation.ts'
+import { app as user } from '../../supabase/functions/_backend/public/user/index.ts'
 import { app as webhooks } from '../../supabase/functions/_backend/public/webhooks/index.ts'
 import { app as canceled_org_retention_alerts } from '../../supabase/functions/_backend/triggers/canceled_org_retention_alerts.ts'
 import { app as credit_usage_alerts } from '../../supabase/functions/_backend/triggers/credit_usage_alerts.ts'
 import { app as credit_usage_posthog } from '../../supabase/functions/_backend/triggers/credit_usage_posthog.ts'
-import { app as cron_app_fame } from '../../supabase/functions/_backend/triggers/cron_app_fame.ts'
 import { app as cron_clean_orphan_images } from '../../supabase/functions/_backend/triggers/cron_clean_orphan_images.ts'
 import { app as cron_clear_versions } from '../../supabase/functions/_backend/triggers/cron_clear_versions.ts'
 import { app as cron_email } from '../../supabase/functions/_backend/triggers/cron_email.ts'
@@ -86,7 +87,6 @@ import { app as cron_rollout_auto_pause } from '../../supabase/functions/_backen
 import { app as cron_stat_app } from '../../supabase/functions/_backend/triggers/cron_stat_app.ts'
 import { app as cron_stat_org } from '../../supabase/functions/_backend/triggers/cron_stat_org.ts'
 import { app as cron_sync_sub } from '../../supabase/functions/_backend/triggers/cron_sync_sub.ts'
-import { app as global_stats, globalStatsLegacyUsageApp, globalStatsShardApps } from '../../supabase/functions/_backend/triggers/global_stats.ts'
 import { app as on_app_create } from '../../supabase/functions/_backend/triggers/on_app_create.ts'
 import { app as on_app_delete } from '../../supabase/functions/_backend/triggers/on_app_delete.ts'
 import { app as on_app_update } from '../../supabase/functions/_backend/triggers/on_app_update.ts'
@@ -106,6 +106,7 @@ import { app as on_version_update } from '../../supabase/functions/_backend/trig
 import { app as pluginNotifications } from '../../supabase/functions/_backend/triggers/plugin_notifications.ts'
 import { app as queue_consumer } from '../../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
+import { app as stripe_event_us } from '../../supabase/functions/_backend/triggers/stripe_event_us.ts'
 import { app as updates_cache_purge } from '../../supabase/functions/_backend/triggers/updates_cache_purge.ts'
 import { app as webhook_delivery } from '../../supabase/functions/_backend/triggers/webhook_delivery.ts'
 import { app as webhook_dispatcher } from '../../supabase/functions/_backend/triggers/webhook_dispatcher.ts'
@@ -137,6 +138,7 @@ app.route('/bundle', bundle)
 app.route('/channel', channel)
 app.route('/device', device)
 app.route('/organization', organization)
+app.route('/user', user)
 app.route('/notifications', notifications)
 app.route('/statistics', statistics)
 app.route('/webhooks', webhooks)
@@ -160,6 +162,7 @@ appPrivate.route('/plans', plans)
 appPrivate.route('/credits', credits)
 appPrivate.route('/store_top', storeTop)
 appPrivate.route('/website_stats', publicStats)
+appPrivate.route('/billing_region', billing_region)
 appPrivate.route('/config', config)
 appPrivate.route('/config/builder', configBuilder)
 appPrivate.route('/custom_domains', customDomains)
@@ -213,7 +216,6 @@ appPrivate.route('/sso/verify-dns', sso_verify_dns)
 const functionNameTriggers = 'triggers'
 const appTriggers = createHono(functionNameTriggers, version)
 appTriggers.route('/ok', ok)
-appTriggers.route('/cron_app_fame', cron_app_fame)
 appTriggers.route('/cron_email', cron_email)
 appTriggers.route('/cron_clear_versions', cron_clear_versions)
 appTriggers.route('/cron_clean_orphan_images', cron_clean_orphan_images)
@@ -221,24 +223,6 @@ appTriggers.route('/cron_reconcile_build_status', cron_reconcile_build_status)
 appTriggers.route('/canceled_org_retention_alerts', canceled_org_retention_alerts)
 appTriggers.route('/credit_usage_alerts', credit_usage_alerts)
 appTriggers.route('/credit_usage_posthog', credit_usage_posthog)
-appTriggers.route('/global_stats', global_stats)
-appTriggers.route('/global_stats_core', globalStatsShardApps.core)
-appTriggers.route('/global_stats_usage', globalStatsLegacyUsageApp)
-appTriggers.route('/global_stats_usage_updates', globalStatsShardApps.usage_updates)
-appTriggers.route('/global_stats_usage_devices', globalStatsShardApps.usage_devices)
-appTriggers.route('/global_stats_usage_device_platforms', globalStatsShardApps.usage_device_platforms)
-appTriggers.route('/global_stats_usage_registrations', globalStatsShardApps.usage_registrations)
-appTriggers.route('/global_stats_usage_storage', globalStatsShardApps.usage_storage)
-appTriggers.route('/global_stats_usage_success_rate', globalStatsShardApps.usage_success_rate)
-appTriggers.route('/global_stats_usage_demo_apps', globalStatsShardApps.usage_demo_apps)
-appTriggers.route('/global_stats_revenue', globalStatsShardApps.revenue)
-appTriggers.route('/global_stats_plugins', globalStatsShardApps.plugins)
-appTriggers.route('/global_stats_builds', globalStatsShardApps.builds)
-appTriggers.route('/global_stats_retention', globalStatsShardApps.retention)
-appTriggers.route('/global_stats_paid_products', globalStatsShardApps.paid_products)
-appTriggers.route('/global_stats_ltv', globalStatsShardApps.ltv)
-appTriggers.route('/global_stats_notifications', globalStatsShardApps.notifications)
-appTriggers.route('/global_stats_native_notifications', globalStatsShardApps.native_notifications)
 appTriggers.route('/on_channel_update', on_channel_update)
 appTriggers.route('/on_app_create', on_app_create)
 appTriggers.route('/on_app_delete', on_app_delete)
@@ -256,6 +240,7 @@ appTriggers.route('/on_version_delete', on_version_delete)
 appTriggers.route('/on_manifest_create', on_manifest_create)
 appTriggers.route('/on_deploy_history_create', on_deploy_history_create)
 appTriggers.route('/stripe_event', stripe_event)
+appTriggers.route('/stripe_event_us', stripe_event_us)
 appTriggers.route('/updates_cache_purge', updates_cache_purge)
 appTriggers.route('/on_organization_create', on_organization_create)
 appTriggers.route('/cron_stat_app', cron_stat_app)

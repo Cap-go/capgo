@@ -1,4 +1,5 @@
 import { app as accept_invitation } from '../_backend/private/accept_invitation.ts'
+import { app as billing_region } from '../_backend/private/billing_region.ts'
 import { app as bundle_install_stats } from '../_backend/private/bundle_install_stats.ts'
 import { app as channel_device } from '../_backend/private/channel_device.ts'
 import { app as channel_stats } from '../_backend/private/channel_stats.ts'
@@ -66,6 +67,7 @@ appGlobal.route('/custom_domains', customDomains)
 appGlobal.route('/credits', credits)
 appGlobal.route('/store_top', storeTop)
 appGlobal.route('/website_stats', publicStats)
+appGlobal.route('/billing_region', billing_region)
 appGlobal.route('/config', config)
 appGlobal.route('/config/builder', configBuilder)
 appGlobal.route('/devices', devices_priv)

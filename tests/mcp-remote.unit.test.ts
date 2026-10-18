@@ -171,6 +171,39 @@ describe('hosted MCP protocol', () => {
     expect(calls).toEqual([{ method: 'POST', path: '/channel', body: { app_id: 'com.example.app', channel: 'production', version: '1.2.3' } }])
   })
 
+  it.concurrent('maps settings parity tools to their public API routes', async () => {
+    const { ctx, calls } = fakeContext()
+    const call = (id: number, name: string, args: Record<string, unknown>) => handleJsonRpcMessage({ jsonrpc: '2.0', id, method: 'tools/call', params: { name, arguments: args } }, ctx)
+    await call(20, 'capgo_update_app', { appId: 'com.example.app', allow_preview: true, build_timeout_seconds: 600, default_upload_channel: 'beta', device_data_collection: { country: false } })
+    await call(21, 'capgo_update_channel', { appId: 'com.example.app', channel: 'production', paused: true, updatePackage: 'delta' })
+    await call(22, 'capgo_delete_channel', { appId: 'com.example.app', channel: 'beta', delete_bundle: true })
+    await call(23, 'capgo_update_organization', { orgId: '046a36ac-e03c-4590-9257-bd6c9dba9ee8', email_preferences: { weekly_stats: false } })
+    await call(24, 'capgo_update_organization_member_role', { orgId: '046a36ac-e03c-4590-9257-bd6c9dba9ee8', email: 'member@example.com', role: 'org_admin' })
+    await call(25, 'capgo_get_account', {})
+    await call(26, 'capgo_update_account', { first_name: 'Ada', email_preferences: { weekly_stats: false } })
+    expect(calls).toEqual([
+      { method: 'PUT', path: '/app/com.example.app', body: { allow_preview: true, build_timeout_seconds: 600, default_upload_channel: 'beta', device_data_collection: { country: false } } },
+      { method: 'POST', path: '/channel', body: { app_id: 'com.example.app', channel: 'production', paused: true, updatePackage: 'delta' } },
+      { method: 'DELETE', path: '/channel', body: { app_id: 'com.example.app', channel: 'beta', delete_bundle: true } },
+      { method: 'PUT', path: '/organization', body: { orgId: '046a36ac-e03c-4590-9257-bd6c9dba9ee8', email_preferences: { weekly_stats: false } } },
+      { method: 'PUT', path: '/organization/members', body: { orgId: '046a36ac-e03c-4590-9257-bd6c9dba9ee8', email: 'member@example.com', role: 'org_admin' } },
+      { method: 'GET', path: '/user' },
+      { method: 'PUT', path: '/user', body: { first_name: 'Ada', email_preferences: { weekly_stats: false } } },
+    ])
+  })
+
+  it.concurrent('rejects build timeouts outside the API range before calling it', async () => {
+    const { ctx, calls } = fakeContext()
+    const response = await handleJsonRpcMessage({
+      jsonrpc: '2.0',
+      id: 27,
+      method: 'tools/call',
+      params: { name: 'capgo_update_app', arguments: { appId: 'com.example.app', build_timeout_seconds: 60 } },
+    }, ctx)
+    expect(calls).toHaveLength(0)
+    expect(response?.result).toMatchObject({ isError: true })
+  })
+
   it.concurrent('reports invalid arguments as a tool error so the model can retry', async () => {
     const { ctx, calls } = fakeContext()
     const response = await handleJsonRpcMessage({
@@ -286,6 +319,8 @@ describe('hosted MCP OAuth helpers', () => {
       .toEqual(['https://chatgpt.com/connector_platform_oauth_redirect'])
     expect(getPinnedClientMetadata('https://connect.smithery.ai/.well-known/oauth-client')?.redirect_uris)
       .toEqual(['https://connect.smithery.ai/oauth/callback'])
+    expect(getPinnedClientMetadata('https://mcp.so/api/mcp-servers/oauth/client-metadata')?.redirect_uris)
+      .toEqual(['https://mcp.so/api/mcp-servers/oauth/callback'])
     expect(getPinnedClientMetadata('https://app.example/oauth/client.json')).toBeNull()
     expect(base64UrlEncode(new Uint8Array([251, 255]))).toBe('-_8')
   })

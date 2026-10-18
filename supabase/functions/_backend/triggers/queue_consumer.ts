@@ -278,9 +278,7 @@ function prepareQueueHttpBody(functionName: string, body: Record<string, unknown
 }
 
 function getQueueHttpTimeoutMs(functionName: string): number {
-  // Workers AI scoring of one app fame batch takes ~20s per attempt, so the
-  // default 15s abort canceled every run before anything was persisted.
-  if (isOnboardingQueue(functionName) || isAppFameQueue(functionName))
+  if (isOnboardingQueue(functionName))
     return 90_000
   if (isVersionQueueFunction(functionName))
     return VERSION_QUEUE_HTTP_TIMEOUT_MS
@@ -1104,15 +1102,11 @@ async function mass_edit_queue_messages_cf_ids(
 
 // --- Hono app setup ---
 function shouldRunQueueSyncInBackground(queueName: string): boolean {
-  return queueName !== 'on_manifest_create' && !isOnboardingQueue(queueName) && !isAppFameQueue(queueName)
+  return queueName !== 'on_manifest_create' && !isOnboardingQueue(queueName)
 }
 
 function isOnboardingQueue(queueName: string): boolean {
   return queueName === 'cron_onboarding_refresh_apps'
-}
-
-function isAppFameQueue(queueName: string): boolean {
-  return queueName === 'cron_app_fame'
 }
 
 async function runQueueSync(

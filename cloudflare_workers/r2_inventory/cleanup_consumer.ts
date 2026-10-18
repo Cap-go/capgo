@@ -5,6 +5,7 @@ import { Client } from 'pg'
 import { publicationDeadline } from './cleanup.ts'
 import { sendCleanupAlert } from './cleanup_alerts.ts'
 import { CLEANUP_CONSUMER, completeCleanupGroup, inspectCleanupGroup, parseCleanupMessage } from './cleanup_database.ts'
+import { cleanupFailureDiagnostic } from './cleanup_diagnostics.ts'
 import { createCleanupStorage } from './cleanup_storage.ts'
 
 export interface CleanupConsumerEnv extends CleanupStorageEnv {
@@ -72,6 +73,15 @@ export async function consumeCleanupBatch(batch: MessageBatch<unknown>, env: Cle
   const settled = new Set<Message<unknown>>()
   const counts: AlertCounts = {}
   const storageFailures = new Set<string>()
+  const databaseFailures = new Set<string>()
+  const reportDatabaseFailure = (error: unknown, stage: Parameters<typeof cleanupFailureDiagnostic>[1]) => {
+    const diagnostic = cleanupFailureDiagnostic(error, stage)
+    const identity = JSON.stringify(diagnostic)
+    if (databaseFailures.size < 3 && !databaseFailures.has(identity)) {
+      databaseFailures.add(identity)
+      console.log(JSON.stringify({ event: 'r2_cleanup_database_failure', ...diagnostic }))
+    }
+  }
   const problem = (reason: AlertReason, count = 1) => {
     counts[reason] = (counts[reason] ?? 0) + count
   }
@@ -190,18 +200,21 @@ export async function consumeCleanupBatch(batch: MessageBatch<unknown>, env: Cle
             if (conflicts.length)
               problem('conflict', conflicts.length)
           }
-          catch {
+          catch (error) {
+            reportDatabaseFailure(error, 'completion')
             problem('completion')
           }
         }
       }
-      catch {
+      catch (error) {
+        reportDatabaseFailure(error, 'inspection')
         problem('safety', group.length)
         retry(group.flatMap(job => job.messages))
       }
     }
   }
-  catch {
+  catch (error) {
+    reportDatabaseFailure(error, 'batch')
     problem('safety')
   }
   finally {

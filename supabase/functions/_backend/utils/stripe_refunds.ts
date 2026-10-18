@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import type Stripe from 'stripe'
+import type { BillingAccount } from './stripe_billing.ts'
 import type { Database } from './supabase.types.ts'
 import { cloudlog } from './logging.ts'
 import { getStripe } from './stripe.ts'
@@ -26,8 +27,8 @@ export function toStripeRefundRow(refund: Stripe.Refund, charge: Pick<Stripe.Cha
 
 // charge.refunded only carries the cumulative amount_refunded, so list the
 // charge refunds to keep one row per refund with its own date and status.
-export async function recordChargeRefunds(c: Context, charge: Stripe.Charge): Promise<number> {
-  const refunds = await getStripe(c).refunds.list({ charge: charge.id, limit: 100 }).autoPagingToArray({ limit: MAX_REFUNDS_PER_CHARGE })
+export async function recordChargeRefunds(c: Context, charge: Stripe.Charge, billingAccount: BillingAccount = 'ee'): Promise<number> {
+  const refunds = await getStripe(c, billingAccount).refunds.list({ charge: charge.id, limit: 100 }).autoPagingToArray({ limit: MAX_REFUNDS_PER_CHARGE })
 
   if (refunds.length === 0) {
     cloudlog({ requestId: c.get('requestId'), message: 'charge.refunded without refunds', chargeId: charge.id })
