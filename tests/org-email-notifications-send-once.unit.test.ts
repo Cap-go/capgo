@@ -219,9 +219,7 @@ describe('sendNotifToOrgMembersOnce', () => {
   })
 
   it('keeps org claim write failures retryable and reports duplicate claims as terminal', async () => {
-    hasNotifOrgClaimMock
-      .mockResolvedValueOnce(false)
-      .mockResolvedValue(true)
+    sendNotifOrgOnceMock.mockResolvedValue({ sent: true, cleanupFailed: false })
     const { sendNotifToOrgMembersOnceWithResult } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
     const send = () => sendNotifToOrgMembersOnceWithResult(
       createContext(),
@@ -236,10 +234,6 @@ describe('sendNotifToOrgMembersOnce', () => {
     claimNotifOrgOnceMock.mockResolvedValue('failed')
     await expect(send()).resolves.toBe('failed')
 
-    hasNotifOrgClaimMock
-      .mockReset()
-      .mockResolvedValueOnce(false)
-      .mockResolvedValue(true)
     claimNotifOrgOnceMock.mockResolvedValue(false)
     await expect(send()).resolves.toBe('already_claimed')
   })
