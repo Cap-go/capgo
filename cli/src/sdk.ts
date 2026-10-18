@@ -1256,8 +1256,7 @@ export class CapgoSDK {
     try {
       const data = await listMembersInternal(orgId, {
         apikey: options?.apikey || this.apikey || findSavedKey(true),
-        supaHost: options?.supaHost || this.supaHost,
-        supaAnon: options?.supaAnon || this.supaAnon,
+        apiHost: this.resolveApiHost(options),
       }, true)
       return { success: true, data }
     }
@@ -1279,8 +1278,7 @@ export class CapgoSDK {
       const parsed = organizationMemberRoleOptionsSchema.parse(options)
       await inviteMemberInternal(parsed.orgId, {
         apikey: parsed.apikey || this.apikey || findSavedKey(true),
-        supaHost: parsed.supaHost || this.supaHost,
-        supaAnon: parsed.supaAnon || this.supaAnon,
+        apiHost: this.resolveApiHost(parsed),
         email: parsed.email,
         role: parsed.role,
       }, true)
@@ -1299,8 +1297,7 @@ export class CapgoSDK {
       const parsed = organizationMemberRoleOptionsSchema.parse(options)
       await setMemberRoleInternal(parsed.orgId, {
         apikey: parsed.apikey || this.apikey || findSavedKey(true),
-        supaHost: parsed.supaHost || this.supaHost,
-        supaAnon: parsed.supaAnon || this.supaAnon,
+        apiHost: this.resolveApiHost(parsed),
         email: parsed.email,
         role: parsed.role,
       }, true)
@@ -1319,8 +1316,7 @@ export class CapgoSDK {
       const parsed = organizationMemberSdkOptionsSchema.parse(options)
       await removeMemberInternal(parsed.orgId, {
         apikey: parsed.apikey || this.apikey || findSavedKey(true),
-        supaHost: parsed.supaHost || this.supaHost,
-        supaAnon: parsed.supaAnon || this.supaAnon,
+        apiHost: this.resolveApiHost(parsed),
         email: parsed.email,
       }, true)
       return { success: true }
@@ -1341,8 +1337,7 @@ export class CapgoSDK {
     try {
       const data = await getAccountInternal({
         apikey: options?.apikey || this.apikey || findSavedKey(true),
-        supaHost: options?.supaHost || this.supaHost,
-        supaAnon: options?.supaAnon || this.supaAnon,
+        apiHost: this.resolveApiHost(options),
       }, true)
       return { success: true, data }
     }
@@ -1364,8 +1359,7 @@ export class CapgoSDK {
       const parsed = updateAccountOptionsSchema.parse(options)
       const data = await setAccountInternal({
         apikey: parsed.apikey || this.apikey || findSavedKey(true),
-        supaHost: parsed.supaHost || this.supaHost,
-        supaAnon: parsed.supaAnon || this.supaAnon,
+        apiHost: this.resolveApiHost(parsed),
         firstName: parsed.firstName,
         lastName: parsed.lastName,
         country: parsed.country,

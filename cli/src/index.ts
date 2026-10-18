@@ -851,8 +851,10 @@ account.command('get')
 Example: npx @capgo/cli@latest account get`)
   .action(getAccount)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
-  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
-  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .option('--api-host <apiHost>', optionDescriptions.apiHost)
+  .option('--files-host <filesHost>', optionDescriptions.filesHost)
+  .addOption(deprecatedSupaHostOption())
+  .addOption(deprecatedSupaAnonOption())
 
 account.command('set')
   .alias('s')
@@ -874,8 +876,10 @@ Example: npx @capgo/cli@latest account set --no-newsletter --email-preference we
   .option('--no-newsletter', `Unsubscribe from the newsletter`)
   .option('--email-preference <key=bool>', `Email notification toggle (repeatable), e.g. --email-preference weekly_stats=false. Keys: ${USER_EMAIL_PREFERENCE_KEYS.join(', ')}`, collect, [])
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
-  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
-  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .option('--api-host <apiHost>', optionDescriptions.apiHost)
+  .option('--files-host <filesHost>', optionDescriptions.filesHost)
+  .addOption(deprecatedSupaHostOption())
+  .addOption(deprecatedSupaAnonOption())
 
 const organization = program
   .command('organization')
@@ -938,8 +942,10 @@ Example: npx @capgo/cli@latest organization members-invite ORG_ID --email teamma
   .option('-e, --email <email>', `Email of the user to invite`)
   .option('-r, --role <role>', memberRoleDescription)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
-  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
-  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .option('--api-host <apiHost>', optionDescriptions.apiHost)
+  .option('--files-host <filesHost>', optionDescriptions.filesHost)
+  .addOption(deprecatedSupaHostOption())
+  .addOption(deprecatedSupaAnonOption())
 
 organization
   .command('members-role [orgId]')
@@ -950,8 +956,10 @@ Example: npx @capgo/cli@latest organization members-role ORG_ID --email teammate
   .option('-e, --email <email>', `Email of the member`)
   .option('-r, --role <role>', memberRoleDescription)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
-  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
-  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .option('--api-host <apiHost>', optionDescriptions.apiHost)
+  .option('--files-host <filesHost>', optionDescriptions.filesHost)
+  .addOption(deprecatedSupaHostOption())
+  .addOption(deprecatedSupaAnonOption())
 
 organization
   .command('members-remove [orgId]')
@@ -961,8 +969,10 @@ Example: npx @capgo/cli@latest organization members-remove ORG_ID --email teamma
   .action(removeMember)
   .option('-e, --email <email>', `Email of the member to remove`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
-  .option('--supa-host <supaHost>', optionDescriptions.supaHost)
-  .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+  .option('--api-host <apiHost>', optionDescriptions.apiHost)
+  .option('--files-host <filesHost>', optionDescriptions.filesHost)
+  .addOption(deprecatedSupaHostOption())
+  .addOption(deprecatedSupaAnonOption())
 
 organization
   .command('set [orgId]')
