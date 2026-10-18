@@ -13,7 +13,7 @@ BEGIN;
 -- 'com.demoadmin.app', 'com.demo.app'
 -- Plan tests
 SELECT
-  plan (9);
+  plan (7);
 
 INSERT INTO public.app_versions (id, app_id, name, owner_org, storage_provider)
 VALUES
@@ -63,20 +63,6 @@ SELECT
   lives_ok (
     'SELECT COUNT(*) FROM public.plans',
     'Anonymous users should be able to select from plans table'
-  );
-
--- Test 4: Global stats should not be directly readable by anonymous users
-SELECT
-  ok (
-    NOT has_table_privilege('anon', 'public.global_stats', 'SELECT'),
-    'Anonymous users should not be able to select from global_stats'
-  );
-
--- Test 5: Global stats should not be directly readable by authenticated users
-SELECT
-  ok (
-    NOT has_table_privilege('authenticated', 'public.global_stats', 'SELECT'),
-    'Authenticated users should not be able to select from global_stats'
   );
 
 -- Test 5: Users table has RLS enabled

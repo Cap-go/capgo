@@ -1,6 +1,5 @@
 import type { Buffer } from 'node:buffer'
 import type { Options } from '../api/app'
-import type { Database } from '../types/supabase.types'
 import { existsSync, readFileSync } from 'node:fs'
 import { intro, log, outro } from '@clack/prompts'
 import { checkAppExistsAndHasPermissionOrgErr, getAppIconStoragePath, resolveAppSetIconPath } from '../api/app'
@@ -22,6 +21,17 @@ import {
 
 const MIN_BUILD_TIMEOUT_MINUTES = 5
 const MAX_BUILD_TIMEOUT_MINUTES = 360
+
+function parseBooleanOption(value: unknown, flag: string): boolean {
+  if (typeof value === 'boolean')
+    return value
+  const normalized = String(value).trim().toLowerCase()
+  if (normalized === 'true')
+    return true
+  if (normalized === 'false')
+    return false
+  throw new CliUserError(`${flag} must be true or false`)
+}
 
 export async function setAppInternal(appId: string, options: Options, silent = false) {
   if (!silent)
@@ -54,6 +64,14 @@ export async function setAppInternal(appId: string, options: Options, silent = f
     exposeMetadata,
     preview,
     allowDeviceCustomId,
+    collectCountry,
+    collectPlatform,
+    collectOsVersion,
+    collectPluginVersion,
+    collectVersionBuild,
+    collectIsEmulator,
+    collectIsProd,
+    collectInstallSource,
     blockProviderInfraRequests,
     buildTimeoutMinutes,
     iosStoreUrl,
@@ -156,9 +174,32 @@ export async function setAppInternal(appId: string, options: Options, silent = f
   if (retention != null)
     putBody.retention = retention * 24 * 60 * 60
   if (exposeMetadata != null)
-    putBody.expose_metadata = exposeMetadata
+    putBody.expose_metadata = parseBooleanOption(exposeMetadata, '--expose-metadata')
+  if (preview != null)
+    putBody.allow_preview = preview
+  if (buildTimeoutMinutes != null)
+    putBody.build_timeout_seconds = Math.trunc(Number(buildTimeoutMinutes)) * 60
+  if (defaultUploadChannel != null)
+    putBody.default_upload_channel = defaultUploadChannel
   if (allowDeviceCustomId != null)
     putBody.allow_device_custom_id = allowDeviceCustomId
+  const deviceDataCollection: Record<string, boolean> = {}
+  const collectPatches: Array<[string, boolean | null | undefined]> = [
+    ['country', collectCountry],
+    ['platform', collectPlatform],
+    ['os_version', collectOsVersion],
+    ['plugin_version', collectPluginVersion],
+    ['version_build', collectVersionBuild],
+    ['is_emulator', collectIsEmulator],
+    ['is_prod', collectIsProd],
+    ['install_source', collectInstallSource],
+  ]
+  for (const [key, value] of collectPatches) {
+    if (value != null)
+      deviceDataCollection[key] = value
+  }
+  if (Object.keys(deviceDataCollection).length > 0)
+    putBody.device_data_collection = deviceDataCollection
   if (blockProviderInfraRequests != null)
     putBody.block_provider_infra_requests = blockProviderInfraRequests
   if (iosStoreUrl !== undefined)
@@ -178,28 +219,6 @@ export async function setAppInternal(appId: string, options: Options, silent = f
       if (!silent)
         log.error(`Could not set app ${formatError(putError)}`)
       throw new Error(`Could not set app: ${formatError(putError)}`)
-    }
-  }
-
-  // TODO(cli-http): PUT app does not support allow_preview / build_timeout_seconds / default_upload_channel yet
-  const appUpdate: Database['public']['Tables']['apps']['Update'] = {}
-  if (preview != null)
-    appUpdate.allow_preview = preview
-  if (buildTimeoutMinutes != null)
-    appUpdate.build_timeout_seconds = Math.trunc(Number(buildTimeoutMinutes)) * 60
-  if (defaultUploadChannel != null)
-    appUpdate.default_upload_channel = defaultUploadChannel
-
-  if (Object.keys(appUpdate).length > 0) {
-    const { error: dbError } = await supabase
-      .from('apps')
-      .update(appUpdate)
-      .eq('app_id', appId)
-
-    if (dbError) {
-      if (!silent)
-        log.error(`Could not set app ${formatError(dbError)}`)
-      throw new Error(`Could not set app: ${formatError(dbError)}`)
     }
   }
 
