@@ -97,6 +97,10 @@ npx @capgo/cli@latest app todo
 📋 Show your app's onboarding todo list with done, skipped, and pending tasks.
 Uses the same live progress checks as the Capgo dashboard. The app ID can be inferred from your Capacitor project.
 
+Apps assigned only the supported Builder checklist show separate 🍎 iOS and 🤖 Android progress, saved setup choices, and build warnings. Colors are enabled in interactive terminals unless `NO_COLOR` is set. Only a successful cloud build reported by Capgo completes the final task.
+
+![Builder-only checklist with independent platform progress and explanatory notes](./assets/builder-only-checklist.png)
+
 **Example:**
 
 ```bash

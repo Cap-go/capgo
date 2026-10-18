@@ -14,6 +14,8 @@ sidebar:
 npx @capgo/cli@latest init
 ```
 
+For an app assigned only the supported Builder checklist by Capgo, `init` continues with the guided Builder setup and its existing resume flow. Use `npx @capgo/cli@latest app todo` to inspect saved iOS and Android progress. The Builder checklist completes only after Capgo reports a successful cloud build. OTA-only and dual-assigned apps keep the live update setup below.
+
 This includes adding code for updates, building, uploading your app, and verifying update functionality.
 Capgo bundles are web assets and can be fetched by anyone who knows the URL. Use encryption for banking, regulated, or other high-security apps.
 During the iOS run-on-device step, choose a physical iPhone/iPad or simulator. If you choose a physical device, the CLI lets you connect, unlock, and check again before it launches the app.
