@@ -641,7 +641,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
             @click="segmentVal = 'y'"
           >
             {{ t('yearly') }}
-            <span class="py-0.5 px-1.5 text-xs font-bold text-green-600 bg-green-100 rounded-full dark:text-green-400 dark:bg-green-900/30">-20%</span>
+            <span class="py-0.5 px-1.5 text-xs font-bold text-green-600 bg-green-100 rounded-full dark:text-green-400 dark:bg-green-900/30">{{ t('yearly-two-months-free') }}</span>
           </button>
         </div>
       </div>

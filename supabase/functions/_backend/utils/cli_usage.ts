@@ -1,8 +1,6 @@
 import type { Context } from 'hono'
-import { getRuntimeKey } from 'hono/adapter'
 import { cloudlogErr, serializeError } from './logging.ts'
 import { checkKey, supabaseAdmin } from './supabase.ts'
-import { backgroundTask } from './utils.ts'
 
 export interface CliUsageEvent {
   cli_version: string
@@ -15,46 +13,38 @@ export interface CliUsageEvent {
   api_version: string
 }
 
-function usesAnalyticsEngine(c: Context): boolean {
-  return getRuntimeKey() === 'workerd' && !!c.env.CLI_USAGE
+/**
+ * Workers RPC service binding to the admin dashboard API Worker's
+ * `CliUsageIngest` entrypoint. Only the prod API Worker has it; the admin
+ * dashboard owns the CLI_USAGE dataset writer.
+ */
+export interface CliUsageIngestBinding {
+  record: (event: CliUsageEvent) => Promise<unknown>
+}
+
+function getCliUsageIngest(c: Context): CliUsageIngestBinding | undefined {
+  return (c.env as { ADMIN_CLI_USAGE?: CliUsageIngestBinding } | undefined)?.ADMIN_CLI_USAGE
+}
+
+export function hasCliUsageIngest(c: Context): boolean {
+  return !!getCliUsageIngest(c)
 }
 
 /**
- * Record CLI usage from request headers into the CLI_USAGE Analytics Engine
- * dataset (read by the admin dashboard). Without it (non-workerd runtimes),
- * nothing is recorded.
+ * Forward CLI usage to the admin dashboard. Never throws; without the
+ * ADMIN_CLI_USAGE binding (preprod, local, Supabase Edge Functions) it records nothing.
  * Prefer /private/config only for v1 — avoid hot authenticated private routes.
  */
-export function trackCliUsage(c: Context, event: CliUsageEvent) {
-  if (!event.cli_version)
+export async function trackCliUsage(c: Context, event: CliUsageEvent): Promise<void> {
+  const ingest = getCliUsageIngest(c)
+  if (!event.cli_version || !ingest)
     return
 
   try {
-    if (usesAnalyticsEngine(c)) {
-      backgroundTask(c, Promise.resolve().then(() => {
-        try {
-          c.env.CLI_USAGE.writeDataPoint({
-            blobs: [
-              event.cli_version,
-              event.command,
-              event.node_version,
-              event.os_platform,
-              event.apikey_id ?? '',
-              event.org_id ?? '',
-              event.source,
-              event.api_version,
-            ],
-            indexes: [event.apikey_id || 'anonymous'],
-          })
-        }
-        catch (error) {
-          cloudlogErr({ requestId: c.get('requestId'), message: 'trackCliUsage AE write failed', error: serializeError(error) })
-        }
-      }))
-    }
+    await ingest.record(event)
   }
   catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'trackCliUsage error', error: serializeError(error) })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'trackCliUsage admin ingest failed', error: serializeError(error) })
   }
 }
 

@@ -1,14 +1,25 @@
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { Context } from 'hono'
 import type { PublicLiveUpdateMetrics } from '../utils/cloudflare.ts'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { REQUIRED_GLOBAL_STATS_SHARDS } from '../utils/global_stats.ts'
-import { useCors } from '../utils/hono.ts'
 import { CacheHelper } from '../utils/cache.ts'
 import { getPublicLiveUpdateMetricsCF } from '../utils/cloudflare.ts'
+import { useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
+import { countAllApps, countAllUpdates, countAllUpdatesExternal } from '../utils/stats.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
+
+const WEBSITE_STATS_CACHE_TTL_SECONDS = 3600
+const WEBSITE_STATS_CACHE_PATH = '/.public-website-stats'
+const WEBSITE_STATS_HEADERS = {
+  'Cache-Control': 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400',
+}
+export const WEBSITE_STATS_FALLBACK = {
+  apps: 1688,
+  updates: 1862788600,
+  stars: 595,
+} as const
 
 const LIVE_UPDATE_METRICS_CACHE_TTL_SECONDS = 300
 const LIVE_UPDATE_METRICS_CACHE_PATH = '/.public-live-update-metrics'
@@ -71,42 +82,88 @@ export function sanitizePublicLiveUpdateMetrics(metrics: PublicLiveUpdateMetrics
   }
 }
 
-
 app.use('*', useCors)
 
-export function getLatestCompletedGlobalStatsDateId(referenceDate = new Date()) {
-  const completedDay = new Date(Date.UTC(
-    referenceDate.getUTCFullYear(),
-    referenceDate.getUTCMonth(),
-    referenceDate.getUTCDate() - 1,
-  ))
+interface WebsiteStatsResponse {
+  apps: number
+  updates: number
+  stars: number
+}
 
-  return completedDay.toISOString().slice(0, 10)
+async function getGithubStars(): Promise<number> {
+  const response = await fetch('https://api.github.com/repos/Cap-go/capacitor-updater', {
+    headers: {
+      'User-Agent': 'capgo-app', // GitHub API requires a User-Agent
+    },
+  })
+  if (!response.ok)
+    throw new Error(`GitHub API error: HTTP ${response.status}`)
+  const json = await response.json() as { stargazers_count?: number }
+  return Number(json.stargazers_count ?? 0)
+}
+
+function isPositiveCount(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+}
+
+/**
+ * Website counters: unique Capgo apps (D1 store_apps + Postgres apps),
+ * update downloads retained in Analytics Engine (app_log + sampled
+ * app_log_external) and GitHub stars of the updater plugin. Each counter
+ * falls back to the hardcoded value when its source is unavailable.
+ */
+async function computeWebsiteStats(c: Context): Promise<{ stats: WebsiteStatsResponse, complete: boolean }> {
+  const [apps, updates, updatesExternal, stars] = await Promise.allSettled([
+    countAllApps(c),
+    countAllUpdates(c),
+    countAllUpdatesExternal(c),
+    getGithubStars(),
+  ])
+  const value = (result: PromiseSettledResult<number>) => result.status === 'fulfilled' && isPositiveCount(result.value) ? result.value : null
+
+  const appsCount = value(apps)
+  const updatesCount = value(updates)
+  const updatesExternalCount = value(updatesExternal) ?? 0
+  const starsCount = value(stars)
+  const complete = appsCount !== null && updatesCount !== null && starsCount !== null
+  if (!complete) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Website stats source unavailable, using fallback counters',
+      apps: apps.status === 'rejected' ? serializeError(apps.reason) : apps.value,
+      updates: updates.status === 'rejected' ? serializeError(updates.reason) : updates.value,
+      stars: stars.status === 'rejected' ? serializeError(stars.reason) : stars.value,
+    })
+  }
+
+  return {
+    complete,
+    stats: {
+      apps: appsCount ?? WEBSITE_STATS_FALLBACK.apps,
+      updates: updatesCount === null ? WEBSITE_STATS_FALLBACK.updates : updatesCount + updatesExternalCount,
+      stars: starsCount ?? WEBSITE_STATS_FALLBACK.stars,
+    },
+  }
 }
 
 app.get('/', async (c) => {
-  const latestCompletedDateId = getLatestCompletedGlobalStatsDateId()
-  const { data, error } = await supabaseAdmin(c)
-    .from('global_stats')
-    .select()
-    .lte('date_id', latestCompletedDateId)
-    .contains('completed_shards', [...REQUIRED_GLOBAL_STATS_SHARDS])
-    .order('date_id', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  if (data && !error) {
-    return c.json({
-      apps: data.apps,
-      updates: (data.updates ?? 0) + (data.updates_external ?? 0),
-      stars: data.stars,
-    })
+  const cache = new CacheHelper(c)
+  const cacheKey = cache.buildRequest(WEBSITE_STATS_CACHE_PATH)
+  const cached = await cache.matchJson<WebsiteStatsResponse>(cacheKey)
+  if (cached)
+    return c.json(cached, 200, WEBSITE_STATS_HEADERS)
+
+  try {
+    const { stats, complete } = await computeWebsiteStats(c)
+    if (!complete)
+      return c.json(stats, 200, { 'Cache-Control': 'public, max-age=300' })
+    await cache.putJson(cacheKey, stats, WEBSITE_STATS_CACHE_TTL_SECONDS)
+    return c.json(stats, 200, WEBSITE_STATS_HEADERS)
   }
-  cloudlog({ requestId: c.get('requestId'), message: 'Missing completed global_stats row', latestCompletedDateId, error })
-  return c.json({
-    apps: 1688,
-    updates: 1862788600,
-    stars: 595,
-  })
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Website stats failed, using fallback counters', error: serializeError(error) })
+    return c.json({ ...WEBSITE_STATS_FALLBACK }, 200, { 'Cache-Control': 'public, max-age=300' })
+  }
 })
 
 app.get('/live_updates', async (c) => {

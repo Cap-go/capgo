@@ -41,6 +41,7 @@ Standalone: `build prescan` accepts `--skip` / `--warn`. Full catalog: `webdocs/
   - The user creates ONE App Store Connect API key (.p8 file), then the CLI handles everything else.
   - On macOS, offers a native file picker dialog for .p8 selection.
   - Auto-detects Key ID from .p8 filename (e.g. `AuthKey_XXXX.p8`).
+  - For apps assigned only the supported Builder checklist, the saved platform is used when `--platform` is omitted; an explicit platform takes precedence. Generic `init` also hands these apps to this wizard. `app todo` shows both platforms independently, including backend-reported build failures. Finishing credential setup or requesting a build does not complete the checklist; Capgo must report a successful cloud build. OTA-only and dual-assigned apps retain their existing behavior.
   - Progress persists in `~/.capgo-credentials/onboarding/<appId>.json` — safe to interrupt and resume.
   - Saves credentials to the same `~/.capgo-credentials/credentials.json` used by `build request`.
   - Optionally kicks off the first build at the end.

@@ -148,6 +148,36 @@ await test('zipBundleInternal throws CliUserError when notifyAppReady is missing
   }
 })
 
+await test('zipBundleInternal throws CliUserError when the path does not exist', async () => {
+  const dir = makeDir('missing-path')
+  const webDir = join(dir, 'dist')
+
+  try {
+    for (const options of [{ codeCheck: false }, { ignoreNotifyAppReady: true }, {}]) {
+      await assert.rejects(
+        () => zipBundleInternal('com.example.app', { path: webDir, bundle: '1.0.0', ...options }, true),
+        (error) => {
+          assertCliUserError(error, `Path ${webDir} does not exist, build your app first, or provide a valid path`)
+          assert.equal(shouldCapturePosthogException(error), false)
+          return true
+        },
+      )
+    }
+
+    await assert.rejects(
+      () => zipBundleInternal('com.example.app', { path: webDir, bundle: '1.0.0', codeCheck: false, json: true }, true),
+      (error) => {
+        assertCliUserError(error, 'path_not_found', ['message'])
+        assert.match(error.context.message, /does not exist/)
+        return true
+      },
+    )
+  }
+  finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
 await test('encryptZipInternal throws CliUserError when public key is missing from config', async () => {
   const dir = makeDir('missing-public-key')
   const zipPath = join(dir, 'bundle.zip')

@@ -125,56 +125,6 @@ export type Database = {
           },
         ]
       }
-      app_fame: {
-        Row: {
-          app_id: string
-          category: string | null
-          checked_at: string
-          confidence: number
-          created_at: string
-          fame_score: number
-          known_as: string | null
-          model: string
-          summary: string
-          tier: string
-          updated_at: string
-        }
-        Insert: {
-          app_id: string
-          category?: string | null
-          checked_at?: string
-          confidence: number
-          created_at?: string
-          fame_score: number
-          known_as?: string | null
-          model?: string
-          summary?: string
-          tier: string
-          updated_at?: string
-        }
-        Update: {
-          app_id?: string
-          category?: string | null
-          checked_at?: string
-          confidence?: number
-          created_at?: string
-          fame_score?: number
-          known_as?: string | null
-          model?: string
-          summary?: string
-          tier?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "app_fame_app_id_fkey"
-            columns: ["app_id"]
-            isOneToOne: true
-            referencedRelation: "apps"
-            referencedColumns: ["app_id"]
-          },
-        ]
-      }
       app_metrics_cache: {
         Row: {
           cached_at: string
@@ -436,6 +386,7 @@ export type Database = {
           created_at: string | null
           created_from_onboarding: boolean
           default_upload_channel: string
+          device_data_collection: Json
           existing_app: boolean
           expose_metadata: boolean
           icon_url: string
@@ -467,6 +418,7 @@ export type Database = {
           created_at?: string | null
           created_from_onboarding?: boolean
           default_upload_channel?: string
+          device_data_collection?: Json
           existing_app?: boolean
           expose_metadata?: boolean
           icon_url: string
@@ -498,6 +450,7 @@ export type Database = {
           created_at?: string | null
           created_from_onboarding?: boolean
           default_upload_channel?: string
+          device_data_collection?: Json
           existing_app?: boolean
           expose_metadata?: boolean
           icon_url?: string
@@ -1538,7 +1491,7 @@ export type Database = {
           is_prod: boolean | null
           key_id: string | null
           os_version: string | null
-          platform: Database["public"]["Enums"]["platform_os"]
+          platform: Database["public"]["Enums"]["platform_os"] | null
           plugin_version: string
           updated_at: string
           version: number | null
@@ -1557,7 +1510,7 @@ export type Database = {
           is_prod?: boolean | null
           key_id?: string | null
           os_version?: string | null
-          platform: Database["public"]["Enums"]["platform_os"]
+          platform: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
           updated_at: string
           version?: number | null
@@ -1576,372 +1529,12 @@ export type Database = {
           is_prod?: boolean | null
           key_id?: string | null
           os_version?: string | null
-          platform?: Database["public"]["Enums"]["platform_os"]
+          platform?: Database["public"]["Enums"]["platform_os"] | null
           plugin_version?: string
           updated_at?: string
           version?: number | null
           version_build?: string | null
           version_name?: string
-        }
-        Relationships: []
-      }
-      global_stats: {
-        Row: {
-          above_plan_with_credits: number | null
-          above_plan_without_credits: number | null
-          active_canceled_orgs: number
-          active_past_due_orgs: number
-          apps: number
-          apps_active: number | null
-          apps_created: number
-          apps_with_cli_onboarding_builds_24h: number
-          apps_with_manual_builds_24h: number
-          apps_with_preview: number
-          apps_with_store_url: number
-          average_ltv: number
-          build_avg_seconds_day_android: number
-          build_avg_seconds_day_ios: number
-          build_count_day_android: number
-          build_count_day_ios: number
-          build_requests_day_ios_cocoapods: number
-          build_requests_day_ios_sdk: Json
-          build_requests_day_ios_spm: number
-          build_requests_day_ios_unknown: number
-          build_total_seconds_day_android: number
-          build_total_seconds_day_ios: number
-          builder_active_paying_clients_60d: number
-          builds_android: number | null
-          builds_ios: number | null
-          builds_last_month: number | null
-          builds_last_month_android: number | null
-          builds_last_month_ios: number | null
-          builds_success_android: number | null
-          builds_success_ios: number | null
-          builds_success_total: number | null
-          builds_total: number | null
-          bundle_storage_gb: number
-          canceled_orgs: number
-          churn_revenue: number
-          churn_revenue_enterprise: number
-          churn_revenue_maker: number
-          churn_revenue_solo: number
-          churn_revenue_team: number
-          completed_shards: Json
-          created_at: string | null
-          credits_bought: number
-          credits_consumed: number
-          date_id: string
-          demo_apps_created: number
-          devices_last_month: number | null
-          devices_last_month_android: number | null
-          devices_last_month_ios: number | null
-          live_updates_active_paying_clients_60d: number
-          longest_ltv: number
-          mrr: number
-          need_upgrade: number | null
-          new_paying_orgs: number
-          not_paying: number | null
-          notifications_apps: number
-          notifications_campaigns: number
-          notifications_campaigns_day: number
-          notifications_failed_day: number
-          notifications_opened_day: number
-          notifications_opened_last_month: number
-          notifications_providers: number
-          notifications_received_day: number
-          notifications_sent_day: number
-          notifications_sent_last_month: number
-          nrr: number
-          onboarded: number | null
-          org_conversion_rate: number
-          orgs: number
-          past_due_orgs: number
-          past_due_orgs_average_days: number
-          paying: number | null
-          paying_monthly: number | null
-          paying_yearly: number | null
-          plan_credits: number
-          plan_enterprise: number | null
-          plan_enterprise_conversion_rate: number
-          plan_enterprise_monthly: number
-          plan_enterprise_yearly: number
-          plan_maker: number | null
-          plan_maker_conversion_rate: number
-          plan_maker_monthly: number
-          plan_maker_yearly: number
-          plan_solo: number | null
-          plan_solo_conversion_rate: number
-          plan_solo_monthly: number
-          plan_solo_yearly: number
-          plan_team: number | null
-          plan_team_conversion_rate: number
-          plan_team_monthly: number
-          plan_team_yearly: number
-          plan_total_conversion_rate: number
-          plugin_major_breakdown: Json
-          plugin_version_breakdown: Json
-          plugin_version_ladder: Json
-          refunds_amount: number
-          refunds_count: number
-          registers_today: number
-          revenue_enterprise: number
-          revenue_maker: number
-          revenue_solo: number
-          revenue_team: number
-          shortest_ltv: number
-          stars: number
-          success_rate: number | null
-          total_revenue: number
-          trial: number | null
-          trial_extended_orgs: number
-          trial_extended_subscribed_orgs: number
-          updates: number
-          updates_external: number | null
-          updates_last_month: number | null
-          upgrade_rate_12m: number
-          upgraded_orgs: number
-          users: number | null
-          users_active: number | null
-          users_with_2fa: number
-          versions_created: number
-        }
-        Insert: {
-          above_plan_with_credits?: number | null
-          above_plan_without_credits?: number | null
-          active_canceled_orgs?: number
-          active_past_due_orgs?: number
-          apps: number
-          apps_active?: number | null
-          apps_created?: number
-          apps_with_cli_onboarding_builds_24h?: number
-          apps_with_manual_builds_24h?: number
-          apps_with_preview?: number
-          apps_with_store_url?: number
-          average_ltv?: number
-          build_avg_seconds_day_android?: number
-          build_avg_seconds_day_ios?: number
-          build_count_day_android?: number
-          build_count_day_ios?: number
-          build_requests_day_ios_cocoapods?: number
-          build_requests_day_ios_sdk?: Json
-          build_requests_day_ios_spm?: number
-          build_requests_day_ios_unknown?: number
-          build_total_seconds_day_android?: number
-          build_total_seconds_day_ios?: number
-          builder_active_paying_clients_60d?: number
-          builds_android?: number | null
-          builds_ios?: number | null
-          builds_last_month?: number | null
-          builds_last_month_android?: number | null
-          builds_last_month_ios?: number | null
-          builds_success_android?: number | null
-          builds_success_ios?: number | null
-          builds_success_total?: number | null
-          builds_total?: number | null
-          bundle_storage_gb?: number
-          canceled_orgs?: number
-          churn_revenue?: number
-          churn_revenue_enterprise?: number
-          churn_revenue_maker?: number
-          churn_revenue_solo?: number
-          churn_revenue_team?: number
-          completed_shards?: Json
-          created_at?: string | null
-          credits_bought?: number
-          credits_consumed?: number
-          date_id: string
-          demo_apps_created?: number
-          devices_last_month?: number | null
-          devices_last_month_android?: number | null
-          devices_last_month_ios?: number | null
-          live_updates_active_paying_clients_60d?: number
-          longest_ltv?: number
-          mrr?: number
-          need_upgrade?: number | null
-          new_paying_orgs?: number
-          not_paying?: number | null
-          notifications_apps?: number
-          notifications_campaigns?: number
-          notifications_campaigns_day?: number
-          notifications_failed_day?: number
-          notifications_opened_day?: number
-          notifications_opened_last_month?: number
-          notifications_providers?: number
-          notifications_received_day?: number
-          notifications_sent_day?: number
-          notifications_sent_last_month?: number
-          nrr?: number
-          onboarded?: number | null
-          org_conversion_rate?: number
-          orgs?: number
-          past_due_orgs?: number
-          past_due_orgs_average_days?: number
-          paying?: number | null
-          paying_monthly?: number | null
-          paying_yearly?: number | null
-          plan_credits?: number
-          plan_enterprise?: number | null
-          plan_enterprise_conversion_rate?: number
-          plan_enterprise_monthly?: number
-          plan_enterprise_yearly?: number
-          plan_maker?: number | null
-          plan_maker_conversion_rate?: number
-          plan_maker_monthly?: number
-          plan_maker_yearly?: number
-          plan_solo?: number | null
-          plan_solo_conversion_rate?: number
-          plan_solo_monthly?: number
-          plan_solo_yearly?: number
-          plan_team?: number | null
-          plan_team_conversion_rate?: number
-          plan_team_monthly?: number
-          plan_team_yearly?: number
-          plan_total_conversion_rate?: number
-          plugin_major_breakdown?: Json
-          plugin_version_breakdown?: Json
-          plugin_version_ladder?: Json
-          refunds_amount?: number
-          refunds_count?: number
-          registers_today?: number
-          revenue_enterprise?: number
-          revenue_maker?: number
-          revenue_solo?: number
-          revenue_team?: number
-          shortest_ltv?: number
-          stars: number
-          success_rate?: number | null
-          total_revenue?: number
-          trial?: number | null
-          trial_extended_orgs?: number
-          trial_extended_subscribed_orgs?: number
-          updates: number
-          updates_external?: number | null
-          updates_last_month?: number | null
-          upgrade_rate_12m?: number
-          upgraded_orgs?: number
-          users?: number | null
-          users_active?: number | null
-          users_with_2fa?: number
-          versions_created?: number
-        }
-        Update: {
-          above_plan_with_credits?: number | null
-          above_plan_without_credits?: number | null
-          active_canceled_orgs?: number
-          active_past_due_orgs?: number
-          apps?: number
-          apps_active?: number | null
-          apps_created?: number
-          apps_with_cli_onboarding_builds_24h?: number
-          apps_with_manual_builds_24h?: number
-          apps_with_preview?: number
-          apps_with_store_url?: number
-          average_ltv?: number
-          build_avg_seconds_day_android?: number
-          build_avg_seconds_day_ios?: number
-          build_count_day_android?: number
-          build_count_day_ios?: number
-          build_requests_day_ios_cocoapods?: number
-          build_requests_day_ios_sdk?: Json
-          build_requests_day_ios_spm?: number
-          build_requests_day_ios_unknown?: number
-          build_total_seconds_day_android?: number
-          build_total_seconds_day_ios?: number
-          builder_active_paying_clients_60d?: number
-          builds_android?: number | null
-          builds_ios?: number | null
-          builds_last_month?: number | null
-          builds_last_month_android?: number | null
-          builds_last_month_ios?: number | null
-          builds_success_android?: number | null
-          builds_success_ios?: number | null
-          builds_success_total?: number | null
-          builds_total?: number | null
-          bundle_storage_gb?: number
-          canceled_orgs?: number
-          churn_revenue?: number
-          churn_revenue_enterprise?: number
-          churn_revenue_maker?: number
-          churn_revenue_solo?: number
-          churn_revenue_team?: number
-          completed_shards?: Json
-          created_at?: string | null
-          credits_bought?: number
-          credits_consumed?: number
-          date_id?: string
-          demo_apps_created?: number
-          devices_last_month?: number | null
-          devices_last_month_android?: number | null
-          devices_last_month_ios?: number | null
-          live_updates_active_paying_clients_60d?: number
-          longest_ltv?: number
-          mrr?: number
-          need_upgrade?: number | null
-          new_paying_orgs?: number
-          not_paying?: number | null
-          notifications_apps?: number
-          notifications_campaigns?: number
-          notifications_campaigns_day?: number
-          notifications_failed_day?: number
-          notifications_opened_day?: number
-          notifications_opened_last_month?: number
-          notifications_providers?: number
-          notifications_received_day?: number
-          notifications_sent_day?: number
-          notifications_sent_last_month?: number
-          nrr?: number
-          onboarded?: number | null
-          org_conversion_rate?: number
-          orgs?: number
-          past_due_orgs?: number
-          past_due_orgs_average_days?: number
-          paying?: number | null
-          paying_monthly?: number | null
-          paying_yearly?: number | null
-          plan_credits?: number
-          plan_enterprise?: number | null
-          plan_enterprise_conversion_rate?: number
-          plan_enterprise_monthly?: number
-          plan_enterprise_yearly?: number
-          plan_maker?: number | null
-          plan_maker_conversion_rate?: number
-          plan_maker_monthly?: number
-          plan_maker_yearly?: number
-          plan_solo?: number | null
-          plan_solo_conversion_rate?: number
-          plan_solo_monthly?: number
-          plan_solo_yearly?: number
-          plan_team?: number | null
-          plan_team_conversion_rate?: number
-          plan_team_monthly?: number
-          plan_team_yearly?: number
-          plan_total_conversion_rate?: number
-          plugin_major_breakdown?: Json
-          plugin_version_breakdown?: Json
-          plugin_version_ladder?: Json
-          refunds_amount?: number
-          refunds_count?: number
-          registers_today?: number
-          revenue_enterprise?: number
-          revenue_maker?: number
-          revenue_solo?: number
-          revenue_team?: number
-          shortest_ltv?: number
-          stars?: number
-          success_rate?: number | null
-          total_revenue?: number
-          trial?: number | null
-          trial_extended_orgs?: number
-          trial_extended_subscribed_orgs?: number
-          updates?: number
-          updates_external?: number | null
-          updates_last_month?: number | null
-          upgrade_rate_12m?: number
-          upgraded_orgs?: number
-          users?: number | null
-          users_active?: number | null
-          users_with_2fa?: number
-          versions_created?: number
         }
         Relationships: []
       }
@@ -2926,6 +2519,7 @@ export type Database = {
           build_time_unit: number
           created_at: string
           credit_id: string
+          credit_id_us: string | null
           description: string
           id: string
           market_desc: string | null
@@ -2936,8 +2530,11 @@ export type Database = {
           price_m_id: string
           price_y: number
           price_y_id: string
+          price_y_id_us: string | null
+          price_m_id_us: string | null
           storage: number
           stripe_id: string
+          stripe_id_us: string | null
           updated_at: string
         }
         Insert: {
@@ -2945,6 +2542,7 @@ export type Database = {
           build_time_unit?: number
           created_at?: string
           credit_id: string
+          credit_id_us?: string | null
           description?: string
           id?: string
           market_desc?: string | null
@@ -2955,8 +2553,11 @@ export type Database = {
           price_m_id: string
           price_y?: number
           price_y_id: string
+          price_y_id_us?: string | null
+          price_m_id_us?: string | null
           storage: number
           stripe_id?: string
+          stripe_id_us?: string | null
           updated_at?: string
         }
         Update: {
@@ -2964,6 +2565,7 @@ export type Database = {
           build_time_unit?: number
           created_at?: string
           credit_id?: string
+          credit_id_us?: string | null
           description?: string
           id?: string
           market_desc?: string | null
@@ -2974,8 +2576,11 @@ export type Database = {
           price_m_id?: string
           price_y?: number
           price_y_id?: string
+          price_y_id_us?: string | null
+          price_m_id_us?: string | null
           storage?: number
           stripe_id?: string
+          stripe_id_us?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -3454,6 +3059,7 @@ export type Database = {
       stripe_info: {
         Row: {
           bandwidth_exceeded: boolean | null
+          billing_account: string
           build_time_exceeded: boolean | null
           canceled_at: string | null
           churn_reason: string | null
@@ -3483,6 +3089,7 @@ export type Database = {
         }
         Insert: {
           bandwidth_exceeded?: boolean | null
+          billing_account?: string
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
           churn_reason?: string | null
@@ -3512,6 +3119,7 @@ export type Database = {
         }
         Update: {
           bandwidth_exceeded?: boolean | null
+          billing_account?: string
           build_time_exceeded?: boolean | null
           canceled_at?: string | null
           churn_reason?: string | null
@@ -3539,15 +3147,7 @@ export type Database = {
           updated_at?: string
           upgraded_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "stripe_info_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "plans"
-            referencedColumns: ["stripe_id"]
-          },
-        ]
+        Relationships: []
       }
       tmp_users: {
         Row: {
@@ -4683,6 +4283,7 @@ export type Database = {
           created_at: string | null
           created_from_onboarding: boolean
           default_upload_channel: string
+          device_data_collection: Json
           existing_app: boolean
           expose_metadata: boolean
           icon_url: string
@@ -4906,6 +4507,7 @@ export type Database = {
           channel_device_count: number
           created_at: string
           default_upload_channel: string
+          device_data_collection: Json
           existing_app: boolean
           expose_metadata: boolean
           icon_url: string
@@ -5546,7 +5148,6 @@ export type Database = {
         }
         Returns: number
       }
-      process_admin_stats: { Args: never; Returns: undefined }
       process_all_cron_tasks: { Args: never; Returns: undefined }
       process_billing_period_stats_email: { Args: never; Returns: undefined }
       process_channel_device_counts_queue: {
@@ -5572,10 +5173,6 @@ export type Database = {
             Args: { batch_size?: number; queue_names: string[] }
             Returns: undefined
           }
-      process_global_stats_creates_queue: {
-        Args: { batch_size?: number }
-        Returns: number
-      }
       process_stats_email_monthly: { Args: never; Returns: undefined }
       process_stats_email_weekly: { Args: never; Returns: undefined }
       process_subscribed_orgs: { Args: never; Returns: undefined }
