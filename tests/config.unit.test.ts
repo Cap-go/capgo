@@ -2,7 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { app } from '../supabase/functions/_backend/private/config.ts'
 import { MIN_CLI_VERSION, MIN_CLI_VERSION_REASON } from '../supabase/functions/_backend/utils/cliMinVersion.ts'
 
-const connect = vi.hoisted(() => vi.fn(() => { throw new Error('No database lookup expected') }))
+const connect = vi.hoisted(() => vi.fn(() => {
+  throw new Error('No database lookup expected')
+}))
 vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({ getPgClient: connect, closeClient: vi.fn() }))
 
 beforeEach(() => {
@@ -45,5 +47,35 @@ describe('get /private/config', () => {
     finally {
       fetch.mockRestore()
     }
+  })
+
+  it('forwards CLI usage to the admin RPC binding without blocking the response', async () => {
+    const record = vi.fn().mockRejectedValue(new Error('admin ingest unavailable'))
+    // Run the background task inline, as the Worker's waitUntil would.
+    vi.stubEnv('CAPGO_PREVENT_BACKGROUND_FUNCTIONS', 'true')
+    const response = await app.request('http://local/', {
+      method: 'GET',
+      headers: { 'x-cli-version': '8.32.8', 'x-cli-command': 'bundle upload', 'x-cli-node': 'v22.0.0', 'x-cli-os': 'linux', 'capgo_api': '2025-10-01' },
+    }, { ADMIN_CLI_USAGE: { record } })
+
+    expect(response.status).toBe(200)
+    await vi.waitFor(() => expect(record).toHaveBeenCalledWith({
+      cli_version: '8.32.8',
+      command: 'bundle upload',
+      node_version: 'v22.0.0',
+      os_platform: 'linux',
+      source: 'config',
+      api_version: '2025-10-01',
+      apikey_id: null,
+      org_id: null,
+    }))
+    expect(connect).not.toHaveBeenCalled()
+  })
+
+  it('skips CLI usage work when the admin RPC binding is absent', async () => {
+    const response = await app.request('http://local/', { method: 'GET', headers: { 'x-cli-version': '8.32.8', 'capgkey': 'fake-key' } })
+
+    expect(response.status).toBe(200)
+    expect(connect).not.toHaveBeenCalled()
   })
 })
