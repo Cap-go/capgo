@@ -26,7 +26,7 @@ export interface BuilderAppSelectionGateProps {
   cols: number
   rows: number
   footer?: ReactNode
-  onSelected: (appId: string) => void
+  onSelected: (appId: string) => void | Promise<void>
   onSwitchKey: () => void
   onCancel: () => void
   onEvent?: (event: AppSelectionEvent) => void
@@ -68,7 +68,7 @@ const BuilderAppSelectionGate: FC<BuilderAppSelectionGateProps> = ({ apikey, sug
       await services.persist(app.app_id)
       if (!active.current || requestId !== request.current)
         return
-      selectedCallback.current(app.app_id)
+      await selectedCallback.current(app.app_id)
       emit({ phase: 'resolved', result: source ? 'selected' : 'exact_match', source, visibleCount: count })
     }
     catch (cause) {

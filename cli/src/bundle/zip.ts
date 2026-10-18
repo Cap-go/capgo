@@ -117,6 +117,13 @@ export async function zipBundleInternal(appId: string, options: BundleZipOptions
       throw new Error(message)
     }
 
+    if (!existsSync(path)) {
+      const message = `Path ${path} does not exist, build your app first, or provide a valid path`
+      throw json
+        ? new CliUserError('path_not_found', { message })
+        : new CliUserError(message)
+    }
+
     if (shouldShowPrompts)
       log.info(`Started from path "${path}"`)
 
