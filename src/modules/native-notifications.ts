@@ -1,8 +1,8 @@
 import type { UserModule } from '~/types'
 import { App } from '@capacitor/app'
 import { Capacitor } from '@capacitor/core'
+import { isSpoofed, useConsole } from '~/services/console'
 import { registerNativeNotifications, setupNativeNotifications, unregisterNativeNotifications } from '~/services/nativeNotifications'
-import { isSpoofed, useSupabase } from '~/services/supabase'
 
 export const install: UserModule = () => {
   if (!Capacitor.isNativePlatform())
@@ -23,7 +23,7 @@ export const install: UserModule = () => {
       void registerWhenActive()
   })
 
-  useSupabase().auth.onAuthStateChange((event, session) => {
+  useConsole().auth.onAuthStateChange((event, session) => {
     // Never bind an admin's device to the customer they are logged in as.
     const previousUserId = userId
     userId = session?.user?.id && !isSpoofed() ? session.user.id : null
