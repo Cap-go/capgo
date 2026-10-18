@@ -227,6 +227,10 @@ function mergeLastStripeEventAt(
 
 type StripeWebhookPersistOptions = {
   allowOutOfOrderPaymentConfirmation?: boolean
+  /** When set, re-check stored subscription_id under the row lock before applying the update. */
+  invoiceSubscriptionId?: string | null
+  /** Record processed_stripe_events even when revenue movement is zero (failed-invoice idempotency). */
+  recordStripeEventIdempotency?: boolean
 }
 
 function toStripeInfoUpdate(data: StripeData['data']): StripeInfoUpdate {
@@ -691,8 +695,9 @@ async function persistStripeInfoAndRevenueMovement(
     ...updateData,
   }
   const shouldRecordMovement = hasRevenueMovement(movement)
+  const shouldRecordProcessedEvent = shouldRecordMovement || options?.recordStripeEventIdempotency === true
 
-  if (Object.keys(transactionUpdateData).length === 0 && !shouldRecordMovement)
+  if (Object.keys(transactionUpdateData).length === 0 && !shouldRecordProcessedEvent)
     return 'applied'
 
   const pgClient = await getPgClient(c, false)
@@ -702,8 +707,8 @@ async function persistStripeInfoAndRevenueMovement(
 
     // Lock the row so concurrent retries serialize before we classify
     // the event as missing/stale and before we append revenue movement.
-    const stripeInfoRow = await pgClient.query<Pick<StripeInfoRow, 'last_stripe_event_at' | 'past_due_at' | 'status'>>(
-      'SELECT last_stripe_event_at, past_due_at, status FROM public.stripe_info WHERE customer_id = $1 FOR UPDATE',
+    const stripeInfoRow = await pgClient.query<Pick<StripeInfoRow, 'last_stripe_event_at' | 'past_due_at' | 'status' | 'subscription_id'>>(
+      'SELECT last_stripe_event_at, past_due_at, status, subscription_id FROM public.stripe_info WHERE customer_id = $1 FOR UPDATE',
       [customerId],
     )
     const lockedStripeInfo = stripeInfoRow.rows[0]
@@ -711,6 +716,12 @@ async function persistStripeInfoAndRevenueMovement(
     if (!lockedStripeInfo) {
       await pgClient.query('ROLLBACK')
       return 'missing'
+    }
+
+    if (options?.invoiceSubscriptionId !== undefined
+      && !shouldApplyInvoiceToStoredSubscription(lockedStripeInfo.subscription_id, options.invoiceSubscriptionId)) {
+      await pgClient.query('ROLLBACK')
+      return 'stale'
     }
 
     if (!options?.allowOutOfOrderPaymentConfirmation && isStaleStripeEvent(lockedStripeInfo, eventOccurredAtIso)) {
@@ -735,7 +746,7 @@ async function persistStripeInfoAndRevenueMovement(
 
     const updateStatement = buildStripeInfoUpdateStatement(customerId, transactionUpdateData)
 
-    if (shouldRecordMovement) {
+    if (shouldRecordProcessedEvent) {
       const processedEvent = await pgClient.query(`
         INSERT INTO public.processed_stripe_events (
           event_id,
@@ -1661,6 +1672,11 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     return handleCheckoutSessionCompleted(c, stripeEvent, org, stripeData.data.customer_id)
   }
 
+  if (stripeEvent.type === 'payment_intent.succeeded') {
+    await handleAutoTopUpPaymentIntent(c, stripeEvent, org.id)
+    return c.json(BRES)
+  }
+
   const { data: customer } = await supabaseAdmin(c)
     .from('stripe_info')
     .select()
@@ -1669,11 +1685,6 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
 
   if (!customer) {
     throw simpleError('no_customer_found', 'no customer found', { stripeData })
-  }
-
-  if (stripeEvent.type === 'payment_intent.succeeded') {
-    await handleAutoTopUpPaymentIntent(c, stripeEvent, org.id)
-    return c.json(BRES)
   }
 
   if (stripeEvent.type === 'invoice.paid' || stripeEvent.type === 'invoice.payment_succeeded') {
@@ -1754,6 +1765,10 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
       updateData,
       eventOccurredAtIso,
       revenueMovement,
+      {
+        invoiceSubscriptionId: stripeData.data.subscription_id,
+        recordStripeEventIdempotency: true,
+      },
     )
     if (didPersist === 'missing')
       return quickError(404, 'canceled_customer_id_not_found', `canceled: customer_id not found`, { stripeData })
@@ -1765,7 +1780,14 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
         cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment email because org has active usage credits', orgId: org.id })
       }
       else {
-        await trackBillingBentoEvent(c, org, stripeData.data.customer_id, BENTO_FAILED_PAYMENT_EVENT)
+        const openInvoice = await getLatestOpenSubscriptionInvoice(c, stripeData.data.customer_id)
+        await trackBillingBentoEvent(
+          c,
+          org,
+          stripeData.data.customer_id,
+          BENTO_FAILED_PAYMENT_EVENT,
+          buildDunningInvoiceBentoData(openInvoice),
+        )
       }
     }
     return c.json(BRES)
