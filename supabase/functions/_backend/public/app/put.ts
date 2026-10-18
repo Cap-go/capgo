@@ -12,6 +12,7 @@ import { deleteAppStatus } from '../../utils/appStatus.ts'
 import { trackBentoEvent } from '../../utils/bento.ts'
 import { createIfNotExistStoreInfo } from '../../utils/cloudflare.ts'
 import { lockOnboardingApp, unlockOnboardingApp } from '../../utils/demo.ts'
+import { DEVICE_DATA_COLLECTION_KEYS, mergeDeviceDataCollection } from '../../utils/deviceDataCollection.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { buildOnboardingIntentBentoEventData, parseOrgOnboardingIntent } from '../../utils/org_onboarding_intent.ts'
@@ -32,14 +33,35 @@ interface UpdateApp {
   need_onboarding?: boolean
   existing_app?: boolean
   block_provider_infra_requests?: boolean
+  allow_preview?: boolean
+  build_timeout_seconds?: number
+  default_upload_channel?: string
+  device_data_collection?: unknown
   ios_store_url?: string | null
   android_store_url?: string | null
   onboarding?: unknown
 }
 
+export const MIN_BUILD_TIMEOUT_SECONDS = 300
+export const MAX_BUILD_TIMEOUT_SECONDS = 21600
+
 type AppSettings = Pick<Database['public']['Tables']['apps']['Update'], 'name' | 'icon_url' | 'retention' | 'expose_metadata' | 'allow_device_custom_id'
-  | 'need_onboarding' | 'existing_app' | 'block_provider_infra_requests'
+  | 'need_onboarding' | 'existing_app' | 'block_provider_infra_requests' | 'device_data_collection'
+  | 'allow_preview' | 'build_timeout_seconds' | 'default_upload_channel'
   | 'ios_store_url' | 'android_store_url'>
+
+function validateDeviceDataCollectionPatch(patch: unknown): Record<string, boolean> {
+  if (patch === null || typeof patch !== 'object' || Array.isArray(patch))
+    throw simpleError('invalid_device_data_collection', 'device_data_collection must be an object')
+  const allowedKeys: readonly string[] = DEVICE_DATA_COLLECTION_KEYS
+  for (const [key, value] of Object.entries(patch)) {
+    if (!allowedKeys.includes(key))
+      throw simpleError('invalid_device_data_collection', `Unknown device_data_collection key: ${key}`, { key })
+    if (typeof value !== 'boolean')
+      throw simpleError('invalid_device_data_collection', `device_data_collection.${key} must be a boolean`, { key })
+  }
+  return patch as Record<string, boolean>
+}
 
 export async function persistAppOnboarding(
   c: Context<MiddlewareKeyVariables>,
@@ -187,6 +209,14 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   else if (body.retention && body.retention < 0) {
     throw quickError(400, 'retention_to_small', 'Retention cannot be smaller than 0', { retention: body.retention })
   }
+  if (body.allow_preview !== undefined && typeof body.allow_preview !== 'boolean')
+    throw quickError(400, 'invalid_allow_preview', 'allow_preview must be a boolean', { allow_preview: body.allow_preview })
+  if (body.build_timeout_seconds !== undefined
+    && (!Number.isInteger(body.build_timeout_seconds) || body.build_timeout_seconds < MIN_BUILD_TIMEOUT_SECONDS || body.build_timeout_seconds > MAX_BUILD_TIMEOUT_SECONDS)) {
+    throw quickError(400, 'invalid_build_timeout', `build_timeout_seconds must be an integer between ${MIN_BUILD_TIMEOUT_SECONDS} and ${MAX_BUILD_TIMEOUT_SECONDS}`, { build_timeout_seconds: body.build_timeout_seconds })
+  }
+  if (body.default_upload_channel !== undefined && (typeof body.default_upload_channel !== 'string' || body.default_upload_channel.trim() === ''))
+    throw quickError(400, 'invalid_default_upload_channel', 'default_upload_channel must be a channel name', { default_upload_channel: body.default_upload_channel })
 
   const onboardingPatch = parseAppOnboardingPatch(body.onboarding)
   const canUpdateSettings = await checkPermission(c, 'app.update_settings', { appId })
@@ -201,7 +231,7 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     : supabaseAdmin(c)
   const { data: previousApp, error: previousAppError } = await previousAppClient
     .from('apps')
-    .select('need_onboarding, owner_org, name, app_id, onboarding')
+    .select('need_onboarding, owner_org, name, app_id, onboarding, device_data_collection')
     .eq('app_id', appId)
     .single()
 
@@ -235,6 +265,10 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     body.allow_device_custom_id,
     body.existing_app,
     body.block_provider_infra_requests,
+    body.allow_preview,
+    body.build_timeout_seconds,
+    body.default_upload_channel,
+    body.device_data_collection,
     body.ios_store_url,
     body.android_store_url,
   ]
@@ -261,6 +295,20 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   }
   if (body.icon !== undefined && body.icon !== '' && !normalizedIcon)
     throw simpleError('invalid_icon_path', 'Icon path must belong to this app organization')
+  if (body.default_upload_channel !== undefined) {
+    const { data: uploadChannel, error: uploadChannelError } = await callerClient
+      .from('channels')
+      .select('id')
+      .eq('app_id', appId)
+      .eq('name', body.default_upload_channel)
+      .maybeSingle()
+    if (uploadChannelError || !uploadChannel)
+      throw quickError(400, 'channel_not_found', 'default_upload_channel must be an existing channel of this app', { app_id: appId, channel: body.default_upload_channel })
+  }
+  // Validate before taking the onboarding lock so a bad payload cannot leak it.
+  const deviceDataCollection = body.device_data_collection !== undefined
+    ? mergeDeviceDataCollection(previousApp.device_data_collection, validateDeviceDataCollectionPatch(body.device_data_collection))
+    : undefined
   const onboardingLock = shouldSerializeOnboardingCompletion
     ? await lockOnboardingApp(c, appId)
     : null
@@ -279,6 +327,10 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     need_onboarding: body.need_onboarding,
     existing_app: body.existing_app,
     block_provider_infra_requests: body.block_provider_infra_requests,
+    allow_preview: body.allow_preview,
+    build_timeout_seconds: body.build_timeout_seconds,
+    default_upload_channel: body.default_upload_channel,
+    device_data_collection: deviceDataCollection,
     ios_store_url: body.ios_store_url,
     android_store_url: body.android_store_url,
   }

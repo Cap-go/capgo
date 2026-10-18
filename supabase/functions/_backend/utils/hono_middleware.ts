@@ -9,7 +9,7 @@ import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import { throwDatabaseUnavailable } from './pg_auth_lookup.ts'
 import { waitAuthPgRetryJitter } from './pg_auth_retry.ts'
-import { isTransientPgError } from './pg_errors.ts'
+import { isFreshPgClientRetryError } from './pg_errors.ts'
 import * as schema from './postgres_schema.ts'
 import { isAPIKeyRateLimited, isIPRateLimited, recordAPIKeyUsage, recordFailedAuth } from './rate_limit.ts'
 import { buildRateLimitInfo } from './rateLimitInfo.ts'
@@ -667,19 +667,19 @@ async function resolveApiKey(
       const drizzleClient = getDrizzleClient(pgClient)
       const outcome = await checkKeyPg(c, key, drizzleClient)
       lastOutcome = outcome
-      if (outcome.kind === 'db_error' && attempt === 0 && isTransientPgError(outcome.error)) {
+      if (outcome.kind === 'db_error' && attempt === 0 && isFreshPgClientRetryError(outcome.error)) {
         await waitAuthPgRetryJitter()
         continue
       }
       return outcome
     }
     catch (error) {
-      if (attempt === 0 && isTransientPgError(error)) {
+      if (attempt === 0 && isFreshPgClientRetryError(error)) {
         await waitAuthPgRetryJitter()
         lastOutcome = { kind: 'db_error', error }
         continue
       }
-      if (isTransientPgError(error))
+      if (isFreshPgClientRetryError(error))
         return { kind: 'db_error', error }
       throw error
     }
@@ -727,19 +727,19 @@ async function resolveSubkey(
       const drizzleClient = getDrizzleClient(subkeyPgClient)
       const outcome = await checkKeyByIdPg(c, subkeyId, drizzleClient, expectedUserId)
       lastOutcome = outcome
-      if (outcome.kind === 'db_error' && attempt === 0 && isTransientPgError(outcome.error)) {
+      if (outcome.kind === 'db_error' && attempt === 0 && isFreshPgClientRetryError(outcome.error)) {
         await waitAuthPgRetryJitter()
         continue
       }
       return outcome
     }
     catch (error) {
-      if (attempt === 0 && isTransientPgError(error)) {
+      if (attempt === 0 && isFreshPgClientRetryError(error)) {
         await waitAuthPgRetryJitter()
         lastOutcome = { kind: 'db_error', error }
         continue
       }
-      if (isTransientPgError(error))
+      if (isFreshPgClientRetryError(error))
         return { kind: 'db_error', error }
       throw error
     }

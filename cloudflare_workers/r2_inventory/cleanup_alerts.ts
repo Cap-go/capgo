@@ -77,7 +77,7 @@ export async function sendCleanupAlert(database: CleanupDatabase, bucket: string
       return
     const response = await fetch(url, {
       method: 'POST',
-      redirect: 'error',
+      redirect: 'manual',
       signal: AbortSignal.timeout(3000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ content: cleanupAlertContent(claim.counts), allowed_mentions: { parse: [] } }),

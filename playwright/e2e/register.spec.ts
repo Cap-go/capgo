@@ -1,5 +1,8 @@
 import type { Page } from '@playwright/test'
+import { env } from 'node:process'
+import { createClient } from '@supabase/supabase-js'
 import { getSupabaseWorktreeConfig } from '../../scripts/supabase-worktree-config'
+import { getSupabaseStatus } from '../../scripts/supabase-worktree-status'
 import { expect, test } from '../support/commands'
 
 const { ports: supabasePorts } = getSupabaseWorktreeConfig()
@@ -59,22 +62,22 @@ async function forceWebNativeOnboardingTreatments(email: string, password: strin
   if (!loginResponse.ok || !session.user || !session.token)
     throw new Error(session.message ?? 'Cannot sign in treatment user')
   const headers = { 'content-type': 'application/json', 'authorization': `Bearer capgo_session_${session.token}` }
-  const query = async (operations: { method: string, args: unknown[] }[]) => {
-    const response = await fetch(`${apiURL}/private/console/query`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ kind: 'table', name: 'users', args: [], operations }),
-    })
-    const result = await response.json()
-    if (!response.ok || result.error)
-      throw new Error(result.error?.message ?? 'Cannot update treatment user')
-    return result.data
-  }
-  const profile = await query([
-    { method: 'select', args: ['onboarding'] },
-    { method: 'eq', args: ['id', session.user.id] },
-    { method: 'single', args: [] },
-  ])
+
+  // Experiment fixtures use a separate backend client; user sessions cannot
+  // override the server-managed assignment fields.
+  const configuredServiceKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY
+  const status = configuredServiceKey ? null : getSupabaseStatus()
+  const serviceKey = configuredServiceKey || status?.SERVICE_ROLE_KEY || status?.SECRET_KEY
+  if (!serviceKey)
+    throw new Error('Local Supabase service key is required for treatment fixtures')
+  const adminClient = createClient(localSupabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const { data: profile, error: profileError } = await adminClient
+    .from('users')
+    .select('onboarding')
+    .eq('id', session.user.id)
+    .single()
+  if (profileError)
+    throw profileError
 
   const onboarding = profile.onboarding && typeof profile.onboarding === 'object' && !Array.isArray(profile.onboarding)
     ? profile.onboarding
@@ -82,22 +85,28 @@ async function forceWebNativeOnboardingTreatments(email: string, password: strin
   const abtests = onboarding.abtests && typeof onboarding.abtests === 'object' && !Array.isArray(onboarding.abtests)
     ? onboarding.abtests
     : {}
-  await query([{ method: 'update', args: [{
-    onboarding: {
-      ...onboarding,
-      abtests: {
-        ...abtests,
-        webnativeapp_publish_intent: {
-          assigned_at: new Date().toISOString(),
-          branch: 'A',
-        },
-        webnativeapp_development_environment: {
-          assigned_at: new Date().toISOString(),
-          branch: 'C',
+  const { error: updateError } = await adminClient
+    .from('users')
+    .update({
+      onboarding: {
+        ...onboarding,
+        abtests: {
+          ...abtests,
+          webnativeapp_publish_intent: {
+            assigned_at: new Date().toISOString(),
+            branch: 'A',
+          },
+          webnativeapp_development_environment: {
+            assigned_at: new Date().toISOString(),
+            branch: 'C',
+          },
         },
       },
-    },
-  }] }, { method: 'eq', args: ['id', session.user.id] }])
+    })
+    .eq('id', session.user.id)
+  if (updateError)
+    throw updateError
+
   await fetch(`${apiURL}/auth/sign-out`, { method: 'POST', headers, body: '{}' })
 }
 

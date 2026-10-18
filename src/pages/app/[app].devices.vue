@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { useConsole } from '~/services/console'
+import { parseAppRowDeviceDataCollection } from '~/services/deviceDataCollection'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
@@ -15,6 +16,7 @@ const isLoading = ref(false)
 const supabase = useConsole()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
+const deviceDataCollection = computed(() => parseAppRowDeviceDataCollection(app.value as unknown))
 
 async function loadAppInfo() {
   try {
@@ -59,7 +61,7 @@ watchEffect(async () => {
         <div class="w-full h-full px-0 pt-6 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <SectionIntro section="devices" />
           <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-sm md:rounded-xl border-slate-200 dark:bg-slate-800/60 dark:border-white/10">
-            <DeviceTable :app-id="id" :version-name="typeof route.query.version === 'string' ? route.query.version : undefined" />
+            <DeviceTable :app-id="id" :version-name="typeof route.query.version === 'string' ? route.query.version : undefined" :device-data-collection="deviceDataCollection" />
           </div>
         </div>
       </div>

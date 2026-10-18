@@ -5,7 +5,7 @@ import { eq, sql } from 'drizzle-orm'
 import { cloudlog } from './logging.ts'
 import { buildPlanValidationExpression, closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import { waitAuthPgRetryJitter } from './pg_auth_retry.ts'
-import { isTransientPgError } from './pg_errors.ts'
+import { isFreshPgClientRetryError } from './pg_errors.ts'
 import * as schema from './postgres_schema.ts'
 
 /**
@@ -62,7 +62,7 @@ export async function withFreshPgRetry<T>(
   }
   catch (e: unknown) {
     logPgError(c, source, e)
-    if (!isTransientPgError(e))
+    if (!isFreshPgClientRetryError(e))
       throw e
   }
 

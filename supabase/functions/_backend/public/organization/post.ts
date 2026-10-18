@@ -1,12 +1,16 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
+import type { BillingAccount } from '../../utils/stripe_billing.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { assertJwtMfaAssurance } from '../../utils/jwt_mfa_assurance.ts'
+import { cloudlogErr } from '../../utils/logging.ts'
 import { parseOrgOnboardingDevelopmentEnvironment, parseOrgOnboardingIntent } from '../../utils/org_onboarding_intent.ts'
 import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from '../../utils/pg.ts'
 import { safeParseSchema } from '../../utils/schema_validation.ts'
+import { getPlanProductId } from '../../utils/stripe.ts'
+import { canChooseUsBillingAccount, resolveNewOrgBillingAccount } from '../../utils/stripe_billing.ts'
 import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
@@ -25,6 +29,7 @@ const bodySchema = z.object({
   intent: z.enum(['ota', 'builder', 'both', 'exploring', 'publish', 'unknown']).optional(),
   startingOut: z.boolean().optional(),
   developmentEnvironment: z.enum(['hosted_builder', 'ai_assistant', 'hand_coded', 'other', 'local_project', 'exploring', 'skipped']).optional(),
+  billingAccount: z.enum(['ee', 'us']).optional(),
 })
 
 interface PgTransactionClient {
@@ -35,21 +40,39 @@ async function getInitialPlanForMau(c: Context<MiddlewareKeyVariables>, estimate
   const adminClient = supabaseAdmin(c)
   const { data: plan, error } = await adminClient
     .from('plans')
-    .select('name, stripe_id, mau')
+    .select('name, stripe_id, stripe_id_us, mau')
     .gte('mau', estimatedMau)
     .order('mau', { ascending: true })
     .limit(1)
     .single()
 
-  if (error || !plan?.stripe_id) {
+  if (error || !plan) {
     throw simpleError('cannot_get_plan', 'Cannot get plan', { error: error?.message, estimatedMau })
   }
 
   return plan
 }
 
-async function createPendingStripeInfo(c: Context<MiddlewareKeyVariables>, orgId: string, estimatedMau: number) {
+// A plan without US Stripe ids must not block org creation when US was only suggested: bill it on EE instead.
+// An explicit US choice must not be silently moved to another billing entity.
+function resolvePlanBillingAccount(c: Context<MiddlewareKeyVariables>, plan: { name: string, stripe_id: string, stripe_id_us: string | null }, billingAccount: BillingAccount, explicit: boolean): BillingAccount {
+  if (billingAccount !== 'us')
+    return billingAccount
+  try {
+    getPlanProductId(plan, 'us')
+    return 'us'
+  }
+  catch {
+    if (explicit)
+      throw simpleError('cannot_get_plan', 'Cannot get plan', { plan: plan.name, billingAccount })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Plan missing US Stripe ids, falling back to ee', plan: plan.name })
+    return 'ee'
+  }
+}
+
+async function createPendingStripeInfo(c: Context<MiddlewareKeyVariables>, orgId: string, estimatedMau: number, requestedBillingAccount: BillingAccount, explicit: boolean) {
   const plan = await getInitialPlanForMau(c, estimatedMau)
+  const billingAccount = resolvePlanBillingAccount(c, plan, requestedBillingAccount, explicit)
   const pendingCustomerId = `pending_${orgId}`
   const trialAt = new Date()
   trialAt.setDate(trialAt.getDate() + 15)
@@ -58,7 +81,8 @@ async function createPendingStripeInfo(c: Context<MiddlewareKeyVariables>, orgId
     .from('stripe_info')
     .insert({
       customer_id: pendingCustomerId,
-      product_id: plan.stripe_id,
+      product_id: getPlanProductId(plan, billingAccount),
+      billing_account: billingAccount,
       trial_at: trialAt.toISOString(),
       status: null,
       is_good_plan: true,
@@ -269,7 +293,11 @@ export async function post(
   await ensureApiKeyCanCreateOrganization(c, auth)
   const ownerEmail = await getOwnerEmail(c, auth)
   const orgId = crypto.randomUUID()
-  const pendingCustomerId = await createPendingStripeInfo(c, orgId, estimatedMau)
+  // An explicit US choice must not be silently moved to the EE entity.
+  if (body.billingAccount === 'us' && !canChooseUsBillingAccount(c))
+    throw simpleError('billing_account_unavailable', 'US billing is not available', { billingAccount: 'us' })
+  const billingAccount = resolveNewOrgBillingAccount(c, body.billingAccount)
+  const pendingCustomerId = await createPendingStripeInfo(c, orgId, estimatedMau, billingAccount, body.billingAccount === 'us')
   const onboarding = {
     intent: parseOrgOnboardingIntent({ intent: body.intent }),
     starting_out: body.startingOut ?? false,

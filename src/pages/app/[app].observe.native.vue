@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ChartData, ChartOptions } from 'chart.js'
 import type { VersionGroupOption } from '~/components/dashboard/VersionGroupSelector.vue'
+import type { DeviceDataCollectionKey } from '~/services/deviceDataCollection'
 import type { NativeReleaseSeriesInput } from '~/services/nativeReleaseStats'
 import type { ObserveSignalCategory } from '~/services/statsActions'
 import type { PeriodDayOption } from '~/utils/periodDays'
@@ -13,11 +14,13 @@ import IconActivity from '~icons/lucide/activity'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconTimer from '~icons/lucide/timer'
 import { provideChartCardCompact } from '~/components/dashboard/chartCardDensity'
+import DeviceDataCollectionGate from '~/components/dashboard/DeviceDataCollectionGate.vue'
 import DevicesStats from '~/components/dashboard/DevicesStats.vue'
 import NativeReleaseStatsPanel from '~/components/dashboard/NativeReleaseStatsPanel.vue'
 import PeriodDaySelector from '~/components/dashboard/PeriodDaySelector.vue'
 import VersionGroupSelector from '~/components/dashboard/VersionGroupSelector.vue'
 import InfoPopover from '~/components/InfoPopover.vue'
+import { useDeviceDataCollection } from '~/composables/useDeviceDataCollection'
 import { useNativeObserveStats } from '~/composables/useNativeObserveStats'
 import { usePeriodDaysQuery } from '~/composables/usePeriodDaysQuery'
 import { formatLocalDateShort } from '~/services/date'
@@ -100,6 +103,7 @@ const packageId = computed(() => {
 const appRouteSegment = computed(() => route.path.match(/^\/app\/([^/]+)/)?.[1] ?? encodeURIComponent(packageId.value))
 const { days } = usePeriodDaysQuery()
 const versionGroup = ref<VersionGroupOption>('version')
+const { collection } = useDeviceDataCollection(packageId)
 const { stats, statsLoading, fetchStats } = useNativeObserveStats<NativeObserveStatsResponse>(
   packageId,
   () => ({ days: days.value, version_group: versionGroup.value }),
@@ -149,6 +153,7 @@ const topVersions = computed(() => stats.value?.versions.slice(0, versionGroup.v
 const visibleVersions = computed(() => showAllVersions.value ? topVersions.value : topVersions.value.slice(0, PREVIEW_ROWS))
 const visibleActions = computed(() => showAllActions.value ? topActions.value : topActions.value.slice(0, PREVIEW_ROWS))
 const showPlatformColumn = computed(() => versionGroup.value !== 'version')
+const versionTableRequirements = computed<DeviceDataCollectionKey[]>(() => showPlatformColumn.value ? ['platform'] : [])
 const showChannelColumn = computed(() => versionGroup.value === 'version_platform_channel')
 const versionHealthHelp = computed(() => {
   if (versionGroup.value === 'version_platform_channel')
@@ -451,6 +456,7 @@ watch([packageId, days, versionGroup], async () => {
             variant="chart"
             :use-billing-period="false"
             :accumulated="false"
+            :device-data-collection="collection"
             @native-usage="nativeUsage = $event"
           />
           <div v-if="hasData" class="flex flex-col h-[320px] p-4 bg-white border rounded-xl shadow-sm dark:bg-slate-800/60 border-slate-200 dark:border-white/10">
@@ -488,66 +494,73 @@ watch([packageId, days, versionGroup], async () => {
 
         <!-- One detail table at a time (third-level tabs) keeps the page on one screen. -->
 
-        <div v-if="activeDetailTab === 'versions'" class="p-4 bg-white border rounded-xl shadow-sm dark:bg-slate-800/60 border-slate-200 dark:border-white/10">
-          <div class="overflow-x-auto">
-            <table class="d-table d-table-sm w-full" :class="versionTableMinWidth">
-              <thead class="text-[11px] font-semibold tracking-wider uppercase border-y border-slate-200 text-slate-500 bg-slate-50 dark:border-white/10 dark:text-slate-400 dark:bg-white/[0.03]">
-                <tr>
-                  <th class="whitespace-nowrap">
-                    {{ t('native-observe-version') }}
-                  </th>
-                  <th v-if="showPlatformColumn" class="whitespace-nowrap">
-                    {{ t('native-observe-platform') }}
-                  </th>
-                  <th v-if="showChannelColumn" class="whitespace-nowrap">
-                    {{ t('native-observe-channel') }}
-                  </th>
-                  <th class="whitespace-nowrap">
-                    {{ t('events') }}
-                  </th>
-                  <th class="whitespace-nowrap">
-                    {{ t('devices') }}
-                  </th>
-                  <th class="whitespace-nowrap">
-                    {{ t('native-observe-signal-devices') }}
-                  </th>
-                  <th class="whitespace-nowrap">
-                    {{ t('native-observe-launch-p90') }}
-                  </th>
-                  <th class="whitespace-nowrap">
-                    {{ t('native-observe-webview-p90') }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="version in visibleVersions" :key="versionRowKey(version)">
-                  <td class="font-medium text-slate-900 dark:text-slate-100">
-                    {{ version.version_name }}
-                  </td>
-                  <td v-if="showPlatformColumn">
-                    {{ version.platform || '-' }}
-                  </td>
-                  <td v-if="showChannelColumn">
-                    {{ version.channel_name || '-' }}
-                  </td>
-                  <td>{{ formatCount(version.events) }}</td>
-                  <td>{{ formatCount(version.devices) }}</td>
-                  <td>{{ formatCount(version.affected_devices) }}</td>
-                  <td>{{ formatDuration(version.launch_p90_ms) }}</td>
-                  <td>{{ formatDuration(version.webview_load_p90_ms) }}</td>
-                </tr>
-              </tbody>
-            </table>
+        <DeviceDataCollectionGate
+          v-if="activeDetailTab === 'versions'"
+          :app-id="packageId"
+          :collection="collection"
+          :requires="versionTableRequirements"
+        >
+          <div class="p-4 bg-white border rounded-xl shadow-sm dark:bg-slate-800/60 border-slate-200 dark:border-white/10">
+            <div class="overflow-x-auto">
+              <table class="d-table d-table-sm w-full" :class="versionTableMinWidth">
+                <thead class="text-[11px] font-semibold tracking-wider uppercase border-y border-slate-200 text-slate-500 bg-slate-50 dark:border-white/10 dark:text-slate-400 dark:bg-white/[0.03]">
+                  <tr>
+                    <th class="whitespace-nowrap">
+                      {{ t('native-observe-version') }}
+                    </th>
+                    <th v-if="showPlatformColumn" class="whitespace-nowrap">
+                      {{ t('native-observe-platform') }}
+                    </th>
+                    <th v-if="showChannelColumn" class="whitespace-nowrap">
+                      {{ t('native-observe-channel') }}
+                    </th>
+                    <th class="whitespace-nowrap">
+                      {{ t('events') }}
+                    </th>
+                    <th class="whitespace-nowrap">
+                      {{ t('devices') }}
+                    </th>
+                    <th class="whitespace-nowrap">
+                      {{ t('native-observe-signal-devices') }}
+                    </th>
+                    <th class="whitespace-nowrap">
+                      {{ t('native-observe-launch-p90') }}
+                    </th>
+                    <th class="whitespace-nowrap">
+                      {{ t('native-observe-webview-p90') }}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="version in visibleVersions" :key="versionRowKey(version)">
+                    <td class="font-medium text-slate-900 dark:text-slate-100">
+                      {{ version.version_name }}
+                    </td>
+                    <td v-if="showPlatformColumn">
+                      {{ version.platform || '-' }}
+                    </td>
+                    <td v-if="showChannelColumn">
+                      {{ version.channel_name || '-' }}
+                    </td>
+                    <td>{{ formatCount(version.events) }}</td>
+                    <td>{{ formatCount(version.devices) }}</td>
+                    <td>{{ formatCount(version.affected_devices) }}</td>
+                    <td>{{ formatDuration(version.launch_p90_ms) }}</td>
+                    <td>{{ formatDuration(version.webview_load_p90_ms) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <button
+              v-if="topVersions.length > PREVIEW_ROWS"
+              type="button"
+              class="mt-3 text-xs font-medium text-azure-600 hover:underline dark:text-azure-300"
+              @click="showAllVersions = !showAllVersions"
+            >
+              {{ showAllVersions ? t('show-less') : t('show-all-count', { count: topVersions.length }) }}
+            </button>
           </div>
-          <button
-            v-if="topVersions.length > PREVIEW_ROWS"
-            type="button"
-            class="mt-3 text-xs font-medium text-azure-600 hover:underline dark:text-azure-300"
-            @click="showAllVersions = !showAllVersions"
-          >
-            {{ showAllVersions ? t('show-less') : t('show-all-count', { count: topVersions.length }) }}
-          </button>
-        </div>
+        </DeviceDataCollectionGate>
         <div v-else-if="activeDetailTab === 'actions'" class="p-4 bg-white border rounded-xl shadow-sm dark:bg-slate-800/60 border-slate-200 dark:border-white/10">
           <div class="overflow-x-auto">
             <table class="d-table d-table-sm w-full min-w-[820px]">
@@ -627,12 +640,18 @@ watch([packageId, days, versionGroup], async () => {
             {{ showAllActions ? t('show-less') : t('show-all-count', { count: topActions.length }) }}
           </button>
         </div>
-        <NativeReleaseStatsPanel
+        <DeviceDataCollectionGate
           v-else
-          :usage-data="nativeUsage.data"
-          :is-loading="nativeUsage.isLoading"
-          @retry="nativeDevicesStats?.reload()"
-        />
+          :app-id="packageId"
+          :collection="collection"
+          :requires="['platform', 'version_build']"
+        >
+          <NativeReleaseStatsPanel
+            :usage-data="nativeUsage.data"
+            :is-loading="nativeUsage.isLoading"
+            @retry="nativeDevicesStats?.reload()"
+          />
+        </DeviceDataCollectionGate>
       </template>
     </div>
   </div>

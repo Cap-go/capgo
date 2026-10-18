@@ -701,7 +701,7 @@ export async function createRoleBindingForPrincipal(
   return { ok: true, data: binding }
 }
 
-async function updateRoleBindingRole(
+export async function updateRoleBindingRole(
   drizzle: DrizzleExecutor,
   bindingId: string,
   binding: RoleBindingRecord,
@@ -728,7 +728,7 @@ async function updateRoleBindingRole(
   return (updateResult.rows[0] as RoleBindingRecord | undefined) ?? null
 }
 
-function isLastSuperAdminDemotionError(error: unknown): boolean {
+export function isLastSuperAdminDemotionError(error: unknown): boolean {
   const errorCodes = [
     'CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING',
     'CANNOT_DELETE_LAST_SUPER_ADMIN_BINDING',

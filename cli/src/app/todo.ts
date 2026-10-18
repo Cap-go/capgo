@@ -2,6 +2,7 @@ import type { OptionsBase } from '../schemas/base'
 import { env, stdin, stdout } from 'node:process'
 import { intro, log, outro, spinner } from '@clack/prompts'
 import { check2FAComplianceForApp } from '../api/app'
+import { formatBuilderOnlyChecklist, getBuilderOnlyChecklist } from './builder-checklist'
 import { getPendingOnboardingChecks } from '../onboarding/background-workers'
 import { CliUserError } from '../shared/cli-user-error'
 import { createSupabaseClient, findSavedKey, formatCapgoCliInvokeError, getAppId, getCapgoCliHttpStatus, getConfig, invokeCapgoCliApi } from '../utils'
@@ -129,6 +130,9 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 export function getAppTodoSteps(progress: AppTodoProgress) {
+  const builder = getBuilderOnlyChecklist(progress.onboarding)
+  if (builder)
+    return builder
   const raw = asRecord(progress.onboarding)
   const setup = raw.setup !== null && typeof raw.setup === 'object' && !Array.isArray(raw.setup)
     ? asRecord(raw.setup)
@@ -151,11 +155,14 @@ export function getAppTodoSteps(progress: AppTodoProgress) {
     const title = version === 3 || otaV1 ? V3_STEP_TITLES[id as keyof typeof V3_STEP_TITLES] : STEP_TITLES[id]
     return { id, title, status }
   })
-  return { version, steps }
+  return { version, steps, path: 'ota' as const, selectedPlatform: undefined }
 }
 
 export function formatAppTodoList(appId: string, progress: AppTodoProgress, options: { color?: boolean } = {}): string {
-  const { version, steps } = getAppTodoSteps(progress)
+  const checklist = getAppTodoSteps(progress)
+  if (checklist.path === 'builder')
+    return formatBuilderOnlyChecklist(appId, checklist, options)
+  const { version, steps } = checklist
   if (version === 4 && steps.length === 0)
     return `App: ${appId} — Todo list v4\nThis CLI does not support this OTA checklist version.`
   const done = steps.filter(step => step.status === 'done').length
@@ -239,8 +246,8 @@ export async function appTodo(appId: string | undefined, options: Partial<Option
       log.error(error.message)
     throw error
   }
-  const { version, steps } = getAppTodoSteps(progress)
-  const checks = version === 3 || (version === 4 && steps.length > 0) ? backgroundChecks : []
+  const { version, steps, path } = getAppTodoSteps(progress)
+  const checks = path !== 'builder' && (version === 3 || (version === 4 && steps.length > 0)) ? backgroundChecks : []
   if (checks.length) {
     const waiting = stdin.isTTY && stdout.isTTY ? spinner() : null
     const waitMessage = (seconds: number) => `Waiting ${seconds} seconds for background TODO list checks to finish`

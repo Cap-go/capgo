@@ -66,6 +66,7 @@ export interface MiddlewareKeyVariables {
     deliverPluginNotificationsInProcess?: boolean
     skipChannelSelfPostgresFallback?: boolean
     requireReadReplica?: boolean
+    deviceDataCollection?: import('./deviceDataCollection.ts').DeviceDataCollection
   }
 }
 

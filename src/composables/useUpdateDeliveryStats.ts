@@ -5,7 +5,7 @@ import { toast } from 'vue-sonner'
 import { defaultApiHost, useConsole } from '~/services/console'
 import { chartLabelCountForPeriodDays } from '~/services/date'
 
-export type UpdateDeliveryScope = 'app' | 'org' | 'platform'
+export type UpdateDeliveryScope = 'app' | 'org'
 
 export interface UpdateDeliveryStatsResponse {
   scope: UpdateDeliveryScope

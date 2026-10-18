@@ -25,7 +25,7 @@ describe('update delivery stats helpers', () => {
     expect(updateDeliveryStatsTestUtils.normalizePeriodDays(7.5)).toBeNull()
   })
 
-  it.concurrent('builds an unfiltered pairing query for platform (same actions as app/org)', () => {
+  it.concurrent('builds an unfiltered pairing query with the shared delivery actions', () => {
     const query = buildUpdateDeliveryTimingEventsCFQuery({
       start_date: '2026-07-01T00:00:00.000Z',
       end_date: '2026-07-02T00:00:00.000Z',
@@ -72,7 +72,7 @@ describe('update delivery stats helpers', () => {
     expect(result, JSON.stringify(result)).toEqual({ ok: true })
   }, 60_000)
 
-  it.concurrent('splits platform windows into UTC day chunks', () => {
+  it.concurrent('splits delivery windows into UTC day chunks', () => {
     const chunks = updateDeliveryStatsTestUtils.buildDeliveryDayChunks(
       dayjs.utc('2026-07-01T00:00:00.000Z'),
       dayjs.utc('2026-07-31T00:00:00.000Z'),
@@ -87,7 +87,7 @@ describe('update delivery stats helpers', () => {
     }
   })
 
-  it.concurrent('pairs midnight-crossing deliveries the same way for platform and app', () => {
+  it.concurrent('pairs midnight-crossing deliveries', () => {
     const periodStartMs = Date.parse('2026-07-02T00:00:00.000Z')
     const samples = updateDeliveryStatsTestUtils.buildDeliveriesFromEvents([
       {
@@ -118,23 +118,6 @@ describe('update delivery stats helpers', () => {
         duration_ms: 1500 + 60_000,
       },
     ])
-  })
-
-  it.concurrent('swallows partial chunk failures only for platform, and never caches them', () => {
-    const partial = [new Error('chunk-2')]
-    expect(updateDeliveryStatsTestUtils.resolveDeliveryChunkFailures(partial, 3, true)).toBe(1)
-    expect(() => updateDeliveryStatsTestUtils.resolveDeliveryChunkFailures(partial, 3, false))
-      .toThrow('chunk-2')
-
-    const allFailed = [new Error('a'), new Error('b')]
-    expect(() => updateDeliveryStatsTestUtils.resolveDeliveryChunkFailures(allFailed, 2, true))
-      .toThrow('a')
-    expect(() => updateDeliveryStatsTestUtils.resolveDeliveryChunkFailures(allFailed, 2, false))
-      .toThrow('a')
-
-    expect(updateDeliveryStatsTestUtils.shouldCacheUpdateDeliveryStats(10, 0)).toBe(true)
-    expect(updateDeliveryStatsTestUtils.shouldCacheUpdateDeliveryStats(10, 1)).toBe(false)
-    expect(updateDeliveryStatsTestUtils.shouldCacheUpdateDeliveryStats(0, 0)).toBe(false)
   })
 
   it.concurrent('recovers full percentiles when a day exceeds the AE row cap', async () => {
@@ -271,28 +254,6 @@ describe('update delivery stats helpers', () => {
     expect(truncatedOverview.p95_ms).toBe(100)
     expect(recoveredOverview.samples).toBe(30_000)
     expect(recoveredOverview.p95_ms).toBe(60_000)
-    expect(updateDeliveryStatsTestUtils.shouldCacheUpdateDeliveryStats(Number(recoveredOverview.samples), 0)).toBe(true)
-    expect(updateDeliveryStatsTestUtils.shouldCacheUpdateDeliveryStats(Number(truncatedOverview.samples), 1)).toBe(false)
-  })
-
-  it.concurrent('caps platform delivery period days at 90', () => {
-    expect(updateDeliveryStatsTestUtils.normalizePlatformPeriodDays(30)).toBe(30)
-    expect(updateDeliveryStatsTestUtils.normalizePlatformPeriodDays(90)).toBe(90)
-    expect(updateDeliveryStatsTestUtils.normalizePlatformPeriodDays(365)).toBe(90)
-  })
-
-  it.concurrent('builds an empty platform response instead of failing the chart', () => {
-    const response = updateDeliveryStatsTestUtils.buildEmptyUpdateDeliveryResponse({
-      labels: ['2026-07-01', '2026-07-02'],
-      days: 7,
-      start: '2026-07-01T00:00:00.000Z',
-      end: '2026-07-02T23:59:59.999Z',
-      scope: 'platform',
-    })
-    expect(response.scope).toBe('platform')
-    expect(response.overview.samples).toBe(0)
-    expect(response.daily.samples).toEqual([0, 0])
-    expect(response.daily.p50_ms).toEqual([null, null])
   })
 
   it.concurrent('keeps pairing AE queries unfiltered so start events remain available', () => {
@@ -312,7 +273,7 @@ describe('update delivery stats helpers', () => {
     expect(updateDeliveryStatsTestUtils.normalizeScope(undefined)).toBe('app')
     expect(updateDeliveryStatsTestUtils.normalizeScope('app')).toBe('app')
     expect(updateDeliveryStatsTestUtils.normalizeScope('org')).toBe('org')
-    expect(updateDeliveryStatsTestUtils.normalizeScope('platform')).toBe('platform')
+    expect(updateDeliveryStatsTestUtils.normalizeScope('platform')).toBeNull()
     expect(updateDeliveryStatsTestUtils.normalizeScope('unknown')).toBeNull()
   })
 

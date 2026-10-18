@@ -24,10 +24,13 @@ const supabaseStartExclude = env.PLAYWRIGHT_SUPABASE_EXCLUDE?.split(',').filter(
 const baseEnv = existsSync(sourceEnvPath) ? readFileSync(sourceEnvPath, 'utf8') : ''
 const baseEnvValues = parse(baseEnv)
 const overriddenEnv = [
+  ['ENV', env.ENV || 'local'],
   ['S3_ENDPOINT', `127.0.0.1:${supabaseConfig.ports.api}/storage/v1/s3`],
   ['STRIPE_SECRET_KEY', env.STRIPE_SECRET_KEY || 'sk_test_emulator'],
+  ['STRIPE_SECRET_KEY_US', env.STRIPE_SECRET_KEY_US || env.STRIPE_SECRET_KEY || 'sk_test_emulator'],
   ['STRIPE_API_BASE_URL', stripeApiBaseUrl],
   ['STRIPE_WEBHOOK_SECRET', env.STRIPE_WEBHOOK_SECRET || 'testsecret'],
+  ['STRIPE_WEBHOOK_SECRET_US', env.STRIPE_WEBHOOK_SECRET_US || env.STRIPE_WEBHOOK_SECRET || 'testsecret'],
   ['WEBAPP_URL', webAppUrl],
   ['ENV_NAME', 'capgo-api-local'],
   ['CONSOLE_AUTH_E2E', 'true'],

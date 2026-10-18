@@ -2,6 +2,7 @@
 import type { ChartData, ChartOptions, Plugin } from 'chart.js'
 import type { PropType } from 'vue'
 import type { TooltipClickHandler } from '~/services/chartTooltip'
+import type { DeviceDataCollection, DeviceDataCollectionKey } from '~/services/deviceDataCollection'
 import type { NativeActiveDevicesSummary, NativeDailyPlatformActive } from '~/services/nativeDeviceStats'
 import type { Organization } from '~/stores/organization'
 import { useDark } from '@vueuse/core'
@@ -16,6 +17,7 @@ import { useChartData } from '~/services/chartDataService'
 import { createTooltipConfig, todayLinePlugin, verticalLinePlugin } from '~/services/chartTooltip'
 import { useConsole } from '~/services/console'
 import { formatUtcDateParam, generateChartDayLabels, getChartDateRange, getLastNUtcDaysRange, normalizeToUtcStartOfDay } from '~/services/date'
+import { DEFAULT_DEVICE_DATA_COLLECTION } from '~/services/deviceDataCollection'
 import { formatNumberValue } from '~/services/formatLocale'
 import {
   calculateSummaryEvolutionPercent,
@@ -28,6 +30,7 @@ import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
 import { shouldShowDashboardDemoData } from '~/utils/dashboardDemoMode'
 import ChartCard from './ChartCard.vue'
+import DeviceDataCollectionGate from './DeviceDataCollectionGate.vue'
 import NativeDeviceMetricCard from './NativeDeviceMetricCard.vue'
 import NativePlatformTrendChart from './NativePlatformTrendChart.vue'
 import PeriodDaySelector from './PeriodDaySelector.vue'
@@ -56,6 +59,10 @@ const props = defineProps({
   usageKind: {
     type: String,
     default: 'bundle',
+  },
+  deviceDataCollection: {
+    type: Object as () => DeviceDataCollection,
+    default: () => ({ ...DEFAULT_DEVICE_DATA_COLLECTION }),
   },
   // 'chart' renders only the version chart: the page owns the title, the
   // shared period selector and the KPI tiles.
@@ -723,6 +730,7 @@ const iosActiveEvolution = computed(() => calculateSummaryEvolutionPercent(
   selectedPeriodPreviousActiveDevices.value?.ios,
 ))
 const showNativeKpis = computed(() => isNativeUsage.value && props.variant === 'full')
+const versionChartRequirements = computed<DeviceDataCollectionKey[]>(() => isNativeUsage.value ? ['version_build'] : [])
 const isThirtyDaySummaryLoading = computed(() => isFetchingThirtyDaySummary.value || (isLoading.value && isNativeUsage.value && (props.useBillingPeriod || periodDays.value !== 30)))
 
 const todayLineOptions = computed(() => {
@@ -1065,137 +1073,150 @@ watch(
       />
     </div>
 
-    <div v-if="showNativeKpis" class="flex flex-col gap-6">
-      <div>
-        <div class="mb-3">
-          <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-            {{ t('native-active-devices-last-30-days') }}
-          </h3>
-          <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            {{ t('native-active-devices-help') }}
-          </p>
-        </div>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <NativeDeviceMetricCard
-            :title="t('native-active-devices-android')"
-            :value="thirtyDayActiveDevices.android"
-            :subtitle="t('native-active-devices-last-30-days')"
-            :is-loading="isLoading || isThirtyDaySummaryLoading"
-            accent-class="text-emerald-600 dark:text-emerald-400"
-          />
-          <NativeDeviceMetricCard
-            :title="t('native-active-devices-ios')"
-            :value="thirtyDayActiveDevices.ios"
-            :subtitle="t('native-active-devices-last-30-days')"
-            :is-loading="isLoading || isThirtyDaySummaryLoading"
-            accent-class="text-[#119eff]"
-          />
-          <NativeDeviceMetricCard
-            :title="t('native-active-devices-total')"
-            :value="thirtyDayActiveDevices.total"
-            :subtitle="t('native-active-devices-last-30-days')"
-            :is-loading="isLoading || isThirtyDaySummaryLoading"
-          />
-        </div>
-      </div>
-
-      <div>
-        <div class="mb-3">
-          <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-            {{ t('native-active-devices-selected-period') }}
-          </h3>
-          <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
-            {{ t('native-platform-active-trend-help') }} ({{ selectedPeriodLabel }})
-          </p>
-        </div>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <NativeDeviceMetricCard
-            :title="t('native-active-devices-android')"
-            :value="selectedPeriodActiveDevices?.android"
-            :subtitle="selectedPeriodLabel"
-            :evolution="androidActiveEvolution"
-            :is-loading="isLoading"
-            accent-class="text-emerald-600 dark:text-emerald-400"
-          />
-          <NativeDeviceMetricCard
-            :title="t('native-active-devices-ios')"
-            :value="selectedPeriodActiveDevices?.ios"
-            :subtitle="selectedPeriodLabel"
-            :evolution="iosActiveEvolution"
-            :is-loading="isLoading"
-            accent-class="text-[#119eff]"
-          />
-          <NativeDeviceMetricCard
-            :title="t('native-active-devices-total')"
-            :value="selectedPeriodActiveDevices?.total"
-            :subtitle="selectedPeriodLabel"
-            :evolution="totalActiveEvolution"
-            :is-loading="isLoading"
-          />
-        </div>
-      </div>
-
-      <NativePlatformTrendChart
-        :daily-platform-active="selectedPeriodDailyPlatformActive"
-        :is-loading="isLoading"
-        :has-data="!!selectedPeriodDailyPlatformActive"
-        :is-demo-data="isDemoMode"
-      />
-    </div>
-
-    <div
-      data-testid="version-chart-range"
-      :data-from="currentRange ? formatUtcDateParam(currentRange.startDate) : undefined"
-      :data-to="currentRange ? formatUtcDateParam(currentRange.endDate) : undefined"
+    <DeviceDataCollectionGate
+      v-if="showNativeKpis"
+      :app-id="activeAppId"
+      :collection="props.deviceDataCollection"
+      :requires="['platform']"
     >
-      <ChartCard
-        :title="t(titleKey)"
-        :is-loading="isLoading"
-        :has-data="hasData"
-        :is-demo-data="isDemoMode"
-      >
-        <template #header>
-          <div v-if="props.variant === 'chart'" class="flex items-start justify-between w-full gap-3">
-            <h2 class="min-w-0 text-base font-semibold leading-tight text-slate-900 dark:text-white">
-              {{ t(titleKey) }}
-            </h2>
+      <div class="flex flex-col gap-6">
+        <div>
+          <div class="mb-3">
+            <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {{ t('native-active-devices-last-30-days') }}
+            </h3>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {{ t('native-active-devices-help') }}
+            </p>
           </div>
-          <div v-else class="flex w-full items-start justify-end">
-            <div class="flex max-w-[11rem] flex-col items-end text-right shrink-0">
-              <div
-                class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold text-white rounded-full shadow-lg whitespace-nowrap bg-cyan-500"
-              >
-                {{ latestVersionPercentageDisplay }}
-              </div>
-              <div
-                v-if="latestVersion"
-                class="font-bold leading-tight break-words dark:text-white text-slate-600"
-                :class="isNativeUsage ? 'text-xl sm:text-2xl' : 'text-3xl'"
-              >
-                {{ latestVersion.name }}
-              </div>
-              <div v-if="latestVersion" class="text-xs text-slate-500 dark:text-slate-400">
-                {{ latestVersionCountDisplay }} {{ t('devices') }}
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <NativeDeviceMetricCard
+              :title="t('native-active-devices-android')"
+              :value="thirtyDayActiveDevices.android"
+              :subtitle="t('native-active-devices-last-30-days')"
+              :is-loading="isLoading || isThirtyDaySummaryLoading"
+              accent-class="text-emerald-600 dark:text-emerald-400"
+            />
+            <NativeDeviceMetricCard
+              :title="t('native-active-devices-ios')"
+              :value="thirtyDayActiveDevices.ios"
+              :subtitle="t('native-active-devices-last-30-days')"
+              :is-loading="isLoading || isThirtyDaySummaryLoading"
+              accent-class="text-[#119eff]"
+            />
+            <NativeDeviceMetricCard
+              :title="t('native-active-devices-total')"
+              :value="thirtyDayActiveDevices.total"
+              :subtitle="t('native-active-devices-last-30-days')"
+              :is-loading="isLoading || isThirtyDaySummaryLoading"
+            />
+          </div>
+        </div>
+
+        <div>
+          <div class="mb-3">
+            <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+              {{ t('native-active-devices-selected-period') }}
+            </h3>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {{ t('native-platform-active-trend-help') }} ({{ selectedPeriodLabel }})
+            </p>
+          </div>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <NativeDeviceMetricCard
+              :title="t('native-active-devices-android')"
+              :value="selectedPeriodActiveDevices?.android"
+              :subtitle="selectedPeriodLabel"
+              :evolution="androidActiveEvolution"
+              :is-loading="isLoading"
+              accent-class="text-emerald-600 dark:text-emerald-400"
+            />
+            <NativeDeviceMetricCard
+              :title="t('native-active-devices-ios')"
+              :value="selectedPeriodActiveDevices?.ios"
+              :subtitle="selectedPeriodLabel"
+              :evolution="iosActiveEvolution"
+              :is-loading="isLoading"
+              accent-class="text-[#119eff]"
+            />
+            <NativeDeviceMetricCard
+              :title="t('native-active-devices-total')"
+              :value="selectedPeriodActiveDevices?.total"
+              :subtitle="selectedPeriodLabel"
+              :evolution="totalActiveEvolution"
+              :is-loading="isLoading"
+            />
+          </div>
+        </div>
+
+        <NativePlatformTrendChart
+          :daily-platform-active="selectedPeriodDailyPlatformActive"
+          :is-loading="isLoading"
+          :has-data="!!selectedPeriodDailyPlatformActive"
+          :is-demo-data="isDemoMode"
+        />
+      </div>
+    </DeviceDataCollectionGate>
+
+    <DeviceDataCollectionGate
+      :app-id="activeAppId"
+      :collection="props.deviceDataCollection"
+      :requires="versionChartRequirements"
+    >
+      <div
+        data-testid="version-chart-range"
+        :data-from="currentRange ? formatUtcDateParam(currentRange.startDate) : undefined"
+        :data-to="currentRange ? formatUtcDateParam(currentRange.endDate) : undefined"
+      >
+        <ChartCard
+          :title="t(titleKey)"
+          :is-loading="isLoading"
+          :has-data="hasData"
+          :is-demo-data="isDemoMode"
+        >
+          <template #header>
+            <div v-if="props.variant === 'chart'" class="flex items-start justify-between w-full gap-3">
+              <h2 class="min-w-0 text-base font-semibold leading-tight text-slate-900 dark:text-white">
+                {{ t(titleKey) }}
+              </h2>
+            </div>
+            <div v-else class="flex w-full items-start justify-end">
+              <div class="flex max-w-[11rem] flex-col items-end text-right shrink-0">
+                <div
+                  class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold text-white rounded-full shadow-lg whitespace-nowrap bg-cyan-500"
+                >
+                  {{ latestVersionPercentageDisplay }}
+                </div>
+                <div
+                  v-if="latestVersion"
+                  class="font-bold leading-tight break-words dark:text-white text-slate-600"
+                  :class="isNativeUsage ? 'text-xl sm:text-2xl' : 'text-3xl'"
+                >
+                  {{ latestVersion.name }}
+                </div>
+                <div v-if="latestVersion" class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ latestVersionCountDisplay }} {{ t('devices') }}
+                </div>
               </div>
             </div>
-          </div>
-        </template>
+          </template>
 
-        <div v-if="props.variant === 'chart'" class="flex flex-col w-full h-full gap-2">
-          <div class="relative flex-1 min-h-0">
-            <Line class="w-full h-full" :data="compactChart.data" :options="compactChartOptions" />
+          <div v-if="props.variant === 'chart'" class="flex flex-col w-full h-full gap-2">
+            <div class="relative flex-1 min-h-0">
+              <Line class="w-full h-full" :data="compactChart.data" :options="compactChartOptions" />
+            </div>
+            <!-- Legend under the chart so the chart keeps its height. -->
+            <ul class="flex flex-wrap justify-center text-xs gap-x-3 gap-y-1" data-testid="version-chart-legend">
+              <li v-for="item in compactChart.legend" :key="item.name" class="flex items-center gap-1.5" :title="`${item.devices} ${t('devices')}`">
+                <span class="inline-block w-2 h-2 rounded-full" :style="{ backgroundColor: item.color }" />
+                <span class="font-medium text-slate-700 dark:text-slate-200">{{ item.name }}</span>
+                <span class="tabular-nums text-slate-500 dark:text-slate-400">{{ item.share }}</span>
+              </li>
+            </ul>
           </div>
-          <!-- Legend under the chart so the chart keeps its height. -->
-          <ul class="flex flex-wrap justify-center text-xs gap-x-3 gap-y-1" data-testid="version-chart-legend">
-            <li v-for="item in compactChart.legend" :key="item.name" class="flex items-center gap-1.5" :title="`${item.devices} ${t('devices')}`">
-              <span class="inline-block w-2 h-2 rounded-full" :style="{ backgroundColor: item.color }" />
-              <span class="font-medium text-slate-700 dark:text-slate-200">{{ item.name }}</span>
-              <span class="tabular-nums text-slate-500 dark:text-slate-400">{{ item.share }}</span>
-            </li>
-          </ul>
-        </div>
-        <Line v-else class="h-full w-full" :data="processedChartData!" :options="chartOptions" :plugins="chartPlugins" />
-      </ChartCard>
-    </div>
+          <Line v-else class="h-full w-full" :data="processedChartData!" :options="chartOptions" :plugins="chartPlugins" />
+        </ChartCard>
+      </div>
+    </DeviceDataCollectionGate>
   </section>
 </template>
