@@ -131,7 +131,7 @@ window.fetch = async (input, init) => {
   const method = init?.method?.toUpperCase() ?? 'GET'
   if (url.pathname.endsWith('/users') && method === 'PATCH')
     state.userWrites.push(JSON.parse(String(init?.body)))
-  if ((url.pathname.endsWith('/apps') || url.pathname.endsWith('/rpc/mark_onboarding_feature_started') || url.pathname.includes('/app/')) && method !== 'GET' && method !== 'HEAD') {
+  if ((url.pathname.endsWith('/apps') || url.pathname.endsWith('/rpc/mark_onboarding_feature_started') || url.pathname.endsWith('/rpc/verify_getting_started') || url.pathname.includes('/app/')) && method !== 'GET' && method !== 'HEAD') {
     state.appWrites.push({
       method,
       body: init?.body ? JSON.parse(String(init.body)) : undefined,

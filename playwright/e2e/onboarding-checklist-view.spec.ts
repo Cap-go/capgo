@@ -76,6 +76,7 @@ for (const assignment of ['ota-only', 'builder-only']) {
       await page.goto(`${gettingStarted}?assignment=${assignment}&platform=android&checklistState=completed${parameter}`)
       await expect(page).toHaveURL(`/app/${appId}`)
       await expect(page.locator('[data-test="preview-app-dashboard"]')).toBeVisible()
+      expect(await page.evaluate(() => (window as any).onboardingSetupPreview.events)).toContain('getting-started-verified')
     })
   }
 

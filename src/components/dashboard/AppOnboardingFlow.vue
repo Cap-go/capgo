@@ -2592,7 +2592,7 @@ async function skipOnboardingSplash() {
 
 async function leaveSplashIfAlreadySetup() {
   const app = createdApp.value
-  if (!app)
+  if (!app || props.showChecklist)
     return false
   const { data } = await supabase.rpc('verify_getting_started', { p_app_id: app.app_id })
   if (data != null)
@@ -2600,7 +2600,7 @@ async function leaveSplashIfAlreadySetup() {
   const skip = data != null
     ? shouldSkipOnboardingResume(data as unknown)
     : shouldSkipOnboardingResume(app.onboarding)
-  if (!skip || props.showChecklist)
+  if (!skip)
     return false
   allowOnboardingDashboardExploration(onboardingUserId.value, app.app_id)
   await persistOnboardingProgress('completed')
