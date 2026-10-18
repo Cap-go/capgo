@@ -1117,6 +1117,7 @@ export interface AppOwnerPostgresResult {
   expose_metadata: boolean
   allow_device_custom_id: boolean
   block_provider_infra_requests: boolean
+  device_data_collection: unknown
 }
 
 export async function getAppOwnerPostgres(
@@ -1142,6 +1143,7 @@ export async function getAppOwnerPostgres(
         expose_metadata: schema.apps.expose_metadata,
         allow_device_custom_id: schema.apps.allow_device_custom_id,
         block_provider_infra_requests: schema.apps.block_provider_infra_requests,
+        device_data_collection: schema.apps.device_data_collection,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,

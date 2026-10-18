@@ -91,6 +91,7 @@ jobs:
       run_capgo: ${{ steps.set.outputs.capgo }}
       run_cli: ${{ steps.set.outputs.cli }}
       run_notifications: ${{ steps.set.outputs.notifications }}
+      release_fingerprint: ${{ steps.fingerprint.outputs.value }}
     steps:
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -103,6 +104,11 @@ jobs:
           # Keep a stable merge base for paths-filter on long-lived branches.
           fetch-depth: 0
           filter: blob:none
+
+      - name: Fingerprint tested source for release reuse
+        id: fingerprint
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        run: echo "value=$(node scripts/release-test-fingerprint.ts)" >> "$GITHUB_OUTPUT"
 
       - name: Detect changed paths
         if: github.event_name != 'workflow_call'
@@ -1680,3 +1686,74 @@ jobs:
           if [ "${RUNNER_ENVIRONMENT:-}" != "github-hosted" ]; then
             bun scripts/supabase-worktree.ts stop --no-backup || true
           fi
+
+  # Record which release scopes passed for this exact source so the main-branch
+  # release gate (bump_version.yml) can reuse the result instead of re-running
+  # identical suites. Same-repo PRs only; fork runs never produce reusable results.
+  record_release_tests:
+    needs:
+      - changes
+      - dead_code
+      - notifications_package
+      - lint_typecheck
+      - test_unit
+      - test_db
+      - test_backend
+      - test_backend_plugin
+      - test_backend_sql
+      - test_cloudflare
+      - test_cloudflare_plugin
+      - test_playwright
+      - cli_node_compatibility
+      - cli_typos
+      - cli_create_valid_zip_linux
+      - cli_check_posix_paths_windows
+      - cli_check_posix_paths_unix
+      - cli_check_posix_paths_macos
+      - cli_posix_paths_final
+      - cli_tests
+      - cli_capgo_integration
+      - published_cli_contract
+    if: ${{ always() && github.event_name == 'pull_request' && needs.changes.result == 'success' && needs.changes.outputs.release_fingerprint != '' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    name: Record release test result
+    permissions: {}
+    steps:
+      - name: Write tested scopes
+        env:
+          RUN_CAPGO: ${{ needs.changes.outputs.run_capgo }}
+          RUN_CLI: ${{ needs.changes.outputs.run_cli }}
+          RUN_NOTIFICATIONS: ${{ needs.changes.outputs.run_notifications }}
+        run: |
+          mkdir -p release-tests
+          for scope in capgo cli notifications; do
+            var="RUN_${scope^^}"
+            if [ "${!var}" = "true" ]; then
+              touch "release-tests/$scope"
+            fi
+          done
+      - name: Upload Capgo scope result
+        if: needs.changes.outputs.run_capgo == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-tests-capgo-${{ needs.changes.outputs.release_fingerprint }}
+          path: release-tests/capgo
+          retention-days: 7
+          overwrite: true
+      - name: Upload CLI scope result
+        if: needs.changes.outputs.run_cli == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-tests-cli-${{ needs.changes.outputs.release_fingerprint }}
+          path: release-tests/cli
+          retention-days: 7
+          overwrite: true
+      - name: Upload notifications scope result
+        if: needs.changes.outputs.run_notifications == 'true'
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-tests-notifications-${{ needs.changes.outputs.release_fingerprint }}
+          path: release-tests/notifications
+          retention-days: 7
+          overwrite: true

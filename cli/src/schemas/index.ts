@@ -1,3 +1,7 @@
+// Account
+export { accountSetOptionsSchema } from './account'
+export type { AccountProfile, AccountSetOptions } from './account'
+
 // App
 export { appDebugOptionsSchema, appOptionsSchema, appSettingOptionsSchema } from './app'
 export type { AppDebugOptions, AppOptions, AppSettingOptions } from './app'
@@ -69,8 +73,8 @@ export type { Compatibility, CompatibilityDetails, IncompatibilityReason, Native
 export type { CapacitorConfig, ExtConfigPairs } from './config'
 
 // Organization
-export { organizationAddOptionsSchema, organizationDeleteOptionsSchema, organizationSetOptionsSchema, passwordPolicyConfigSchema } from './organization'
-export type { OrganizationAddOptions, OrganizationDeleteOptions, OrganizationSetOptions, PasswordPolicyConfig } from './organization'
+export { organizationAddOptionsSchema, organizationDeleteOptionsSchema, organizationMemberOptionsSchema, organizationMemberRoleSchema, organizationSetOptionsSchema, passwordPolicyConfigSchema } from './organization'
+export type { OrganizationAddOptions, OrganizationDeleteOptions, OrganizationMemberOptions, OrganizationMemberRole, OrganizationSetOptions, PasswordPolicyConfig } from './organization'
 
 // SDK
 export {

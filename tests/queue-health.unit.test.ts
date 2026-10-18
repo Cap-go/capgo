@@ -79,7 +79,7 @@ describe('queue_health helpers', () => {
       },
       {
         task_type: 'function_queue',
-        target: ['on_version_update', 'admin_stats'],
+        target: ['on_version_update', 'cron_email'],
         hour_interval: 2,
       },
       {
@@ -90,7 +90,7 @@ describe('queue_health helpers', () => {
     ])
 
     expect(intervals.get('on_version_update')).toBe(10)
-    expect(intervals.get('admin_stats')).toBe(7200)
+    expect(intervals.get('cron_email')).toBe(7200)
     expect(intervals.has('ignored')).toBe(false)
   })
 

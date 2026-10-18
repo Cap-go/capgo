@@ -97,9 +97,9 @@ export function buildBuilderPayload(input: {
   const trimmedCacheKey = input.cacheKey?.trim()
 
   return {
-    priority: input.priority,
     // userId carries the org_id (anonymized owner) — kept for backwards compat.
     userId: input.orgId,
+    priority: input.priority,
     // actorUserId is the human user who triggered the build (apikey.user_id). The builder
     // uses it as the PostHog distinct_id so its build events join this same person.
     actorUserId: input.actorUserId,

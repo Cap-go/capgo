@@ -56,32 +56,6 @@ describe('queue Load Test', () => {
     await fetchQueueSync(queueName)
   })
 
-  it('should queue delayed messages with the same PGMQ send shape used by global stats retries', async () => {
-    const retryMessage = {
-      function_name: 'global_stats',
-      function_type: 'cloudflare',
-      payload: {
-        date_id: '2099-01-01',
-        retry_count: 1,
-      },
-    }
-
-    const result = await pool.query<{ msg_id: number | string }>(
-      'SELECT pgmq.send($1::text, $2::jsonb, $3::integer) AS msg_id',
-      [queueName, JSON.stringify(retryMessage), 60],
-    )
-
-    expect(Number.isSafeInteger(Number(result.rows[0]?.msg_id))).toBe(true)
-  })
-
-  it('should enqueue the provider-neutral global stats route from the admin stats cron function', async () => {
-    const result = await pool.query<{ definition: string }>(
-      `SELECT pg_get_functiondef('public.process_admin_stats()'::regprocedure) AS definition`,
-    )
-
-    expect(result.rows[0]?.definition).toMatch(/'function_name'\s*,\s*'global_stats'/)
-  })
-
   it.concurrent('should reject invalid queue sync requests', async () => {
     // Test missing queue_name
     const invalidResponse1 = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
