@@ -37,17 +37,11 @@ interface UpdateApp {
   need_onboarding?: boolean
   existing_app?: boolean
   block_provider_infra_requests?: boolean
-  allow_preview?: boolean
-  build_timeout_seconds?: number
-  default_upload_channel?: string
   device_data_collection?: unknown
   ios_store_url?: string | null
   android_store_url?: string | null
   onboarding?: unknown
 }
-
-export const MIN_BUILD_TIMEOUT_SECONDS = 300
-export const MAX_BUILD_TIMEOUT_SECONDS = 21600
 
 type AppSettings = Pick<Database['public']['Tables']['apps']['Update'], 'name' | 'icon_url' | 'retention' | 'expose_metadata' | 'allow_device_custom_id'
   | 'need_onboarding' | 'existing_app' | 'block_provider_infra_requests' | 'device_data_collection'
@@ -215,10 +209,6 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   }
   if (body.allow_preview !== undefined && typeof body.allow_preview !== 'boolean')
     throw quickError(400, 'invalid_allow_preview', 'allow_preview must be a boolean', { allow_preview: body.allow_preview })
-  if (body.build_timeout_seconds !== undefined
-    && (!Number.isInteger(body.build_timeout_seconds) || body.build_timeout_seconds < MIN_BUILD_TIMEOUT_SECONDS || body.build_timeout_seconds > MAX_BUILD_TIMEOUT_SECONDS)) {
-    throw quickError(400, 'invalid_build_timeout', `build_timeout_seconds must be an integer between ${MIN_BUILD_TIMEOUT_SECONDS} and ${MAX_BUILD_TIMEOUT_SECONDS}`, { build_timeout_seconds: body.build_timeout_seconds })
-  }
   if (body.default_upload_channel !== undefined && (typeof body.default_upload_channel !== 'string' || body.default_upload_channel.trim() === ''))
     throw quickError(400, 'invalid_default_upload_channel', 'default_upload_channel must be a channel name', { default_upload_channel: body.default_upload_channel })
 
@@ -335,23 +325,6 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     body.need_onboarding,
   ].some(value => value !== undefined)
 
-  if (body.default_upload_channel !== undefined) {
-    // app.update_settings was verified above; validate with the admin client so a
-    // caller without channel.read can still point the setting at an existing channel.
-    const { data: uploadChannel, error: uploadChannelError } = await supabaseAdmin(c)
-      .from('channels')
-      .select('id')
-      .eq('app_id', appId)
-      .eq('name', body.default_upload_channel)
-      .maybeSingle()
-    if (uploadChannelError || !uploadChannel) {
-      throw quickError(400, 'invalid_default_upload_channel', 'Default upload channel does not exist for this app', {
-        app_id: appId,
-        default_upload_channel: body.default_upload_channel,
-      })
-    }
-  }
-
   const settingsPayload: AppSettings = {
     name: body.name,
     icon_url: normalizedIcon ?? body.icon,
@@ -364,9 +337,6 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     need_onboarding: body.need_onboarding,
     existing_app: body.existing_app,
     block_provider_infra_requests: body.block_provider_infra_requests,
-    allow_preview: body.allow_preview,
-    build_timeout_seconds: body.build_timeout_seconds,
-    default_upload_channel: body.default_upload_channel,
     device_data_collection: deviceDataCollection,
     ios_store_url: body.ios_store_url,
     android_store_url: body.android_store_url,

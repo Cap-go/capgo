@@ -37,6 +37,7 @@ const { get } = await import('../supabase/functions/_backend/public/bundle/get.t
 function createContext() {
   return {
     json: (body: unknown, status = 200) => Response.json(body, { status }),
+    get: (key: string) => key === 'auth' ? { userId: 'user-1' } : undefined,
   } as any
 }
 

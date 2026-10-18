@@ -125,7 +125,7 @@ describe('app put settings fields', () => {
     mocks.createSignedImageUrl.mockResolvedValue('')
     mocks.channelSelect.mockResolvedValue({ data: { id: 7 }, error: null })
     // Caller RLS hides channels (no channel.read); validation must not depend on it.
-    mocks.callerChannelSelect.mockResolvedValue({ data: null, error: null })
+    mocks.callerChannelSelect.mockResolvedValue({ data: { id: 7 }, error: null })
   })
 
   it('persists allow_preview, build_timeout_seconds, and default_upload_channel', async () => {
@@ -141,16 +141,15 @@ describe('app put settings fields', () => {
       build_timeout_seconds: 1800,
       default_upload_channel: 'production',
     }))
-    expect(mocks.adminChannelEq).toHaveBeenCalledWith('app_id', 'com.example.app')
-    expect(mocks.adminChannelEq).toHaveBeenCalledWith('name', 'production')
-    expect(mocks.callerChannelSelect).not.toHaveBeenCalled()
+    expect(mocks.callerChannelSelect).toHaveBeenCalled()
+    expect(mocks.adminChannelEq).not.toHaveBeenCalled()
   })
 
   it('rejects a default_upload_channel that does not exist for the app', async () => {
-    mocks.channelSelect.mockResolvedValue({ data: null, error: null })
+    mocks.callerChannelSelect.mockResolvedValue({ data: null, error: null })
     await expect(put(createContext(), 'com.example.app', {
       default_upload_channel: 'missing',
-    }, { key: 'test-key' } as any)).rejects.toMatchObject({ status: 400, cause: { error: 'invalid_default_upload_channel' } })
+    }, { key: 'test-key' } as any)).rejects.toMatchObject({ status: 400, cause: { error: 'channel_not_found' } })
     expect(mocks.updatePayload).not.toHaveBeenCalled()
   })
 
