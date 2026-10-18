@@ -137,7 +137,7 @@ AS $$
   SELECT COALESCE(current_plan.native_build_queue_priority, solo_plan.native_build_queue_priority, 10)
   FROM public.orgs AS o
   LEFT JOIN public.stripe_info AS si ON o.customer_id = si.customer_id
-  LEFT JOIN public.plans AS current_plan ON si.product_id = current_plan.stripe_id
+  LEFT JOIN public.plans AS current_plan ON si.product_id IN (current_plan.stripe_id, current_plan.stripe_id_us)
   LEFT JOIN public.plans AS solo_plan ON solo_plan.name = 'Solo'
   WHERE o.id = p_org_id
   LIMIT 1;
@@ -184,7 +184,7 @@ BEGIN
     p.native_build_queue_priority
   FROM public.orgs o
   JOIN public.stripe_info si ON o.customer_id = si.customer_id
-  JOIN public.plans p ON si.product_id = p.stripe_id
+  JOIN public.plans p ON si.product_id IN (p.stripe_id, p.stripe_id_us)
   WHERE o.id = orgid;
 END;
 $$;
