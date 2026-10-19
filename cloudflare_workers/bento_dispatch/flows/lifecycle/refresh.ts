@@ -163,7 +163,8 @@ export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: An
       const saved = await db.query( // NOSONAR -- This revision fence must finish before dependent evidence writes on the pinned transaction.
         `UPDATE public.bento_lifecycle_journeys SET state = $4::jsonb, candidate = $5::jsonb,
       next_evaluation_at = $7::timestamptz, refresh_claim_until = NULL, refresh_claim_token = NULL
-      WHERE org_id = $1::uuid AND product = $2 AND revision = $3 AND refresh_claim_token = $6::uuid RETURNING org_id`, [input.orgId, input.product, fresh.revision, JSON.stringify(state), JSON.stringify(candidate), token, nextAt],
+      WHERE org_id = $1::uuid AND product = $2 AND revision = $3 AND refresh_claim_token = $6::uuid RETURNING org_id`,
+        [input.orgId, input.product, fresh.revision, JSON.stringify(state), JSON.stringify(candidate), token, nextAt],
       )
       if (!saved.rowCount) {
         await db.query('ROLLBACK')
