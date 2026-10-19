@@ -39,6 +39,7 @@ import { appendInternalLog, getInternalLogPath, startInternalLog } from '../supp
 import { uploadSupportLogs } from '../support/support-upload'
 import { canPromptInteractively, consoleWebUrl, createSupabaseClient, defaultApiHost, findBuildCommandForProjectType, findMainFile, findMainFileForProjectType, findProjectType, findRoot, findSavedKeySilent, formatError, getAllPackagesDependencies, getAppId, getBundleVersion, getConfig, getConfigForWrite, getLocalConfig, getNativeProjectResetAdvice, getOrganizationListWithPermission, getPackageScripts, getPMAndCommand, hasCliPermission, PACKNAME, projectIsMonorepo, resolveUserIdFromApiKey, setPMAndCommand, updateConfigbyKey, updateConfigUpdater, validateIosUpdaterSync } from '../utils'
 import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-conflict'
+import { readBuilderOnlyInitAssignment, tryBuilderOnlyInit } from './builder-setup'
 import { loginInitInBrowser, shouldStartInitBrowserLogin } from './browser-login'
 import { selectOnboardingChannel } from './channel-selection'
 import { createMissingExecutableError, getAvailablePackageManagers, getMissingPackageManagerExecutable, getPackageManagerInfo, preparePackageManagerCommandEnvironment, probeExecutable, probePackageManagerCommand, resolveExecutableProbeError, waitForCommandResult } from './command-execution'
@@ -2214,6 +2215,9 @@ async function maybeReusePendingOnboardingApp(
   }
 
   const selectedAppId = selectedApp.app_id
+  if (await readBuilderOnlyInitAssignment(selectedAppId, { ...options, apikey }, undefined, pLog.warn)) {
+    return { appId: selectedAppId, pendingApp: selectedApp, reusedPendingApp: false, builderOnly: true }
+  }
   pLog.info(`Using pending onboarding app ${selectedAppId}`)
 
   if (findNearestCapacitorConfig(cwd())) {
@@ -5448,10 +5452,31 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   flushDeferredCommandInvocation(options.apikey)
   activeInitTelemetry?.setAuth('', options.apikey)
 
+  const handoffBuilderOnlySetup = (targetAppId: string | undefined, projectDir = initialCwd) => tryBuilderOnlyInit(targetAppId, options, {
+    warn: pLog.warn,
+    beforeLaunch: async () => {
+      await finishActiveCliReplay()
+      stopInitInkSession({ text: 'Continuing with the assigned Builder checklist.', tone: 'green' })
+    },
+    launch: async (builderOptions) => {
+      const { onboardingBuilderCommand } = await import('../build/onboarding/command')
+      await withTemporaryCwd(projectDir, () => onboardingBuilderCommand(builderOptions))
+    },
+  })
+  const initialProjectDir = packageJsonPath ? dirname(packageJsonPath) : initialCwd
+  const assignmentConfig = await withTemporaryCwd(initialProjectDir, () => getConfig(true)).catch(() => undefined)
+  const assignmentAppId = appId || (assignmentConfig ? getAppId(undefined, assignmentConfig.config) : undefined)
+  if (await handoffBuilderOnlySetup(assignmentAppId, initialProjectDir))
+    return
+
   let resumed = await tryResumeOnboarding(options.apikey, initialTargets, initialCwd, supabase, {
     supaHost: options.supaHost,
     supaAnon: options.supaAnon,
   })
+  // A saved OTA checkpoint can target a different app from the local config.
+  // Recheck its authoritative assignment before resuming any OTA work.
+  if (resumed?.appId && await handoffBuilderOnlySetup(resumed.appId, globalPathToPackageJson ? dirname(globalPathToPackageJson) : initialProjectDir))
+    return
   await activeInitTelemetry?.recordRunStarted()
   let stepToSkip = resumed?.stepDone ?? 0
 
@@ -5686,6 +5711,8 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   if (appId)
     globalAppId = appId
   activeInitTelemetry?.setScope(appId)
+  if (pendingOnboardingSelection.builderOnly && await handoffBuilderOnlySetup(appId, selectedProjectDir))
+    return
   await ensureCapacitorProjectReady(orgId, options.apikey, appId, pendingOnboardingSelection.pendingApp)
   selectedPackageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
   selectedProjectDir = dirname(selectedPackageJsonPath)
@@ -5719,6 +5746,8 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
       appId = await addAppStep(organization, options.apikey, appId, options)
       globalAppId = appId
       activeInitTelemetry?.setScope(appId)
+      if (await handoffBuilderOnlySetup(appId, selectedProjectDir))
+        return
       markStepDone(1)
     }
 

@@ -40,7 +40,7 @@ describe('cleanup Discord aggregation', () => {
       expect(db.query.mock.calls.some(([sql]) => sql === 'commit')).toBe(true)
       const body = JSON.parse(String(init.body))
       expect(body).toEqual({ content: 'R2 cleanup encountered a problem: referenced objects skipped (3), database completion updates failed (1)', allowed_mentions: { parse: [] } })
-      expect(init.redirect).toBe('error')
+      expect(init.redirect).toBe('manual')
       expect(init.signal).toBeInstanceOf(AbortSignal)
       return new Response(null, { status: 204 })
     })

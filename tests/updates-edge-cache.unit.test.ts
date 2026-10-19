@@ -555,7 +555,7 @@ describe('edge-cached plugin reads', () => {
     const c = makeContext()
     const { drizzle } = fakeDrizzle(new Error('statement timeout'))
     await expect(getAppVersionWithEdgeCache(c, 'com.example.app', '1.0.0', drizzle)).resolves.toBeNull()
-    await expect(getAppOwnerWithEdgeCache(c, 'com.example.app', drizzle, ['mau'])).resolves.toEqual({ value: null, hit: false })
+    await expect(getAppOwnerWithEdgeCache(c, 'com.example.app', drizzle, ['mau'])).resolves.toEqual({ value: null, hit: false, lookupFailed: true })
     await expect(getChannelByNameWithEdgeCache(c, 'com.example.app', 'production', drizzle)).resolves.toBeNull()
     await expect(getCompatibleChannelsWithEdgeCache(c, 'com.example.app', 'ios', false, true, drizzle)).resolves.toEqual([])
     expect(cache.put).not.toHaveBeenCalled()

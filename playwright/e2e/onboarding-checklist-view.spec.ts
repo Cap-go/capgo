@@ -87,6 +87,30 @@ for (const assignment of ['ota-only', 'builder-only']) {
   })
 }
 
+for (const showChecklist of [false, true]) {
+  test(`preserves dual checklist tabs and exit behavior with checklist viewing ${showChecklist ? 'enabled' : 'disabled'}`, async ({ page }) => {
+    await page.goto(`${gettingStarted}?assignment=both-builder&platform=android&checklistState=pending&otaProgress=1&builderProgress=android${showChecklist ? '&showChecklist=1' : ''}`)
+    await expect(page.getByRole('tab', { name: 'Builder', exact: true })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('[data-test="builder-step-start_setup"]')).toHaveAttribute('data-status', 'done')
+    await page.getByRole('tab', { name: 'Live Updates', exact: true }).click()
+    await expect(page.locator('[data-test="app-onboarding-cli-step-login_cli_mcp"]')).toHaveAttribute('data-status', 'done')
+    if (!showChecklist)
+      await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites.some((write: any) => write.body?.p_feature_key === 'ota'))).toBe(true)
+    await page.getByRole('tab', { name: 'Builder', exact: true }).click()
+    await page.getByRole('button', { name: 'Explore dashboard', exact: true }).click()
+    await expect(page.locator('[data-test="preview-app-dashboard"]')).toBeVisible()
+    const state = await page.evaluate(() => (window as any).onboardingSetupPreview.state)
+    expect(state.appWrites.some((write: any) => write.body?.onboarding?.outcome === 'switched_to_manual')).toBe(false)
+    if (showChecklist) {
+      expect(state.appWrites).toEqual([])
+      expect(state.userWrites).toEqual([])
+    }
+    else {
+      expect(state.appWrites.some((write: any) => write.body?.p_feature_key === 'builder')).toBe(true)
+    }
+  })
+}
+
 test('keeps unavailable apps behind the existing not-found page', async ({ page }) => {
   await page.goto(`${gettingStarted}?showChecklist=1&unavailable=1`)
   await expect(page.getByRole('heading', { name: 'App not found', exact: true })).toBeVisible()

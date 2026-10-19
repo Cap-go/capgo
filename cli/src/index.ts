@@ -1070,7 +1070,7 @@ build
   .summary('Configure build credentials interactively')
   .description('Set up build credentials interactively (iOS: certificates + profiles automated; Android: keystore + Google OAuth provisions GCP service account and Play Console invite)')
   .option('-a, --apikey <apikey>', 'API key to link to your account')
-  .option('-p, --platform <platform>', 'Platform to onboard (ios or android). If omitted, auto-detects when only one native folder exists; prompts otherwise.')
+  .option('-p, --platform <platform>', 'Platform to onboard (ios or android). If omitted, uses the saved platform for Builder-only checklists, then auto-detects a single native folder or prompts.')
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
   .option('--no-analytics', 'Disable build onboarding analytics and terminal replay for this run')
