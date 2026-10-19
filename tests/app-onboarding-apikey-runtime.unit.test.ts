@@ -148,8 +148,6 @@ async function reachIconStep(container: Element) {
   await nextTick()
 
   await click(container, '[data-test="app-onboarding-continue"]')
-  await vi.waitFor(() => expect(container.querySelector('[data-test="app-onboarding-skip-app-id"]')).not.toBeNull())
-  await click(container, '[data-test="app-onboarding-skip-app-id"]')
   await vi.waitFor(() => expect(container.textContent).toContain('app-onboarding-icon-step-title'))
 }
 
