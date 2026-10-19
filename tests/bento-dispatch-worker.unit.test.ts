@@ -32,6 +32,7 @@ vi.mock('../supabase/functions/_backend/utils/bento.ts', async importOriginal =>
 }))
 
 const job = { version: 1, evaluationKey: 'org:invite_existing_user_reminder_1', runId: '11111111-1111-4111-8111-111111111111' }
+const controller = { scheduledTime: Date.UTC(2026, 0, 1, 10) } as ScheduledController
 function environment(): DispatchEnv {
   return { HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'postgres://local' } as Hyperdrive, DISPATCH_QUEUE: { send: vi.fn() } as never, POSTHOG_QUEUE: { send: vi.fn() }, BENTO_PUBLISHABLE_KEY: 'configured', BENTO_SECRET_KEY: 'configured', BENTO_SITE_UUID: 'configured', WEBAPP_URL: 'https://console.example.com' }
 }
@@ -52,14 +53,14 @@ afterEach(() => vi.restoreAllMocks())
 describe('dedicated evaluation Worker', () => {
   it('sweeps audits independently and still schedules evaluations during analytics failure', async () => {
     store.relayPendingAudit.mockRejectedValue(new Error('unavailable'))
-    await scheduleDispatch({} as ScheduledController, environment())
+    await scheduleDispatch(controller, environment())
     expect(publish).toHaveBeenCalledOnce()
     expect(db.end).toHaveBeenCalledOnce()
   })
   it('schedules from Worker configuration without a separate activation setting or Vault access', async () => {
     db.query.mockRejectedValue(new Error('Runtime settings are unavailable'))
-    await scheduleDispatch({} as ScheduledController, environment())
-    expect(publish).toHaveBeenCalledOnce()
+    await scheduleDispatch(controller, environment())
+    expect(publish).toHaveBeenCalledExactlyOnceWith(expect.anything(), store, expect.anything(), controller.scheduledTime)
     expect(db.query).not.toHaveBeenCalled()
   })
   it.each(['BENTO_PUBLISHABLE_KEY', 'BENTO_SECRET_KEY', 'BENTO_SITE_UUID', 'WEBAPP_URL'] as const)('reports missing %s instead of silently pausing or claiming business work', async (key) => {
