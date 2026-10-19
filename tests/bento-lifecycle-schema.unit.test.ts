@@ -401,9 +401,10 @@ describe('lifecycle private schema and bounded lookup indexes', () => {
 
   it('keeps original-creator, due and per-person/org history lookups indexed', async () => {
     const indexes = (await db.query(`SELECT indexname, indexdef FROM pg_catalog.pg_indexes WHERE schemaname = 'public' AND indexname IN
-      ('org_lifecycle_original_creator','bento_lifecycle_due','bento_lifecycle_dispatch_org','bento_lifecycle_dispatch_person')`)).rows
-    expect(indexes).toHaveLength(4)
+      ('org_lifecycle_original_creator','bento_lifecycle_due','bento_lifecycle_candidates','bento_lifecycle_dispatch_org','bento_lifecycle_dispatch_person')`)).rows
+    expect(indexes).toHaveLength(5)
     expect(indexes.find(row => row.indexname === 'org_lifecycle_original_creator').indexdef).toContain('(original_creator_id, org_id)')
+    expect(indexes.find(row => row.indexname === 'bento_lifecycle_candidates').indexdef).toContain('(product, next_evaluation_at, org_id) WHERE (candidate IS NOT NULL)')
     expect(indexes.find(row => row.indexname === 'bento_lifecycle_dispatch_person').indexdef).toContain('recipientId')
     expect(indexes.find(row => row.indexname === 'bento_lifecycle_dispatch_org').indexdef).toContain('orgId')
   })

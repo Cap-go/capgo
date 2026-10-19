@@ -21,6 +21,9 @@ CREATE TABLE public.bento_lifecycle_journeys (
   PRIMARY KEY (org_id, product)
 );
 CREATE INDEX bento_lifecycle_due ON public.bento_lifecycle_journeys(next_evaluation_at, org_id, product);
+-- Recurring selection walks only populated candidates for one product.
+CREATE INDEX bento_lifecycle_candidates ON public.bento_lifecycle_journeys(product, next_evaluation_at, org_id)
+  WHERE candidate IS NOT NULL;
 CREATE TABLE public.bento_lifecycle_app_observations (
   org_id uuid NOT NULL REFERENCES public.orgs(id) ON DELETE CASCADE,
   product text NOT NULL CHECK (product IN ('ota', 'builder')),

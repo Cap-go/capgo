@@ -153,13 +153,15 @@ export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: An
       state.appLessSince = null
     fresh.input.state = state
     const candidate = evaluateLifecycle(fresh.input)
+    // SQL NULL keeps idle journeys out of the candidate-selection index.
+    const storedCandidate = candidate === null ? null : JSON.stringify(candidate)
     // Fence changes that committed while gathering analytics. A late response
     // cannot write old-incarnation context into a replacement journey.
     await db.query('BEGIN')
     try {
       const saved = await db.query(`UPDATE public.bento_lifecycle_journeys SET state = $4::jsonb, candidate = $5::jsonb,
       next_evaluation_at = $7::timestamptz, refresh_claim_until = NULL, refresh_claim_token = NULL
-      WHERE org_id = $1::uuid AND product = $2 AND revision = $3 AND refresh_claim_token = $6::uuid RETURNING org_id`, [input.orgId, input.product, fresh.revision, JSON.stringify(state), JSON.stringify(candidate), token, nextLifecycleEvaluation(fresh.input, candidate)])
+      WHERE org_id = $1::uuid AND product = $2 AND revision = $3 AND refresh_claim_token = $6::uuid RETURNING org_id`, [input.orgId, input.product, fresh.revision, JSON.stringify(state), storedCandidate, token, nextLifecycleEvaluation(fresh.input, candidate)])
       if (!saved.rowCount) {
         await db.query('ROLLBACK')
         continue

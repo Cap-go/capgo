@@ -219,6 +219,23 @@ lookup returned one row, used `org_lifecycle_original_creator`, `orgs_pkey` and
 zero reads in embedded PostgreSQL. These are fixture measurements, not
 production-machine latency.
 
+Recurring candidate selection has a separate partial index on
+`bento_lifecycle_journeys(product, next_evaluation_at, org_id) WHERE candidate IS NOT NULL`.
+The refresher stores an absent candidate as SQL `NULL`; JSON `null` would still
+enter that index. The recurring-selection test distinguishes both values in SQL
+and runs the real refresher to verify the stored value becomes SQL `NULL`.
+It explains and executes the actual `findEligibleUsers` SQL, including its joins,
+sibling arbitration, ordering and limit, with the normal PostgreSQL planner over
+100,000 users/organizations and 200,000 journeys. The fixture has eight eligible
+OTA candidates, three rejected OTA candidates (accepted, exhausted and expired),
+32 Builder candidates and otherwise idle rows. Separate phases cover only
+rejected OTA candidates, Builder-only candidates and no candidates. Each plan
+uses the candidate index with a product condition and avoids sequential scans
+of the large journey/user/organization tables. This is independent of the
+creator-enrollment proof above. The index removes idle-cohort scanning; `LIMIT 20`
+does not cap how many populated candidates rejected by the other predicates
+may need examination.
+
 Each cron leases at most 20 due organization/product rows through the due-time
 index and SKIP LOCKED. Tokens and revisions fence expired refreshes; observation
 IDs and state updates commit together. Lifecycle handlers resolve/send
