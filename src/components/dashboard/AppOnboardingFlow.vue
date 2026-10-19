@@ -1234,7 +1234,6 @@ function resetStoreImportState() {
   storeAppIdLookupFailed.value = false
   isImportingStore.value = false
   isStoreImportOpen.value = false
-  isAppIdAdvancedOpen.value = false
   isStoreIconImportOpen.value = false
 }
 
@@ -1700,12 +1699,12 @@ function onAppIdInput(event: Event) {
   manualAppId.value = (event.target as HTMLInputElement).value
   appIdFeedback.value = ''
   appIdSuggestions.value = []
-  detailsFieldTracker.schedule('onboarding_app_id_entered', 'app_id', 'app_id', manualAppId.value)
+  detailsFieldTracker.schedule('onboarding_app_id_entered', 'app_id', 'app_icon', manualAppId.value)
 }
 
 function onStoreUrlInput(event: Event) {
   storeAppIdLookupFailed.value = false
-  detailsFieldTracker.schedule('onboarding_store_url_entered', 'store_url', 'app_id', (event.target as HTMLInputElement).value)
+  detailsFieldTracker.schedule('onboarding_store_url_entered', 'store_url', 'app_icon', (event.target as HTMLInputElement).value)
 }
 
 function onIconStoreUrlInput(event: Event) {
