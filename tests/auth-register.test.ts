@@ -31,7 +31,7 @@ async function postRegister(body: Record<string, unknown>) {
   })
 }
 
-describe('POST /auth/register', () => {
+describe('pOST /auth/register', () => {
   it('creates a user and returns session tokens', async () => {
     const payload = buildRegisterPayload()
     const response = await postRegister(payload)
@@ -68,6 +68,34 @@ describe('POST /auth/register', () => {
       registration_os: payload.registration_os,
       registration_browser: payload.registration_browser,
     })
+  })
+
+  it.concurrent('creates a user without first or last name', async () => {
+    const payload = buildRegisterPayload({ first_name: undefined, last_name: undefined })
+    const response = await postRegister(payload)
+    expect(response.status).toBe(200)
+
+    const body = await response.json() as {
+      user: { id: string }
+      session: { access_token: string, refresh_token: string }
+    }
+    createdUserIds.push(body.user.id)
+    expect(body.session.access_token).toBeTruthy()
+    expect(body.session.refresh_token).toBeTruthy()
+
+    const admin = getSupabaseClient()
+    const { data: profile, error: profileError } = await admin
+      .from('users')
+      .select('email, first_name, last_name')
+      .eq('id', body.user.id)
+      .single()
+    expect(profileError).toBeNull()
+    expect(profile).toEqual({ email: payload.email, first_name: '', last_name: '' })
+
+    const { data: authUser, error: authUserError } = await admin.auth.admin.getUserById(body.user.id)
+    expect(authUserError).toBeNull()
+    expect(authUser.user?.user_metadata).not.toHaveProperty('first_name')
+    expect(authUser.user?.user_metadata).not.toHaveProperty('last_name')
   })
 
   it('returns invalid_request for malformed payloads', async () => {
