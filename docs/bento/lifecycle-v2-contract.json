@@ -1,5 +1,5 @@
 {
-  "version": "new-emails-v2-2026-10-17",
+  "version": "new-emails-v2-2026-10-19",
   "readiness_setting": "BENTO_LIFECYCLE_V2_SENDER_CONTRACT",
   "required_string_fields": [
     "dispatch_id",
@@ -16,6 +16,7 @@
     "next_action_explanation",
     "continue_url",
     "cta_label",
+    "cta_destination_hint",
     "ai_setup_url",
     "org_preferences_url",
     "pause_url",

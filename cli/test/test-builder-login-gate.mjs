@@ -220,7 +220,7 @@ console.log('Builder browser retry and cancellation passed')
 
 console.log('Builder small-terminal browser fallback passed')
 
-function renderShellForLogin({ initialPlatform, list = async () => [{ app_id: 'com.example.builderlogin', name: 'Builder Login' }] } = {}) {
+function renderShellForLogin({ initialPlatform, resolveChecklistPlatform, list = async () => [{ app_id: 'com.example.builderlogin', name: 'Builder Login' }] } = {}) {
   const stdout = makeStream(100, 50)
   const stdin = makeStdin()
   const resolved = []
@@ -253,6 +253,7 @@ function renderShellForLogin({ initialPlatform, list = async () => [{ app_id: 'c
     },
     journeyId: 'bj_login-test',
     initialPlatform,
+    resolveChecklistPlatform,
     onResolvePlatform: (platform) => {
       resolved.push(platform)
       instance?.unmount()
@@ -302,3 +303,22 @@ console.log('Builder shell authenticates before platform choice and auto-load')
 }
 
 console.log('Builder shell verifies the app before --platform auto-load')
+
+{
+  let finishAssignment
+  const assignment = new Promise(resolve => (finishAssignment = resolve))
+  const lookups = []
+  const shell = renderShellForLogin({ initialPlatform: 'ios', resolveChecklistPlatform: async (key, appId) => {
+    lookups.push({ key, appId })
+    return assignment
+  } })
+  shell.finishValidation()
+  await waitFor(() => lookups.length === 1, 'verified app checklist lookup')
+  assert.deepEqual(shell.resolved, [], 'platform load waits for the authoritative selected app')
+  assert.deepEqual(lookups, [{ key: 'existing-test-key', appId: 'com.example.builderlogin' }])
+  finishAssignment('android')
+  await waitFor(() => shell.resolved.length === 1, 'saved Builder-only platform')
+  assert.deepEqual(shell.resolved, ['android'], 'saved Android selection overrides inferred iOS directory')
+  await stop(shell)
+}
+console.log('Builder shell waits for the selected app assignment before resuming its saved platform')

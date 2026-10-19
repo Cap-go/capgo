@@ -319,6 +319,8 @@ describe('hosted MCP OAuth helpers', () => {
       .toEqual(['https://chatgpt.com/connector_platform_oauth_redirect'])
     expect(getPinnedClientMetadata('https://connect.smithery.ai/.well-known/oauth-client')?.redirect_uris)
       .toEqual(['https://connect.smithery.ai/oauth/callback'])
+    expect(getPinnedClientMetadata('https://mcp.so/api/mcp-servers/oauth/client-metadata')?.redirect_uris)
+      .toEqual(['https://mcp.so/api/mcp-servers/oauth/callback'])
     expect(getPinnedClientMetadata('https://app.example/oauth/client.json')).toBeNull()
     expect(base64UrlEncode(new Uint8Array([251, 255]))).toBe('-_8')
   })

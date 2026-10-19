@@ -16,7 +16,7 @@ import { clearWebsitePaidUserCookie } from '~/services/websiteAuthCookie'
 import { useMainStore } from '~/stores/main'
 import { isPendingOrganizationInvite, useOrganizationStore } from '~/stores/organization'
 import { shouldSkipOnboardingResume } from '~/utils/appOnboardingProgress'
-import { lifecycleOrganizationTarget } from '~/utils/lifecycleOrganizationLink'
+import { isLifecycleUnscopedSelection, lifecycleOrganizationTarget } from '~/utils/lifecycleOrganizationLink'
 import { getOnboardingResumeRedirect, isNewOnboardingUser } from '~/utils/onboardingRedirect'
 import { hasPendingInviteSkip } from '~/utils/pendingInviteSkip'
 import { validateRedirectPath } from '~/utils/safeRedirect'
@@ -266,6 +266,14 @@ async function guard(
       return null
     if (!organizationsLoaded)
       return null
+    // Let an authorized email resolve its exact app or explicit selection.
+    // The ordinary resume shortcut must not silently choose another app.
+    const lifecycleDestination = to.path === '/apps' || to.path === '/app/new'
+      || (to.name === '/app/[app].getting-started' && to.query.lifecycleSetup === '1')
+    if (isLifecycleUnscopedSelection(to.path, to.query)
+      || (lifecycleDestination && lifecycleOrganizationTarget(to.query, organizationStore.organizations))) {
+      return null
+    }
     if (!isNewOnboardingUser(sessionUser?.created_at))
       return null
 
@@ -383,9 +391,9 @@ async function guard(
       })
     }
 
-    const lifecycleTarget = lifecycleOrganizationTarget(to.query, organizationsLoaded ? organizationStore.organizations : [])
+    const lifecycleTarget = isLifecycleUnscopedSelection(to.path, to.query) ? undefined : lifecycleOrganizationTarget(to.query, organizationsLoaded ? organizationStore.organizations : [])
     if (lifecycleTarget === null)
-      return next('/apps')
+      return next({ path: '/apps', query: { source: 'capgo_lifecycle', lifecycleSelect: '1' } })
     if (lifecycleTarget)
       organizationStore.setCurrentOrganization(lifecycleTarget)
 
@@ -452,9 +460,9 @@ async function guard(
       })
     }
 
-    const lifecycleTarget = lifecycleOrganizationTarget(to.query, organizationsLoaded ? organizationStore.organizations : [])
+    const lifecycleTarget = isLifecycleUnscopedSelection(to.path, to.query) ? undefined : lifecycleOrganizationTarget(to.query, organizationsLoaded ? organizationStore.organizations : [])
     if (lifecycleTarget === null)
-      return next('/apps')
+      return next({ path: '/apps', query: { source: 'capgo_lifecycle', lifecycleSelect: '1' } })
     if (lifecycleTarget)
       organizationStore.setCurrentOrganization(lifecycleTarget)
 

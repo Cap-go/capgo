@@ -6,7 +6,7 @@ import { lifecycleBranch } from './payload.ts'
 import { trialWindows } from './trial.ts'
 import { DAY, HOUR, iso, ms } from './types.ts'
 
-export const LIFECYCLE_MONITOR_POLICY = 'new-emails-v2-2026-10-17'
+export const LIFECYCLE_MONITOR_POLICY = contract.version
 const lifecycle = (user: EligibleUser) => user.flowKey.startsWith('lifecycle:v2:')
 
 async function checksum(value: string) {
@@ -150,19 +150,27 @@ function validateSnapshotIdentity(user: EligibleUser, event: DispatchRecord, pay
   }
 }
 
+function validateSnapshotUrl(value: string) {
+  const url = new URL(value)
+  if (url.protocol !== 'https:' || url.username || url.password || url.hash)
+    throw new Error('Unsafe lifecycle snapshot URL')
+  for (const [name, value] of url.searchParams) {
+    if (name === 'oid' || name === 'source')
+      continue
+    if (name === 'lifecycleSetup' && value === '1')
+      continue
+    throw new Error('Unsafe lifecycle snapshot URL')
+  }
+}
+
 function snapshotPersonalization(payload: BentoEvent) {
   const data: Record<string, string | boolean> = {}
   for (const key of [...contract.required_string_fields].sort((left, right) => left.localeCompare(right, 'en'))) {
     const value = payload.data[key]
     if (typeof value !== 'string' || value.length > 16_384)
       throw new Error('Invalid lifecycle snapshot field')
-    if (key.endsWith('_url')) {
-      const url = new URL(value)
-      if (url.protocol !== 'https:' || url.username || url.password || url.hash
-        || [...url.searchParams.keys()].some(name => name !== 'oid' && name !== 'source')) {
-        throw new Error('Unsafe lifecycle snapshot URL')
-      }
-    }
+    if (key.endsWith('_url'))
+      validateSnapshotUrl(value)
     data[key] = value
   }
   for (const key of ['checklist_complete', 'first_value_verified']) {

@@ -1,6 +1,6 @@
 import type { ReadOnlyContext } from '../../contracts.ts'
 
-export const LIFECYCLE_CONTRACT = 'new-emails-v2-2026-10-17'
+export const LIFECYCLE_CONTRACT = 'new-emails-v2-2026-10-19'
 export const LIFECYCLE_ROLLOUT_KEYS = ['BENTO_EVENT_DISPATCH_ENABLED', 'BENTO_LIFECYCLE_V2_SENDER_CONTRACT', 'BENTO_LIFECYCLE_V2_LEGACY_HANDOFF'] as const
 
 export async function lifecycleSettings(read: ReadOnlyContext, overrides: Readonly<Record<string, string | undefined>>, keys: readonly string[]) {

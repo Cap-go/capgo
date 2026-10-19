@@ -40,7 +40,7 @@ attempt is not a recorded send.
 The request snapshot contains only the contract's named string and boolean
 personalization fields, the event, intended recipient, policy version and a
 SHA-256 checksum of their canonical JSON projection plus `unique.key`. URL fields
-allow HTTPS with only the generated `oid` and `source` query parameters, with no
+allow HTTPS with only the generated `oid`, `source` and exact `lifecycleSetup=1` query parameters, with no
 userinfo or fragment. Arbitrary event metadata and settings are not copied.
 Separate server-only audit metadata archives a SHA-256 fingerprint of the current
 billing-customer binding. It is absent from Bento payloads and every read view.

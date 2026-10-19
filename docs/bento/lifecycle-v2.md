@@ -110,13 +110,56 @@ usage credits suppress upgrade pressure. Fresh measured usage and current
 monthly catalog pricing determine the smallest fitting plan; missing pricing or
 usage does not fabricate a recommendation.
 
+## Setup email destinations
+
+The approved 19 October sender contract adds the plain-text
+`cta_destination_hint` field. All 28 setup, recovery and unfinished Trial
+branches use **Continue setup in Capgo** for a current eligible app, or
+**Choose my app in Capgo** without an app. The hint explains the actual
+destination; concrete run/upload/build instructions stay in the body. The
+remaining 21 purchase, ready Trial, first-success and funding primaries retain
+their purpose-specific actions.
+
+Current-app setup and OTA AI-help links retain the authorized organization and
+app URL, with `source=capgo_lifecycle`, `oid` and `lifecycleSetup=1`. The client
+resolver re-reads that exact app's persisted onboarding JSON through the
+authenticated, organization-scoped client at click time, without a refresh RPC
+or write. An unfinished visit
+keeps normal setup behavior. A visit that would normally redirect after
+completion instead selects `showChecklist=1`, the completed-view interface from
+PR #3741. **PR #3741 must be deployed before lifecycle activation.** The email
+does not set that flag from a send-time completion snapshot. Missing or
+inaccessible apps fall back to authorized selection; the resolver does not pick
+another app. The auth guard preserves these explicit authorized lifecycle
+setup/selection destinations against the ordinary one-pending-app shortcut.
+If org membership is lost, it removes the inaccessible `oid` and opens an
+explicit unscoped chooser (`source=capgo_lifecycle&lifecycleSelect=1`), retaining
+authentication, MFA and invitation gates.
+Normal setup retains its own refresh behavior. An unavailable app read opens
+the authorized chooser. This does not promise post-send retargeting of a static delivered
+URL, changed app name or body copy.
+
+The OTA secondary action is **Open setup for AI help**, styled as a quieter
+outlined button by the sender. With a current app, explain that the user opens
+the first checklist step and chooses **Copy AI setup prompt** there, then pastes
+it into the coding assistant working with the project. The email link opens the
+page and does not copy a prompt. Without an app, choose/add the app before
+promising a checklist control. Builder AI help stays text about the current
+task and non-secret error, without an unverified prompt-copy UI. Both button
+styles use email-compatible markup and targets at least 44px high in the
+matching sender definition.
+
+This CTA revision changes no subjects, purposes, timing, sending budgets,
+eligibility, experiment assignments or no-app episode rules.
+
 ## Activation and legacy handoff
 
 All gates default closed. The authorized activation sequence is:
 
 1. Merge/apply PR #3732's protected enrollment migration and engine first.
-2. Merge this lifecycle migration/worker and PR #21's JSON definition. Deployment
-   and live Bento application remain separate operator actions.
+2. Merge this lifecycle migration/worker and PR #21's JSON definition. Deploy
+   PR #3741's completed-checklist view before activating email destinations.
+   Deployment and live Bento application remain separate operator actions.
 3. Verify the deployed JSON contains every event/tag in
    `lifecycle-v2-contract.json`, with isolated event → tag → email → finish
    branches. Verify inline text escaping and actual product URL targets.
@@ -135,7 +178,7 @@ All gates default closed. The authorized activation sequence is:
    the hold only after that evidence exists; changing the hold wakes evaluation.
 6. Only after sender and legacy-session verification explicitly set Vault
    `BENTO_LIFECYCLE_V2_SENDER_CONTRACT` and
-   `BENTO_LIFECYCLE_V2_LEGACY_HANDOFF` to `new-emails-v2-2026-10-17`, and retain
+   `BENTO_LIFECYCLE_V2_LEGACY_HANDOFF` to `new-emails-v2-2026-10-19`, and retain
    the existing global `BENTO_EVENT_DISPATCH_ENABLED=true` requirement. Explicit
    deployment overrides use the same exact values. This PR sets none of them.
 

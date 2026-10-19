@@ -160,12 +160,14 @@ describe('lifecycle cross-repository sender contract', () => {
     expect(result.data).not.toHaveProperty('signing_credentials')
   })
 
-  it.concurrent('changes Run my app to Test my update only when the current app actually connected', () => {
+  it.concurrent('keeps run and test instructions in the body while the primary action opens setup', () => {
     const done = Object.fromEntries(['login_cli_mcp', 'add_channel', 'add_updater', 'add_code', 'upload_bundle'].map(id => [id, { status: 'done', at: DONE }]))
     const disconnected = buildLifecycleEvent(input({ evidence: app(done) }), candidate('stall_24h'), 'dispatch', WEBAPP)
-    expect(disconnected.data.cta_label).toBe('Run my app')
+    expect(disconnected.data.cta_label).toBe('Continue setup in Capgo')
+    expect(disconnected.data.next_action_title).toBe('Run your app')
     const connected = buildLifecycleEvent(input({ evidence: app({ ...done, run_device: { status: 'done', at: DONE } }) }), candidate('help_48h'), 'dispatch', WEBAPP)
-    expect(connected.data.cta_label).toBe('Test my update')
+    expect(connected.data.cta_label).toBe('Continue setup in Capgo')
+    expect(connected.data.next_action_title).toBe('Test your update')
     expect(connected.data.next_action_explanation).toContain('download and install')
     expect(connected.data.completed_steps_summary).toContain('Connected your app')
   })
@@ -391,15 +393,15 @@ describe('current source evidence and accepted purposes', () => {
     const first = evaluateLifecycle(current)!
     expect(first.branch).toBe('stall_24h')
     const event = buildLifecycleEvent(current, first, 'platform-help', WEBAPP)
-    expect(event.data).toMatchObject({ cta_label: 'Choose my platform', platform_label: '', completed_steps_summary: '', checklist_complete: false, first_value_verified: false })
+    expect(event.data).toMatchObject({ cta_label: 'Continue setup in Capgo', platform_label: '', completed_steps_summary: '', checklist_complete: false, first_value_verified: false })
     expect(new URL(String(event.data.continue_url)).pathname).toBe('/app/com.example.lifecycle/getting-started')
     const second = evaluateLifecycle({ ...current, now: '2026-10-19T10:00:00.000Z', accepted: [{ purpose: first.purpose, acceptedAt: current.now, context: first.context, product: 'builder' }] })!
     expect(second.branch).toBe('help_48h')
-    expect(buildLifecycleEvent(current, second, 'platform-help-48h', WEBAPP).data.cta_label).toBe('Choose my platform')
+    expect(buildLifecycleEvent(current, second, 'platform-help-48h', WEBAPP).data.cta_label).toBe('Continue setup in Capgo')
     const trialInput = { ...current, now: '2026-10-29T10:00:00.000Z' }
     const trial = evaluateLifecycle(trialInput)!
     expect(trial.branch).toBe('trial3_unfinished')
-    expect(buildLifecycleEvent(trialInput, trial, 'platform-trial', WEBAPP).data).toMatchObject({ cta_label: 'Choose my platform', platform_label: '', next_action_title: 'Choose your build platform' })
+    expect(buildLifecycleEvent(trialInput, trial, 'platform-trial', WEBAPP).data).toMatchObject({ cta_label: 'Continue setup in Capgo', platform_label: '', next_action_title: 'Choose your build platform' })
   })
 
   it.concurrent('keeps malformed Builder platform evidence out of recovery and specific task copy', async () => {
@@ -409,7 +411,7 @@ describe('current source evidence and accepted purposes', () => {
     expect(evaluateLifecycle(loaded!.input)).toBeNull()
     const trialInput = { ...loaded!.input, now: '2026-10-29T10:00:00.000Z' }
     const trial = evaluateLifecycle(trialInput)!
-    expect(buildLifecycleEvent(trialInput, trial, 'unknown-platform', WEBAPP).data.cta_label).not.toBe('Choose my platform')
+    expect(buildLifecycleEvent(trialInput, trial, 'unknown-platform', WEBAPP).data.next_action_title).not.toBe('Choose your build platform')
   })
 
   it.concurrent('loads verified current device and finalized upload without manufacturing canonical checklist completion', async () => {

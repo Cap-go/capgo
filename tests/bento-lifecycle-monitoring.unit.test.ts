@@ -41,7 +41,7 @@ beforeAll(async () => {
       status text,completed_at timestamptz,builder_job_id text,upload_session_key text,platform text);
     CREATE TABLE public.onboarding_demo_data(app_id text,seed_id uuid,relation_name text,row_key text,
       PRIMARY KEY(seed_id,relation_name,row_key),UNIQUE(app_id,relation_name,row_key));`)
-  for (const name of ['20261017131933_bento_invitation_dispatches', '20261017144842_organization_lifecycle_v2', '20261019095333_lifecycle_monitoring_evidence'])
+  for (const name of ['20261017131933_bento_invitation_dispatches', '20261019102456_organization_lifecycle_v2', '20261019103827_lifecycle_monitoring_evidence'])
     await db.exec(readFileSync(`supabase/migrations/${name}.sql`, 'utf8'))
   client = { query: async (sql, values) => {
     const result = await db.query(sql, values)
@@ -133,10 +133,11 @@ describe('durable lifecycle monitoring evidence', () => {
     expect((await db.query('SELECT * FROM public.bento_lifecycle_due_v1 WHERE org_id=$1', [f.orgId])).rows).toEqual([])
   })
 
-  it('archives each retry separately, drops arbitrary fields and rejects token-bearing URLs', async () => {
+  it('archives each retry separately, permits the setup marker and rejects unsafe URL parameters', async () => {
     const f = await fixture()
     const payload = buildLifecycleEvent(f.input, f.decision.candidate!, f.event.id, 'https://console.example.com')
     payload.data.arbitrary_secret = 'must not persist'
+    payload.data.ai_setup_url = `https://console.example.com/app/example/getting-started?oid=${f.orgId}&source=capgo_lifecycle&lifecycleSetup=1`
     await recordLifecycleSnapshot(client, f.user, f.event, payload)
     f.user.email = 'replacement-owner@example.com'
     f.input.email = f.user.email
@@ -149,6 +150,8 @@ describe('durable lifecycle monitoring evidence', () => {
     expect(rows[1]).toMatchObject({ recipient_email: 'replacement-owner@example.com' })
     expect(rows[0].snapshot_checksum).not.toBe(rows[1].snapshot_checksum)
     expect(rows[0].personalization).not.toHaveProperty('arbitrary_secret')
+    expect(rows[0].personalization.ai_setup_url).toContain('lifecycleSetup=1')
+    expect(rows[0].policy_version).toBe('new-emails-v2-2026-10-19')
     await recordLifecycleDecision(client, { ...f.input, email: 'new-intention@example.com' }, f.decision, 1, after(1), { originalCreatorId: f.creatorId, sourceVerifiedAt: f.input.now })
     const monitored = (await db.query('SELECT * FROM public.bento_lifecycle_monitor_v1 WHERE org_id=$1 AND purpose=$2', [f.orgId, f.user.tag])).rows[0]
     expect(monitored).toMatchObject({ recipient_email: 'replacement-owner@example.com', intended_recipient_email: 'new-intention@example.com' })
@@ -156,6 +159,8 @@ describe('durable lifecycle monitoring evidence', () => {
     await expect(recordLifecycleSnapshot(client, f.user, f.event, retryPayload)).rejects.toThrow('already differs')
     f.event.attempt_count = 3
     retryPayload.data.continue_url = 'https://console.example.com/path?token=never-archive'
+    await expect(recordLifecycleSnapshot(client, f.user, f.event, retryPayload)).rejects.toThrow('Unsafe lifecycle snapshot URL')
+    retryPayload.data.continue_url = 'https://console.example.com/path?lifecycleSetup=token'
     await expect(recordLifecycleSnapshot(client, f.user, f.event, retryPayload)).rejects.toThrow('Unsafe lifecycle snapshot URL')
     expect((await db.query('SELECT id FROM public.bento_lifecycle_send_snapshots WHERE dispatch_id=$1', [f.event.id])).rows).toHaveLength(2)
   })

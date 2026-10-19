@@ -149,23 +149,15 @@ meta:
     display: none;
   }
 
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-details-eyebrow),
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-details-preview-app-id),
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-icon .onboarding-details-eyebrow),
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-icon .onboarding-icon-upload-helper) {
     display: none;
   }
 
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-details-heading h2),
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-icon .onboarding-details-heading h2) {
     margin-top: 0;
   }
 
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-app-id-input) {
-    margin-top: 0.25rem;
-  }
-
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-store-import),
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-icon .onboarding-icon-store-import) {
     margin-block: 0.75rem;
   }
@@ -201,13 +193,11 @@ meta:
   }
 
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-name .onboarding-flow-title),
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-flow-title),
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-icon .onboarding-flow-title) {
     display: none;
   }
 
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-name .onboarding-flow-header nav),
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-flow-header nav),
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-icon .onboarding-flow-header nav) {
     margin-top: 0;
   }
@@ -269,44 +259,6 @@ meta:
   ) {
     margin-top: 0.5rem;
   }
-
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-app-id-input) {
-    margin-top: 0.25rem;
-  }
-
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-details-preview-app-id) {
-    display: grid;
-    grid-template-columns: 3.25rem auto;
-    grid-template-rows: auto auto;
-    column-gap: 0.75rem;
-    justify-content: center;
-    padding-block: 0;
-    text-align: left;
-  }
-
-  :deep(
-    .onboarding-flow-app-creation.onboarding-flow-details-app-id
-      .onboarding-details-preview-app-id
-      .onboarding-details-preview-icon
-  ) {
-    grid-row: 1 / span 2;
-    width: 3.25rem;
-    height: 3.25rem;
-    border-radius: 0.875rem;
-  }
-
-  :deep(
-    .onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-details-preview-app-id > p:first-of-type
-  ) {
-    align-self: end;
-    margin-top: 0;
-  }
-
-  :deep(
-    .onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-details-preview-app-id > p:last-child
-  ) {
-    align-self: start;
-  }
 }
 
 @media (min-width: 640px) and (max-height: 700px) {
@@ -366,7 +318,6 @@ meta:
     margin-top: 0.25rem;
   }
 
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-store-import),
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-icon .onboarding-icon-store-import) {
     margin-block: 0.75rem;
   }
@@ -376,12 +327,10 @@ meta:
     padding-top: 0.75rem;
   }
 
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-details-eyebrow),
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-icon .onboarding-details-eyebrow) {
     display: none;
   }
 
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-details-heading h2),
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-icon .onboarding-details-heading h2) {
     margin-top: 0;
   }
@@ -394,12 +343,6 @@ meta:
 
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-icon .onboarding-icon-uploader) {
     padding: 0.75rem;
-  }
-}
-
-@media (min-width: 640px) and (max-height: 600px) {
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-details-preview-app-id) {
-    display: none;
   }
 }
 
@@ -449,13 +392,8 @@ meta:
 @media (min-width: 640px) and (max-height: 500px) {
   :deep(.onboarding-flow-app-creation.onboarding-flow-intent .onboarding-flow-title),
   :deep(.onboarding-flow-app-creation.onboarding-flow-details-name .onboarding-flow-title),
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-flow-title) {
-    display: none;
-  }
-
   :deep(.onboarding-flow-app-creation.onboarding-flow-intent .onboarding-flow-header nav),
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-name .onboarding-flow-header nav),
-  :deep(.onboarding-flow-app-creation.onboarding-flow-details-app-id .onboarding-flow-header nav) {
+  :deep(.onboarding-flow-app-creation.onboarding-flow-details-name .onboarding-flow-header nav) {
     margin-top: 0;
   }
 }

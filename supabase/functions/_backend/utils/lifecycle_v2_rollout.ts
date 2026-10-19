@@ -4,7 +4,7 @@ import { cloudlog } from './logging.ts'
 import { closeClient, getPgClient } from './pg.ts'
 import { existInEnv, getEnv } from './utils.ts'
 
-export const LIFECYCLE_V2_CONTRACT = 'new-emails-v2-2026-10-17'
+export const LIFECYCLE_V2_CONTRACT = 'new-emails-v2-2026-10-19'
 
 const REQUIRED_SETTINGS = {
   BENTO_EVENT_DISPATCH_ENABLED: 'true',
