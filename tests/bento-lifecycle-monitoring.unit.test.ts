@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { evaluateLifecycle, evaluateLifecycleDecision } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/evaluate.ts'
 import { recordLifecycleAttempt, recordLifecycleDecision, recordLifecycleSnapshot } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/monitoring.ts'
 import { buildLifecycleEvent } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/payload.ts'
+import { refreshLifecycleJourneys } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/refresh.ts'
 import { createMutationContext } from '../cloudflare_workers/bento_dispatch/helpers.ts'
 import { DispatchStore } from '../cloudflare_workers/bento_dispatch/store.ts'
 
@@ -23,7 +24,7 @@ beforeAll(async () => {
       onboarding jsonb NOT NULL DEFAULT '{}', created_via_invite boolean NOT NULL DEFAULT false,
       email_preferences jsonb NOT NULL DEFAULT '{}', enable_notifications boolean NOT NULL DEFAULT true,
       opt_for_newsletters boolean NOT NULL DEFAULT true, email text);
-    CREATE TABLE public.orgs(id uuid PRIMARY KEY, created_by uuid NOT NULL REFERENCES public.users(id),
+    CREATE TABLE public.orgs(id uuid PRIMARY KEY, created_by uuid NOT NULL REFERENCES public.users(id),name text NOT NULL DEFAULT 'Example organization',
       onboarding jsonb NOT NULL DEFAULT '{}',email_preferences jsonb NOT NULL DEFAULT '{}',management_email text,
       customer_id text,has_usage_credits boolean NOT NULL DEFAULT false);
     CREATE INDEX finx_orgs_created_by ON public.orgs(created_by);
@@ -31,8 +32,11 @@ beforeAll(async () => {
     CREATE TABLE public.apps(id uuid PRIMARY KEY,app_id text UNIQUE,owner_org uuid REFERENCES public.orgs(id),
       created_at timestamptz NOT NULL,onboarding jsonb NOT NULL DEFAULT '{}');
     CREATE INDEX finx_apps_owner_org ON public.apps(owner_org);
-    CREATE TYPE public.stripe_status AS ENUM('trialing','succeeded','canceled');
-    CREATE TABLE public.stripe_info(customer_id text PRIMARY KEY,status public.stripe_status,trial_at timestamptz,subscription_id text);
+    CREATE TYPE public.stripe_status AS ENUM('created','succeeded','updated','failed','deleted','canceled');
+    CREATE TABLE public.stripe_info(customer_id text PRIMARY KEY,status public.stripe_status,trial_at timestamptz,subscription_id text,paid_at timestamptz);
+    CREATE TABLE public.role_bindings(principal_type text,principal_id uuid,scope_type text,org_id uuid,is_direct boolean,expires_at timestamptz);
+    CREATE TABLE public.org_metrics_cache(org_id uuid,start_date date,end_date date,cached_at timestamptz,mau bigint,storage bigint,bandwidth bigint,build_time_unit bigint);
+    CREATE TABLE public.plans(name text,price_m numeric,mau bigint,storage bigint,bandwidth bigint,build_time_unit bigint);
     CREATE TABLE public.build_requests(id uuid PRIMARY KEY,app_id text,owner_org uuid,created_at timestamptz,
       status text,completed_at timestamptz,builder_job_id text,upload_session_key text,platform text);
     CREATE TABLE public.onboarding_demo_data(app_id text,seed_id uuid,relation_name text,row_key text,
@@ -194,10 +198,12 @@ describe('durable lifecycle monitoring evidence', () => {
     rows = (await db.query('SELECT * FROM public.bento_lifecycle_clock_candidates_v1 WHERE org_id=$1', [f.orgId])).rows
     expect(rows.some(row => row.purpose === 'reminder:48h')).toBe(true)
     expect(rows.some(row => row.purpose === 'reminder:24h')).toBe(false)
-    await db.query(`INSERT INTO public.stripe_info VALUES($1,'trialing',CURRENT_TIMESTAMP+INTERVAL '8 days',NULL)`, [f.orgId])
+    await db.query(`INSERT INTO public.stripe_info(customer_id,status,trial_at,subscription_id) VALUES($1,'created',CURRENT_TIMESTAMP+INTERVAL '8 days',NULL)`, [f.orgId])
     await db.query('UPDATE public.orgs SET customer_id=$2 WHERE id=$1', [f.orgId, f.orgId])
     rows = (await db.query('SELECT * FROM public.bento_lifecycle_clock_candidates_v1 WHERE org_id=$1', [f.orgId])).rows
     expect(rows.filter(row => row.purpose.startsWith('trial:'))).toHaveLength(7)
+    await db.query(`UPDATE public.stripe_info SET status='succeeded',subscription_id='' WHERE customer_id=$1`, [f.orgId])
+    expect((await db.query(`SELECT * FROM public.bento_lifecycle_clock_candidates_v1 WHERE org_id=$1 AND purpose LIKE 'trial:%'`, [f.orgId])).rows).toHaveLength(7)
     await db.query(`UPDATE public.bento_lifecycle_journeys SET state='{"lastProgressAt":"not a date","batch":{"key":"invalid","openedAt":"yesterday","lastAt":"bad"}}' WHERE org_id=$1`, [f.orgId])
     await expect(db.query('SELECT * FROM public.bento_lifecycle_clock_candidates_v1 WHERE org_id=$1', [f.orgId])).resolves.toBeDefined()
   })
@@ -235,6 +241,23 @@ describe('durable lifecycle monitoring evidence', () => {
     expect(evaluateLifecycleDecision({ ...f.input, compatibleCredits: true })).toMatchObject({ candidate: null, decision: 'suppress', reason: 'usage_credits_commercial_suppressed' })
   })
 
+  it('records decisions and refresh heartbeats through the real source and revision-fenced refresher', async () => {
+    await db.query(`UPDATE public.bento_lifecycle_journeys SET next_evaluation_at=CURRENT_TIMESTAMP+INTERVAL '7 days'`)
+    const f = await fixture()
+    await db.query(`ALTER TABLE public.stripe_info ADD COLUMN IF NOT EXISTS build_time_exceeded boolean NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS subscription_anchor_start timestamptz,ADD COLUMN IF NOT EXISTS subscription_anchor_end timestamptz`)
+    await db.query(`INSERT INTO public.role_bindings VALUES('user',$1,'org',$2,true,NULL)`, [f.creatorId, f.orgId])
+    await db.query(`INSERT INTO public.stripe_info(customer_id,status,trial_at) VALUES($1,'created',CURRENT_TIMESTAMP+INTERVAL '100 days')`, [f.orgId])
+    await db.query(`UPDATE public.orgs SET customer_id=$2 WHERE id=$1`, [f.orgId, f.orgId])
+    expect(await refreshLifecycleJourneys(client, null)).toBe(1)
+    const row = (await db.query('SELECT * FROM public.bento_lifecycle_monitor_v1 WHERE org_id=$1 AND is_current', [f.orgId])).rows[0]
+    expect(row).toMatchObject({ original_creator_id: f.creatorId, source_healthy: true, recipient_id: f.creatorId, recipient_email: 'creator@example.com', sender_ready: true })
+    // This stacked base can lack PR3732's runtime config. The actual source
+    // correctly records a closed cohort gate until that dependency is present.
+    expect(['no_app_recovery_24h', 'creator_ineligible']).toContain(row.reason)
+    expect((await db.query('SELECT refresh_claim_token FROM public.bento_lifecycle_journeys WHERE org_id=$1', [f.orgId])).rows).toEqual([{ refresh_claim_token: null }])
+  })
+
   it('associates positive mature milestones with their own incarnation and leaves missing outcomes unknown', async () => {
     const f = await fixture()
     const incarnation = randomUUID()
@@ -255,5 +278,29 @@ describe('durable lifecycle monitoring evidence', () => {
     expect(outcome.incarnation_matches).toBe(false)
     expect(new Date(outcome.first_value_at).getTime()).toBe(Date.parse(firstValueAt))
     expect(outcome.setup48h_status).toBe('verified_value_observed')
+  })
+
+  it('associates a mature first subscription only with matching privately archived billing continuity', async () => {
+    const f = await fixture()
+    const customerId = `cus_fixture_${f.orgId}`
+    const payload = buildLifecycleEvent(f.input, f.decision.candidate!, f.event.id, 'https://console.example.com')
+    await recordLifecycleSnapshot(client, f.user, f.event, payload, { billingCustomerId: customerId })
+    expect(payload.data).not.toHaveProperty('billingCustomerId')
+    const stored = (await db.query('SELECT billing_customer_fingerprint FROM public.bento_lifecycle_send_snapshots WHERE dispatch_id=$1', [f.event.id])).rows[0]
+    expect(stored.billing_customer_fingerprint).toMatch(/^[a-f0-9]{64}$/)
+    expect(stored.billing_customer_fingerprint).not.toContain(customerId)
+    await db.query(`UPDATE public.bento_event_dispatches SET status='accepted',event_at=CURRENT_TIMESTAMP-INTERVAL '8 days' WHERE id=$1`, [f.event.id])
+    await db.query(`INSERT INTO public.stripe_info(customer_id,status,subscription_id,paid_at)
+      VALUES($1,'succeeded','sub_fixture',CURRENT_TIMESTAMP-INTERVAL '4 days')`, [customerId])
+    await db.query('UPDATE public.orgs SET customer_id=$2 WHERE id=$1', [f.orgId, customerId])
+    let outcome = (await db.query('SELECT * FROM public.bento_lifecycle_outcomes_v1 WHERE org_id=$1', [f.orgId])).rows[0]
+    expect(outcome).toMatchObject({ subscription7d_mature: true, subscription7d_status: 'first_subscription_observed', billing_context_matches: true })
+    expect(outcome).not.toHaveProperty('billing_customer_fingerprint')
+    expect(outcome).not.toHaveProperty('customer_id')
+    const inspected = (await db.query('SELECT * FROM public.bento_lifecycle_snapshots_v1 WHERE dispatch_id=$1', [f.event.id])).rows[0]
+    expect(inspected).not.toHaveProperty('billing_customer_fingerprint')
+    await db.query('UPDATE public.orgs SET customer_id=$2 WHERE id=$1', [f.orgId, `cus_replacement_fixture_${f.orgId}`])
+    outcome = (await db.query('SELECT * FROM public.bento_lifecycle_outcomes_v1 WHERE org_id=$1', [f.orgId])).rows[0]
+    expect(outcome).toMatchObject({ subscription7d_status: 'unknown', billing_context_matches: false, first_subscription_at: null })
   })
 })

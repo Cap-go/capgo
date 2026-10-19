@@ -51,7 +51,7 @@ export function createMutationContext(store: DispatchStore, run: RunRecord, send
       }
       const payload = current.buildEvent(claim.id)
       if (user.flowKey.startsWith('lifecycle:v2:'))
-        await store.snapshotEvent(claim, user, payload)
+        await store.snapshotEvent(claim, user, payload, current.lifecycleEvidence)
       accepted = await send(payload)
       if (!accepted) {
         await store.failEvent(run, claim, user, 'provider_not_confirmed')

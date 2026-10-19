@@ -1,4 +1,4 @@
-import type { BentoEvent, DispatchRecord, EligibleUser, QueryClient } from '../../contracts.ts'
+import type { BentoEvent, DispatchRecord, EligibleUser, LifecycleSendAudit, QueryClient } from '../../contracts.ts'
 import type { LifecycleDecision } from './evaluate.ts'
 import type { LifecycleInput } from './types.ts'
 import contract from '../../../../docs/bento/lifecycle-v2-contract.json' with { type: 'json' }
@@ -127,7 +127,7 @@ export async function recordLifecycleAttempt(db: QueryClient, user: EligibleUser
 
 // Capture the allowlisted resolved request, once per physical attempt. Retries can
 // legitimately have different recipient/context under the same dispatch ID.
-export async function recordLifecycleSnapshot(db: QueryClient, user: EligibleUser, event: DispatchRecord, payload: BentoEvent) {
+export async function recordLifecycleSnapshot(db: QueryClient, user: EligibleUser, event: DispatchRecord, payload: BentoEvent, evidence?: LifecycleSendAudit) {
   if (!lifecycle(user))
     return
   if (payload.email.toLowerCase() !== user.email.toLowerCase() || payload.data.dispatch_id !== event.id
@@ -159,10 +159,11 @@ export async function recordLifecycleSnapshot(db: QueryClient, user: EligibleUse
   if (new TextEncoder().encode(serialized).length > 64 * 1024)
     throw new Error('Lifecycle snapshot too large')
   const digest = await checksum(serialized)
+  const billingFingerprint = evidence?.billingCustomerId ? await checksum(`bento-billing-customer-v1:${evidence.billingCustomerId}`) : null
   await db.query(`INSERT INTO public.bento_lifecycle_send_snapshots
     (dispatch_id,attempt_number,org_id,product,purpose,recipient_id,recipient_email,event_name,variant,
-     app_incarnation,policy_version,snapshot_checksum,expected_subject,personalization)
-    VALUES($1::uuid,$2,$3::uuid,$4,$5,$6::uuid,$7,$8,$9,$10::uuid,$11,$12,$13,$14::jsonb)
+     app_incarnation,policy_version,snapshot_checksum,expected_subject,personalization,billing_customer_fingerprint)
+    VALUES($1::uuid,$2,$3::uuid,$4,$5,$6::uuid,$7,$8,$9,$10::uuid,$11,$12,$13,$14::jsonb,$15)
     ON CONFLICT(dispatch_id,attempt_number) DO NOTHING`, [
     event.id,
     event.attempt_count,
@@ -178,10 +179,11 @@ export async function recordLifecycleSnapshot(db: QueryClient, user: EligibleUse
     digest,
     payload.data.email_subject,
     JSON.stringify(data),
+    billingFingerprint,
   ])
-  const saved = await db.query<{ snapshot_checksum: string }>(`SELECT snapshot_checksum FROM public.bento_lifecycle_send_snapshots
+  const saved = await db.query<{ snapshot_checksum: string, billing_customer_fingerprint: string | null }>(`SELECT snapshot_checksum,billing_customer_fingerprint FROM public.bento_lifecycle_send_snapshots
     WHERE dispatch_id=$1::uuid AND attempt_number=$2`, [event.id, event.attempt_count])
-  if (saved.rows[0]?.snapshot_checksum !== digest)
+  if (saved.rows[0]?.snapshot_checksum !== digest || saved.rows[0]?.billing_customer_fingerprint !== billingFingerprint)
     throw new Error('Lifecycle snapshot already differs')
   await recordLifecycleAttempt(db, user, 'provider_request', 'resolved_payload_archived', event)
 }

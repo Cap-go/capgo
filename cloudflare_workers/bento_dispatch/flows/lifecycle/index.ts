@@ -59,5 +59,5 @@ export async function resolveLifecycle(read: ReadOnlyContext, user: EligibleUser
   }
   if (await hasHigherPrioritySibling(read, user.contextKey, product, candidate.priority))
     return { action: 'skip', reason: 'lifecycle_higher_priority_due' }
-  return { action: 'send', buildEvent: id => buildLifecycleEvent(current.input, candidate, id, settings.WEBAPP_URL) }
+  return { action: 'send', buildEvent: id => buildLifecycleEvent(current.input, candidate, id, settings.WEBAPP_URL), lifecycleEvidence: { billingCustomerId: current.row.customer_id } }
 }

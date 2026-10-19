@@ -1,6 +1,6 @@
 import type { QueryResultRow } from 'pg'
 import type { PostHogQueueEnv, PostHogQueueMessage } from '../../supabase/functions/_backend/utils/posthog_queue.ts'
-import type { BentoEvent, DispatchJob, DispatchRecord, EligibleUser, Json, QueryClient, ReadOnlyContext, RunRecord, TerminalReason } from './contracts.ts'
+import type { BentoEvent, DispatchJob, DispatchRecord, EligibleUser, Json, LifecycleSendAudit, QueryClient, ReadOnlyContext, RunRecord, TerminalReason } from './contracts.ts'
 import { flowAudit, recordFlowEvent, safeFlowMetadata } from '../../supabase/functions/_backend/utils/bento_flow_audit.ts'
 import { enqueuePostHog } from '../../supabase/functions/_backend/utils/posthog_queue.ts'
 import { claimLifecycleBudget } from './flows/lifecycle/budget.ts'
@@ -240,13 +240,13 @@ export class DispatchStore {
     return this.eventResult(run, event, user, safeError(code))
   }
 
-  snapshotEvent(event: DispatchRecord, user: EligibleUser, payload: BentoEvent): Promise<void> {
+  snapshotEvent(event: DispatchRecord, user: EligibleUser, payload: BentoEvent, evidence?: LifecycleSendAudit): Promise<void> {
     return this.transaction(async (client) => {
       const owned = await client.query(`SELECT id FROM public.bento_event_dispatches
         WHERE id=$1::uuid AND claim_token=$2::uuid AND status='sending' AND claim_until > CURRENT_TIMESTAMP FOR UPDATE`, [event.id, event.claim_token])
       if (!owned.rows.length)
         throw new Error('Dispatch claim lost')
-      await recordLifecycleSnapshot(client, user, event, payload)
+      await recordLifecycleSnapshot(client, user, event, payload, evidence)
     })
   }
 

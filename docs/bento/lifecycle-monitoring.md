@@ -37,11 +37,15 @@ second current-source check and before provider I/O, under the claim token fence
 A conflicting snapshot under the same attempt is rejected. A failed or skipped
 attempt is not a recorded send.
 
-The snapshot contains only the contract's named string and boolean
+The request snapshot contains only the contract's named string and boolean
 personalization fields, the event, intended recipient, policy version and a
 SHA-256 checksum of their canonical JSON projection plus `unique.key`. URL fields
 allow HTTPS with only the generated `oid` and `source` query parameters, with no
 userinfo or fragment. Arbitrary event metadata and settings are not copied.
+Separate server-only audit metadata archives a SHA-256 fingerprint of the current
+billing-customer binding. It is absent from Bento payloads and every read view.
+It permits matching existing durable first-subscription evidence to the same
+billing context without exposing a customer identifier to the dashboard.
 The archived subject and personalization are **expected resolved send request
 content**. They do not prove a particular rendered body, sender template version,
 observed message, delivery or human open. Those require separate Bento evidence.
@@ -70,7 +74,7 @@ require a bounded, deliberate protected read route there.
 | `bento_lifecycle_timeline_v1` | Append-only changed decisions and attempt events; query by indexed org/product/purpose and a bounded time window. |
 | `bento_lifecycle_snapshots_v1` | Private per-attempt expected request inspection. `content_evidence='expected_send_request'`. |
 | `bento_lifecycle_claims_v1` | Accepted or currently active v2 claims only. `claim_at` uses confirmed acceptance time, or active claim attempt time; this mirrors the actual budget and excludes legacy/transactional messages. |
-| `bento_lifecycle_outcomes_v1` | First accepted dispatch per org/product and immutable original creator cohort, with mature 48h positive-only first-milestone association. The anchor is provider acceptance, not the separately observed send. Verified value comes from the snapshot incarnation's observation; readiness is explicitly organization-level and may include intentionally skipped steps. No-progress and subscription7d outcomes remain unknown. |
+| `bento_lifecycle_outcomes_v1` | First accepted dispatch per org/product and immutable original creator cohort, with mature 48h positive-only first-milestone association and mature 7d positive-only first-subscription association when the private billing continuity matches. The anchor is provider acceptance, not the separately observed send. Verified value comes from the snapshot incarnation's observation; readiness is explicitly organization-level and may include intentionally skipped steps. Missing progress/subscription evidence remains unknown. |
 
 Unique organization-purpose identities define reconciliation. Shared Trial ready
 and unfinished variants compete for one purpose. A product decision is not an
@@ -98,7 +102,11 @@ does not transfer another app's verified value. Organization readiness persists
 by design and is labeled separately. `lastProgressAt` is overwritten; it cannot
 reconstruct every historical setup step in a 48h window. Existing billing status
 and period anchors do not prove a first subscription transition within seven
-days, so that capability stays unknown.
+days. `stripe_info.paid_at` preserves the first subscription event for a billing
+customer. The private snapshot fingerprint must match the current organization
+billing binding before this timestamp can support a positive seven-day
+association. A missing timestamp, absent continuity or later customer replacement
+stays unknown. No read view reveals the fingerprint or billing customer ID.
 
 ## Execution and validation
 

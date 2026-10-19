@@ -73,6 +73,7 @@ CREATE TABLE public.bento_lifecycle_send_snapshots (
     snapshot_checksum text NOT NULL CHECK (snapshot_checksum ~ '^[a-f0-9]{64}$'),
     expected_subject text NOT NULL,
     personalization jsonb NOT NULL CHECK (pg_catalog.jsonb_typeof(personalization) = 'object' AND pg_catalog.pg_column_size(personalization) <= 65536),
+    billing_customer_fingerprint text CHECK (billing_customer_fingerprint ~ '^[a-f0-9]{64}$'),
     UNIQUE(dispatch_id, attempt_number)
 );
 CREATE INDEX bento_lifecycle_snapshot_org ON public.bento_lifecycle_send_snapshots(org_id, recorded_at DESC);
@@ -259,7 +260,7 @@ CROSS JOIN LATERAL (
         WHERE phase.phase_index > COALESCE(previous_trial.phase_index,-1)
     ) trial
     WHERE source.trial_at IS NOT NULL AND source.has_usage_credits IS FALSE
-        AND NOT (COALESCE(source.billing_status,'') = 'succeeded' AND source.subscription_id IS NOT NULL)
+        AND NOT (COALESCE(source.billing_status,'') = 'succeeded' AND NULLIF(source.subscription_id,'') IS NOT NULL)
 ) clocks
 WHERE clocks.due_at IS NOT NULL AND (clocks.expires_at IS NULL OR clocks.due_at < clocks.expires_at)
     AND NOT EXISTS (
@@ -304,12 +305,13 @@ WHERE d.flow_key LIKE 'lifecycle:v2:%'
 
 -- Positive-only milestone association, one first accepted cohort per org/product.
 -- Overwritten lastProgressAt cannot establish a complete historical 48h absence.
--- Current subscription state/period anchors cannot establish a 7d conversion.
+-- First-subscription evidence requires the same privately fingerprinted billing
+-- customer binding. Missing history remains unknown, never no-conversion.
 CREATE VIEW public.bento_lifecycle_outcomes_v1 AS
 WITH first_accepted AS (
     SELECT DISTINCT ON (snapshot.org_id,snapshot.product)
         dispatch.id AS dispatch_id, dispatch.event_at AS accepted_at,
-        snapshot.org_id,snapshot.product,snapshot.app_incarnation
+        snapshot.org_id,snapshot.product,snapshot.app_incarnation,snapshot.billing_customer_fingerprint
     FROM public.bento_event_dispatches dispatch
     JOIN public.bento_lifecycle_send_snapshots snapshot ON snapshot.dispatch_id = dispatch.id
         AND snapshot.attempt_number = dispatch.attempt_count
@@ -322,9 +324,14 @@ WITH first_accepted AS (
         CASE WHEN first_accepted.product = 'ota'
             THEN public.lifecycle_v2_parse_timestamp(obs.verified->>'otaAppliedAt')
             ELSE public.lifecycle_v2_parse_timestamp(obs.verified->>'builderSucceededAt') END AS first_value_at,
-        obs.verified_at AS source_verified_at, coverage.evaluated_at AS last_evaluated_at
+        obs.verified_at AS source_verified_at, coverage.evaluated_at AS last_evaluated_at,
+        COALESCE(first_accepted.billing_customer_fingerprint = pg_catalog.encode(pg_catalog.sha256(
+            pg_catalog.convert_to('bento-billing-customer-v1:' || o.customer_id,'UTF8')),'hex'),false) AS billing_context_matches,
+        si.paid_at AS current_billing_first_subscription_at
     FROM first_accepted
     JOIN public.org_lifecycle_creators provenance ON provenance.org_id = first_accepted.org_id
+    JOIN public.orgs o ON o.id = first_accepted.org_id
+    LEFT JOIN public.stripe_info si ON si.customer_id = o.customer_id
     JOIN public.bento_lifecycle_journeys j ON j.org_id = first_accepted.org_id AND j.product = first_accepted.product
     LEFT JOIN public.bento_lifecycle_app_observations obs ON obs.org_id = first_accepted.org_id
         AND obs.product = first_accepted.product AND obs.app_incarnation = first_accepted.app_incarnation
@@ -342,7 +349,14 @@ SELECT 'bento-lifecycle-monitor-v1'::text AS contract_version, milestones.org_id
         WHEN milestones.first_value_at > milestones.accepted_at AND milestones.first_value_at <= milestones.accepted_at + INTERVAL '48 hours' THEN 'verified_value_observed'
         WHEN milestones.checklist_complete_at > milestones.accepted_at AND milestones.checklist_complete_at <= milestones.accepted_at + INTERVAL '48 hours' THEN 'organization_readiness_observed'
         ELSE 'unknown' END AS setup48h_status,
-    'unknown'::text AS subscription7d_status,'first_milestone_association'::text AS evidence_scope
+    milestones.accepted_at + INTERVAL '7 days' <= CURRENT_TIMESTAMP AS subscription7d_mature,
+    milestones.billing_context_matches,
+    CASE WHEN milestones.billing_context_matches THEN milestones.current_billing_first_subscription_at END AS first_subscription_at,
+    CASE WHEN NOT milestones.billing_context_matches OR milestones.current_billing_first_subscription_at IS NULL THEN 'unknown'
+        WHEN milestones.accepted_at + INTERVAL '7 days' > CURRENT_TIMESTAMP THEN 'maturing'
+        WHEN milestones.billing_context_matches AND milestones.current_billing_first_subscription_at > milestones.accepted_at
+            AND milestones.current_billing_first_subscription_at <= milestones.accepted_at + INTERVAL '7 days' THEN 'first_subscription_observed'
+        ELSE 'unknown' END AS subscription7d_status,'first_milestone_association'::text AS evidence_scope
 FROM milestones;
 
 ALTER VIEW public.bento_lifecycle_monitor_v1 OWNER TO postgres;
