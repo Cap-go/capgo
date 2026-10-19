@@ -15,6 +15,14 @@ describe('console content security policy', () => {
     expect(CONSOLE_CONTENT_SECURITY_POLICY).not.toMatch(/script-src[^;]*'unsafe-inline'/)
   })
 
+  it.concurrent('allows Stripe Embedded Checkout script, iframe and API calls', () => {
+    const directive = (name: string) => CONSOLE_CONTENT_SECURITY_POLICY.split('; ').find(part => part.startsWith(`${name} `)) ?? ''
+    expect(directive('script-src')).toContain('https://js.stripe.com')
+    expect(directive('frame-src')).toContain('https://*.js.stripe.com')
+    expect(directive('frame-src')).toContain('https://hooks.stripe.com')
+    expect(directive('connect-src')).toContain('https://api.stripe.com')
+  })
+
   it.concurrent('includes production API and Supabase connect sources only', () => {
     expect(CONSOLE_CONTENT_SECURITY_POLICY).toContain('https://sb.capgo.app')
     expect(CONSOLE_CONTENT_SECURITY_POLICY).toContain('https://api.capgo.app')

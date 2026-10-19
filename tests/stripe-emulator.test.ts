@@ -212,12 +212,15 @@ describe('stripe emulator integration', () => {
       '/settings/organization/plans',
     )
 
-    expect(checkout.url).toBeTruthy()
-    expectCheckoutUrlOnEmulator(checkout.url as string, stripeApiBaseUrl)
+    if (!('url' in checkout))
+      throw new Error('Expected a hosted checkout URL')
+    const checkoutUrl = checkout.url
+    expect(checkoutUrl).toBeTruthy()
+    expectCheckoutUrlOnEmulator(checkoutUrl, stripeApiBaseUrl)
     expect(mockedSupabaseAdmin).toHaveBeenCalled()
 
     const sessions = await stripe.checkout.sessions.list({ limit: 10 })
-    const session = sessions.data.find(candidate => candidate.url === checkout.url)
+    const session = sessions.data.find(candidate => candidate.url === checkoutUrl)
 
     expect(session).toMatchObject({
       customer: customer.id,

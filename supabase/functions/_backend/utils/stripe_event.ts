@@ -97,7 +97,14 @@ function subscriptionUpdated(c: Context, event: Stripe.CustomerSubscriptionCreat
   if (previousInterval === 'month' && currentInterval === 'year') {
     isUpgrade = true
   }
-  return { data, isUpgrade, previousPriceId, previousProductId }
+  return {
+    data,
+    isUpgrade,
+    previousPriceId,
+    previousProductId,
+    subscriptionStatus: subscription.status,
+    previousSubscriptionStatus: previousAttributes?.status,
+  }
 }
 
 function invoiceUpcoming(event: Stripe.InvoiceUpcomingEvent, data: StripeData['data']) {
@@ -222,6 +229,8 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
   let isUpgrade = false
   let previousPriceId: string | undefined
   let previousProductId: string | undefined
+  let subscriptionStatus: Stripe.Subscription.Status | undefined
+  let previousSubscriptionStatus: Stripe.Subscription.Status | undefined
 
   cloudlog({ requestId: c.get('requestId'), message: 'event', event: JSON.stringify(event, null, 2) })
   if (!event?.data?.object) {
@@ -234,6 +243,8 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
     isUpgrade = res.isUpgrade
     previousPriceId = res.previousPriceId
     previousProductId = res.previousProductId
+    subscriptionStatus = res.subscriptionStatus
+    previousSubscriptionStatus = res.previousSubscriptionStatus
   }
   else if (event.type === 'charge.failed') {
     const charge = event.data.object
@@ -279,7 +290,7 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
   else {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Other event', event })
   }
-  return { data, isUpgrade, previousPriceId, previousProductId }
+  return { data, isUpgrade, previousPriceId, previousProductId, subscriptionStatus, previousSubscriptionStatus }
 }
 
 export function normalizeBillingEmail(email: string | null | undefined) {

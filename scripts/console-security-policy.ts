@@ -95,6 +95,8 @@ export function buildConsoleContentSecurityPolicy(options: ConsoleCspOptions = {
     'https://challenges.cloudflare.com', // Cloudflare Turnstile
     'https://static.cloudflareinsights.com', // Cloudflare Web Analytics (if enabled)
     'https://psthg.capgo.app', // first-party PostHog reverse proxy
+    'https://js.stripe.com', // Stripe.js for Embedded Checkout
+    'https://*.js.stripe.com',
   ])
 
   const styleSrc = joinSources([
@@ -132,6 +134,8 @@ export function buildConsoleContentSecurityPolicy(options: ConsoleCspOptions = {
     'https://challenges.cloudflare.com',
     'https://api.github.com',
     'https://registry.npmjs.org',
+    'https://api.stripe.com', // Stripe.js / Embedded Checkout
+    'https://checkout.stripe.com',
     ...PREVIEW_CONNECT_SOURCES,
     ...getConfiguredConnectSources(dev),
     ...(dev
@@ -150,6 +154,8 @@ export function buildConsoleContentSecurityPolicy(options: ConsoleCspOptions = {
     'https://checkout.stripe.com',
     'https://billing.stripe.com',
     'https://js.stripe.com',
+    'https://*.js.stripe.com', // Embedded Checkout iframe
+    'https://hooks.stripe.com', // 3D Secure challenges
     ...PREVIEW_CONNECT_SOURCES,
   ])
 

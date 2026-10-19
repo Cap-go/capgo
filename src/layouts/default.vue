@@ -7,6 +7,7 @@ import AssistantChat from '~/components/assistant/AssistantChat.vue'
 import OnboardingExploreBanner from '~/components/dashboard/OnboardingExploreBanner.vue'
 import OnboardingExploreReminder from '~/components/dashboard/OnboardingExploreReminder.vue'
 import PastDueBanner from '~/components/dashboard/PastDueBanner.vue'
+import TrialCardPrompt from '~/components/dashboard/TrialCardPrompt.vue'
 import LogAsDialogField from '~/components/LogAsDialogField.vue'
 import { useEdgeSwipeBack } from '~/composables/useEdgeSwipeBack'
 import { isNativeChromeEnabled, useNativeChrome } from '~/composables/useNativeChrome'
@@ -109,6 +110,7 @@ useEdgeSwipeBack(contentShell, {
   >
     <div ref="contentShell" class="native-chrome-content flex flex-col h-full overflow-hidden bg-slate-100 dark:bg-slate-900">
       <PastDueBanner />
+      <TrialCardPrompt />
       <OnboardingExploreBanner v-if="pendingOnboardingAppId" :app-id="pendingOnboardingAppId" />
       <OnboardingExploreReminder v-if="pendingOnboardingAppId" :app-id="pendingOnboardingAppId" />
       <main class="w-full h-full overflow-hidden">
@@ -144,6 +146,7 @@ useEdgeSwipeBack(contentShell, {
         />
         <!-- App and settings layouts are nested inside this shared dashboard shell. -->
         <PastDueBanner />
+        <TrialCardPrompt />
         <OnboardingExploreBanner v-if="pendingOnboardingAppId" :app-id="pendingOnboardingAppId" />
         <OnboardingExploreReminder v-if="pendingOnboardingAppId" :app-id="pendingOnboardingAppId" />
         <main class="w-full h-full overflow-hidden">

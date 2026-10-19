@@ -108,6 +108,36 @@ describe('stripe subscription event classification', () => {
     })
   })
 
+  it.concurrent('exposes the raw subscription status so a trial end can be detected', () => {
+    const stripeData = extractDataEvent(mockContext, {
+      data: {
+        object: {
+          customer: 'cus_trial_end',
+          id: 'sub_trial_end',
+          status: 'active',
+          trial_end: 1_714_517_200,
+          items: {
+            data: [
+              makeSubscriptionItem({
+                interval: 'month',
+                priceId: 'price_monthly_trial',
+                productId: 'prod_trial',
+              }),
+            ],
+          },
+        },
+        previous_attributes: {
+          status: 'trialing',
+        },
+      },
+      type: 'customer.subscription.updated',
+    } as any)
+
+    expect(stripeData.subscriptionStatus).toBe('active')
+    expect(stripeData.previousSubscriptionStatus).toBe('trialing')
+    expect(stripeData.data.trial_at).toBe(new Date(1_714_517_200 * 1000).toISOString())
+  })
+
   it.concurrent('uses the licensed subscription item for cancel-at-period-end timestamps', () => {
     const stripeData = extractDataEvent(mockContext, {
       data: {

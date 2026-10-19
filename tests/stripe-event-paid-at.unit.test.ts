@@ -55,4 +55,51 @@ describe('stripe paid_at tracking', () => {
       ),
     ).toBeUndefined()
   })
+  it.concurrent('does not set paid_at when a trial checkout creates a trialing subscription', () => {
+    expect(
+      stripeEventTestUtils.getPaidAtUpdate(
+        { paid_at: null, status: null },
+        'created',
+        '2026-03-24T12:00:00.000Z',
+        { subscriptionStatus: 'trialing' },
+      ),
+    ).toBeUndefined()
+  })
+
+  it.concurrent('sets paid_at on the first charge when the trial ends', () => {
+    const eventOccurredAtIso = '2026-04-07T12:00:00.000Z'
+
+    expect(
+      stripeEventTestUtils.getPaidAtUpdate(
+        { paid_at: null, status: 'succeeded' },
+        'updated',
+        eventOccurredAtIso,
+        { subscriptionStatus: 'active', previousSubscriptionStatus: 'trialing' },
+      ),
+    ).toBe(eventOccurredAtIso)
+  })
+
+  it.concurrent('sets paid_at when a subscription recovers from past due without a prior payment', () => {
+    const eventOccurredAtIso = '2026-04-09T12:00:00.000Z'
+
+    expect(
+      stripeEventTestUtils.getPaidAtUpdate(
+        { paid_at: null, status: 'succeeded' },
+        'updated',
+        eventOccurredAtIso,
+        { subscriptionStatus: 'active', previousSubscriptionStatus: 'past_due' },
+      ),
+    ).toBe(eventOccurredAtIso)
+  })
+
+  it.concurrent('keeps the existing paid_at when a trial ends', () => {
+    expect(
+      stripeEventTestUtils.getPaidAtUpdate(
+        { paid_at: '2026-03-20T09:00:00.000Z', status: 'succeeded' },
+        'updated',
+        '2026-04-07T12:00:00.000Z',
+        { subscriptionStatus: 'active', previousSubscriptionStatus: 'trialing' },
+      ),
+    ).toBeUndefined()
+  })
 })

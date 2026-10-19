@@ -77,6 +77,7 @@ function mockBillingAccountLookup(billingAccount = 'ee') {
 
 afterEach(() => {
   delete mockedEnv.STRIPE_API_BASE_URL
+  delete mockedEnv.STRIPE_PUBLISHABLE_KEY
   mockedEnv.ENV = 'local'
   mockedEnv.STRIPE_SECRET_KEY = 'sk_test_123'
   mockedSupabaseAdmin.mockReset()
@@ -210,7 +211,7 @@ describe('stripe redirect URL allowlist', () => {
       'affonso_ref_123',
     )
 
-    expect(result.url).toBe('https://pay.capgo.test/p/pay')
+    expect(result).toEqual({ url: 'https://pay.capgo.test/p/pay' })
     expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
       allow_promotion_codes: true,
       success_url: 'https://capgo.test/app/success?success=true',
@@ -226,6 +227,122 @@ describe('stripe redirect URL allowlist', () => {
         affonso_referral: 'affonso_ref_123',
       },
     }))
+  })
+
+  it('keeps the remaining trial when a trial org checks out early', async () => {
+    const createSession = vi.fn().mockResolvedValue({ url: 'https://pay.capgo.test/p/pay' })
+    const stripeClient = {
+      prices: {
+        list: vi.fn().mockResolvedValue({ data: createPriceList() }),
+      },
+      checkout: {
+        sessions: {
+          create: createSession,
+        },
+      },
+    } as any
+
+    vi.mocked(Stripe).mockImplementation(function () {
+      return stripeClient
+    } as any)
+
+    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    trialEndsAt.setMilliseconds(0)
+    const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', 'org_123', undefined, undefined, undefined, undefined, { trialEndsAt: trialEndsAt.toISOString() })
+
+    expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'subscription',
+      subscription_data: { trial_end: trialEndsAt.getTime() / 1000 },
+    }))
+  })
+
+  it('charges immediately when the trial is too close to its end for Stripe', async () => {
+    const createSession = vi.fn().mockResolvedValue({ url: 'https://pay.capgo.test/p/pay' })
+    const stripeClient = {
+      prices: {
+        list: vi.fn().mockResolvedValue({ data: createPriceList() }),
+      },
+      checkout: {
+        sessions: {
+          create: createSession,
+        },
+      },
+    } as any
+
+    vi.mocked(Stripe).mockImplementation(function () {
+      return stripeClient
+    } as any)
+
+    const { createCheckout, getCheckoutTrialEnd } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const trialEndsAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', 'org_123', undefined, undefined, undefined, undefined, { trialEndsAt })
+
+    expect(createSession.mock.calls[0][0]).not.toHaveProperty('subscription_data')
+    expect(getCheckoutTrialEnd(null)).toBeUndefined()
+    expect(getCheckoutTrialEnd('not a date')).toBeUndefined()
+    expect(getCheckoutTrialEnd('2026-01-10T00:00:00.000Z', Date.parse('2026-01-08T00:00:00.000Z'))).toBeUndefined()
+    expect(getCheckoutTrialEnd('2026-01-10T01:00:00.000Z', Date.parse('2026-01-08T00:00:00.000Z'))).toBe(Date.parse('2026-01-10T01:00:00.000Z') / 1000)
+  })
+
+  it('returns a client secret for embedded checkout when the account has a publishable key', async () => {
+    mockedEnv.STRIPE_PUBLISHABLE_KEY = 'pk_test_123'
+    const createSession = vi.fn().mockResolvedValue({ url: null, client_secret: 'cs_secret_123' })
+    const stripeClient = {
+      prices: {
+        list: vi.fn().mockResolvedValue({ data: createPriceList() }),
+      },
+      checkout: {
+        sessions: {
+          create: createSession,
+        },
+      },
+    } as any
+
+    vi.mocked(Stripe).mockImplementation(function () {
+      return stripeClient
+    } as any)
+
+    const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const result = await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', 'org_123', undefined, undefined, undefined, undefined, { embedded: true })
+
+    expect(result).toEqual({ clientSecret: 'cs_secret_123', publishableKey: 'pk_test_123' })
+    const params = createSession.mock.calls[0][0]
+    expect(params).toMatchObject({
+      ui_mode: 'embedded_page',
+      redirect_on_completion: 'if_required',
+      return_url: 'https://capgo.test/app/success?success=true',
+      allow_promotion_codes: true,
+      tax_id_collection: { enabled: true },
+    })
+    expect(params).not.toHaveProperty('success_url')
+    expect(params).not.toHaveProperty('cancel_url')
+  })
+
+  it('falls back to hosted checkout when embedded is requested without a publishable key', async () => {
+    mockedEnv.STRIPE_PUBLISHABLE_KEY = 'not-a-publishable-key'
+    const createSession = vi.fn().mockResolvedValue({ url: 'https://pay.capgo.test/p/pay' })
+    const stripeClient = {
+      prices: {
+        list: vi.fn().mockResolvedValue({ data: createPriceList() }),
+      },
+      checkout: {
+        sessions: {
+          create: createSession,
+        },
+      },
+    } as any
+
+    vi.mocked(Stripe).mockImplementation(function () {
+      return stripeClient
+    } as any)
+
+    const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const result = await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', 'org_123', undefined, undefined, undefined, undefined, { embedded: true })
+
+    expect(result).toEqual({ url: 'https://pay.capgo.test/p/pay' })
+    expect(createSession.mock.calls[0][0]).not.toHaveProperty('ui_mode')
+    expect(createSession.mock.calls[0][0]).toMatchObject({ success_url: 'https://capgo.test/app/success?success=true' })
   })
 
   it('rejects external success URLs for checkout', async () => {
@@ -539,7 +656,7 @@ describe('stripe redirect URL allowlist', () => {
       '/app/cancel',
     )
 
-    expect(result.url).toBe('https://pay.capgo.test/p/subscription')
+    expect(result).toEqual({ url: 'https://pay.capgo.test/p/subscription' })
     expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
       line_items: [
         expect.objectContaining({
