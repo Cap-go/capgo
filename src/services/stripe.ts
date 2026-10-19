@@ -186,6 +186,38 @@ export async function openCheckout(priceId: string, successUrl: string, cancelUr
   }
 }
 
+export type EmbeddedCheckoutSession
+  = | { kind: 'embedded', clientSecret: string, publishableKey: string }
+    | { kind: 'hosted', url: string }
+
+// Embedded Checkout session for an in-console payment. The backend answers
+// with a hosted URL instead when the org's Stripe account has no publishable key.
+export async function createEmbeddedCheckoutSession(priceId: string, isYear: boolean, orgId: string, returnUrl: string): Promise<EmbeddedCheckoutSession | null> {
+  const datafastAttribution = await getDatafastAttribution()
+  const affonsoReferral = await getAffonsoReferral()
+  const resp = await invokeCapgoApi('private/stripe_checkout', {
+    body: JSON.stringify({
+      priceId,
+      successUrl: returnUrl,
+      cancelUrl: returnUrl,
+      recurrence: isYear ? 'year' : 'month',
+      orgId,
+      uiMode: 'embedded',
+      attributionId: datafastAttribution.visitorId,
+      datafastVisitorId: datafastAttribution.visitorId,
+      datafastSessionId: datafastAttribution.sessionId,
+      affonsoReferral,
+    }),
+  })
+  if (resp.error)
+    return null
+  if (resp.data?.clientSecret && resp.data?.publishableKey)
+    return { kind: 'embedded', clientSecret: resp.data.clientSecret, publishableKey: resp.data.publishableKey }
+  if (resp.data?.url)
+    return { kind: 'hosted', url: resp.data.url }
+  return null
+}
+
 export async function startCreditTopUp(orgId: string, quantity = 100) {
   if (!orgId)
     return

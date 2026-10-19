@@ -64,6 +64,17 @@ export function getStripeWebhookSecret(c: Context, account: BillingAccount = 'ee
   return getEnv(c, getStripeWebhookSecretEnvName(account))
 }
 
+export function getStripePublishableKeyEnvName(account: BillingAccount): string {
+  return account === 'us' ? 'STRIPE_PUBLISHABLE_KEY_US' : 'STRIPE_PUBLISHABLE_KEY'
+}
+
+// Public key for Embedded Checkout. Empty when unset or not a pk_ key, so
+// callers fall back to the hosted checkout page.
+export function getStripePublishableKey(c: Context, account: BillingAccount = 'ee'): string {
+  const key = (getEnv(c, getStripePublishableKeyEnvName(account)) || '').trim()
+  return key.startsWith('pk_') ? key : ''
+}
+
 export function isStripeConfiguredForAccount(c: Context, account: BillingAccount = 'ee'): boolean {
   const secretKey = getStripeSecretKey(c, account).trim()
   if (!secretKey)

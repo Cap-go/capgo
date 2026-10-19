@@ -21,6 +21,8 @@ interface CheckoutData {
   orgId: string
   // Enterprise MAU slider: MAU bought on top of the plan allowance.
   extraMau?: number
+  // 'embedded' returns a client secret for Embedded Checkout instead of a URL.
+  uiMode?: 'hosted' | 'embedded'
 }
 
 function parseExtraMau(value: unknown) {
@@ -107,6 +109,6 @@ app.post('/', middlewareAuth, async (c) => {
   const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', planId, body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId, {
     visitorId: body.datafastVisitorId,
     sessionId: body.datafastSessionId,
-  }, body.affonsoReferral, extraMauCheckout, trialEndsAt)
-  return c.json({ url: checkout.url })
+  }, body.affonsoReferral, extraMauCheckout, { trialEndsAt, embedded: body.uiMode === 'embedded' })
+  return c.json(checkout)
 })

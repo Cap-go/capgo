@@ -8,6 +8,7 @@ import {
   BillingAccountUnavailableError,
   getBillingAccountForCustomer,
   getPlanPriceId,
+  getStripePublishableKey,
   getStripeSecretKey,
   isAutomaticTaxEnabled,
   isStripeConfiguredForAccount,
@@ -895,7 +896,19 @@ export function getCheckoutTrialEnd(trialEndsAt: string | null | undefined, now 
   return Math.floor(trialEndMs / 1000)
 }
 
-export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string, datafastAttribution?: DatafastAttribution, affonsoReferral?: string | null, extraMau?: ExtraMauCheckout, trialEndsAt?: string | null) {
+export interface CheckoutOptions {
+  // Remaining trial to keep on the new subscription (see getCheckoutTrialEnd).
+  trialEndsAt?: string | null
+  // Embedded Checkout, mounted in the console with the returned client secret.
+  // Falls back to the hosted page when the account has no publishable key.
+  embedded?: boolean
+}
+
+export type CheckoutResult
+  = | { url: string }
+    | { clientSecret: string, publishableKey: string }
+
+export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string, datafastAttribution?: DatafastAttribution, affonsoReferral?: string | null, extraMau?: ExtraMauCheckout, options: CheckoutOptions = {}): Promise<CheckoutResult> {
   const billingAccount = await getBillingAccountForCustomer(c, customerId)
   assertBillingAccountReachableForUser(c, billingAccount, customerId)
   if (!isStripeConfiguredForAccount(c, billingAccount))
@@ -920,15 +933,20 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
   }
   const allowedSuccessUrl = getAllowedRedirectUrl(c, successUrl, 'success_url')
   const allowedCancelUrl = getAllowedRedirectUrl(c, cancelUrl, 'cancel_url')
-  const trialEnd = getCheckoutTrialEnd(trialEndsAt)
+  const trialEnd = getCheckoutTrialEnd(options.trialEndsAt)
+  const publishableKey = options.embedded ? getStripePublishableKey(c, billingAccount) : ''
+  // Embedded Checkout has no cancel page; return_url is only used by
+  // payment methods that must leave the page (e.g. some bank redirects).
+  const pageParams: Pick<Stripe.Checkout.SessionCreateParams, 'ui_mode' | 'return_url' | 'redirect_on_completion' | 'success_url' | 'cancel_url'> = publishableKey
+    ? { ui_mode: 'embedded_page', redirect_on_completion: 'if_required', return_url: `${allowedSuccessUrl}?success=true` }
+    : { success_url: `${allowedSuccessUrl}?success=true`, cancel_url: allowedCancelUrl }
   const session = await getStripe(c, billingAccount).checkout.sessions.create({
     allow_promotion_codes: true,
     billing_address_collection: 'auto',
     mode: 'subscription',
     ...(trialEnd ? { subscription_data: { trial_end: trialEnd } } : {}),
     customer: customerId,
-    success_url: `${allowedSuccessUrl}?success=true`,
-    cancel_url: allowedCancelUrl,
+    ...pageParams,
     automatic_tax: { enabled: isAutomaticTaxEnabled(billingAccount) },
     client_reference_id: clientReferenceId,
     metadata: Object.keys(metadata).length ? metadata : undefined,
@@ -940,7 +958,9 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
     saved_payment_method_options: CHECKOUT_SAVED_PAYMENT_METHOD_OPTIONS,
     line_items: lineItems,
   })
-  return { url: session.url }
+  if (publishableKey && session.client_secret)
+    return { clientSecret: session.client_secret, publishableKey }
+  return { url: session.url ?? '' }
 }
 
 async function listPricesByProduct(c: Context, productId: string, billingAccount: BillingAccount, active?: boolean) {
