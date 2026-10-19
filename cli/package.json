@@ -1,7 +1,7 @@
 {
   "name": "@capgo/cli",
   "type": "module",
-  "version": "8.87.3",
+  "version": "8.88.0",
   "description": "A CLI to upload to capgo servers",
   "author": "Martin martin@capgo.app",
   "license": "Apache 2.0",
@@ -120,7 +120,7 @@
     "test:app-add-exists": "bun test/test-app-add-exists.mjs",
     "test:app-add-getting-started": "bun test/test-app-add-getting-started.mjs",
     "test:app-list-output-text": "bun test/test-app-list-output-text.mjs",
-    "test:app-todo": "bun test/test-app-todo.mjs && bun test/test-builder-only-checklist.mjs && bun test/test-builder-only-setup.mjs",
+    "test:app-todo": "bun test/test-app-todo.mjs && bun test/test-builder-only-checklist.mjs && bun test/test-builder-only-setup.mjs && bun test/test-app-todo-lists.mjs && bun test/test-app-todo-tabs.mjs && bun test/test-app-todo-command.mjs && node test/test-app-todo-interactive.mjs",
     "test:doctor-analytics": "bun test/test-doctor-analytics.mjs",
     "test:posthog-exception": "bun test/test-posthog-exception.mjs",
     "test:cli-recovery": "bun test/test-cli-recovery.mjs",

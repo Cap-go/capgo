@@ -6,6 +6,7 @@ import { existInEnv, getEnv } from './utils.ts'
 
 export const LIFECYCLE_V2_CONTRACT = 'new-emails-v2-2026-10-19'
 
+// Match Worker lifecycle readiness; these do not control invitation reminders.
 const REQUIRED_SETTINGS = {
   BENTO_EVENT_DISPATCH_ENABLED: 'true',
   BENTO_LIFECYCLE_V2_SENDER_CONTRACT: LIFECYCLE_V2_CONTRACT,

@@ -16,6 +16,7 @@ import { DispatchStore } from './store.ts'
 export interface DispatchEnv extends PostHogQueueEnv {
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive
   DISPATCH_QUEUE: Queue<DispatchJob>
+  // Lifecycle-only opt-in; ordinary reminders use Worker configuration.
   BENTO_EVENT_DISPATCH_ENABLED?: string
   BENTO_LIFECYCLE_V2_SENDER_CONTRACT?: string
   BENTO_LIFECYCLE_V2_LEGACY_HANDOFF?: string
@@ -29,36 +30,17 @@ export interface DispatchEnv extends PostHogQueueEnv {
 
 const settings = ['BENTO_PUBLISHABLE_KEY', 'BENTO_SECRET_KEY', 'BENTO_SITE_UUID', 'WEBAPP_URL'] as const
 
-async function enabled(db: Client, env: DispatchEnv) {
-  // Vault owns runtime activation; an environment value is an explicit
-  // deployment-time override. An absent setting leaves dispatch inactive.
-  if (env.BENTO_EVENT_DISPATCH_ENABLED !== undefined)
-    return env.BENTO_EVENT_DISPATCH_ENABLED.trim() === 'true'
-  const result = await db.query<{ decrypted_secret: string }>(
-    'SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = $1 LIMIT 1',
-    ['BENTO_EVENT_DISPATCH_ENABLED'],
-  )
-  return result.rows[0]?.decrypted_secret?.trim() === 'true'
-}
-
-async function senderContext(db: Client, env: DispatchEnv, runId: string): Promise<HonoContext> {
-  const missing = settings.filter(key => !env[key]?.trim())
+function senderContext(env: DispatchEnv, runId: string): HonoContext {
   const values: Record<string, string> = {}
-  if (missing.length) {
-    const result = await db.query<{ name: string, decrypted_secret: string }>(
-      'SELECT name, decrypted_secret FROM vault.decrypted_secrets WHERE name = ANY($1::text[])',
-      [missing],
-    )
-    for (const row of result.rows)
-      values[row.name] = row.decrypted_secret
-  }
   for (const key of settings) {
-    if (env[key]?.trim())
-      values[key] = env[key]!
+    const value = env[key]?.trim()
+    if (!value)
+      throw new Error('Missing dispatch configuration')
+    values[key] = value
   }
   const c = new Context(new Request('https://bento-dispatch.internal'), { env: values })
   c.set('requestId', runId)
-  if (!isBentoConfigured(c) || !values.WEBAPP_URL)
+  if (!isBentoConfigured(c))
     throw new Error('Missing dispatch configuration')
   // Validate the destination before claiming any events or consuming attempts.
   const url = new URL(values.WEBAPP_URL)
@@ -96,8 +78,7 @@ export async function scheduleDispatch(_controller: ScheduledController, env: Di
         await store.relayPendingAudit(env.POSTHOG_QUEUE)
       }
       catch { console.error(JSON.stringify({ event: 'bento_dispatch_audit_pending' })) }
-      if (!await enabled(db, env))
-        return
+      senderContext(env, 'bento-dispatch-scheduler')
       try {
         const read = { query: async <T extends import('pg').QueryResultRow>(sql: string, values?: unknown[]) => (await db.query<T>(sql, values)).rows }
         if (await lifecycleReady(read, env as unknown as Record<string, string>)) {
@@ -161,9 +142,7 @@ export async function consumeDispatch(batch: MessageBatch<unknown>, env: Dispatc
   }
   try {
     const counts = await withDatabase(env, async (db) => {
-      if (!await enabled(db, env))
-        return { accepted: 0, cancelled: 0, failed: 0 }
-      const c = await senderContext(db, env, job.runId)
+      const c = senderContext(env, job.runId)
       const store = new DispatchStore(db)
       const result = await processDispatchJob(job, store, run => createMutationContext(store, run, async (event) => {
         return await trackBentoEvent(c, event.email, event.data, event.event, AbortSignal.timeout(10_000)) === true

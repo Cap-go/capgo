@@ -200,6 +200,46 @@ describe('pOST /auth/register unit', () => {
     expect(signUpMock).not.toHaveBeenCalled()
   })
 
+  it.each([true, false])('preserves signup attribution and explicit newsletter preference %s without forcing an onboarding version', async (newsletter) => {
+    const attribution = {
+      ref: 'readme-example',
+      signup_source: 'plugin_example',
+      signup_plugin: 'example',
+      first_touch_type: 'plugin',
+      first_touch_path: '/plugins/example/',
+      utm_source: 'example-source',
+      utm_medium: 'readme',
+      utm_campaign: 'example-campaign',
+    }
+    const response = await postRegister({
+      ...validBody,
+      ...attribution,
+      first_name: undefined,
+      last_name: undefined,
+      opt_for_newsletters: newsletter,
+    })
+    expect(response.status).toBe(200)
+    expect(signUpMock).toHaveBeenCalledWith({
+      email: validBody.email,
+      password: validBody.password,
+      options: { captchaToken: validBody.captcha_token, data: attribution },
+    })
+    expect(usersUpsertMock).toHaveBeenCalledWith({
+      id: '11111111-1111-1111-1111-111111111111',
+      email: validBody.email,
+      first_name: '',
+      last_name: '',
+      enable_notifications: true,
+      opt_for_newsletters: newsletter,
+    }, { onConflict: 'id' })
+  })
+
+  it('rejects non-boolean newsletter preferences before signup', async () => {
+    const response = await postRegister({ ...validBody, opt_for_newsletters: 'true' })
+    expect(response.status).toBe(400)
+    expect(signUpMock).not.toHaveBeenCalled()
+  })
+
   it('returns captcha_failed when GoTrue rejects the captcha token', async () => {
     signUpMock.mockResolvedValueOnce({
       data: { user: null, session: null },

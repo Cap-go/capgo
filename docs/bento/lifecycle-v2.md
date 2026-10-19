@@ -154,7 +154,10 @@ eligibility, experiment assignments or no-app episode rules.
 
 ## Activation and legacy handoff
 
-All gates default closed. The authorized activation sequence is:
+All lifecycle gates default closed. The shared dispatcher independently runs
+invitation reminders from valid Worker credentials and origin, without a global
+Vault activation switch. Lifecycle-only readiness/analytics reads cannot block
+that existing reminder path. The authorized lifecycle activation sequence is:
 
 1. Merge/apply PR #3732's protected enrollment migration and engine first.
 2. Merge this lifecycle migration/worker and PR #21's JSON definition. Deploy
@@ -179,13 +182,19 @@ All gates default closed. The authorized activation sequence is:
 6. Only after sender and legacy-session verification explicitly set Vault
    `BENTO_LIFECYCLE_V2_SENDER_CONTRACT` and
    `BENTO_LIFECYCLE_V2_LEGACY_HANDOFF` to `new-emails-v2-2026-10-19`, and retain
-   the existing global `BENTO_EVENT_DISPATCH_ENABLED=true` requirement. Explicit
+   the lifecycle-only `BENTO_EVENT_DISPATCH_ENABLED=true` opt-in. That flag does
+   not gate invitation reminders or replace either attestation. Explicit
    deployment overrides use the same exact values. This PR sets none of them.
 
 Readiness and legacy suppression use the same protected creator predicate and
 three controls. Unknown readiness retains existing legacy delivery and prevents
 new provider events. Unrelated invitations, billing and transactional messages
 are not suppressed. Existing subscription/customer/paid tags remain intact.
+
+A draft managed sender does not qualify for the sender-contract attestation.
+Publishing and verifying the matching sender is a separate authorized operator
+step; configured Worker credentials alone never enable lifecycle dispatch or
+legacy lifecycle suppression.
 
 ## Execution model and capacity
 

@@ -104,6 +104,13 @@ organization and current token-generation timestamp, without the token itself.
 A resend creates a new context; the previous context becomes `superseded`.
 Already-sent invitations are not backfilled.
 
+`org_invitation_email_requests` holds mutable delivery state, not permanent send
+history. New-user acceptance calls `accept_tmp_user_invitation`, which deletes
+the accepted `tmp_users` row. Its delivery-state row is removed by the
+`tmp_user_id` foreign key's `ON DELETE CASCADE`. The independent
+`bento_event_dispatches` start/acceptance history survives; counting surviving
+delivery-state rows does not count all historical invitation emails.
+
 A missing source is `removed` unless actual active organization membership proves
 acceptance. Terminal reasons distinguish `accepted`, `cancelled`, `expired`,
 `removed`, `superseded`, and `completed`. `endFlow` atomically closes the active
@@ -136,11 +143,20 @@ import the shared fact/audit helper under `_backend/utils`, so deployment scope
 includes both when that helper changes. Provision only the evaluation queue;
 bind the existing `capgo-posthog-events-prod` queue for analytics.
 
-The Worker is inactive when Vault has no `BENTO_EVENT_DISPATCH_ENABLED` setting.
-Credentials and origin use the existing exact Vault keys `BENTO_PUBLISHABLE_KEY`,
-`BENTO_SECRET_KEY`, `BENTO_SITE_UUID`, and `WEBAPP_URL`. Explicit Worker environment
-values override runtime Vault settings. Keep credentials and site in the same
-Bento environment as the four replacement flows.
+Invitation evaluations run automatically from Worker configuration, without a
+dispatcher-wide activation flag or credential lookup in Vault. `WEBAPP_URL` is explicit production configuration in
+`wrangler.jsonc`. Supply `BENTO_PUBLISHABLE_KEY`, `BENTO_SECRET_KEY` and
+`BENTO_SITE_UUID` as Cloudflare Worker secrets before deploying. Missing or invalid
+configuration fails visibly before scheduling or claiming business work.
+Keep credentials and site in the same Bento environment as the four replacement
+flows.
+
+The separately gated lifecycle evaluations retain their matching sender-contract
+and legacy-handoff attestations plus `BENTO_EVENT_DISPATCH_ENABLED=true` as an
+additional **lifecycle-only** opt-in. Those optional lifecycle/analytics Vault
+reads are isolated: missing settings or Vault failures cannot stop configured
+invitation reminders. Credentials and origin never fall back to Vault. A draft
+lifecycle sender is not ready for its attestations or lifecycle activation.
 
 Retention cleanup is deferred to future work, with a one-month follow-up to
 revisit the policy. A 365-day retention window is a candidate for that discussion,
@@ -154,16 +170,18 @@ history required for cadence. Deleting accepted events generically can weaken
 future flow deduplication; this feature does not define a universal deletion
 period. This follow-up does not block activation.
 
-Live Bento editing/publication is deferred. After the four recreation flows have
-been prepared, reviewed and manually published, enable the Vault setting through
-the normal operational process. Verify controlled invitations and observe run
-summaries, accepted ledger events, pending audit age, provider budget deferrals,
-exhausted attempts and queue backlog before expanding use.
+Live Bento editing/publication is separate from event dispatch. The Worker can
+send reminder events before the four recreation flows are published; those
+events do not send reminder emails until the matching Bento flow is live.
+Verify controlled invitations and observe run summaries, accepted ledger events,
+pending audit age, provider budget deferrals, exhausted attempts and queue
+backlog. Publishing a flow does not replay reminders already acknowledged by
+Bento; accepted ledger markers continue to prevent resends.
 
-To pause, set activation false. Initial Cloudflare emails continue. Queued
-evaluation messages are acknowledged while disabled; ledger history remains.
-Reactivation rechecks current state and overdue eligibility. Do not erase accepted
-markers or reset exhausted attempt counts.
+To pause evaluations operationally, pause the queue consumer and remove the cron
+trigger in Cloudflare. Initial Cloudflare emails continue. Resume both to recheck
+current state and overdue eligibility. Do not erase accepted markers or reset
+exhausted attempt counts.
 
 ## Local plan evidence
 
