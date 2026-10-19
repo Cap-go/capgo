@@ -51,12 +51,16 @@ vi.mock('~/components/OnboardingProfile.vue', async () => {
 })
 
 let app: ReturnType<typeof createApp> | undefined
-async function mount() {
+async function mount(openName = true) {
   const container = document.createElement('div')
   app = createApp(NamePage)
   app.mount(container)
   await nextTick()
   await Promise.resolve()
+  if (openName) {
+    container.querySelector<HTMLButtonElement>('[data-test="onboarding-welcome-continue"]')?.click()
+    await vi.waitFor(() => expect(container.querySelector('form')).not.toBeNull())
+  }
   return container
 }
 async function submit(container: HTMLElement) {
@@ -81,7 +85,51 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('required first onboarding step', () => {
+describe('welcome followed by required About you', () => {
+  it('starts with the existing welcome screen and only then asks for names', async () => {
+    const container = await mount(false)
+    expect(container.querySelector('[data-test="onboarding-welcome"]')).not.toBeNull()
+    expect(container.querySelector('form')).toBeNull()
+    expect(container.querySelector('[data-test="onboarding-name-restart"]')).toBeNull()
+    expect(mocks.capture).toHaveBeenCalledWith('onboarding_step_viewed', expect.objectContaining({ step: 'welcome', step_index: 0 }))
+
+    container.querySelector<HTMLButtonElement>('[data-test="onboarding-welcome-continue"]')!.click()
+    await vi.waitFor(() => expect(container.querySelector('form')).not.toBeNull())
+    expect(container.querySelector('[data-test="onboarding-welcome"]')).toBeNull()
+    expect(container.querySelector('[data-test="onboarding-name-restart"]')).toBeNull()
+    expect(main.user.onboarding.profile_draft).toEqual({ first_name: '', last_name: '' })
+    expect(mocks.save).not.toHaveBeenCalled()
+    const welcome = mocks.capture.mock.calls.find(call => call[0] === 'onboarding_step_completed' && call[1].step === 'welcome')![1]
+    expect(welcome).toMatchObject({ next_step: 'name' })
+    expect(mocks.capture).toHaveBeenCalledWith('onboarding_step_viewed', expect.objectContaining({
+      step: 'name',
+      previous_step: 'welcome',
+      step_index: 1,
+      onboarding_attempt_id: welcome.onboarding_attempt_id,
+      onboarding_run_id: welcome.onboarding_run_id,
+    }))
+  })
+  it('resumes the name form after a refresh with an existing draft', async () => {
+    const attemptId = '36473744-0000-4000-8000-000000000001'
+    const previousRun = 'ir_36473744-0000-4000-8000-000000000002'
+    main.user.onboarding = { ...main.user.onboarding, onboarding_attempt_id: attemptId, last_run_id: previousRun, profile_draft: { first_name: 'Draft', last_name: '' } }
+    const container = await mount(false)
+    expect(container.querySelector('form')).not.toBeNull()
+    expect(container.querySelector('[data-test="onboarding-welcome"]')).toBeNull()
+    expect(main.user.onboarding.profile_draft.first_name).toBe('Draft')
+    expect(mocks.capture).toHaveBeenCalledWith('onboarding_step_viewed', expect.objectContaining({ step: 'name', resumed: true, step_index: 1, onboarding_attempt_id: attemptId, onboarding_run_id: expect.not.stringMatching(previousRun) }))
+    expect(main.user.onboarding.onboarding_attempt_id).toBe(attemptId)
+  })
+  it('stays on welcome and offers retry if starting the name draft fails', async () => {
+    const container = await mount(false)
+    mocks.persist.mockResolvedValueOnce({ status: 'error', error: new Error('network unavailable') })
+    container.querySelector<HTMLButtonElement>('[data-test="onboarding-welcome-continue"]')!.click()
+    await vi.waitFor(() => expect(mocks.toastError).toHaveBeenCalled())
+    expect(container.querySelector('form')).toBeNull()
+    expect(container.querySelector<HTMLButtonElement>('[data-test="onboarding-welcome-continue"]')?.disabled).toBe(false)
+    expect(mocks.capture.mock.calls.some(call => call[0] === 'onboarding_step_completed')).toBe(false)
+  })
+
   it('uses the shared onboarding frame and shows About you as the first progress step', async () => {
     const container = await mount()
     expect(container.querySelector('[data-test="onboarding-page"]')).not.toBeNull()
@@ -116,7 +164,7 @@ describe('required first onboarding step', () => {
     await submit(container)
     expect(mocks.replace).not.toHaveBeenCalled()
     expect(mocks.capture).toHaveBeenCalledWith('onboarding_profile_save_failed', expect.objectContaining({ step: 'name', onboarding_version: 6 }))
-    expect(mocks.capture.mock.calls.some(call => call[0] === 'onboarding_step_completed')).toBe(false)
+    expect(mocks.capture.mock.calls.some(call => call[0] === 'onboarding_step_completed' && call[1]?.step === 'name')).toBe(false)
   })
   it('preserves the original destination query/hash and telemetry identity after saving', async () => {
     mocks.valid = true
@@ -141,7 +189,7 @@ describe('required first onboarding step', () => {
     expect(mocks.replace).not.toHaveBeenCalled()
     expect(main.user.onboarding.profile_completed_at).toBeUndefined()
     expect(mocks.capture).toHaveBeenCalledWith('onboarding_profile_save_failed', expect.objectContaining({ step: 'name' }))
-    expect(mocks.capture.mock.calls.some(call => call[0] === 'onboarding_step_completed')).toBe(false)
+    expect(mocks.capture.mock.calls.some(call => call[0] === 'onboarding_step_completed' && call[1]?.step === 'name')).toBe(false)
   })
   it('debounces field events for 500 ms and sends lengths without raw names', async () => {
     vi.useFakeTimers()

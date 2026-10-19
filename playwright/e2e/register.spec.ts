@@ -66,12 +66,18 @@ async function enableNameTreatmentFixture(page: Page) {
       return
     }
     const token = headers.authorization?.replace(/^Bearer /i, '')
-    if (!token)
-      throw new Error('Missing local test session for assignment fixture')
+    if (!token) {
+      await route.fulfill({ status: 401, json: { error: 'not_authenticated' } })
+      return
+    }
     const admin = localAdminClient()
     const { data: auth, error: authError } = await admin.auth.getUser(token)
-    if (authError || !auth.user)
-      throw authError ?? new Error('Cannot identify treatment fixture user')
+    if (authError || !auth.user) {
+      // A refresh already in flight can arrive after logout revoked the token.
+      // Match the real endpoint's unauthenticated response in that case.
+      await route.fulfill({ status: 401, json: { error: 'not_authenticated' } })
+      return
+    }
     const { data, error } = await admin.from('users').select('onboarding').eq('id', auth.user.id).single()
     if (error)
       throw error
@@ -86,9 +92,24 @@ async function enableNameTreatmentFixture(page: Page) {
 
 async function loginToOnboarding(page: Page, email: string, password: string) {
   await page.login(email, password, /\/onboarding\/(?:name|app)/)
+  if (new URL(page.url()).pathname === '/onboarding/name')
+    await continuePastProfileWelcome(page)
+}
+
+async function continuePastProfileWelcome(page: Page) {
+  const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
+  const name = page.locator('[data-test="onboarding-name-step"]')
+  await expect(welcome.or(name)).toBeVisible()
+  if (await welcome.isVisible()) {
+    await expect(name).toHaveCount(0)
+    await welcome.click()
+  }
+  await expect(name).toBeVisible()
+  await expect(page.locator('[data-test="onboarding-name-restart"]')).toHaveCount(0)
 }
 
 async function completeName(page: Page) {
+  await continuePastProfileWelcome(page)
   await page.fill('[data-test="onboarding-first-name"]', 'Example')
   await page.fill('[data-test="onboarding-last-name"]', 'User')
   await page.click('[data-test="onboarding-name-continue"]')
@@ -262,6 +283,7 @@ test.describe('Registration', () => {
     expect(registrationPayload).not.toHaveProperty('last_name')
 
     await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
     await expectProtectedRouteRedirect(page, '/dashboard', /\/onboarding\/name/, '[data-test="onboarding-name-step"]')
     await page.route('**/rest/v1/users?*', async (route) => {
       if (route.request().method() === 'GET') {
@@ -276,6 +298,7 @@ test.describe('Registration', () => {
     await page.unroute('**/rest/v1/users?*')
     await page.locator('[data-test="account-load-retry"]').click()
     await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
     await expect(page.locator('[data-test="onboarding-name-step"]')).toBeVisible()
     await expect(page.locator('[data-test="onboarding-intent-ota"]')).toHaveCount(0)
     const continueGoal = page.locator('[data-test="onboarding-name-continue"]')
@@ -378,6 +401,7 @@ test.describe('Registration', () => {
     await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
     await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
 
     await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toHaveCount(0)
     await expect(page.locator('[data-test="onboarding-first-name"]')).toBeVisible()
@@ -410,6 +434,7 @@ test.describe('Registration', () => {
       await page.fill('[data-test="confirm-password"]', password)
       await page.click('[data-test="submit"]')
       await page.waitForURL(/\/onboarding\/name/)
+      await continuePastProfileWelcome(page)
 
       const draftSaved = page.waitForResponse((response) => {
         if (!response.url().includes('/rest/v1/users?') || response.request().method() !== 'PATCH' || !response.ok())
@@ -435,14 +460,8 @@ test.describe('Registration', () => {
       await supabase.auth.signOut({ scope: 'local' })
 
       await page.reload()
-      const resume = page.locator('[data-test="onboarding-resume-continue"]')
-      const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
       const firstName = page.locator('[data-test="onboarding-first-name"]')
-      await expect(resume.or(welcome).or(firstName)).toBeVisible()
-      if (await resume.isVisible())
-        await resume.click()
-      else if (await welcome.isVisible())
-        await welcome.click()
+      await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toHaveCount(0)
       await expect(firstName).toHaveValue('Draft')
       await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('User')
       await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeEnabled()
@@ -603,6 +622,7 @@ test.describe('Registration', () => {
     await page.click('[data-test="submit"]')
 
     await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
     await completeName(page)
     await expectOnboardingGoal(page)
     await page.click('[data-test="onboarding-intent-ota"]')
@@ -633,6 +653,7 @@ test.describe('Registration', () => {
     await loginToOnboarding(page, email, password)
     await expect(page.locator('[data-test="onboarding-resume-restart"]')).toBeVisible()
     await page.locator('[data-test="onboarding-resume-restart"]').click()
+    await continuePastProfileWelcome(page)
     await page.locator('[data-test="onboarding-name-continue"]').click()
     await expectOnboardingGoal(page)
     await expect(page.locator('[data-test="onboarding-intent-ota"]')).toBeVisible()
@@ -653,6 +674,7 @@ test.describe('Registration', () => {
     await page.click('[data-test="submit"]')
 
     await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
     await completeName(page)
     await expectOnboardingGoal(page)
     await forceWebNativeOnboardingTreatments(email, password)
@@ -694,6 +716,7 @@ test.describe('Registration', () => {
     await page.click('[data-test="submit"]')
 
     await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
     await completeName(page)
     await page.click('[data-test="onboarding-logout"]')
 

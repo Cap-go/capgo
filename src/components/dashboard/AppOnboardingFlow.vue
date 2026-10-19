@@ -719,8 +719,8 @@ function initializeProgressTracking(resumed: boolean) {
   if (initialStep === 'welcome')
     trackedAnalyticsSteps.unshift('welcome')
   ensurePublishAppQuestionStepTracked()
-  if (profileHandoff)
-    trackedAnalyticsSteps.unshift('name')
+  if (props.preOrg && !props.newOrganization && profileOnboarding.value)
+    trackedAnalyticsSteps.unshift('welcome', 'name')
 
   progressTracker = createOnboardingProgressTracker({
     flow: props.preOrg ? 'pre_org' : 'existing_org',

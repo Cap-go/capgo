@@ -89,8 +89,9 @@ interface OnboardingResumeCandidate {
 
 interface CreateOnboardingTelemetryIdentityOptions {
   capture?: CaptureEvent
-  // Continue an attempt handed off by another page instead of starting one.
-  continueFrom?: { attemptId: string, runId: string } | null
+  // A handoff retains the run; a resumed visit omits runId to start a new run
+  // within the same saved attempt.
+  continueFrom?: { attemptId: string, runId?: string } | null
   flow: OnboardingAnalyticsFlow
   idFactory?: () => string
   onboardingVersion?: () => OnboardingAnalyticsVersion

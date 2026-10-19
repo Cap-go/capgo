@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Json } from '~/types/supabase.types'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -7,12 +8,13 @@ import IconArrowRight from '~icons/lucide/arrow-right'
 import IconLoader from '~icons/lucide/loader-2'
 import AppOnboardingHeader from '~/components/dashboard/AppOnboardingHeader.vue'
 import AppOnboardingPageFrame from '~/components/dashboard/AppOnboardingPageFrame.vue'
+import AppOnboardingWelcome from '~/components/dashboard/AppOnboardingWelcome.vue'
 import OnboardingProfile from '~/components/OnboardingProfile.vue'
 import { getLocalConfig } from '~/services/supabase'
 import { replaceUserOnboardingWithRetry, serializeUserOnboardingWrite } from '~/services/userOnboardingWriteQueue'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
+import { onboardingPrimaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { initialProfileOnboardingProgressSteps, initialProfileOnboardingSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY } from '~/utils/onboardingProfile'
 import { createOnboardingDetailsFieldDebouncer, createOnboardingProgressTracker, createOnboardingTelemetryIdentity } from '~/utils/onboardingProgressAnalytics'
 import { validateRedirectPath } from '~/utils/safeRedirect'
@@ -25,19 +27,23 @@ const { t } = useI18n()
 const profileForm = ref<InstanceType<typeof OnboardingProfile> | null>(null)
 const isSaving = ref(false)
 const isLoggingOut = ref(false)
+const onboarding = main.user?.onboarding
+const savedOnboarding = onboarding && typeof onboarding === 'object' && !Array.isArray(onboarding) ? onboarding : {}
+const savedDraft = savedOnboarding.profile_draft
+const showWelcome = ref(!savedDraft || typeof savedDraft !== 'object' || Array.isArray(savedDraft))
 const targetPath = computed(() => validateRedirectPath(typeof route.query.to === 'string' ? route.query.to : '', '/onboarding/app', { blockedPrefixes: ['/onboarding/name'] }))
 const progressSteps = computed(() => initialProfileOnboardingProgressSteps(main.user?.onboarding)
   .filter(step => !targetPath.value.startsWith('/onboarding/organization') || step.id === 'name' || step.id === 'organization')
   .map(step => ({ id: step.id, label: t(step.labelKey) })))
-const identity = createOnboardingTelemetryIdentity({ flow: 'pre_org', onboardingVersion: () => 6, supaHost: getLocalConfig().supaHost })
-const tracker = createOnboardingProgressTracker({ flow: 'pre_org', onboardingVersion: () => 6, resumed: false, steps: targetPath.value.startsWith('/onboarding/organization') ? ['name', 'organization'] : initialProfileOnboardingSteps(main.user?.onboarding, false), supaHost: getLocalConfig().supaHost, onboardingAttemptId: identity.attemptId, onboardingRunId: identity.runId })
+const identity = createOnboardingTelemetryIdentity({ continueFrom: !showWelcome.value && typeof savedOnboarding.onboarding_attempt_id === 'string' ? { attemptId: savedOnboarding.onboarding_attempt_id } : null, flow: 'pre_org', onboardingVersion: () => 6, supaHost: getLocalConfig().supaHost })
+const tracker = createOnboardingProgressTracker({ flow: 'pre_org', onboardingVersion: () => 6, resumed: !showWelcome.value, steps: targetPath.value.startsWith('/onboarding/organization') ? ['welcome', 'name', 'organization'] : initialProfileOnboardingSteps(main.user?.onboarding, true), supaHost: getLocalConfig().supaHost, onboardingAttemptId: identity.attemptId, onboardingRunId: identity.runId })
 const fields = createOnboardingDetailsFieldDebouncer((event, step, properties) => tracker.trackDetailsEvent(event, step, properties), 500)
 
 function trackField(field: 'first_name' | 'last_name', value: string) {
   fields.schedule(field === 'first_name' ? 'onboarding_first_name_entered' : 'onboarding_last_name_entered', field, 'name', value)
 }
 
-async function persistProfileProgress(patch: Record<string, string>) {
+async function persistProfileProgress(patch: Record<string, Json>) {
   const userId = main.user?.id
   if (!userId)
     return false
@@ -57,8 +63,36 @@ async function persistProfileProgress(patch: Record<string, string>) {
   })
 }
 
+async function continueAfterWelcome() {
+  if (isSaving.value || !showWelcome.value)
+    return
+  isSaving.value = true
+  try {
+    // The existing draft records that About you has started, including before
+    // any typing, so a refresh resumes the form instead of replaying welcome.
+    const started = await persistProfileProgress({ profile_draft: {
+      first_name: main.user?.first_name ?? '',
+      last_name: main.user?.last_name ?? '',
+    } })
+    if (!started) {
+      toast.error(t('account-error'))
+      return
+    }
+    tracker.completeStep('welcome', { nextStep: 'name' })
+    showWelcome.value = false
+    tracker.viewStep('name', 'welcome')
+  }
+  catch (error) {
+    console.warn('Cannot start profile onboarding', error)
+    toast.error(t('account-error'))
+  }
+  finally {
+    isSaving.value = false
+  }
+}
+
 async function continueAfterName() {
-  if (isSaving.value || !profileForm.value?.isValid)
+  if (showWelcome.value || isSaving.value || !profileForm.value?.isValid)
     return
   isSaving.value = true
   try {
@@ -81,20 +115,6 @@ async function continueAfterName() {
     tracker.completeStep('name', { nextStep: targetPath.value.startsWith('/onboarding/organization') ? 'organization' : 'intent' })
     const destination = router.resolve(targetPath.value)
     await router.replace({ path: destination.path, query: destination.query, hash: destination.hash, state: { [PROFILE_ONBOARDING_HANDOFF_KEY]: { attemptId: identity.attemptId, runId: identity.runId } } })
-  }
-  finally {
-    isSaving.value = false
-  }
-}
-
-async function restartName() {
-  if (isSaving.value)
-    return
-  isSaving.value = true
-  try {
-    fields.dispose()
-    if (!await profileForm.value?.resetDraft())
-      toast.error(t('account-error'))
   }
   finally {
     isSaving.value = false
@@ -127,7 +147,7 @@ onMounted(async () => {
     await router.replace(targetPath.value)
     return
   }
-  tracker.viewStep('name')
+  tracker.viewStep(showWelcome.value ? 'welcome' : 'name')
   document.addEventListener('visibilitychange', visibilityChanged)
   try {
     await persistProfileProgress({ onboarding_attempt_id: identity.attemptId, last_run_id: identity.runId })
@@ -145,7 +165,10 @@ onBeforeUnmount(() => {
 
 <template>
   <AppOnboardingPageFrame :is-logging-out="isLoggingOut" :disabled="isSaving" @logout="logout">
-    <section class="onboarding-flow-shell onboarding-flow-app-creation onboarding-flow-details-name h-full min-h-0 flex-1 overflow-y-auto bg-slate-50 px-4 py-6 sm:px-6 lg:px-8 dark:bg-slate-950">
+    <div v-if="showWelcome" class="min-h-0 flex-1 overflow-y-auto">
+      <AppOnboardingWelcome :disabled="isSaving" @continue="continueAfterWelcome" />
+    </div>
+    <section v-else class="onboarding-flow-shell onboarding-flow-app-creation onboarding-flow-details-name h-full min-h-0 flex-1 overflow-y-auto bg-slate-50 px-4 py-6 sm:px-6 lg:px-8 dark:bg-slate-950">
       <div class="onboarding-flow-content mx-auto w-full max-w-3xl space-y-6">
         <AppOnboardingHeader :title="t('onboarding-welcome-title')" :steps="progressSteps" current-step-id="name" />
         <form class="onboarding-details-card rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95" data-test="onboarding-name-step" @submit.prevent="continueAfterName">
@@ -165,10 +188,7 @@ onBeforeUnmount(() => {
             <p class="text-sm leading-6 text-slate-500 dark:text-slate-400">
               {{ t('onboarding-name-required') }}
             </p>
-            <div class="onboarding-details-actions flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between dark:border-white/15">
-              <button type="button" class="d-btn min-h-12" :class="onboardingSecondaryButtonClass" :disabled="isSaving" data-test="onboarding-name-restart" @click="restartName">
-                {{ t('onboarding-resume-restart') }}
-              </button>
+            <div class="onboarding-details-actions flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-end dark:border-white/15">
               <button type="submit" class="d-btn min-h-12" :class="onboardingPrimaryButtonClass" :disabled="!profileForm?.isValid || isSaving" data-test="onboarding-name-continue">
                 <IconLoader v-if="isSaving" class="h-4 w-4 animate-spin" />
                 {{ t('continue') }}

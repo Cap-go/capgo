@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { hasProfileOnboarding, reconcileOnboardingABTestAssignments, resolveOnboardingAnalyticsVersion } from '../src/utils/onboardingABTests'
-import { consumeProfileOnboardingHandoff, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY, readProfileOnboardingHandoff } from '../src/utils/onboardingProfile'
+import { consumeProfileOnboardingHandoff, initialProfileOnboardingSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY, readProfileOnboardingHandoff } from '../src/utils/onboardingProfile'
 
 const abtests = { onboarding_v6: { branch: 'A' as const, assigned_at: '2026-10-19T11:00:00.000Z' } }
 const onboarding = { abtests }
@@ -20,6 +20,9 @@ describe('required initial onboarding name', () => {
     expect(needsInitialOnboardingName({ onboarding: disabled })).toBe(false)
     expect(hasProfileOnboarding(disabled)).toBe(false)
     expect(resolveOnboardingAnalyticsVersion(disabled)).not.toBe(6)
+  })
+  it('tracks welcome before names and then the goal', () => {
+    expect(initialProfileOnboardingSteps(onboarding, true)).toEqual(['welcome', 'name', 'intent', 'app_name', 'app_icon', 'organization', 'setup'])
   })
   it('uses treatment A regardless of the legacy stored version', () => {
     expect(hasProfileOnboarding({ ...onboarding, version: 4 })).toBe(true)

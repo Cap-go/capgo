@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  createOnboardingProgressTracker,
+  createOnboardingTelemetryIdentity,
   NEW_CHANNEL_ANALYTICS_VERSION,
   NEW_CHANNEL_DEVELOPMENT_ENVIRONMENT_ANALYTICS_VERSION,
   NEW_CHANNEL_PUBLISH_INTENT_ANALYTICS_VERSION,
-  createOnboardingProgressTracker,
-  createOnboardingTelemetryIdentity,
   ONBOARDING_ANALYTICS_VERSION,
   resolveOnboardingAppIconSource,
   WEBNATIVE_DEVELOPMENT_ENVIRONMENT_ANALYTICS_VERSION,
@@ -40,6 +40,18 @@ describe('onboarding progress analytics', () => {
       hasSelectedIconFile: false,
       localIconPreview: '',
     })).toBe('none')
+  })
+
+  it.concurrent('starts a fresh run within the saved attempt when a draft resumes without a handoff', () => {
+    const identity = createOnboardingTelemetryIdentity({
+      flow: 'pre_org',
+      continueFrom: { attemptId: ATTEMPT_A1 },
+      idFactory: () => RUN_R2_UUID,
+      supaHost: 'https://supabase.capgo.test',
+    })
+    expect(identity.attemptId).toBe(ATTEMPT_A1)
+    expect(identity.runId).toBe(RUN_R2)
+    expect(identity.runId).not.toBe(RUN_R1)
   })
 
   it.concurrent('keeps the resumed attempt while continuing from saved progress', () => {

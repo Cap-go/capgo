@@ -41,12 +41,11 @@ export function consumeProfileOnboardingHandoff(history: Pick<History, 'state' |
 
 export function initialProfileOnboardingSteps(onboarding: unknown, showWelcome: boolean): OnboardingAnalyticsStep[] {
   return [
-    'name',
     ...(showWelcome ? ['welcome' as const] : []),
+    'name',
     'intent',
     ...(hasWebNativeDevelopmentEnvironmentTreatment(onboarding) ? ['publish_app_question' as const] : []),
     'app_name',
-    'app_id',
     'app_icon',
     'organization',
     ...(hasNewChannelTreatment(onboarding) ? ['channel' as const] : []),
