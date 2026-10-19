@@ -145,6 +145,9 @@ describe('durable lifecycle monitoring evidence', () => {
     expect(rows[1]).toMatchObject({ recipient_email: 'replacement-owner@example.com' })
     expect(rows[0].snapshot_checksum).not.toBe(rows[1].snapshot_checksum)
     expect(rows[0].personalization).not.toHaveProperty('arbitrary_secret')
+    await recordLifecycleDecision(client, { ...f.input, email: 'new-intention@example.com' }, f.decision, 1, after(1), { originalCreatorId: f.creatorId, sourceVerifiedAt: f.input.now })
+    const monitored = (await db.query('SELECT * FROM public.bento_lifecycle_monitor_v1 WHERE org_id=$1 AND purpose=$2', [f.orgId, f.user.tag])).rows[0]
+    expect(monitored).toMatchObject({ recipient_email: 'replacement-owner@example.com', intended_recipient_email: 'new-intention@example.com' })
     retryPayload.data.email_subject = 'A different request under an existing attempt'
     await expect(recordLifecycleSnapshot(client, f.user, f.event, retryPayload)).rejects.toThrow('already differs')
     f.event.attempt_count = 3

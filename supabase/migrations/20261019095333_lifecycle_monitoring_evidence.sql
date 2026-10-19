@@ -125,6 +125,8 @@ SELECT 'bento-lifecycle-monitor-v1'::text AS contract_version, d.id AS decision_
     COALESCE(s.recipient_email, d.recipient_email) AS recipient_email,
     d.original_creator_id, d.creator_cohort, COALESCE(s.app_incarnation, d.app_incarnation) AS app_incarnation,
     COALESCE(s.event_name, d.event_name) AS event_name, COALESCE(s.variant, d.variant) AS variant,
+    d.recipient_id AS intended_recipient_id, d.recipient_email AS intended_recipient_email,
+    d.app_incarnation AS intended_app_incarnation, d.event_name AS intended_event_name, d.variant AS intended_variant,
     d.policy_version, s.snapshot_checksum, COALESCE(dispatch.attempt_count, 0)::integer AS attempt_count,
     CASE WHEN dispatch.status = 'accepted' THEN dispatch.event_at END AS accepted_at,
     CASE WHEN c.latest_decision_id = d.id THEN c.source_healthy ELSE d.source_healthy END AS source_healthy,

@@ -78,6 +78,12 @@ extra send when a sibling already consumed that organization purpose. The monito
 joins a dispatch only to the product recorded on that dispatch. Count distinct
 dispatch IDs for claims and distinct trusted message IDs for actual send load.
 
+The monitor's `intended_*` scalar fields always come from the changed decision.
+The unprefixed recipient, incarnation, event and variant use the latest archived
+attempt when present. A failed attempt can differ from a later reevaluation under
+the same dispatch ID, so compare these fields explicitly rather than silently
+presenting an old attempted variant as the current intention.
+
 Clock coverage is conservative: current consent, support holds, source freshness,
 canonical incomplete tasks, reminder context, plan availability, paid/credit
 state and sibling priority still require the normal evaluator. A boundary alone
