@@ -61,8 +61,12 @@ PRs or analytics payloads.
 Every view includes `contract_version = 'bento-lifecycle-monitor-v1'`. No view is
 granted to PUBLIC, anon or authenticated. The internal service role receives
 SELECT only. Provision a dashboard-specific database reader with explicit SELECT
-on the required views only; do not grant writes, broad default privileges, Vault
-access or public PostgREST access. Dashboard Access and platform-admin checks
+on the required views and EXECUTE only on their existing pure scalar helpers
+`lifecycle_v2_user_eligible(jsonb,timestamptz,boolean)` and
+`lifecycle_v2_parse_timestamp(text)`. PostgreSQL checks these function privileges
+as the view caller; the helpers read no tables. Do not grant underlying table
+access, writes, broad default privileges, Vault access or public PostgREST access.
+Dashboard Access and platform-admin checks
 belong to the private dashboard repository. Detailed identities and content
 require a bounded, deliberate protected read route there.
 

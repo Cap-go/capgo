@@ -226,6 +226,26 @@ describe('durable lifecycle monitoring evidence', () => {
       expect((await db.query(`SELECT has_table_privilege('service_role',$1,'UPDATE') AS can_update`, [`public.bento_lifecycle_${name}`])).rows).toEqual([{ can_update: false }])
     }
     await expect(db.query(`UPDATE public.bento_lifecycle_attempts SET reason='rewrite' WHERE org_id=$1`, [f.orgId])).rejects.toThrow('append-only')
+    await db.exec(`CREATE ROLE lifecycle_monitor_fixture_reader NOLOGIN;
+      GRANT USAGE ON SCHEMA public TO lifecycle_monitor_fixture_reader;
+      GRANT SELECT ON public.bento_lifecycle_due_v1 TO lifecycle_monitor_fixture_reader;
+      SET ROLE lifecycle_monitor_fixture_reader;`)
+    try {
+      await expect(db.query('SELECT * FROM public.bento_lifecycle_due_v1 WHERE org_id=$1', [f.orgId])).rejects.toThrow('permission denied for function lifecycle_v2_user_eligible')
+    }
+    finally {
+      await db.exec('RESET ROLE')
+    }
+    await db.exec(`GRANT EXECUTE ON FUNCTION public.lifecycle_v2_user_eligible(jsonb,timestamptz,boolean),
+      public.lifecycle_v2_parse_timestamp(text) TO lifecycle_monitor_fixture_reader;
+      SET ROLE lifecycle_monitor_fixture_reader;`)
+    try {
+      expect((await db.query('SELECT org_id FROM public.bento_lifecycle_due_v1 WHERE org_id=$1', [f.orgId])).rows).toEqual([{ org_id: f.orgId }])
+      await expect(db.query('SELECT id FROM public.users LIMIT 1')).rejects.toThrow('permission denied')
+    }
+    finally {
+      await db.exec('RESET ROLE')
+    }
   })
 
   it('gives null evaluator paths explicit reasons while preserving the existing candidate decision', async () => {
