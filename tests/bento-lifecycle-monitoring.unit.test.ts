@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 import { createPgliteEngine, Database } from 'tinbase'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { evaluateLifecycle, evaluateLifecycleDecision } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/evaluate.ts'
+import { buildAppEvidence } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/evidence.ts'
 import { recordLifecycleAttempt, recordLifecycleDecision, recordLifecycleSnapshot } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/monitoring.ts'
 import { buildLifecycleEvent } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/payload.ts'
 import { refreshLifecycleJourneys } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/refresh.ts'
@@ -152,9 +153,10 @@ describe('durable lifecycle monitoring evidence', () => {
     expect(rows[0].personalization).not.toHaveProperty('arbitrary_secret')
     expect(rows[0].personalization.ai_setup_url).toContain('lifecycleSetup=1')
     expect(rows[0].policy_version).toBe('new-emails-v2-2026-10-19')
-    await recordLifecycleDecision(client, { ...f.input, email: 'new-intention@example.com' }, f.decision, 1, after(1), { originalCreatorId: f.creatorId, sourceVerifiedAt: f.input.now })
+    const intendedApp = buildAppEvidence({ app_id: 'com.example.new', id: randomUUID(), created_at: f.input.now, name: 'New intended app', onboarding: { setup: { todo_list_version: 3 } }, need_onboarding: true }, 'ota')!
+    await recordLifecycleDecision(client, { ...f.input, email: 'new-intention@example.com', evidence: intendedApp }, f.decision, 1, after(1), { originalCreatorId: f.creatorId, sourceVerifiedAt: f.input.now })
     const monitored = (await db.query('SELECT * FROM public.bento_lifecycle_monitor_v1 WHERE org_id=$1 AND purpose=$2', [f.orgId, f.user.tag])).rows[0]
-    expect(monitored).toMatchObject({ recipient_email: 'replacement-owner@example.com', intended_recipient_email: 'new-intention@example.com' })
+    expect(monitored).toMatchObject({ recipient_email: 'replacement-owner@example.com', intended_recipient_email: 'new-intention@example.com', app_incarnation: null, intended_app_incarnation: intendedApp.incarnation })
     retryPayload.data.email_subject = 'A different request under an existing attempt'
     await expect(recordLifecycleSnapshot(client, f.user, f.event, retryPayload)).rejects.toThrow('already differs')
     f.event.attempt_count = 3
