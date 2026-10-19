@@ -5,6 +5,7 @@ import { toast } from 'vue-sonner'
 import IconLoader from '~icons/lucide/loader-2'
 import IconLogOut from '~icons/lucide/log-out'
 import IconX from '~icons/lucide/x'
+import Banner from '~/components/Banner.vue'
 import AppOnboardingFlow from '~/components/dashboard/AppOnboardingFlow.vue'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -55,7 +56,11 @@ onMounted(async () => {
 
 <template>
   <div class="relative flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 dark:bg-slate-950">
-    <header class="onboarding-page-actions absolute right-0 top-0 z-20 flex shrink-0 items-center justify-end px-2 py-2 sm:px-6 sm:py-3 lg:px-10">
+    <header class="onboarding-page-actions absolute right-0 top-0 z-20 flex shrink-0 items-center justify-end gap-2 px-2 py-2 sm:px-6 sm:py-3 lg:px-10">
+      <!-- Keep trial status and Upgrade visible while setup hides the console navbar. Wide screens only: narrower ones would overlap the title. -->
+      <div class="hidden xl:flex">
+        <Banner desktop />
+      </div>
       <button
         v-if="isNewOrganization"
         type="button"
