@@ -12,4 +12,10 @@ export const install: UserModule = ({ router }) => {
       return
     return { path: getAppGettingStartedPath(resumeAppId), replace: true }
   })
+  router.beforeResolve(async (to) => {
+    if (to.name !== '/app/[app].getting-started' || to.query.source !== 'capgo_lifecycle' || to.query.lifecycleSetup !== '1')
+      return
+    const { lifecycleSetupNavigation } = await import('~/utils/lifecycleSetupNavigation')
+    return lifecycleSetupNavigation(to)
+  })
 }

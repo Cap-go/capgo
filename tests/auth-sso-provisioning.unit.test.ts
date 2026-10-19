@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { describe, expect, it, vi } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import { allowOnboardingDashboardExploration } from '../src/utils/onboardingRedirect'
 
 interface MockFetchResponse {
@@ -51,6 +52,8 @@ function createTestContext() {
       organizationStore.hasOrganizations = true
     }),
     dedupFetchOrganizations: vi.fn(async () => {}),
+    awaitInitialLoad: vi.fn(async () => {}),
+    setCurrentOrganization: vi.fn(),
   }
 
   const mockGetClaims = vi.fn().mockResolvedValue({
@@ -110,16 +113,21 @@ function createTestContext() {
     ok: true,
     json: async () => ({ success: true }),
   }))
-  const mockApps: Array<{ app_id: string, need_onboarding: boolean }> = []
+  const mockApps: Array<{ app_id: string, need_onboarding: boolean, owner_org?: string }> = []
   const mockFrom = vi.fn((table: string) => {
     if (table === 'apps') {
-      return {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            limit: vi.fn(async () => ({ data: mockApps, error: null })),
-          })),
-        })),
+      const filters = new Map<string, unknown>()
+      const rows = () => mockApps.filter(app => [...filters].every(([key, value]) => app[key as keyof typeof app] === undefined || app[key as keyof typeof app] === value))
+      const query = {
+        select: vi.fn(() => query),
+        eq: vi.fn((key: string, value: unknown) => {
+          filters.set(key, value)
+          return query
+        }),
+        limit: vi.fn(async () => ({ data: rows(), error: null })),
+        maybeSingle: vi.fn(async () => ({ data: rows()[0] ?? null, error: null })),
       }
+      return query
     }
 
     return createUsersQuery(userRecord)
@@ -728,6 +736,111 @@ describe('auth guard SSO provisioning', () => {
 
       expect(next).toHaveBeenCalledWith(false)
       expect(next).not.toHaveBeenCalledWith('/login?message=sso_account_linked')
+    })
+  })
+})
+
+describe('authorized lifecycle selection through real auth routing', () => {
+  const orgId = '22222222-2222-4222-8222-222222222222'
+  const otherApp = 'com.example.remaining'
+  const emailedApp = 'com.example.removed'
+
+  async function selectionRouter(context: AuthGuardTestContext, hadAuth: boolean) {
+    const user = { id: 'user-123', email: 'user@managed.test', email_confirmed_at: '2026-10-19T00:00:00Z', created_at: '2026-10-19T00:00:00Z', app_metadata: { provider: 'email', providers: ['email'] } }
+    context.mockGetSession.mockResolvedValue({ data: { session: { access_token: 'fake-token', user } } })
+    context.mainStore.auth = hadAuth ? user : undefined
+    const load = async () => {
+      context.organizationStore.organizations = [{ gid: orgId, role: 'admin' }]
+      context.organizationStore.hasOrganizations = true
+    }
+    context.organizationStore.fetchOrganizations.mockImplementation(load)
+    context.organizationStore.dedupFetchOrganizations.mockImplementation(load)
+    context.mockApps.push({ app_id: otherApp, need_onboarding: true, owner_org: orgId })
+    const component = { render: () => null }
+    const router = createRouter({ history: createMemoryHistory(), routes: [
+      { path: '/apps', component, meta: { middleware: 'auth' } },
+      { path: '/app/new', component, meta: { middleware: 'auth' } },
+      { path: '/onboarding/invitation', component, meta: { middleware: 'auth' } },
+      { path: '/login', component },
+      { path: '/app/:app/getting-started', name: '/app/[app].getting-started', component, meta: { middleware: 'auth' } },
+    ] })
+    const auth = await import('../src/modules/auth.ts')
+    const setup = await import('../src/modules/onboarding-setup.ts')
+    auth.install({ router } as any)
+    setup.install({ router } as any)
+    return router
+  }
+
+  it.concurrent.each([false, true])('keeps a deleted email target on selection with one other pending app (hadAuth=%s)', async (hadAuth) => {
+    await withTestContext(async (context) => {
+      const router = await selectionRouter(context, hadAuth)
+      await router.push(`/app/${emailedApp}/getting-started?oid=${orgId}&source=capgo_lifecycle&lifecycleSetup=1`)
+      expect(router.currentRoute.value.path).toBe('/apps')
+      expect(router.currentRoute.value.query.oid).toBe(orgId)
+      expect(router.currentRoute.value.query.source).toBe('capgo_lifecycle')
+    })
+  })
+
+  it.concurrent('does not silently choose the remaining app when the emailed app belongs to another org', async () => {
+    await withTestContext(async (context) => {
+      const router = await selectionRouter(context, true)
+      context.mockApps.push({ app_id: emailedApp, need_onboarding: true, owner_org: '44444444-4444-4444-8444-444444444444' })
+      await router.push(`/app/${emailedApp}/getting-started?oid=${orgId}&source=capgo_lifecycle&lifecycleSetup=1`)
+      expect(router.currentRoute.value.path).toBe('/apps')
+      expect(router.currentRoute.value.query.oid).toBe(orgId)
+    })
+  })
+
+  it.concurrent.each([false, true])('keeps a chooser after lost email-org membership without preserving the unauthorized oid (hadAuth=%s)', async (hadAuth) => {
+    await withTestContext(async (context) => {
+      const router = await selectionRouter(context, hadAuth)
+      const inaccessibleOrg = '44444444-4444-4444-8444-444444444444'
+      await router.push(`/app/${emailedApp}/getting-started?oid=${inaccessibleOrg}&source=capgo_lifecycle&lifecycleSetup=1`)
+      expect(router.currentRoute.value.path).toBe('/apps')
+      expect(router.currentRoute.value.query.oid).toBeUndefined()
+      expect(router.currentRoute.value.query.source).toBe('capgo_lifecycle')
+      expect(router.currentRoute.value.query.lifecycleSelect).toBe('1')
+      expect(router.currentRoute.value.fullPath).not.toContain(inaccessibleOrg)
+      expect(context.organizationStore.setCurrentOrganization).not.toHaveBeenCalledWith(inaccessibleOrg)
+    })
+  })
+
+  it.concurrent.each(['/apps', '/app/new'])('preserves explicit authorized lifecycle selection at %s', async (path) => {
+    await withTestContext(async (context) => {
+      const router = await selectionRouter(context, true)
+      await router.push(`${path}?oid=${orgId}&source=capgo_lifecycle`)
+      expect(router.currentRoute.value.path).toBe(path)
+    })
+  })
+
+  it.concurrent.each(['/apps', '/apps?lifecycleSelect=1', '/apps?source=other&lifecycleSelect=1'])('retains the ordinary onboarding redirect for %s', async (path) => {
+    await withTestContext(async (context) => {
+      const router = await selectionRouter(context, true)
+      await router.push(path)
+      expect(router.currentRoute.value.path).toBe(`/app/${otherApp}/getting-started`)
+    })
+  })
+
+  it.concurrent('keeps the invitation gate ahead of the unscoped lifecycle chooser', async () => {
+    await withTestContext(async (context) => {
+      const router = await selectionRouter(context, true)
+      const load = async () => {
+        context.organizationStore.organizations = [{ gid: orgId, role: 'invite_admin' }]
+        context.organizationStore.hasOrganizations = true
+      }
+      context.organizationStore.fetchOrganizations.mockImplementation(load)
+      context.organizationStore.dedupFetchOrganizations.mockImplementation(load)
+      await router.push('/apps?source=capgo_lifecycle&lifecycleSelect=1')
+      expect(router.currentRoute.value.path).toBe('/onboarding/invitation')
+    })
+  })
+
+  it.concurrent('keeps the MFA gate ahead of the unscoped lifecycle chooser', async () => {
+    await withTestContext(async (context) => {
+      const router = await selectionRouter(context, true)
+      context.mockGetAuthenticatorAssuranceLevel.mockResolvedValue({ data: { currentLevel: 'aal1', nextLevel: 'aal2' }, error: null })
+      await router.push('/apps?source=capgo_lifecycle&lifecycleSelect=1')
+      expect(router.currentRoute.value.path).toBe('/login')
     })
   })
 })

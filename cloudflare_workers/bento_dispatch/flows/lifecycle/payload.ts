@@ -3,6 +3,8 @@ import contract from '../../../../docs/bento/lifecycle-v2-contract.json' with { 
 import { isLifecycleCommercialOffer } from './commercial.ts'
 import { nextTask } from './evidence.ts'
 
+const SETUP_BRANCHES = new Set(['progress_digest', 'stall_24h', 'help_48h', 'final_recovery_5d', 'resumed_progress_digest', 'no_app_recovery_24h', 'no_app_help_48h'])
+
 export function lifecycleBranch(product: string, key: string) {
   const branch = contract.branches.find(item => item.product === product && item.key === key)
   if (!branch)
@@ -16,13 +18,15 @@ export function buildLifecycleEvent(input: LifecycleInput, candidate: Candidate,
     throw new Error('Invalid lifecycle webapp URL')
   const url = (path: string) => new URL(path, base).href
   const app = input.evidence
+  const appName = app ? app.name.trim() || app.appId || 'your app' : ''
+  const setup = SETUP_BRANCHES.has(candidate.branch) || candidate.branch.endsWith('_unfinished')
   const task = app?.healthy && input.sourceHealthy ? nextTask(app) : null
   const plan = input.plan
   const purchase = isLifecycleCommercialOffer(input, candidate.branch) || candidate.branch.includes('ready')
   const plansUrl = url(`/settings/organization/plans?oid=${encodeURIComponent(input.orgId)}&source=capgo_lifecycle`)
   const fundingUrl = url(`/settings/organization/credits?oid=${encodeURIComponent(input.orgId)}&source=capgo_lifecycle`)
   const funding = candidate.branch === 'funding_blocked'
-  const setupUrl = app ? url(`/app/${encodeURIComponent(app.appId)}/getting-started?oid=${encodeURIComponent(input.orgId)}&source=capgo_lifecycle`) : url(`${input.product === 'ota' ? '/app/new' : '/apps'}?oid=${encodeURIComponent(input.orgId)}&source=capgo_lifecycle`)
+  const setupUrl = app ? url(`/app/${encodeURIComponent(app.appId)}/getting-started?oid=${encodeURIComponent(input.orgId)}&source=capgo_lifecycle&lifecycleSetup=1`) : url(`${input.product === 'ota' ? '/app/new' : '/apps'}?oid=${encodeURIComponent(input.orgId)}&source=capgo_lifecycle`)
   const nextReleaseUrl = app ? url(`/app/${encodeURIComponent(app.appId)}/${input.product === 'ota' ? 'bundles' : 'builds'}?oid=${encodeURIComponent(input.orgId)}&source=capgo_lifecycle`) : setupUrl
   const currentFacts = input.sourceHealthy ? app?.facts.filter(fact => fact.kind === 'task') ?? [] : []
   const batchFacts = input.state.batch?.incarnation === app?.incarnation ? input.state.batch?.facts ?? [] : []
@@ -47,15 +51,16 @@ export function buildLifecycleEvent(input: LifecycleInput, candidate: Candidate,
     org_name: input.orgName,
     app_id: app?.appId ?? '',
     app_incarnation: app?.incarnation ?? '',
-    app_name: app ? app.name.trim() || app.appId || 'your app' : '',
+    app_name: appName,
     product: input.product,
     platform_label: app?.platform === 'ios' ? 'iOS' : app?.platform === 'android' ? 'Android' : '',
     completed_steps_summary: summary,
     progress_summary: batchFacts.length ? lines(batchFacts) : summary,
     next_action_title: title,
     next_action_explanation: explanation,
-    continue_url: funding ? fundingUrl : purchase ? plansUrl : app && !task ? nextReleaseUrl : setupUrl,
-    cta_label: funding ? 'Review build allowance' : purchase ? `Choose ${plan?.name ?? 'a plan'}` : task?.ctaLabel ?? (app ? input.product === 'ota' ? 'Open my bundles' : 'Open my builds' : 'Choose my app'),
+    continue_url: setup ? setupUrl : funding ? fundingUrl : purchase ? plansUrl : app && !task ? nextReleaseUrl : setupUrl,
+    cta_label: setup ? app ? 'Continue setup in Capgo' : 'Choose my app in Capgo' : funding ? 'Review build allowance' : purchase ? `Choose ${plan?.name ?? 'a plan'}` : task?.ctaLabel ?? (app ? input.product === 'ota' ? 'Open my bundles' : 'Open my builds' : 'Choose my app'),
+    cta_destination_hint: setup ? app ? `Opens the setup checklist for ${appName} in Capgo.` : 'Opens Capgo so you can choose the app you want to set up.' : '',
     ai_setup_url: setupUrl,
     org_preferences_url: url(`/settings/organization/notifications?oid=${encodeURIComponent(input.orgId)}&source=capgo_lifecycle`),
     pause_url: url(`/settings/organization/notifications?oid=${encodeURIComponent(input.orgId)}&source=capgo_lifecycle`),
