@@ -266,23 +266,39 @@ wal_segment_after() {
   printf '%08X%08X%08X' "$tli" "$hi" "$seg"
 }
 
-# 0 = archive has no segment after the replay position (safe to promote),
-# 1 = more WAL exists or the archive could not be checked.
-archive_drained() {
-  local lsn="$1" tli segment out rc=0
-  tli="$(psql_local -At -c 'SELECT timeline_id FROM pg_control_checkpoint()')"
-  segment="$(wal_segment_after "$tli" "$lsn")"
-  out="$(as_pg wal-g wal-fetch "$segment" /tmp/capgo-wal-probe 2>&1)" || rc=$?
+# Probe one archive file. 0 = exists, 1 = does not exist, 2 = check failed.
+archive_has() {
+  local name="$1" out rc=0
+  out="$(as_pg wal-g wal-fetch "$name" /tmp/capgo-wal-probe 2>&1)" || rc=$?
   rm -f /tmp/capgo-wal-probe
-  if ((rc == 0)); then
-    log "segment ${segment} is in the archive but not replayed yet; not promoting"
-    return 1
-  fi
-  if grep -q 'does not exist' <<<"$out"; then
-    return 0
-  fi
-  log "cannot check archive for ${segment}: ${out##*$'\n'}"
-  return 1
+  ((rc == 0)) && return 0
+  grep -q 'does not exist' <<<"$out" && return 1
+  log "cannot check archive for ${name}: ${out##*$'\n'}"
+  return 2
+}
+
+# 0 = no timeline in the archive has a segment after the replay position
+# (safe to promote), 1 = more WAL exists or the archive could not be checked.
+# The control-file timeline only moves at restartpoints, so it can lag the
+# replay timeline: probe it and every newer timeline that has a .history file.
+archive_drained() {
+  local lsn="$1" tli segment rc
+  tli="$(psql_local -At -c 'SELECT timeline_id FROM pg_control_checkpoint()')"
+  while true; do
+    segment="$(wal_segment_after "$tli" "$lsn")"
+    rc=0
+    archive_has "$segment" || rc=$?
+    if ((rc == 0)); then
+      log "segment ${segment} is in the archive but not replayed yet; not promoting"
+      return 1
+    fi
+    ((rc == 1)) || return 1
+    rc=0
+    archive_has "$(printf '%08X.history' $((tli + 1)))" || rc=$?
+    ((rc == 1)) && return 0
+    ((rc == 0)) || return 1
+    tli=$((tli + 1))
+  done
 }
 
 # Restored primary: stay a standby until replay stops advancing AND the

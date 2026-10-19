@@ -132,10 +132,15 @@ writeFileSync(secretsFile, JSON.stringify({
   READER_PASSWORD: state.readerPassword,
   SOURCE_CONNINFO: conninfo,
 }), { mode: 0o600 })
-// allowFail + manual fail(): fail() exits the process, which would skip a
-// finally block and leave the secrets file on disk.
-const secretsResult = await wranglerWorker(['secret', 'bulk', secretsFile], { quiet: true, allowFail: true })
-rmSync(secretsFile, { force: true })
+// allowFail + finally: fail() exits the process (skipping finally blocks) and
+// a thrown spawn error would skip a plain rmSync, so clean up first, then report.
+let secretsResult: Awaited<ReturnType<typeof wranglerWorker>>
+try {
+  secretsResult = await wranglerWorker(['secret', 'bulk', secretsFile], { quiet: true, allowFail: true })
+}
+finally {
+  rmSync(secretsFile, { force: true })
+}
 if (secretsResult.code !== 0)
   fail(`wrangler secret bulk failed (exit ${secretsResult.code}):\n${secretsResult.stderr || secretsResult.stdout}`)
 

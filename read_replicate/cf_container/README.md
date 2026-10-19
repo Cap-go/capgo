@@ -79,7 +79,7 @@ source if it is missing. Each node gets a Hyperdrive config
 - **Supabase direct host** `db.<ref>.supabase.co` must be reachable from the
   container (IPv4 add-on or container IPv6 egress).
 - **Supabase WAL retention.** The primary's logical slot
-  (`capgo_cf_<env>_sub_slot`) pins WAL on Supabase while the primary is down,
+  (`capgo_cf_preprod_sub_slot` in preprod, `capgo_cf_primary_sub_slot` in prod) pins WAL on Supabase while the primary is down,
   restoring or abandoned, so Supabase disk grows without limit. `pgcf:status`
   prints the slot's retained WAL. Before prod: set `max_slot_wal_keep_size` on
   the source (Supabase support/config) and alert on retained bytes.

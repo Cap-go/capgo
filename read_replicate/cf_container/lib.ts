@@ -343,12 +343,15 @@ export async function deprovisionNodeNetwork(state: ClusterState, name: string) 
   const node = state.nodes[name]
   if (!node)
     return
-  if (node.hyperdriveId)
-    await cfApiRaw(['hyperdrive', 'configs', node.hyperdriveId], { method: 'DELETE' })
-  await wrangler(['vpc', 'service', 'delete', node.vpcServiceId], { allowFail: true, input: 'y\n' })
-  // Best-effort like the Hyperdrive delete: a tunnel with lingering connectors
-  // must not stop the state cleanup below.
-  const tunnelDelete = await cfApiRaw(['cfd_tunnel', node.tunnelId], { method: 'DELETE' })
+  // Every delete is best-effort (non-success responses and thrown request
+  // errors alike) so the local state below is always updated.
+  if (node.hyperdriveId) {
+    const res = await cfApiRaw(['hyperdrive', 'configs', node.hyperdriveId], { method: 'DELETE' }).catch((error: unknown) => ({ success: false, errors: [String(error)] }))
+    if (!res.success)
+      detail(`hyperdrive ${node.hyperdriveId} not deleted (${JSON.stringify(res.errors)}); delete it in the dashboard`)
+  }
+  await wrangler(['vpc', 'service', 'delete', node.vpcServiceId], { allowFail: true, input: 'y\n' }).catch(() => detail(`VPC service ${node.vpcServiceId} not deleted; delete it in the dashboard`))
+  const tunnelDelete = await cfApiRaw(['cfd_tunnel', node.tunnelId], { method: 'DELETE' }).catch((error: unknown) => ({ success: false, errors: [String(error)] }))
   if (!tunnelDelete.success)
     detail(`tunnel ${node.tunnelId} not deleted (${JSON.stringify(tunnelDelete.errors)}); delete it in the dashboard`)
   delete state.nodes[name]
