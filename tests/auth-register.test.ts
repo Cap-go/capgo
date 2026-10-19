@@ -98,6 +98,41 @@ describe('pOST /auth/register', () => {
     expect(authUser.user?.user_metadata).not.toHaveProperty('last_name')
   })
 
+  it.concurrent.each([true, false])('preserves signup attribution and newsletter preference %s', async (newsletter) => {
+    const attribution = {
+      ref: 'readme-example',
+      signup_source: 'plugin_example',
+      signup_plugin: 'example',
+      first_touch_type: 'plugin',
+      first_touch_path: '/plugins/example/',
+      utm_source: 'example-source',
+      utm_medium: 'readme',
+      utm_campaign: 'example-campaign',
+    }
+    const payload = buildRegisterPayload({
+      ...attribution,
+      first_name: undefined,
+      last_name: undefined,
+      opt_for_newsletters: newsletter,
+    })
+    const response = await postRegister(payload)
+    expect(response.status).toBe(200)
+    const body = await response.json() as { user: { id: string } }
+    createdUserIds.push(body.user.id)
+
+    const admin = getSupabaseClient()
+    const { data: profile, error } = await admin.from('users')
+      .select('first_name, last_name, opt_for_newsletters, onboarding')
+      .eq('id', body.user.id)
+      .single()
+    expect(error).toBeNull()
+    expect(profile).toMatchObject({ first_name: '', last_name: '', opt_for_newsletters: newsletter })
+    expect(profile?.onboarding).not.toHaveProperty('version', 6)
+    const { data: authUser, error: authError } = await admin.auth.admin.getUserById(body.user.id)
+    expect(authError).toBeNull()
+    expect(authUser.user?.user_metadata).toMatchObject(attribution)
+  })
+
   it('returns invalid_request for malformed payloads', async () => {
     const response = await postRegister({
       email: 'not-an-email',
