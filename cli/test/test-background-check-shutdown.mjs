@@ -192,6 +192,12 @@ test.concurrent('both workers share one five-second shutdown budget', async () =
   assert.equal(JSON.stringify(event).includes(dir), false)
 }, 12_000)
 
+test.concurrent('channel promote gives its eligible setup notice the same bounded grace period', async () => {
+  const result = await run({ commandPath: 'channel promote', controlledClock: true }).completion
+  assert.equal(waitedMs(result), 5_000)
+  assert.ok(result.text.includes('Waiting for background checks'))
+}, 12_000)
+
 test.concurrent('exits early as soon as the last worker finishes', async () => {
   const result = await run({ workers: ['quick.mjs', 'slow.mjs'] }).completion
   const duration = waitedMs(result)

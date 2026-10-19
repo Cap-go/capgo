@@ -31,6 +31,7 @@ const interactiveCommands = new Set([
   'channel delete',
   'channel list',
   'channel currentBundle',
+  'channel promote',
   'channel set',
   'key save',
   'key create',
