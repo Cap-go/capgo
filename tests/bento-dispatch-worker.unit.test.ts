@@ -21,7 +21,10 @@ vi.mock('../cloudflare_workers/bento_dispatch/store.ts', () => ({ DispatchStore:
 } }))
 vi.mock('../cloudflare_workers/bento_dispatch/scheduler.ts', () => ({ publishDispatchJobs: publish }))
 vi.mock('../cloudflare_workers/bento_dispatch/consumer.ts', () => ({ processDispatchJob: process }))
-vi.mock('../supabase/functions/_backend/utils/bento.ts', () => ({ trackBentoEvent: accepted }))
+vi.mock('../supabase/functions/_backend/utils/bento.ts', async importOriginal => ({
+  ...await importOriginal<typeof import('../supabase/functions/_backend/utils/bento.ts')>(),
+  trackBentoEvent: accepted,
+}))
 
 const job = { version: 1, evaluationKey: 'org:invite_existing_user_reminder_1', runId: '11111111-1111-4111-8111-111111111111' }
 function environment(): DispatchEnv {
@@ -65,6 +68,17 @@ describe('dedicated evaluation Worker', () => {
     expect(msg.ack).not.toHaveBeenCalled()
     expect(process).not.toHaveBeenCalled()
     expect(db.query).not.toHaveBeenCalled()
+  })
+  it.each(['test', 'TEST', 'placeholder', 'changeme'])('rejects sentinel credential %s before scheduling or consuming dispatch attempts', async (credential) => {
+    const env = environment()
+    env.BENTO_SECRET_KEY = credential
+    await expect(scheduleDispatch({} as ScheduledController, env)).rejects.toThrow('Bento dispatch scheduling failed')
+    expect(publish).not.toHaveBeenCalled()
+    const msg = message()
+    await consumeDispatch(batch([msg]), env)
+    expect(msg.retry).toHaveBeenCalledOnce()
+    expect(msg.ack).not.toHaveBeenCalled()
+    expect(process).not.toHaveBeenCalled()
   })
   it('runs the registered evaluator and acknowledges completed business work despite audit outage', async () => {
     store.relayPendingAudit.mockRejectedValue(new Error('unavailable'))

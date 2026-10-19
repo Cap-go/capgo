@@ -3,7 +3,7 @@ import type { PostHogQueueEnv } from '../../supabase/functions/_backend/utils/po
 import type { DispatchJob } from './contracts.ts'
 import { Context } from 'hono'
 import { Client } from 'pg'
-import { trackBentoEvent } from '../../supabase/functions/_backend/utils/bento.ts'
+import { isBentoConfigured, trackBentoEvent } from '../../supabase/functions/_backend/utils/bento.ts'
 import { bentoFlows } from './bentoFlows.ts'
 import { processDispatchJob } from './consumer.ts'
 import { createMutationContext } from './helpers.ts'
@@ -32,6 +32,8 @@ function senderContext(env: DispatchEnv, runId: string): HonoContext {
   }
   const c = new Context(new Request('https://bento-dispatch.internal'), { env: values })
   c.set('requestId', runId)
+  if (!isBentoConfigured(c))
+    throw new Error('Missing dispatch configuration')
   // Validate the destination before claiming any events or consuming attempts.
   const url = new URL(values.WEBAPP_URL)
   if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== '/')
