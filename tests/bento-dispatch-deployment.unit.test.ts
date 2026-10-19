@@ -11,6 +11,8 @@ describe('bento dispatcher infrastructure', () => {
     expect(config.workers_dev).toBe(false)
     expect(config.preview_urls).toBe(false)
     expect(config.env.prod.triggers.crons).toEqual(['* * * * *'])
+    expect(config.env.prod.vars).toEqual({ WEBAPP_URL: 'https://console.capgo.app' })
+    expect(config.env.prod.secrets.required).toEqual(['BENTO_PUBLISHABLE_KEY', 'BENTO_SECRET_KEY', 'BENTO_SITE_UUID'])
     expect(config.env.prod.queues.producers).toEqual([{ binding: 'DISPATCH_QUEUE', queue: BENTO_QUEUE_NAME }, { binding: 'POSTHOG_QUEUE', queue: 'capgo-posthog-events-prod' }])
     expect(config.env.prod.queues.consumers).toEqual([{ queue: BENTO_QUEUE_NAME, max_batch_size: 1, max_batch_timeout: 0, max_concurrency: 5, max_retries: 4, retry_delay: 60 }])
     expect(config.env.prod.routes).toBeUndefined()
