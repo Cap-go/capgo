@@ -711,10 +711,9 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
-      first_name: 'Example',
-      last_name: 'User',
       onboarding: currentOnboarding,
     }
+    Object.assign(writerMocks.main.user, { first_name: 'Example', last_name: 'User' })
     writerMocks.loadApp.mockReset()
     writerMocks.loadApp.mockResolvedValue({
       data: {
@@ -788,10 +787,9 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
-      first_name: 'Example',
-      last_name: 'User',
       onboarding: currentOnboarding,
     }
+    Object.assign(writerMocks.main.user, { first_name: 'Example', last_name: 'User' })
     writerMocks.replaceUserOnboardingIfUnchanged.mockReset()
     writerMocks.replaceUserOnboardingIfUnchanged.mockImplementation(async (_userId, _expectedOnboarding, onboarding) => ({
       data: { ...writerMocks.main.user, onboarding },
