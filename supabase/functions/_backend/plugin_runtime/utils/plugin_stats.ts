@@ -9,6 +9,7 @@ import { applyDeviceDataCollectionToDevice, applyDeviceDataCollectionToLogDimens
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { onPremiseAppResponse } from './rateLimitInfo.ts'
+import { isStaleSnippetEdgeReplay } from './snippetEdgeAnswer.ts'
 import { logSkippedSupabaseWrite, shouldSkipSupabaseStatsFallback } from './supabase_write_guard.ts'
 import { backgroundTask, isInternalVersionName } from './utils.ts'
 
@@ -217,6 +218,9 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
 }
 
 export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt, collection: DeviceDataCollection = DEFAULT_DEVICE_DATA_COLLECTION) {
+  // A late replay would stamp an old device state as the newest one.
+  if (isStaleSnippetEdgeReplay(c))
+    return Promise.resolve()
   const requestCountry = collection.country ? c.req.raw?.cf?.country : undefined
   const countryCode = collection.country
     ? normalizeDeviceCountryCode(typeof requestCountry === 'string' ? requestCountry : undefined)
