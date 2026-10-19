@@ -14,15 +14,19 @@
  * Every step is skipped when it already exists; an existing Logpush job is
  * updated when its settings differ.
  *
- * Env:
+ * Env (unset values come from internal/cloudflare/.env.prod, or ENV_FILE):
  *   CLOUDFLARE_API_TOKEN   Logs Edit + Zone Read + Zone WAF/Rulesets Edit (custom log fields)
- *   CLOUDFLARE_ACCOUNT_ID
+ *                          else CF_ANALYTICS_TOKEN
+ *   CLOUDFLARE_ACCOUNT_ID  else CF_ACCOUNT_ANALYTICS_ID
  *   R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY   R2 token able to write the bucket (Logpush destination)
+ *                          else S3_ACCESS_KEY_ID / S3_SECRET_ACCESS_KEY when S3_ENDPOINT is R2 of the account
  *   ZONE_NAME              default capgo.app
+ * The R2 buckets and queues are created with the wrangler login.
  *
  *   bun run snippet-edge-stats:setup [--dry-run]
  */
 import { spawnSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import process from 'node:process'
 
 export const BUCKET = 'capgo-snippet-edge-stats'
@@ -82,18 +86,73 @@ export function withStatHeaderField(rules: CustomFieldsRule[]) {
     : rule)
 }
 
-function requireEnv(name: string) {
-  const value = process.env[name]?.trim()
+const DEFAULT_ENV_FILE = new URL('../internal/cloudflare/.env.prod', import.meta.url).pathname
+
+/** KEY=VALUE lines of a dotenv file; comments, blanks and other lines are skipped. */
+export function parseEnvFile(text: string) {
+  const values: Record<string, string> = {}
+  for (const line of text.split(/\r?\n/)) {
+    const match = /^\s*(?:export\s+)?([\w.]+)\s*=(.*)$/.exec(line)
+    if (!match)
+      continue
+    const raw = match[2]!.trim()
+    const quoted = /^(['"])(.*)\1$/.exec(raw)
+    values[match[1]!] = quoted ? quoted[2]! : raw.replace(/\s+#.*$/, '')
+  }
+  return values
+}
+
+export interface SetupEnv {
+  accountId: string
+  apiToken: string
+  r2AccessKeyId: string
+  r2SecretAccessKey: string
+  zoneName: string
+}
+
+/** The process env first, then the names the prod env file uses for the same values. */
+export function resolveSetupEnv(env: Record<string, string | undefined>, file: Record<string, string>): SetupEnv {
+  const pick = (...values: (string | undefined)[]) => values.map(value => value?.trim()).find(Boolean) ?? ''
+  const accountId = pick(env.CLOUDFLARE_ACCOUNT_ID, file.CLOUDFLARE_ACCOUNT_ID, file.CF_ACCOUNT_ANALYTICS_ID)
+  // The prod S3 keys are R2 keys only when the endpoint is R2 of this account.
+  const s3IsAccountR2 = Boolean(accountId) && pick(file.S3_ENDPOINT).replace(/^https?:\/\//, '').startsWith(`${accountId}.r2.cloudflarestorage.com`)
+  return {
+    accountId,
+    apiToken: pick(env.CLOUDFLARE_API_TOKEN, file.CLOUDFLARE_API_TOKEN, file.CF_ANALYTICS_TOKEN),
+    r2AccessKeyId: pick(env.R2_ACCESS_KEY_ID, file.R2_ACCESS_KEY_ID, s3IsAccountR2 ? file.S3_ACCESS_KEY_ID : undefined),
+    r2SecretAccessKey: pick(env.R2_SECRET_ACCESS_KEY, file.R2_SECRET_ACCESS_KEY, s3IsAccountR2 ? file.S3_SECRET_ACCESS_KEY : undefined),
+    zoneName: pick(env.ZONE_NAME, file.ZONE_NAME) || 'capgo.app',
+  }
+}
+
+/** The env file is gitignored: a worktree only has it in the main checkout. */
+function mainCheckoutEnvFile() {
+  const child = spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { encoding: 'utf8' })
+  return child.status === 0 ? `${child.stdout.trim().replace(/\/\.git$/, '')}/internal/cloudflare/.env.prod` : ''
+}
+
+function readEnvFile() {
+  const path = [process.env.ENV_FILE?.trim(), DEFAULT_ENV_FILE, mainCheckoutEnvFile()].find(candidate => candidate && existsSync(candidate))
+  if (!path)
+    return {}
+  console.log(`Reading unset values from ${path}`)
+  return parseEnvFile(readFileSync(path, 'utf8'))
+}
+
+function required(value: string, names: string) {
   if (!value)
-    throw new Error(`Missing ${name}`)
+    throw new Error(`Missing ${names}`)
   return value
 }
+
+let apiToken = ''
+let wranglerEnv: NodeJS.ProcessEnv = process.env
 
 function wrangler(args: string[], dryRun: boolean, alreadyExists: RegExp) {
   console.log(`$ wrangler ${args.join(' ')}`)
   if (dryRun)
     return
-  const child = spawnSync('bunx', ['wrangler', ...args], { encoding: 'utf8' })
+  const child = spawnSync('bunx', ['wrangler', ...args], { encoding: 'utf8', env: wranglerEnv })
   const output = `${child.stdout}${child.stderr}`
   if (child.status !== 0 && !alreadyExists.test(output)) {
     console.error(output)
@@ -113,7 +172,7 @@ class CloudflareApiError extends Error {
 async function cloudflare<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
     ...init,
-    headers: { 'Authorization': `Bearer ${requireEnv('CLOUDFLARE_API_TOKEN')}`, 'Content-Type': 'application/json', ...init.headers },
+    headers: { 'Authorization': `Bearer ${required(apiToken, 'CLOUDFLARE_API_TOKEN (or CF_ANALYTICS_TOKEN in the env file)')}`, 'Content-Type': 'application/json', ...init.headers },
   })
   const json = await response.json().catch(() => null) as { success: boolean, result: T, errors?: unknown } | null
   if (!json?.success)
@@ -148,8 +207,12 @@ export function logpushJobNeedsUpdate(job: LogpushJob) {
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run')
-  const accountId = requireEnv('CLOUDFLARE_ACCOUNT_ID')
-  const zoneName = process.env.ZONE_NAME?.trim() || 'capgo.app'
+  const setup = resolveSetupEnv(process.env, readEnvFile())
+  const accountId = required(setup.accountId, 'CLOUDFLARE_ACCOUNT_ID (or CF_ACCOUNT_ANALYTICS_ID in the env file)')
+  const zoneName = setup.zoneName
+  apiToken = setup.apiToken
+  // wrangler picks the account from its login, which may see several.
+  wranglerEnv = { ...process.env, CLOUDFLARE_ACCOUNT_ID: accountId }
 
   const exists = /already exists|already been taken|10004|11009/i
   wrangler(['r2', 'bucket', 'create', BUCKET], dryRun, exists)
@@ -158,7 +221,7 @@ async function main() {
     wrangler(['queues', 'create', queue], dryRun, exists)
   wrangler(['r2', 'bucket', 'notification', 'create', BUCKET, '--event-type', 'object-create', '--queue', FILES_QUEUE, '--description', 'Logpush files to replay'], dryRun, exists)
 
-  const destination = `r2://${BUCKET}/{DATE}?account-id=${accountId}&access-key-id=${requireEnv('R2_ACCESS_KEY_ID')}&secret-access-key=${requireEnv('R2_SECRET_ACCESS_KEY')}`
+  const destination = `r2://${BUCKET}/{DATE}?account-id=${accountId}&access-key-id=${required(setup.r2AccessKeyId, 'R2_ACCESS_KEY_ID (or S3_ACCESS_KEY_ID of an R2 S3_ENDPOINT)')}&secret-access-key=${required(setup.r2SecretAccessKey, 'R2_SECRET_ACCESS_KEY (or S3_SECRET_ACCESS_KEY of an R2 S3_ENDPOINT)')}`
   if (dryRun) {
     console.log(`Would add response field ${STAT_HEADER} to ${zoneName} custom log fields`)
     console.log(`Would create Logpush job ${JSON.stringify({ ...logpushJobBody('r2://<redacted>'), destination_conf: undefined })}`)
