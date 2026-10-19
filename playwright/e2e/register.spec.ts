@@ -44,6 +44,10 @@ async function seedNameTreatment(userId: string) {
 async function enableNameTreatmentFixture(page: Page) {
   // Simulate future treatment in local browser tests while the shipped flag stays at 0%.
   await page.route('**/auth/register', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback()
+      return
+    }
     const response = await route.fetch()
     const body = await response.json()
     if (response.ok() && body.user?.id)
