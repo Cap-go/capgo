@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { cwd } from 'node:process'
 import { Worker } from 'node:worker_threads'
 import { registerOnboardingCheck } from './background-workers'
+import { shouldEvaluateSetupNotice } from './setup-notice-policy'
 
 export interface OnboardingCheckOptions {
   cwd: string
@@ -16,9 +17,10 @@ export interface OnboardingCheckOptions {
   mainFile?: string
   supaHost?: string
   supaAnon?: string
+  setupNotice?: boolean
 }
 
-export function startOnboardingCheck(command: Command, commandPath: string, workerUrl: URL, attemptIds?: string[]): void {
+export function startOnboardingCheck(command: Command, commandPath: string, workerUrl: URL, attemptIds?: string[], ci = false): void {
   try {
     const options = command.optsWithGlobals()
     const argument = (name: string) => {
@@ -39,6 +41,7 @@ export function startOnboardingCheck(command: Command, commandPath: string, work
       mainFile: text(options.mainFile),
       supaHost: text(options.supaHost),
       supaAnon: text(options.supaAnon),
+      setupNotice: shouldEvaluateSetupNotice(commandPath, options, ci),
     }
     const worker = new Worker(workerUrl, { workerData, stdout: true, stderr: true })
     // Discovery/config loading must not write into terminal UIs or MCP stdout.
@@ -55,6 +58,6 @@ export function startOnboardingCheck(command: Command, commandPath: string, work
   }
 }
 
-export function startOnboardingChecks(command: Command, commandPath: string): void {
-  startOnboardingCheck(command, commandPath, new URL('./onboarding-worker.js', import.meta.url), [randomUUID(), randomUUID()])
+export function startOnboardingChecks(command: Command, commandPath: string, ci = false): void {
+  startOnboardingCheck(command, commandPath, new URL('./onboarding-worker.js', import.meta.url), [randomUUID(), randomUUID()], ci)
 }

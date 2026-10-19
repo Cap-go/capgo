@@ -17,25 +17,31 @@ beforeAll(async () => {
     export { startOnboardingCheck } from ${JSON.stringify(fileURLToPath(new URL('../src/onboarding/background.ts', import.meta.url)))}
     export { waitForOnboardingChecks } from ${JSON.stringify(fileURLToPath(new URL('../src/onboarding/background-shutdown.ts', import.meta.url)))}
     export { getPendingOnboardingChecks } from ${JSON.stringify(fileURLToPath(new URL('../src/onboarding/background-workers.ts', import.meta.url)))}
+    export { markTrialNoticeShown } from ${JSON.stringify(fileURLToPath(new URL('../src/onboarding/trial-notice-state.ts', import.meta.url)))}
   `)
-  const build = await Bun.build({ entrypoints: [join(dir, 'entry.ts')], outdir: dir, target: 'node', format: 'esm' })
+  // The production build stubs this optional Ink development dependency.
+  const build = await Bun.build({ entrypoints: [join(dir, 'entry.ts')], outdir: dir, target: 'node', format: 'esm', external: ['react-devtools-core'] })
   assert.equal(build.success, true)
   harness = pathToFileURL(join(dir, 'entry.js')).href
   writeFileSync(join(dir, 'busy.mjs'), 'setInterval(() => {}, 10_000)')
   writeFileSync(join(dir, 'quick.mjs'), 'setTimeout(() => {}, 300)')
   writeFileSync(join(dir, 'slow.mjs'), 'setTimeout(() => {}, 900)')
   writeFileSync(join(dir, 'released.mjs'), "import { parentPort } from 'node:worker_threads'; parentPort.once('message', () => process.exit(0))")
+  writeFileSync(join(dir, 'notice.mjs'), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: { kind: 'setup', appId: 'com.example.ready', product: 'OTA live updates', title: 'Create a channel', action: 'Continue your checklist', secondary: [] } })`)
+  for (const app of ['one', 'two']) {
+    writeFileSync(join(dir, `plan-${app}.mjs`), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: { kind: 'plan', appId: 'com.example.${app}', completed: ['OTA'], secondary: [], billing: { orgId: 'fixture-org', trialEndsAt: null, plansUrl: 'https://console.example.com/plans' } } })`)
+  }
 })
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false } = {}) {
+function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, waitForWorkers = false, trialAlreadyShown = false } = {}) {
   const source = `
     import assert from 'node:assert/strict'
     import { performance } from 'node:perf_hooks'
     import FakeTimers from ${JSON.stringify(import.meta.resolve('@sinonjs/fake-timers'))}
     import { setImmediate as nextTurn } from 'node:timers/promises'
-    import { startOnboardingCheck, waitForOnboardingChecks, getPendingOnboardingChecks } from ${JSON.stringify(harness)}
+    import { startOnboardingCheck, waitForOnboardingChecks, getPendingOnboardingChecks, markTrialNoticeShown } from ${JSON.stringify(harness)}
     Object.defineProperty(process.stdin, 'isTTY', { value: ${stdinTty} })
     Object.defineProperty(process.stdout, 'isTTY', { value: ${stdoutTty} })
     globalThis.fetch = async (url, init) => {
@@ -56,6 +62,11 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
     const command = { optsWithGlobals: () => (${JSON.stringify({ apikey: 'fake-api-key', appId: 'com.example.ready', ...options })}), registeredArguments: [], args: [] }
     for (const filename of ${JSON.stringify(workers)})
       startOnboardingCheck(command, ${JSON.stringify(commandPath)}, new URL(filename, ${JSON.stringify(pathToFileURL(join(dir, 'run.mjs')).href)}))
+    if (${waitForWorkers}) {
+      const checks = [...getPendingOnboardingChecks()]
+      for (const [worker] of checks) worker.ref()
+      await Promise.all(checks.map(([, check]) => check.completion))
+    }
     console.log('pending-attempts:' + JSON.stringify([...getPendingOnboardingChecks().values()].map(check => check.attemptId)))
     let foregroundInterrupts = 0
     if (${previousInterrupt}) {
@@ -63,6 +74,7 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
       process.emit('SIGINT')
     }
     await new Promise(resolve => setTimeout(resolve, ${foregroundMs}))
+    if (${trialAlreadyShown}) markTrialNoticeShown('fixture-org')
     console.log('interrupt-count-before-wait:' + foregroundInterrupts)
     const clock = ${controlledClock} ? FakeTimers.install({ now: Date.now(), toFake: ['setTimeout', 'clearTimeout', 'Date'] }) : undefined
     const now = ${controlledClock} ? Date.now : () => performance.now()
@@ -126,6 +138,32 @@ function waitedMs(result) {
   return Number(result.output.match(/foreground-finished:(\d+)/)?.[1])
 }
 
+test.concurrent('ready notices render for human-readable output even when no worker or TTY wait remains', async () => {
+  for (const tty of [true, false]) {
+    const result = await run({ commandPath: 'bundle list', workers: ['notice.mjs', 'notice.mjs'], waitForWorkers: true, tty }).completion
+    assert.equal(result.code, 0, result.text)
+    assert.equal(result.text.match(/Continue OTA live updates setup/g)?.length, 1, 'deduplicate the app notice')
+    assert.ok(!result.text.includes('Waiting for background checks'))
+  }
+})
+
+test.concurrent('machine modes and explicit setup flows discard ready notices', async () => {
+  const cases = [{ options: { json: true } }, { options: { outputText: true } }, { options: { quiet: true } }, { options: { silent: true } }, { options: { format: 'json' } }, { ci: true }, { commandPath: 'app todo' }, { commandPath: 'build init' }, { commandPath: 'mcp' }]
+  for (const settings of cases) {
+    const result = await run({ commandPath: 'bundle list', workers: ['notice.mjs'], waitForWorkers: true, ...settings }).completion
+    assert.equal(result.code, 0, result.text)
+    assert.ok(!result.text.includes('Continue OTA live updates setup'))
+  }
+}, 12000)
+
+test.concurrent('plan prompts are deduplicated by organization, including foreground trial warnings', async () => {
+  for (const trialAlreadyShown of [false, true]) {
+    const result = await run({ commandPath: 'bundle list', workers: ['plan-one.mjs', 'plan-two.mjs'], waitForWorkers: true, trialAlreadyShown }).completion
+    assert.equal(result.code, 0, result.text)
+    assert.equal((result.text.match(/Choose a Capgo plan/g) ?? []).length, trialAlreadyShown ? 0 : 1)
+  }
+})
+
 function waitEvents(result) {
   return result.output.split('\n').filter(line => line.startsWith('telemetry:')).map(line => JSON.parse(line.slice('telemetry:'.length)))
 }
@@ -185,7 +223,7 @@ test.concurrent('SIGINT during the grace period exits immediately even after a p
 
 test.concurrent('machine output, init, MCP, CI and non-interactive commands do not wait or print', async () => {
   const cases = [
-    { options: { json: true } }, { options: { outputText: true } }, { options: { quiet: true } },
+    { options: { json: true } }, { options: { outputText: true } }, { options: { quiet: true } }, { options: { silent: true } }, { options: { format: 'json' } },
     { commandPath: 'channel currentBundle', options: { quiet: true } },
     { commandPath: 'bundle zip', options: { json: true } },
     { commandPath: 'init' }, { commandPath: 'build init' }, { commandPath: 'build onboarding' },

@@ -1,7 +1,7 @@
 import type { OnboardingCheckOptions } from './background'
 import type { PreparedOnboardingCheck } from './background-check'
 import { env } from 'node:process'
-import { defaultApiHost, findSavedKeySilent, isCapgoManagedSupabaseHost, normalizeSupabaseHost, resolveConfiguredCapgoPublicApiHost } from '../utils'
+import { defaultApiHost, defaultHostWeb, findSavedKeySilent, isCapgoManagedSupabaseHost, normalizeSupabaseHost, resolveConfiguredCapgoPublicApiHost } from '../utils'
 import { isTrustedOnboardingApiHost } from './background-api'
 import { resolveNotifyAppReadyProject } from './notify-app-ready-project'
 
@@ -51,6 +51,7 @@ export async function prepareOnboardingCheck(options: OnboardingCheckOptions): P
     project: { dir: project.dir, workspaceRoot: project.workspaceRoot, appId: project.appId, webDir: project.webDir },
     apiHost,
     anonKey,
+    webHost: updater?.localWebHost || defaultHostWeb,
     apikey,
     command: options.command,
   }

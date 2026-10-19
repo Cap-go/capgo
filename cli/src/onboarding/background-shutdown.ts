@@ -3,33 +3,81 @@ import process from 'node:process'
 import { log } from '@clack/prompts'
 import { isCI } from 'ci-info'
 import { flushAnalytics, trackEvent } from '../analytics/track'
-import { getPendingOnboardingChecks } from './background-workers'
-
-const gracePeriodMs = 5_000
+import { getPendingOnboardingChecks, takeSetupNotices } from './background-workers'
+import { ONBOARDING_CHECK_GRACE_MS as gracePeriodMs, shouldEvaluateSetupNotice } from './setup-notice-policy'
+import { formatSetupNotice } from './setup-notices'
+import { markTrialNoticeShown, wasTrialNoticeShown } from './trial-notice-state'
 
 // Only commands with human-facing output opt into the shutdown message and wait.
 const interactiveCommands = new Set([
-  'doctor', 'login', 'get-qr',
-  'app add', 'app delete', 'app list', 'app debug', 'app setting', 'app set',
-  'bundle upload', 'bundle compatibility', 'bundle delete', 'bundle list', 'bundle cleanup',
-  'bundle encrypt', 'bundle decrypt', 'bundle zip',
-  'channel add', 'channel delete', 'channel list', 'channel currentBundle', 'channel set',
-  'key save', 'key create', 'key delete_old',
-  'organization list', 'organization add', 'organization members', 'organization set', 'organization delete',
-  'organisation list', 'organisation add', 'organisation set', 'organisation delete',
+  'doctor',
+  'login',
+  'get-qr',
+  'app add',
+  'app delete',
+  'app list',
+  'app debug',
+  'app setting',
+  'app set',
+  'bundle upload',
+  'bundle compatibility',
+  'bundle delete',
+  'bundle list',
+  'bundle cleanup',
+  'bundle encrypt',
+  'bundle decrypt',
+  'bundle zip',
+  'channel add',
+  'channel delete',
+  'channel list',
+  'channel currentBundle',
+  'channel set',
+  'key save',
+  'key create',
+  'key delete_old',
+  'organization list',
+  'organization add',
+  'organization members',
+  'organization set',
+  'organization delete',
+  'organisation list',
+  'organisation add',
+  'organisation set',
+  'organisation delete',
   'build request',
 ])
 
 function shouldWaitForOnboardingChecks(commandPath: string, options: Record<string, unknown>): boolean {
   return !!process.stdin.isTTY && !!process.stdout.isTTY && !isCI
     && interactiveCommands.has(commandPath)
-    && !options.json && !options.outputText && !options.quiet
+    && !options.json && !options.outputText && !options.quiet && !options.silent && !options.format
+}
+
+function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPath: string): void {
+  const notices = takeSetupNotices()
+  if (!shouldEvaluateSetupNotice(commandPath, command.optsWithGlobals(), isCI))
+    return
+  const shownApps = new Set<string>()
+  for (const notice of notices) {
+    if (shownApps.has(notice.appId) || (notice.kind === 'plan' && wasTrialNoticeShown(notice.billing.orgId)))
+      continue
+    const text = formatSetupNotice(notice)
+    if (text) {
+      log.info(text)
+      shownApps.add(notice.appId)
+      if (notice.kind === 'plan')
+        markTrialNoticeShown(notice.billing.orgId)
+    }
+  }
 }
 
 export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGlobals'>, commandPath: string): Promise<void> {
   const pendingChecks = getPendingOnboardingChecks()
-  if (!shouldWaitForOnboardingChecks(commandPath, command.optsWithGlobals()) || pendingChecks.size === 0)
+  if (!shouldWaitForOnboardingChecks(commandPath, command.optsWithGlobals()) || pendingChecks.size === 0) {
+    // Human-readable non-TTY commands only consume already available results.
+    renderSetupNotices(command, commandPath)
     return
+  }
 
   let timer: ReturnType<typeof setTimeout> | undefined
   const onInterrupt = () => process.exit(130)
@@ -70,4 +118,5 @@ export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGl
     // Delivery shares the worker budget; offline telemetry cannot extend shutdown.
     await flushAnalytics(0)
   }
+  renderSetupNotices(command, commandPath)
 }

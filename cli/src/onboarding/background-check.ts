@@ -1,4 +1,5 @@
 import type { OnboardingScanProject } from './notify-app-ready-project'
+import { parentPort } from 'node:worker_threads'
 import { buildCliRequestHeaders, setCurrentCliCommand } from '../analytics/cli-headers'
 import { sendEvent, trimTrailingSlashes } from '../utils'
 
@@ -12,6 +13,7 @@ export interface PreparedOnboardingCheck {
   project: OnboardingScanProject
   apiHost: string
   anonKey?: string
+  webHost?: string
   apikey: string
   command: string
   attemptId: string
@@ -62,6 +64,8 @@ export async function runOnboardingCheck(prepared: PreparedOnboardingCheck, chec
     })
     todoReportHttpStatus = response.status
     todoReportStatus = response.ok ? 'success' : 'rejected'
+    if (response.ok)
+      parentPort?.postMessage({ type: 'onboarding-step', step: check.step })
     await response.body?.cancel()
   }
   finally {

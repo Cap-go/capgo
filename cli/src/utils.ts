@@ -32,6 +32,7 @@ import { getActiveUploadReporter } from './bundle/reporter'
 import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from './capacitor-cli'
 import { getChecksum } from './checksum'
 import { loadConfig, loadConfigForWrite, writeConfig } from './config'
+import { markTrialNoticeShown } from './onboarding/trial-notice-state'
 import { IOS_SYNC_VALIDATION_FAILED_MESSAGE, isTruthyEnvValue } from './posthog'
 import { getCliLoginCommand } from './runner-command'
 import { nativePackageSchema } from './schemas/common'
@@ -1354,7 +1355,7 @@ export async function checkRemoteCliMessages(supabase: SupabaseClient<Database>,
 // TODO(cli-http): billing/entitlement RPCs have no Capgo HTTP equivalents yet
 export async function checkPlanValid(supabase: SupabaseClient<Database>, orgId: string, appId?: string, warning = true) {
   const config = await getRemoteConfig()
-  const plansUrl = `${config.hostWeb}/settings/organization/plans`
+  const plansUrl = `${config.hostWeb}/settings/organization/plans?oid=${encodeURIComponent(orgId)}`
 
   if (appId) {
     const planCheck = await resolveMeteredPlanAllowed(
@@ -1377,13 +1378,15 @@ export async function checkPlanValid(supabase: SupabaseClient<Database>, orgId: 
     isPayingOrg(supabase, orgId),
     hasOrgUsageCredits(supabase, orgId, appId),
   ])
-  if (shouldWarnTrialExpiry({ trialDays, isPaying: ispaying, hasCredits, warning }))
+  if (shouldWarnTrialExpiry({ trialDays, isPaying: ispaying, hasCredits, warning })) {
     log.warn(`WARNING !!\nTrial expires in ${trialDays} days, upgrade here: ${plansUrl}\n`)
+    markTrialNoticeShown(orgId)
+  }
 }
 
 export async function checkPlanValidUpload(supabase: SupabaseClient<Database>, orgId: string, appId?: string, warning = true) {
   const config = await getRemoteConfig()
-  const plansUrl = `${config.hostWeb}/settings/organization/plans`
+  const plansUrl = `${config.hostWeb}/settings/organization/plans?oid=${encodeURIComponent(orgId)}`
 
   const planCheck = await resolveMeteredPlanAllowed(supabase, orgId, ['storage'], appId)
   if (planCheck === 'permission_denied')
@@ -1397,8 +1400,10 @@ export async function checkPlanValidUpload(supabase: SupabaseClient<Database>, o
     isPayingOrg(supabase, orgId),
     hasOrgUsageCredits(supabase, orgId, appId),
   ])
-  if (shouldWarnTrialExpiry({ trialDays, isPaying: ispaying, hasCredits, warning }))
-    log.warn(`WARNING !!\nTrial expires in ${trialDays} days, upgrade here: ${config.hostWeb}/settings/organization/plans\n`)
+  if (shouldWarnTrialExpiry({ trialDays, isPaying: ispaying, hasCredits, warning })) {
+    log.warn(`WARNING !!\nTrial expires in ${trialDays} days, upgrade here: ${plansUrl}\n`)
+    markTrialNoticeShown(orgId)
+  }
 }
 
 function tryReadKey(path: string): string | undefined {

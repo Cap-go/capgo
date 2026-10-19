@@ -1,11 +1,17 @@
-import { cwd, exit } from 'node:process'
+import type { Command } from 'commander'
+import type { IosProvisioningOptions } from './build/ios-provisioning-command'
+import type { CreateAppleKeyOptions } from './build/onboarding/asc-key/command'
+import type { OnboardingBuilderOptions } from './build/onboarding/command'
+import type { ObserveCliOptions } from './observe/command'
+import process, { cwd, exit } from 'node:process'
 import { log } from '@clack/prompts'
-import { type Command, InvalidArgumentError, Option, program } from 'commander'
+import { isCI } from 'ci-info'
+import { InvalidArgumentError, Option, program } from 'commander'
 import pack from '../package.json'
+import { setCurrentCliCommand } from './analytics/cli-headers'
 import { categorizeCliError } from './analytics/error-category'
 import { applyCommandAnalyticsOptOut, applyRawCommandAnalyticsOptOut } from './analytics/opt-out'
 import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
-import { setCurrentCliCommand } from './analytics/cli-headers'
 import { deferCommandInvocation, extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { addApp } from './app/add'
 import { debugApp } from './app/debug'
@@ -19,16 +25,13 @@ import { clearCredentialsCommand, listCredentialsCommand, migrateCredentialsComm
 import { exportCredentialsCommand, isCredentialsExportInvocation } from './build/credentials-export-command'
 import { sanitizeCredentialsExportTerminalText, writeCredentialsExportStderr } from './build/credentials-export-terminal'
 import { manageCredentialsCommand } from './build/credentials-manage'
-import type { IosProvisioningOptions } from './build/ios-provisioning-command'
-import { iosProvisioningCommand } from './build/ios-provisioning-command'
 import { syncIosMarketingVersionCommand } from './build/ios-marketing-version'
+import { iosProvisioningCommand } from './build/ios-provisioning-command'
 import { lastOutputCommand } from './build/last-output-command'
 import { checkBuildNeeded } from './build/needed'
-import type { OnboardingBuilderOptions } from './build/onboarding/command'
+import { createAppleKeyCommand } from './build/onboarding/asc-key/command'
 import { onboardingBuilderCommand } from './build/onboarding/command'
 import { prescanCommand } from './build/prescan/command'
-import type { CreateAppleKeyOptions } from './build/onboarding/asc-key/command'
-import { createAppleKeyCommand } from './build/onboarding/asc-key/command'
 import { requestBuildCommand } from './build/request'
 import { cleanupBundle } from './bundle/cleanup'
 import { checkCompatibility } from './bundle/compatibility'
@@ -47,6 +50,7 @@ import { promoteChannel } from './channel/promote'
 import { setChannel } from './channel/set'
 import { getConfigWriteTarget, resolveCapacitorConfigTargetPath, setConfigWriteTarget } from './config'
 import { generateDocs } from './docs'
+import { CLI_PROJECT_MODES } from './framework/mode'
 import { defaultStarRepo } from './github'
 import { starAllRepositoriesCommand, starRepositoryCommand } from './github-command'
 import { initApp } from './init'
@@ -55,9 +59,10 @@ import { createKey, deleteOldKey, saveKeyCommand } from './key'
 import { login } from './login'
 import { startMcpServer } from './mcp/server'
 import { setupNotifications } from './notifications/setup'
+import { observeCommand } from './observe/command'
 import { startOnboardingChecks } from './onboarding/background'
 import { waitForOnboardingChecks } from './onboarding/background-shutdown'
-import { type ObserveCliOptions, observeCommand } from './observe/command'
+import { finishOnboardingCommand } from './onboarding/background-workers'
 import { addOrganization, deleteOrganization, inviteMember, listMembers, listOrganizations, removeMember, setMemberRole, setOrganization } from './organization'
 import { capturePosthogException, getCommandPath, shouldCapturePosthogException } from './posthog'
 import { getPreviewQr } from './preview/qr'
@@ -69,7 +74,6 @@ import { TwoFactorComplianceNetworkError } from './shared/two-factor-compliance'
 import { getAccount, setAccount } from './user/settings'
 import { whoami } from './user/whoami'
 import { formatError } from './utils'
-import { CLI_PROJECT_MODES } from './framework/mode'
 import { normalizeAutoBumpInput } from './versionHelpers'
 
 // Common option descriptions used across multiple commands
@@ -111,10 +115,11 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
   currentActionCommand = actionCommand
   setCurrentCliCommand(currentCommandPath)
   applyCommandAnalyticsOptOut(currentCommandPath, actionCommand.opts())
-  startOnboardingChecks(actionCommand, currentCommandPath)
+  startOnboardingChecks(actionCommand, currentCommandPath, isCI)
   const commandContext = extractCommandContext(actionCommand)
-  if (currentCommandPath === 'login' || currentCommandPath === 'init' || currentCommandPath === 'build init' || currentCommandPath === 'build onboarding')
+  if (currentCommandPath === 'login' || currentCommandPath === 'init' || currentCommandPath === 'build init' || currentCommandPath === 'build onboarding') {
     deferCommandInvocation(currentCommandPath, commandContext)
+  }
   else {
     const optionKey = actionCommand.optsWithGlobals().apikey
     trackCommandInvoked(currentCommandPath, commandContext, typeof optionKey === 'string' ? optionKey : undefined)
@@ -123,6 +128,7 @@ program.hook('preAction', (_thisCommand, actionCommand) => {
 
 program.hook('postAction', (_thisCommand, actionCommand) => {
   try {
+    finishOnboardingCommand()
     trackCommandSucceeded(getCommandPath(actionCommand))
   }
   finally {
@@ -1688,11 +1694,11 @@ void (async () => {
       }
       const capturePromise = shouldCapturePosthogException(error)
         ? capturePosthogException({
-          error,
-          functionName: currentCommandPath,
-          kind: 'unhandled_error',
-          status: commanderError.exitCode ?? 1,
-        })
+            error,
+            functionName: currentCommandPath,
+            kind: 'unhandled_error',
+            status: commanderError.exitCode ?? 1,
+          })
         : Promise.resolve(false)
       // For actual errors, show just the message without the full stack trace
       if (commanderError.message) {
@@ -1710,11 +1716,11 @@ void (async () => {
     }
     const capturePromise = shouldCapturePosthogException(error)
       ? capturePosthogException({
-        error,
-        functionName: currentCommandPath,
-        kind: 'unhandled_error',
-        status: 1,
-      })
+          error,
+          functionName: currentCommandPath,
+          kind: 'unhandled_error',
+          status: 1,
+        })
       : Promise.resolve(false)
     // For non-Commander errors, show full error details. A CliUserError already
     // printed a clear message at the call site, so skip the redundant and
