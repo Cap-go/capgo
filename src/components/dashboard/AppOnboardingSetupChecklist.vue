@@ -17,6 +17,7 @@ import { getAppOnboardingStepIds } from '~/services/appOnboarding'
 import { isAppOnboardingChecklistStep } from '~/utils/appOnboardingChecklist'
 import { APP_ONBOARDING_STEP_GUIDES } from '~/utils/appOnboardingGuides'
 import { hasDualOnboardingChecklists } from '~/utils/dualOnboardingChecklists'
+import AppOnboardingAiAgentCard from './AppOnboardingAiAgentCard.vue'
 import ChannelSetupOnboardingDialog from './ChannelSetupOnboardingDialog.vue'
 import TechnicalTeammateInviteCard from './TechnicalTeammateInviteCard.vue'
 
@@ -33,7 +34,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   copyCommand: []
-  copyAi: []
+  copyAi: [placement?: 'checklist']
   hide: []
   explore: []
   complete: []
@@ -122,6 +123,9 @@ function statusLabel(status: string | undefined) {
         {{ t('setup-checklist-subtitle') }}
       </p>
     </header>
+
+    <!-- The first task already offers the AI prompt next to the CLI command; keep it reachable for every later task too. -->
+    <AppOnboardingAiAgentCard v-if="!completed && !isFirstStep" @copy="emit('copyAi', 'checklist')" />
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6" data-test="setup-checklist-progress">
       <p class="shrink-0 text-sm font-medium text-slate-800 dark:text-slate-200" aria-live="polite" aria-atomic="true">
