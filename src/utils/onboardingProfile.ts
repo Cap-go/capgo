@@ -30,6 +30,15 @@ export function readProfileOnboardingHandoff(state: unknown): { attemptId: strin
   return typeof attemptId === 'string' && typeof runId === 'string' ? { attemptId, runId } : null
 }
 
+export function consumeProfileOnboardingHandoff(history: Pick<History, 'state' | 'replaceState'>): { attemptId: string, runId: string } | null {
+  const handoff = readProfileOnboardingHandoff(history.state)
+  if (handoff) {
+    const { [PROFILE_ONBOARDING_HANDOFF_KEY]: _consumed, ...rest } = history.state as Record<string, unknown>
+    history.replaceState(rest, '')
+  }
+  return handoff
+}
+
 export function initialProfileOnboardingSteps(onboarding: unknown, showWelcome: boolean): OnboardingAnalyticsStep[] {
   return [
     'name',

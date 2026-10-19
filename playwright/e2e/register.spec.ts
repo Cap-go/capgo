@@ -40,10 +40,19 @@ async function enableNameTreatmentFixture(page: Page) {
     await route.fulfill({ response })
   })
   await page.route('**/private/onboarding_ab_tests', async (route) => {
-    const response = await route.fetch()
-    const body = await response.json()
-    await route.fulfill({ response, json: { ...body, assignments: {
-      ...body.assignments,
+    // Do not invoke the real disabled allocator: it would remove this test's assignment.
+    const token = route.request().headers().authorization?.replace(/^Bearer /i, '')
+    const admin = localAdminClient()
+    const { data: auth, error: authError } = await admin.auth.getUser(token)
+    if (authError || !auth.user)
+      throw authError ?? new Error('Cannot identify treatment fixture user')
+    const { data, error } = await admin.from('users').select('onboarding').eq('id', auth.user.id).single()
+    if (error)
+      throw error
+    const current = data.onboarding && typeof data.onboarding === 'object' && !Array.isArray(data.onboarding) ? data.onboarding : {}
+    const abtests = current.abtests && typeof current.abtests === 'object' && !Array.isArray(current.abtests) ? current.abtests : {}
+    await route.fulfill({ json: { assignments: {
+      ...abtests,
       onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' },
     } } })
   })

@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { hasProfileOnboarding, reconcileOnboardingABTestAssignments, resolveOnboardingAnalyticsVersion } from '../src/utils/onboardingABTests'
-import { needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY, readProfileOnboardingHandoff } from '../src/utils/onboardingProfile'
+import { consumeProfileOnboardingHandoff, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY, readProfileOnboardingHandoff } from '../src/utils/onboardingProfile'
 
 const abtests = { onboarding_v6: { branch: 'A' as const, assigned_at: '2026-10-19T11:00:00.000Z' } }
 const onboarding = { abtests }
@@ -27,6 +27,22 @@ describe('required initial onboarding name', () => {
   })
   it('removes a stale treatment when the authoritative response omits it', () => {
     expect(reconcileOnboardingABTestAssignments(abtests, {})).toEqual({})
+  })
+  it('consumes the handoff once so a refresh starts a new telemetry run', () => {
+    const identity = { attemptId: 'attempt', runId: 'run' }
+    let state: Record<string, unknown> = { position: 3, [PROFILE_ONBOARDING_HANDOFF_KEY]: identity }
+    const history = {
+      get state() {
+        return state
+      },
+      replaceState: vi.fn((next: Record<string, unknown>) => {
+        state = next
+      }),
+    }
+    expect(consumeProfileOnboardingHandoff(history)).toEqual(identity)
+    expect(state).toEqual({ position: 3 })
+    expect(consumeProfileOnboardingHandoff(history)).toBeNull()
+    expect(history.replaceState).toHaveBeenCalledTimes(1)
   })
   it('carries the same attempt and run into the app onboarding funnel', () => {
     const identity = { attemptId: 'attempt', runId: 'run' }

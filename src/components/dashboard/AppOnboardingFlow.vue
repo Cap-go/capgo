@@ -86,7 +86,7 @@ import {
 } from '~/utils/onboardingAppDraft'
 import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { withOnboardingChannelOrigin } from '~/utils/onboardingChannelAnalytics'
-import { needsInitialOnboardingName, readProfileOnboardingHandoff } from '~/utils/onboardingProfile'
+import { consumeProfileOnboardingHandoff, needsInitialOnboardingName } from '~/utils/onboardingProfile'
 import {
   createOnboardingDetailsFieldDebouncer,
   createOnboardingProgressTracker,
@@ -250,7 +250,7 @@ const profileOnboarding = computed(() => hasProfileOnboarding(main.user?.onboard
 const intentStepLabel = computed(() => t('unified-onboarding-step-intent'))
 const onboardingAnalyticsVersion = () => resolveOnboardingAnalyticsVersion(onboardingForABTests.value, selectedIntent.value)
 const setupHandoff = props.setupAppId ? consumeSetupHandoff(props.setupAppId) : null
-const profileHandoff = props.preOrg && !props.newOrganization ? readProfileOnboardingHandoff(window.history.state) : null
+const profileHandoff = props.preOrg && !props.newOrganization ? consumeProfileOnboardingHandoff(window.history) : null
 const onboardingTelemetry = createOnboardingTelemetryIdentity({
   continueFrom: setupHandoff ?? profileHandoff,
   flow: props.preOrg ? 'pre_org' : 'existing_org',
@@ -348,6 +348,7 @@ function applyOnboardingABTestAssignments(assignments: Record<string, Onboarding
       abtests: reconcileOnboardingABTestAssignments(currentABTests, assignments),
     } as unknown as Json,
   }
+  void redirectToRequiredInitialName()
 }
 
 function refreshOnboardingABTests(options: { force?: boolean } = {}): Promise<void> {
@@ -931,8 +932,7 @@ async function resetOnboardingForm() {
       toast.error(t('account-error'))
     return
   }
-  if (props.preOrg && !props.newOrganization && profileOnboarding.value && !organizationStore.hasOrganizations)
-    await router.replace({ path: '/onboarding/name', query: { to: '/onboarding/app' } })
+  await redirectToRequiredInitialName()
 }
 
 function showWelcomeOnDesktop() {
@@ -2030,6 +2030,9 @@ function continuePreOrgDetails() {
 }
 
 async function createOrganizationAndApp() {
+  if (await redirectToRequiredInitialName())
+    return
+
   if (isSubmitting.value)
     return
 
@@ -2600,6 +2603,18 @@ async function leaveUnavailableSetupApp() {
     await router.replace(`/app/${encodeURIComponent(props.setupAppId)}`)
 }
 
+let nameRedirectPending = false
+async function redirectToRequiredInitialName(): Promise<boolean> {
+  if (!props.preOrg || props.newOrganization || !needsInitialOnboardingName(main.user, organizationStore.hasOrganizations))
+    return false
+  if (!nameRedirectPending) {
+    nameRedirectPending = true
+    onboardingProgressPersistence.abort()
+    await router.replace({ path: '/onboarding/name', query: { to: '/onboarding/app' } })
+  }
+  return true
+}
+
 function trackDashboardExplored() {
   if (!progressTracker) {
     pendingDashboardExplored = true
@@ -2619,11 +2634,8 @@ onMounted(async () => {
   try {
     if (props.preOrg) {
       await waitForOnboardingABTests()
-      if (!props.newOrganization && needsInitialOnboardingName(main.user, organizationStore.hasOrganizations)) {
-        onboardingProgressPersistence.abort()
-        await router.replace({ path: '/onboarding/name', query: { to: '/onboarding/app' } })
+      if (await redirectToRequiredInitialName())
         return
-      }
       if (resumeAppId.value) {
         await organizationStore.awaitInitialLoad()
         await waitForOnboardingABTests()

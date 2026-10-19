@@ -10,6 +10,7 @@ import { parseUserOnboardingProgress, shouldPromptOnboardingResume } from '../sr
 
 const writerMocks = vi.hoisted(() => ({
   abTestAssignments: {} as Record<string, unknown>,
+  abTestResponse: undefined as undefined | (() => Promise<Record<string, unknown>>),
   dialog: {
     lastButtonRole: null as string | null,
     onDialogDismiss: vi.fn(async () => undefined),
@@ -81,7 +82,7 @@ vi.mock('~/services/capgoApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/services/capgoApi')>()
   return {
     ...actual,
-    invokeCapgoApi: vi.fn(async () => ({ data: { assignments: writerMocks.abTestAssignments }, error: null })),
+    invokeCapgoApi: vi.fn(async () => ({ data: { assignments: writerMocks.abTestResponse ? await writerMocks.abTestResponse() : writerMocks.abTestAssignments }, error: null })),
   }
 })
 vi.mock('~/services/supabase', () => ({
@@ -1420,4 +1421,39 @@ describe('app onboarding progress analytics integration', () => {
     const confirmedSidebarExit = sidebarSource.slice(sidebarSource.indexOf('if (requiresOnboardingExplorationConfirmation)'), sidebarSource.indexOf('if (tab.onClick)'))
     expect(confirmedSidebarExit.indexOf(`lastButtonRole !== 'primary'`)).toBeLessThan(confirmedSidebarExit.indexOf('window.dispatchEvent(new Event(ONBOARDING_DASHBOARD_EXPLORED_EVENT))'))
   })
+})
+
+it('requires names when treatment arrives after the bounded startup wait', async () => {
+  const previousUser = writerMocks.main.user
+  const previousResponse = writerMocks.abTestResponse
+  const descriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
+  let resolve!: (assignments: Record<string, unknown>) => void
+  const pending = new Promise<Record<string, unknown>>((done) => {
+    resolve = done
+  })
+  writerMocks.abTestResponse = () => pending
+  writerMocks.main.user = { id: 'late-treatment', image_url: '', onboarding: {} }
+  writerMocks.router.replace.mockClear()
+  Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => ({ matches: false }) })
+  vi.useFakeTimers()
+  const app = createApp(AppOnboardingFlow, { onboarding: true, preOrg: true })
+  app.config.warnHandler = () => undefined
+  try {
+    app.mount(document.createElement('div'))
+    await vi.advanceTimersByTimeAsync(3100)
+    expect(writerMocks.router.replace).not.toHaveBeenCalledWith(expect.objectContaining({ path: '/onboarding/name' }))
+    resolve({ onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } })
+    await vi.advanceTimersByTimeAsync(0)
+    await nextTick()
+    expect(writerMocks.router.replace).toHaveBeenCalledWith({ path: '/onboarding/name', query: { to: '/onboarding/app' } })
+  }
+  finally {
+    resolve({})
+    app.unmount()
+    writerMocks.main.user = previousUser
+    writerMocks.abTestResponse = previousResponse
+    if (descriptor)
+      Object.defineProperty(window, 'matchMedia', descriptor)
+    vi.useRealTimers()
+  }
 })
