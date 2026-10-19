@@ -19,9 +19,9 @@
 import type { LocationHint } from './lib.ts'
 import {
   admin,
-  detail,
   CLUSTER_ENV,
   deprovisionNodeNetwork,
+  detail,
   fail,
   LOCATION_HINTS,
   loadState,
@@ -32,7 +32,8 @@ import {
   waitForNode,
 } from './lib.ts'
 
-// Replicas catch up when replay lag is below this (archive_timeout is 30s).
+// Ready when the primary's heartbeat (committed every 15s, archived within
+// archive_timeout=30s) is this fresh on the replica.
 const MAX_READY_LAG_S = 120
 
 const { flags, positional } = parseArgs(process.argv.slice(2))
@@ -68,7 +69,7 @@ log('waiting for restore from R2 + WAL catch-up')
 await waitForNode(state, name, (h) => {
   const pg = h.node?.postgres
   return h.node?.phase === 'running' && pg?.in_recovery === true
-    && pg.replay_lag_s != null && pg.replay_lag_s < MAX_READY_LAG_S
+    && h.node?.heartbeat_age_s != null && h.node.heartbeat_age_s < MAX_READY_LAG_S
 })
 
 const hyperdriveId = await provisionHyperdrive(state, name)

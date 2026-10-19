@@ -1,7 +1,10 @@
 #!/bin/sh
 # Node status as JSON, served by health_server.pl on :8080/health.
+# Short connect/statement timeouts: a stuck Postgres must not hang /health.
+export PGCONNECT_TIMEOUT=3 PGOPTIONS='-c statement_timeout=3000'
+PSQL="/usr/bin/psql -X -h /var/run/postgresql -U postgres -d ${PG_DATABASE:-postgres} -At"
 PHASE="$(cat /tmp/capgo-phase 2>/dev/null || echo unknown)"
-STATUS="$(/usr/bin/psql -X -h /var/run/postgresql -U postgres -d "${PG_DATABASE:-postgres}" -At 2>/dev/null <<'SQL'
+STATUS="$($PSQL 2>/dev/null <<'SQL'
 SELECT json_build_object(
   'node', current_setting('cluster_name'),
   'in_recovery', pg_is_in_recovery(),
@@ -18,6 +21,10 @@ SELECT json_build_object(
 );
 SQL
 )"
+# Seconds since the primary's last heartbeat commit, as seen by this node.
+# It is the real replication lag on replicas even when Supabase is idle.
+HEARTBEAT="$($PSQL -c "SELECT round(extract(epoch FROM now() - at)::numeric, 1) FROM capgo_cf.heartbeat WHERE id = 1" 2>/dev/null)"
 [ -n "$STATUS" ] || STATUS=null
-printf '{"phase":"%s","postgres":%s,"disk":"%s"}\n' "$PHASE" "$STATUS" \
+[ -n "$HEARTBEAT" ] || HEARTBEAT=null
+printf '{"phase":"%s","postgres":%s,"heartbeat_age_s":%s,"disk":"%s"}\n' "$PHASE" "$STATUS" "$HEARTBEAT" \
   "$(df -h /var/lib/postgresql | awk 'NR==2 {print $3"/"$2}')"

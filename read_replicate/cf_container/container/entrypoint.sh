@@ -57,6 +57,7 @@ PG_PID=""
 FRESH_INIT=0
 RESTORED_PRIMARY=0
 PROMOTE_STABLE_SECONDS="${PROMOTE_STABLE_SECONDS:-60}"
+HEARTBEAT_SECONDS="${HEARTBEAT_SECONDS:-15}"
 
 pg_args() {
   local args=(
@@ -99,8 +100,22 @@ pg_args() {
   printf '%s\0' "${args[@]}"
 }
 
-has_backup() {
-  as_pg wal-g backup-list 2>/dev/null | grep -q 'base_'
+# Prints "found" or "none". Returns 1 when the listing itself fails, so an
+# unreachable bucket is never mistaken for an empty one.
+backup_status() {
+  local out
+  if ! out="$(as_pg wal-g backup-list 2>&1)"; then
+    log "wal-g backup-list failed: ${out##*$'\n'}" >&2
+    return 1
+  fi
+  if grep -q 'base_' <<<"$out"; then
+    echo found
+  elif grep -q 'No backups found' <<<"$out"; then
+    echo none
+  else
+    log "unexpected wal-g backup-list output: ${out##*$'\n'}" >&2
+    return 1
+  fi
 }
 
 start_health_server() {
@@ -203,6 +218,8 @@ ALTER ROLE capgo_reader PASSWORD '${READER_PASSWORD//\'/\'\'}';
 SQL
   psql_local -f /opt/capgo/schema.sql
   psql_local <<'SQL'
+CREATE SCHEMA IF NOT EXISTS capgo_cf;
+CREATE TABLE IF NOT EXISTS capgo_cf.heartbeat (id int PRIMARY KEY, at timestamptz NOT NULL);
 GRANT USAGE ON SCHEMA public TO capgo_reader;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO capgo_reader;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO capgo_reader;
@@ -234,33 +251,96 @@ SQL
   log "first base backup pushed; replicas can now start"
 }
 
+# Name of the WAL segment that replay needs next after LSN $2 on timeline $1
+# (16 MB segments: 256 per 4 GB "xlogid").
+wal_segment_after() {
+  local tli="$1" lsn="$2" hi lo seg
+  hi=$((16#${lsn%/*}))
+  lo=$((16#${lsn#*/}))
+  seg=$((lo / 16777216))
+  ((lo % 16777216 == 0)) || seg=$((seg + 1))
+  if ((seg >= 256)); then
+    hi=$((hi + 1))
+    seg=0
+  fi
+  printf '%08X%08X%08X' "$tli" "$hi" "$seg"
+}
+
+# 0 = archive has no segment after the replay position (safe to promote),
+# 1 = more WAL exists or the archive could not be checked.
+archive_drained() {
+  local lsn="$1" tli segment out rc=0
+  tli="$(psql_local -At -c 'SELECT timeline_id FROM pg_control_checkpoint()')"
+  segment="$(wal_segment_after "$tli" "$lsn")"
+  out="$(as_pg wal-g wal-fetch "$segment" /tmp/capgo-wal-probe 2>&1)" || rc=$?
+  rm -f /tmp/capgo-wal-probe
+  if ((rc == 0)); then
+    log "segment ${segment} is in the archive but not replayed yet; not promoting"
+    return 1
+  fi
+  if grep -q 'does not exist' <<<"$out"; then
+    return 0
+  fi
+  log "cannot check archive for ${segment}: ${out##*$'\n'}"
+  return 1
+}
+
+# Restored primary: stay a standby until replay stops advancing AND the
+# archive confirms there is no next segment. A WAL fetch outage only delays
+# promotion; it never promotes over WAL that exists in R2.
 promote_when_caught_up() {
   phase replaying-archive
   local last="" lsn stable=0
-  while ((stable < PROMOTE_STABLE_SECONDS)); do
+  while true; do
     sleep 5
     lsn="$(psql_local -At -c 'SELECT pg_last_wal_replay_lsn()')"
-    if [[ "$lsn" == "$last" ]]; then
-      stable=$((stable + 5))
-    else
+    if [[ "$lsn" != "$last" ]]; then
       log "replayed up to ${lsn}"
       last="$lsn"
       stable=0
+      continue
     fi
+    stable=$((stable + 5))
+    ((stable >= PROMOTE_STABLE_SECONDS)) || continue
+    if archive_drained "$lsn"; then
+      break
+    fi
+    stable=0
   done
   log "archive drained at ${last}, promoting"
   psql_local -c 'SELECT pg_promote(true, 300)' >/dev/null
 }
 
+push_backup() {
+  if as_pg wal-g backup-push "$PGDATA"; then
+    as_pg wal-g delete retain FULL "$BACKUP_RETAIN_FULL" --confirm || log "backup retention failed"
+  else
+    log "base backup failed"
+  fi
+}
+
+# Replicas use heartbeat age as their readiness/lag signal; the primary
+# commits one row every HEARTBEAT_SECONDS even when Supabase is idle.
+heartbeat_loop() {
+  psql_local -q -c "CREATE SCHEMA IF NOT EXISTS capgo_cf; CREATE TABLE IF NOT EXISTS capgo_cf.heartbeat (id int PRIMARY KEY, at timestamptz NOT NULL)" || true
+  while true; do
+    psql_local -q -c "INSERT INTO capgo_cf.heartbeat VALUES (1, now()) ON CONFLICT (id) DO UPDATE SET at = excluded.at" >/dev/null 2>&1 \
+      || log "heartbeat write failed"
+    sleep "$HEARTBEAT_SECONDS"
+  done
+}
+
 backup_loop() {
+  # A promoted primary is on a new timeline: back it up right away so the next
+  # restart (and new replicas) do not replay everything since the old backup.
+  if [[ "$RESTORED_PRIMARY" == "1" ]]; then
+    log "base backup after promotion"
+    push_backup
+  fi
   while true; do
     sleep $((BACKUP_INTERVAL_HOURS * 3600))
     log "scheduled base backup"
-    if as_pg wal-g backup-push "$PGDATA"; then
-      as_pg wal-g delete retain FULL "$BACKUP_RETAIN_FULL" --confirm || log "backup retention failed"
-    else
-      log "scheduled base backup failed"
-    fi
+    push_backup
   done
 }
 
@@ -285,7 +365,12 @@ start_health_server
 prepare_dirs
 
 if [[ "$ROLE" == "primary" ]]; then
-  if has_backup; then
+  if ! status="$(backup_status)"; then
+    # Never initdb (and re-copy from Supabase) because R2 was unreachable.
+    log "cannot list backups in ${WALG_S3_PREFIX}; refusing to start (cron will retry)"
+    exit 1
+  fi
+  if [[ "$status" == "found" ]]; then
     restore_latest_backup
     # Restore as a standby, not with recovery.signal: a transient wal-fetch
     # failure would end recovery early and silently drop committed changes.
@@ -297,7 +382,7 @@ if [[ "$ROLE" == "primary" ]]; then
   fi
 elif [[ "$ROLE" == "replica" ]]; then
   phase waiting-for-backup
-  until has_backup; do
+  until status="$(backup_status)" && [[ "$status" == "found" ]]; do
     log "no base backup in ${WALG_S3_PREFIX} yet, retrying in 30s"
     sleep 30
   done
@@ -318,6 +403,7 @@ if [[ "$ROLE" == "primary" ]]; then
     sleep 2
   done
   [[ "$FRESH_INIT" == "1" ]] && bootstrap_primary
+  heartbeat_loop &
   backup_loop &
 fi
 

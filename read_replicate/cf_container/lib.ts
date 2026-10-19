@@ -21,6 +21,7 @@ const STATE_FILE = join(DIR, `.cluster-state.${CLUSTER_ENV}.json`)
 /** Must match vars in wrangler.jsonc for the selected env. */
 export const WAL_BUCKET = CLUSTER_ENV === 'prod' ? 'capgo-pg-wal' : 'capgo-pg-wal-preprod'
 export const PUBLICATION_NAME = CLUSTER_ENV === 'prod' ? 'capgo_google_eu_2_pub' : 'capgo_cf_preprod_pub'
+export const SOURCE_SLOT_NAME = CLUSTER_ENV === 'prod' ? 'capgo_cf_primary_sub_slot' : 'capgo_cf_preprod_sub_slot'
 
 export const LOCATION_HINTS = ['wnam', 'enam', 'sam', 'weur', 'eeur', 'apac', 'oc', 'afr', 'me'] as const
 export type LocationHint = typeof LOCATION_HINTS[number]
@@ -241,6 +242,16 @@ export function sourcePassword(): string {
   return decodeURIComponent(new URL(env('MAIN_SUPABASE_DB_URL')).password)
 }
 
+/** Run SQL on the Supabase source with local psql (password via PGPASSWORD). */
+export async function sourceSql(sql: string): Promise<string> {
+  const psql = Bun.which('psql-17') ?? Bun.which('psql') ?? fail('psql not found')
+  const { stdout } = await run([psql, sourceConninfoWithoutPassword(), '-X', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql], {
+    quiet: true,
+    env: { PGPASSWORD: sourcePassword() },
+  })
+  return stdout.trim()
+}
+
 /** Tunnel (cloudflared runs inside the container) -> Workers VPC service. */
 export async function provisionTunnel(state: ClusterState, name: string, locationHint: LocationHint): Promise<NodeState> {
   const existing = state.nodes[name]
@@ -335,7 +346,11 @@ export async function deprovisionNodeNetwork(state: ClusterState, name: string) 
   if (node.hyperdriveId)
     await cfApiRaw(['hyperdrive', 'configs', node.hyperdriveId], { method: 'DELETE' })
   await wrangler(['vpc', 'service', 'delete', node.vpcServiceId], { allowFail: true, input: 'y\n' })
-  await cfApi(['cfd_tunnel', node.tunnelId], { method: 'DELETE' }).catch(() => {})
+  // Best-effort like the Hyperdrive delete: a tunnel with lingering connectors
+  // must not stop the state cleanup below.
+  const tunnelDelete = await cfApiRaw(['cfd_tunnel', node.tunnelId], { method: 'DELETE' })
+  if (!tunnelDelete.success)
+    detail(`tunnel ${node.tunnelId} not deleted (${JSON.stringify(tunnelDelete.errors)}); delete it in the dashboard`)
   delete state.nodes[name]
   saveState(state)
 }
@@ -364,7 +379,12 @@ export async function admin<T>(state: ClusterState, method: string, path: string
 interface NodeHealth {
   name: string
   container: { status: string }
-  node?: { phase?: string, disk?: string, postgres?: { in_recovery?: boolean, replay_lag_s?: number | null, tables_not_ready?: number } | null }
+  node?: {
+    phase?: string
+    disk?: string
+    heartbeat_age_s?: number | null
+    postgres?: { in_recovery?: boolean, replay_lag_s?: number | null, tables_not_ready?: number } | null
+  }
 }
 
 /** Poll a node until `done` returns true. Restores of a large DB take minutes. */
@@ -375,7 +395,7 @@ export async function waitForNode(state: ClusterState, name: string, done: (h: N
     const h = await admin<NodeHealth>(state, 'GET', `/nodes/${name}`)
     const pg = h.node?.postgres
     const line = `[${name}] container=${h.container.status} phase=${h.node?.phase ?? '-'} disk=${h.node?.disk ?? '-'}`
-      + (pg ? ` recovery=${pg.in_recovery} lag=${pg.replay_lag_s ?? '-'}s tables_not_ready=${pg.tables_not_ready ?? '-'}` : '')
+      + (pg ? ` recovery=${pg.in_recovery} heartbeat_age=${h.node?.heartbeat_age_s ?? '-'}s tables_not_ready=${pg.tables_not_ready ?? '-'}` : '')
     if (line !== last) {
       detail(`${new Date().toISOString()} ${line}`)
       last = line

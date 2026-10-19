@@ -30,9 +30,17 @@ bun run pgcf:smoke
 Docker only (S3 mock instead of R2, postgres:17 instead of Supabase). Checks
 fresh bootstrap, replica restore, live change flowing primary -> R2 -> replica,
 and primary SIGTERM + restart restoring from the bucket without losing rows.
-A restored primary replays as a standby and promotes only after replay stops
-advancing for 60s, so a failed WAL fetch is retried and never truncates
-history.
+A restored primary replays as a standby. It promotes only when replay has
+stopped advancing for 60s **and** WAL-G confirms the next segment does not exist
+in R2. If the next segment exists, or R2 cannot be checked, it stays in recovery
+and logs why; an R2 outage delays promotion instead of promoting over archived
+WAL. It does not protect against WAL that never reached R2 (see the crash window
+below).
+
+If R2 cannot be listed at boot, the primary exits instead of treating the
+bucket as empty (no accidental initdb + re-copy from Supabase). Replicas keep
+retrying. The primary commits a heartbeat row every 15s; `heartbeat_age_s` in
+`/health` is the real replication lag on replicas, and `add_region` waits on it.
 
 ## Preprod run
 
@@ -70,8 +78,17 @@ source if it is missing. Each node gets a Hyperdrive config
   streaming on Cloud SQL. The edge cache purge path already tolerates 60s.
 - **Supabase direct host** `db.<ref>.supabase.co` must be reachable from the
   container (IPv4 add-on or container IPv6 egress).
-- A second logical slot on Supabase also blocks Postgres upgrades; tear it
-  down like `readreplicate:upgrade:teardown` does for Google.
+- **Supabase WAL retention.** The primary's logical slot
+  (`capgo_cf_<env>_sub_slot`) pins WAL on Supabase while the primary is down,
+  restoring or abandoned, so Supabase disk grows without limit. `pgcf:status`
+  prints the slot's retained WAL. Before prod: set `max_slot_wal_keep_size` on
+  the source (Supabase support/config) and alert on retained bytes.
+- A second logical slot on Supabase also blocks Postgres upgrades. Teardown
+  (run on the source after stopping/removing the primary):
+
+  ```sql
+  SELECT pg_drop_replication_slot('capgo_cf_preprod_sub_slot');  -- prod: capgo_cf_primary_sub_slot
+  ```
 
 ## Cost (24/7, Workers Paid rates, Oct 2026)
 
