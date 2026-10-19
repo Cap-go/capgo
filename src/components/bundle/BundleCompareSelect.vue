@@ -329,18 +329,23 @@ async function searchCompareVersions(term: string) {
   // Each chain must start from its own builder: the Supabase query builder is
   // mutable and returns `this`, so reusing one instance across concurrent
   // chains would leak filters between the requests.
-  // An exact name match is fetched separately so it is never pushed out by newer
-  // bundles sharing the same prefix (e.g. "4.0.2" vs "4.0.2-staging+...").
-  const namePattern = `%${escapeIlike(trimmed)}%`
+  // Exact and prefix matches are fetched separately so they are never pushed out
+  // by newer bundles that only contain the term (e.g. "4.0.2" vs "4.0.2-staging+...").
+  const escaped = escapeIlike(trimmed)
   const numericId = /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN
-  const [exactResponse, nameResponse, idResponse] = await Promise.all([
+  const [exactResponse, prefixResponse, nameResponse, idResponse] = await Promise.all([
     buildCompareBaseQuery()
       .neq('id', props.currentVersionId)
       .eq('name', trimmed)
       .limit(1),
     buildCompareBaseQuery()
       .neq('id', props.currentVersionId)
-      .ilike('name', namePattern)
+      .ilike('name', `${escaped}%`)
+      .order('created_at', { ascending: false })
+      .limit(COMPARE_SEARCH_LIMIT),
+    buildCompareBaseQuery()
+      .neq('id', props.currentVersionId)
+      .ilike('name', `%${escaped}%`)
       .order('created_at', { ascending: false })
       .limit(COMPARE_SEARCH_LIMIT),
     Number.isNaN(numericId)
@@ -354,18 +359,15 @@ async function searchCompareVersions(term: string) {
   if (requestId !== compareSearchRequestId.value)
     return
 
-  const error = exactResponse.error ?? nameResponse.error ?? idResponse.error
+  const error = exactResponse.error ?? prefixResponse.error ?? nameResponse.error ?? idResponse.error
   let data: VersionRow[] | null = null
   if (!error) {
-    const lowered = trimmed.toLowerCase()
-    // Rank prefix matches ahead of substring matches, keeping newest-first order
-    // within each group (the sort is stable).
-    const nameMatches = [...(nameResponse.data ?? [])]
-      .sort((a, b) => Number(!a.name.toLowerCase().startsWith(lowered)) - Number(!b.name.toLowerCase().startsWith(lowered)))
+    // Rank exact, then ID, then prefix, then substring matches (each newest-first).
     const combined = [
       ...(exactResponse.data ?? []),
       ...(idResponse.data ?? []),
-      ...nameMatches,
+      ...(prefixResponse.data ?? []),
+      ...(nameResponse.data ?? []),
     ]
     const seenIds = new Set<number>()
     data = combined.filter((row) => {
@@ -373,7 +375,7 @@ async function searchCompareVersions(term: string) {
         return false
       seenIds.add(row.id)
       return true
-    })
+    }).slice(0, COMPARE_SEARCH_LIMIT)
   }
 
   if (error) {
