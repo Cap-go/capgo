@@ -17,7 +17,6 @@ it('consolidates legacy execution history without losing active snapshots or pen
   const [oldCompleted, newCompleted, running, laterCompleted] = Array.from({ length: 4 }, () => randomUUID())
   const snapshot = [{ metadata: { source: 'original-selection' } }]
   try {
-    await client.query('BEGIN')
     await client.query(`CREATE SCHEMA ${schema}`)
     await client.query(scoped(legacy))
     await client.query(`INSERT INTO ${schema}.bento_evaluation_runs
@@ -26,7 +25,11 @@ it('consolidates legacy execution history without losing active snapshots or pen
         ($2, 'completed-check', NOW() - INTERVAL '3 minutes', NOW() - INTERVAL '3 minutes', 'completed', NULL, '[{"event_id":"new-completed"}]'),
         ($3, 'active-check', NOW() - INTERVAL '2 minutes', NOW() - INTERVAL '2 minutes', 'running', $5::jsonb, '[{"event_id":"running"}]'),
         ($4, 'active-check', NOW() - INTERVAL '1 minute', NOW() - INTERVAL '1 minute', 'completed', NULL, '[{"event_id":"later-completed"}]')`, [oldCompleted, newCompleted, running, laterCompleted, JSON.stringify(snapshot)])
-    await client.query(scoped(migration))
+    // The pinned Supabase CLI executes statements separately without wrapping
+    // a migration in a transaction. Test the migration's own transaction.
+    for (const statement of scoped(migration).split(/;\s*(?:\n|$)/).filter(part => part.trim()))
+      await client.query(statement)
+    await client.query('BEGIN')
     const { rows } = await client.query(`SELECT id, evaluation_key, status, eligible_users, pending_audit FROM ${schema}.bento_evaluation_runs ORDER BY evaluation_key`)
     expect(rows).toEqual([
       { id: running, evaluation_key: 'active-check', status: 'running', eligible_users: snapshot, pending_audit: [{ event_id: 'running' }, { event_id: 'later-completed' }] },
@@ -39,6 +42,7 @@ it('consolidates legacy execution history without losing active snapshots or pen
   }
   finally {
     await client.query('ROLLBACK')
+    await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`)
     client.release()
   }
 })

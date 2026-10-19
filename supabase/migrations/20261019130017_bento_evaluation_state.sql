@@ -1,5 +1,7 @@
 -- Reuse one execution-state row per evaluation, preserving any unfinished run
 -- and all unhanded analytics before discarding redundant completed history.
+BEGIN;
+
 LOCK TABLE public.bento_evaluation_runs IN ACCESS EXCLUSIVE MODE;
 
 WITH retained AS MATERIALIZED (
@@ -60,3 +62,5 @@ COMMENT ON TABLE public.bento_evaluation_runs IS
 'Reusable private evaluation state: one row per evaluation_key.
 The id rotates per scheduled run to fence stale messages.
 Eligibility snapshots and pending analytics survive retries.';
+
+COMMIT;
