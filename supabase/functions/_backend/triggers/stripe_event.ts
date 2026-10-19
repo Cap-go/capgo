@@ -206,11 +206,28 @@ function buildBillingBentoTagUpdates(
   }))
 }
 
+// Subscription states that have not charged the customer yet. Leaving one for
+// `active` is the first real payment.
+const UNPAID_SUBSCRIPTION_STATUSES = new Set<Stripe.Subscription.Status>(['trialing', 'past_due', 'incomplete'])
+
 function getPaidAtUpdate(
   currentStripeInfo: Pick<StripeInfoRow, 'paid_at' | 'status'> | null | undefined,
   nextStatus: StripeWebhookStatus | null | undefined,
   eventOccurredAtIso: string = new Date().toISOString(),
+  subscription?: Pick<StripeData, 'subscriptionStatus' | 'previousSubscriptionStatus'>,
 ) {
+  // A trial checkout saves the card without charging it: no payment yet.
+  if (subscription?.subscriptionStatus === 'trialing')
+    return undefined
+
+  // stripe_info already reads `succeeded` while trialing or past due, so the
+  // status check below would skip the first charge at the end of the trial.
+  if (subscription?.subscriptionStatus === 'active'
+    && subscription.previousSubscriptionStatus
+    && UNPAID_SUBSCRIPTION_STATUSES.has(subscription.previousSubscriptionStatus)) {
+    return currentStripeInfo?.paid_at ? undefined : eventOccurredAtIso
+  }
+
   if (!nextStatus || !['created', 'succeeded'].includes(nextStatus))
     return undefined
 
@@ -1165,7 +1182,7 @@ async function createdOrUpdated(
     else {
       updateData.past_due_at = null
     }
-    const paidAt = getPaidAtUpdate(currentStripeInfo, status, eventOccurredAtIso)
+    const paidAt = getPaidAtUpdate(currentStripeInfo, status, eventOccurredAtIso, stripeData)
     if (paidAt)
       updateData.paid_at = paidAt
     const revenuePlans = await getRevenuePlans(c)

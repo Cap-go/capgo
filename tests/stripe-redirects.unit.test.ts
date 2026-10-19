@@ -228,6 +228,62 @@ describe('stripe redirect URL allowlist', () => {
     }))
   })
 
+  it('keeps the remaining trial when a trial org checks out early', async () => {
+    const createSession = vi.fn().mockResolvedValue({ url: 'https://pay.capgo.test/p/pay' })
+    const stripeClient = {
+      prices: {
+        list: vi.fn().mockResolvedValue({ data: createPriceList() }),
+      },
+      checkout: {
+        sessions: {
+          create: createSession,
+        },
+      },
+    } as any
+
+    vi.mocked(Stripe).mockImplementation(function () {
+      return stripeClient
+    } as any)
+
+    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    trialEndsAt.setMilliseconds(0)
+    const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', 'org_123', undefined, undefined, undefined, undefined, trialEndsAt.toISOString())
+
+    expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'subscription',
+      subscription_data: { trial_end: trialEndsAt.getTime() / 1000 },
+    }))
+  })
+
+  it('charges immediately when the trial is too close to its end for Stripe', async () => {
+    const createSession = vi.fn().mockResolvedValue({ url: 'https://pay.capgo.test/p/pay' })
+    const stripeClient = {
+      prices: {
+        list: vi.fn().mockResolvedValue({ data: createPriceList() }),
+      },
+      checkout: {
+        sessions: {
+          create: createSession,
+        },
+      },
+    } as any
+
+    vi.mocked(Stripe).mockImplementation(function () {
+      return stripeClient
+    } as any)
+
+    const { createCheckout, getCheckoutTrialEnd } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const trialEndsAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', 'org_123', undefined, undefined, undefined, undefined, trialEndsAt)
+
+    expect(createSession.mock.calls[0][0]).not.toHaveProperty('subscription_data')
+    expect(getCheckoutTrialEnd(null)).toBeUndefined()
+    expect(getCheckoutTrialEnd('not a date')).toBeUndefined()
+    expect(getCheckoutTrialEnd('2026-01-10T00:00:00.000Z', Date.parse('2026-01-08T00:00:00.000Z'))).toBeUndefined()
+    expect(getCheckoutTrialEnd('2026-01-10T01:00:00.000Z', Date.parse('2026-01-08T00:00:00.000Z'))).toBe(Date.parse('2026-01-10T01:00:00.000Z') / 1000)
+  })
+
   it('rejects external success URLs for checkout', async () => {
     const createSession = vi.fn()
     const stripeClient = {

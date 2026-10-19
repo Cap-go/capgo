@@ -15,7 +15,7 @@ import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { useBillingPaidAt } from '~/composables/useBillingPaidAt'
 import { invokeCapgoApi } from '~/services/capgoApi'
 import { ENTERPRISE_MAU_STOPS, formatMau, getOrgExtraMau, quoteEnterpriseScale } from '~/services/enterpriseScale'
-import { formatNumber, formatNumberValue } from '~/services/formatLocale'
+import { formatNumber, formatNumberValue, getFormatLocale } from '~/services/formatLocale'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { shouldShowExpiredTrialPlansState, shouldShowPlanFailureBanner } from '~/services/paymentRequired'
 import { checkPermissions } from '~/services/permissions'
@@ -29,6 +29,7 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { isCreditsOnlyOrg } from '~/utils/organizationBilling'
+import { getTrialEndDate, TRIAL_CARD_PROMPT_MIN_DAYS_LEFT } from '~/utils/trialCardPrompt'
 
 const { t } = useI18n()
 const mainStore = useMainStore()
@@ -139,6 +140,14 @@ watch(() => main.bestPlan, (newBestPlan) => {
 })
 
 const isTrial = computed(() => currentOrganization?.value ? (!currentOrganization?.value.paying && (currentOrganization?.value.trial_left ?? 0) > 0) : false)
+
+// Checkout keeps the remaining trial (see createCheckout), so say so before the click.
+const trialNoChargeUntil = computed(() => {
+  const daysLeft = currentOrganization?.value?.trial_left ?? 0
+  if (!isTrial.value || daysLeft < TRIAL_CARD_PROMPT_MIN_DAYS_LEFT)
+    return ''
+  return getTrialEndDate(daysLeft).toLocaleDateString(getFormatLocale(), { month: 'long', day: 'numeric' })
+})
 
 // Credits-only org: has credits but no active subscription and no trial remaining.
 // These orgs use pay-as-you-go credits as their primary payment method.
@@ -616,6 +625,9 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           </div>
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {{ t(showExpiredTrialState ? 'trial-ended-plans-description' : isCreditsOnly ? 'credits-only-plan-page-desc' : 'plan-desc') }}
+          </p>
+          <p v-if="trialNoChargeUntil" class="mt-1 text-sm font-medium text-blue-700 dark:text-blue-300" data-test="plan-trial-no-charge">
+            {{ t('plan-trial-no-charge-until', { date: trialNoChargeUntil }) }}
           </p>
           <p v-if="!isMobile" class="mt-2 text-sm">
             <a class="font-medium text-blue-600 hover:underline dark:text-blue-300" href="https://capgo.app/pricing/#compare-plans">

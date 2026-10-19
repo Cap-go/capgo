@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_jwt.ts'
-import { cloudlog } from '../utils/logging.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { createCheckout, EXTRA_MAU_UNIT, MAX_EXTRA_MAU } from '../utils/stripe.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
@@ -43,6 +43,23 @@ async function getExtraMauCheckout(c: Parameters<typeof supabaseAdmin>[0], planI
   if (error || plan?.name !== 'Enterprise')
     throw simpleError('extra_mau_not_allowed', 'Extra MAU is only available on the Enterprise plan', { planId })
   return { includedMau: plan.mau, extraMau }
+}
+
+// Trial end to keep on the new subscription. Only orgs without a live
+// subscription get it: a plan change must not restart a free period.
+async function getRemainingTrialEnd(c: Parameters<typeof supabaseAdmin>[0], customerId: string) {
+  const { data, error } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .select('trial_at, status')
+    .eq('customer_id', customerId)
+    .maybeSingle()
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'checkout trial lookup failed', customerId, error })
+    return null
+  }
+  if (!data || data.status === 'succeeded')
+    return null
+  return data.trial_at
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -86,9 +103,10 @@ app.post('/', middlewareAuth, async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'user', org })
   const planId = body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B'
   const extraMauCheckout = await getExtraMauCheckout(c, planId, extraMau)
+  const trialEndsAt = await getRemainingTrialEnd(c, org.customer_id)
   const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', planId, body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId, {
     visitorId: body.datafastVisitorId,
     sessionId: body.datafastSessionId,
-  }, body.affonsoReferral, extraMauCheckout)
+  }, body.affonsoReferral, extraMauCheckout, trialEndsAt)
   return c.json({ url: checkout.url })
 })
