@@ -218,7 +218,8 @@ async function main() {
   // wrangler picks the account from its login, which may see several.
   wranglerEnv = { ...process.env, CLOUDFLARE_ACCOUNT_ID: accountId }
 
-  const exists = /already exists|already been taken|10004|11009/i
+  // 10061: the lifecycle rule of a previous run (rule IDs must be unique).
+  const exists = /already exists|already been taken|10004|11009|10061/i
   wrangler(['r2', 'bucket', 'create', BUCKET], dryRun, exists)
   wrangler(['r2', 'bucket', 'lifecycle', 'add', BUCKET, 'expire-logpush', '--expire-days', String(RETENTION_DAYS), '--force'], dryRun, exists)
   for (const queue of [DLQ, FILES_QUEUE, REPLAY_QUEUE])
