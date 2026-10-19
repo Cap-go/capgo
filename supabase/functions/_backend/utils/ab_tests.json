@@ -73,6 +73,21 @@
       "B": { "bento_tag": "ab:no_todo_list_v4_double_intent", "label": "Current checklist" }
     }
   },
+  "onboarding_v6": {
+    "comment": "Prospective self-signups only. Disabled until rollout is enabled; non-treatment receives no assignment.",
+    "audience": "self_signup",
+    "label": "Onboarding V6",
+    "treatment_percentage": 0,
+    "allocation": "deterministic",
+    "assign_control": false,
+    "enroll_new_users_after": "2026-10-19T10:00:54.000Z",
+    "treatment_branch": "A",
+    "control_branch": "B",
+    "branches": {
+      "A": { "bento_tag": "ab:onboarding_v6", "label": "Required name step" },
+      "B": { "bento_tag": "ab:no_onboarding_v6", "label": "Legacy onboarding" }
+    }
+  },
   "new_emails_v2": {
     "comment": "Prospective signup enrollment only. Intent may be selected later. OTA non-treatment has no assignment or tag.",
     "audience": "self_signup",

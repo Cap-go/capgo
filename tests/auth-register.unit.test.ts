@@ -88,7 +88,7 @@ const validBody = {
   captcha_token: 'captcha-token',
 }
 
-describe('POST /auth/register unit', () => {
+describe('pOST /auth/register unit', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
@@ -118,6 +118,126 @@ describe('POST /auth/register unit', () => {
         },
       },
     })
+  })
+
+  it.each([
+    { label: 'both names omitted', firstName: undefined, lastName: undefined },
+    { label: 'first name omitted', firstName: undefined, lastName: 'Doe' },
+    { label: 'last name omitted', firstName: 'Jane', lastName: undefined },
+  ])('creates a profile with $label', async ({ firstName, lastName }) => {
+    const response = await postRegister({
+      ...validBody,
+      first_name: firstName,
+      last_name: lastName,
+    })
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      user: { id: '11111111-1111-1111-1111-111111111111' },
+      session: { access_token: 'access-token', refresh_token: 'refresh-token' },
+    })
+    expect(signUpMock).toHaveBeenCalledWith({
+      email: validBody.email,
+      password: validBody.password,
+      options: {
+        captchaToken: validBody.captcha_token,
+        data: {
+          ...(firstName ? { first_name: firstName } : {}),
+          ...(lastName ? { last_name: lastName } : {}),
+        },
+      },
+    })
+    expect(usersUpsertMock).toHaveBeenCalledWith({
+      id: '11111111-1111-1111-1111-111111111111',
+      email: validBody.email,
+      first_name: firstName ?? '',
+      last_name: lastName ?? '',
+      enable_notifications: true,
+      opt_for_newsletters: false,
+    }, { onConflict: 'id' })
+  })
+
+  it.each([
+    { first_name: '' },
+    { first_name: '   ' },
+    { first_name: null },
+    { first_name: 123 },
+    { last_name: '' },
+    { last_name: '   ' },
+    { last_name: null },
+    { last_name: false },
+  ])('rejects invalid supplied names: %j', async (names) => {
+    const response = await postRegister({ ...validBody, ...names })
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ error: 'invalid_request' })
+    expect(rpcMock).not.toHaveBeenCalled()
+    expect(signUpMock).not.toHaveBeenCalled()
+    expect(usersUpsertMock).not.toHaveBeenCalled()
+  })
+
+  it('still requires captcha when both names are omitted', async () => {
+    const response = await postRegister({
+      ...validBody,
+      first_name: undefined,
+      last_name: undefined,
+      captcha_token: undefined,
+    })
+    expect(response.status).toBe(422)
+    expect(await response.json()).toMatchObject({ error: 'captcha_failed' })
+    expect(rpcMock).not.toHaveBeenCalled()
+    expect(signUpMock).not.toHaveBeenCalled()
+  })
+
+  it.each(['password', 'Password!', 'Password123', 'PASSWORD123!', ''])('still rejects weak passwords without names: %j', async (password) => {
+    const response = await postRegister({
+      ...validBody,
+      first_name: undefined,
+      last_name: undefined,
+      password,
+    })
+    expect(response.status).toBe(400)
+    expect(await response.json()).toMatchObject({ error: 'invalid_request' })
+    expect(rpcMock).not.toHaveBeenCalled()
+    expect(signUpMock).not.toHaveBeenCalled()
+  })
+
+  it.each([true, false])('preserves signup attribution and explicit newsletter preference %s without forcing an onboarding version', async (newsletter) => {
+    const attribution = {
+      ref: 'readme-example',
+      signup_source: 'plugin_example',
+      signup_plugin: 'example',
+      first_touch_type: 'plugin',
+      first_touch_path: '/plugins/example/',
+      utm_source: 'example-source',
+      utm_medium: 'readme',
+      utm_campaign: 'example-campaign',
+    }
+    const response = await postRegister({
+      ...validBody,
+      ...attribution,
+      first_name: undefined,
+      last_name: undefined,
+      opt_for_newsletters: newsletter,
+    })
+    expect(response.status).toBe(200)
+    expect(signUpMock).toHaveBeenCalledWith({
+      email: validBody.email,
+      password: validBody.password,
+      options: { captchaToken: validBody.captcha_token, data: attribution },
+    })
+    expect(usersUpsertMock).toHaveBeenCalledWith({
+      id: '11111111-1111-1111-1111-111111111111',
+      email: validBody.email,
+      first_name: '',
+      last_name: '',
+      enable_notifications: true,
+      opt_for_newsletters: newsletter,
+    }, { onConflict: 'id' })
+  })
+
+  it('rejects non-boolean newsletter preferences before signup', async () => {
+    const response = await postRegister({ ...validBody, opt_for_newsletters: 'true' })
+    expect(response.status).toBe(400)
+    expect(signUpMock).not.toHaveBeenCalled()
   })
 
   it('returns captcha_failed when GoTrue rejects the captcha token', async () => {

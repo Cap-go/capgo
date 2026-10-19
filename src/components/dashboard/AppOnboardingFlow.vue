@@ -133,6 +133,9 @@ const props = defineProps<{
   // Getting started renders the post-creation setup for this app inside the
   // dashboard shell. Creation pages hand off there once the app exists.
   setupAppId?: string
+  // View persisted setup without automatically leaving a finished checklist
+  // or restarting the user's onboarding run.
+  showChecklist?: boolean
   // An existing user creating another organization runs the same first-run
   // flow from the start, ignoring any saved onboarding progress.
   newOrganization?: boolean
@@ -432,7 +435,7 @@ async function markOnboardingFeatureStarted(featureKey: 'cli_install' | 'ota' | 
 }
 
 watch([flowStep, createdApp, setupStage, usesBuilderSetupCommand, activeChecklistPath], () => {
-  if (!createdApp.value)
+  if (!createdApp.value || props.showChecklist)
     return
   if (usesDualTodoList.value && !activeChecklistPath.value)
     return
@@ -611,6 +614,7 @@ function emitPendingAppOnboardingReady() {
     || (flowStep.value === 'setup' && setupStage.value === 'cli')
   if (
     !app
+    || props.showChecklist
     || isHandingOff.value
     || app.need_onboarding !== true
     || !orgId
@@ -815,6 +819,8 @@ async function persistOnboardingProgress(
   options: OnboardingPersistOptions = {},
 ) {
   clearScheduledOnboardingProgress()
+  if (props.showChecklist)
+    return 'skipped' as const
   return onboardingProgressPersistence.persist(status, options)
 }
 
@@ -1339,9 +1345,11 @@ async function loadResumeApp(appId = resumeAppId.value) {
   const iconLoadRun = ++resumeIconLoadRun
   localIconPreview.value = getImmediateImageUrl(data.icon_url) || ''
   void loadResumeIconPreview(data.icon_url, data.app_id, iconLoadRun)
-  const resumeFinalStep = !newChannelTreatment.value
+  const resumeFinalStep = props.showChecklist || !newChannelTreatment.value
     || Boolean(savedProgress && savedProgress.app_id === data.app_id && savedProgress.final_step && savedProgress.setup_stage === 'cli')
   flowStep.value = resumeFinalStep ? 'setup' : 'channel'
+  if (props.showChecklist)
+    setupStage.value = 'cli'
   if (!savedProgress?.intent)
     hydrateIntentFromCurrentOrg()
   return true
@@ -2539,7 +2547,7 @@ async function openDashboard() {
     .maybeSingle()
   const current = parseAppOnboarding(data?.onboarding ?? app.onboarding)
   const source = reportedSetupSource.value ?? current.source
-  if (!usesDualTodoList.value && source !== 'manual' && current.outcome === 'in_progress')
+  if (!props.showChecklist && !usesDualTodoList.value && source !== 'manual' && current.outcome === 'in_progress')
     await reportOnboardingPatch({ outcome: 'switched_to_manual' })
   window.dispatchEvent(new Event(ONBOARDING_DASHBOARD_EXPLORED_EVENT))
   allowOnboardingDashboardExploration(onboardingUserId.value, createdApp.value.app_id)
@@ -2577,7 +2585,7 @@ async function skipOnboardingSplash() {
 
 async function leaveSplashIfAlreadySetup() {
   const app = createdApp.value
-  if (!app)
+  if (!app || props.showChecklist)
     return false
   const { data } = await supabase.rpc('verify_getting_started', { p_app_id: app.app_id })
   if (data != null)
