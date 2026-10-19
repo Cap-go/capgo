@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// --build-env / CAPGO_BUILD_ENV parsing and --post-build-script validation.
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+// --build-env / CAPGO_BUILD_ENV parsing.
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
-const { parseBuildEnv, resolvePostBuildScript } = await import('../src/build/build-env.ts')
+const { parseBuildEnv } = await import('../src/build/build-env.ts')
+const { parseDebugSymbolsUrl, writeBuildOutputRecord } = await import('../src/build/output-record.ts')
 
 let failed = 0
 function test(name, fn) {
@@ -62,27 +63,25 @@ test('invalid and reserved names fail', () => {
   assertThrows(() => parseBuildEnv(['OUTPUT_UPLOAD_URL_IOS=x'], {}), /reserved/)
 })
 
-const root = mkdtempSync(join(tmpdir(), 'capgo-post-build-'))
-mkdirSync(join(root, 'scripts'))
-writeFileSync(join(root, 'scripts', 'post-build.sh'), 'echo hi\n')
-const outside = mkdtempSync(join(tmpdir(), 'capgo-outside-'))
-writeFileSync(join(outside, 'evil.sh'), 'echo evil\n')
-symlinkSync(join(outside, 'evil.sh'), join(root, 'link.sh'))
-
-test('post-build script resolves project-relative', () => {
-  assertEquals(resolvePostBuildScript(root, './scripts/post-build.sh'), 'scripts/post-build.sh')
-  assertEquals(resolvePostBuildScript(root, undefined), undefined)
+test('debug symbols URL is read from the builder log line', () => {
+  assertEquals(
+    parseDebugSymbolsUrl('🧩 Debug symbols for crash reporting (iOS dSYMs zip): https://builder.capgo.app/builder_download_direct_artefact/abc'),
+    'https://builder.capgo.app/builder_download_direct_artefact/abc',
+  )
+  assertEquals(parseDebugSymbolsUrl('Uploading IPA artifact to R2'), null)
 })
 
-test('post-build script must exist inside the project', () => {
-  assertThrows(() => resolvePostBuildScript(root, 'missing.sh'), /not found/)
-  assertThrows(() => resolvePostBuildScript(root, join(outside, 'evil.sh')), /inside the project/)
-  assertThrows(() => resolvePostBuildScript(root, 'link.sh'), /inside the project/)
+const dir = mkdtempSync(join(tmpdir(), 'capgo-record-'))
+const record = await writeBuildOutputRecord(join(dir, 'build.json'), {
+  jobId: 'job', appId: 'com.example', platform: 'android', buildMode: 'release', status: 'succeeded',
+  outputUrl: null, symbolsUrl: 'https://x/mapping',
 })
-
-rmSync(root, { recursive: true, force: true })
-rmSync(outside, { recursive: true, force: true })
+test('output record stores symbolsUrl', () => {
+  assertEquals(record.symbolsUrl, 'https://x/mapping')
+  assertEquals(JSON.parse(readFileSync(join(dir, 'build.json'), 'utf8')).symbolsUrl, 'https://x/mapping')
+})
+rmSync(dir, { recursive: true, force: true })
 
 if (failed > 0)
   process.exit(1)
-console.log('\n✅ All build env tests passed!')
+console.log('\n✅ All build env / symbols tests passed!')

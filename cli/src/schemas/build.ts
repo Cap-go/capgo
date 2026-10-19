@@ -123,7 +123,6 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   cache: buildCacheOptionSchema,
   cacheKey: buildCacheKeyOptionSchema,
   buildEnv: z.array(z.string().min(1)).optional(),
-  postBuildScript: z.string().min(1).optional(),
 })
 
 export type BuildRequestOptions = z.infer<typeof buildRequestOptionsSchema>
@@ -185,7 +184,6 @@ export const buildOptionsPayloadSchema = z.object({
   storeReleaseName: z.string().optional(),
   storeReleaseNotes: z.string().optional(),
   iosTestflightGroups: z.string().optional(),
-  postBuildScript: z.string().optional(),
 })
 
 export type BuildOptionsPayload = z.infer<typeof buildOptionsPayloadSchema>

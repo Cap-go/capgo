@@ -1,5 +1,3 @@
-import { existsSync, realpathSync, statSync } from 'node:fs'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
 import process from 'node:process'
 
 const BUILD_ENV_KEY_PATTERN = /^[A-Z_][A-Z0-9_]*$/
@@ -52,8 +50,8 @@ const RESERVED_BUILD_ENV_PREFIXES = ['CAPGO_', 'OUTPUT_UPLOAD_URL_', 'OUTPUT_DOW
  * Custom env vars for the cloud build, from repeatable `--build-env` entries and the
  * CAPGO_BUILD_ENV env var (comma-separated). `KEY` takes the value from this process's
  * environment (CI secrets stay out of the command line); `KEY=VALUE` sets it literally.
- * They reach the build as encrypted credentials: Gradle, Xcode build phases and the
- * post-build script see them as env vars (e.g. SENTRY_AUTH_TOKEN for Sentry's plugins).
+ * They reach the build as credentials: Gradle and Xcode build phases see them as env vars
+ * (e.g. SENTRY_AUTH_TOKEN for the Sentry Gradle plugin).
  */
 export function parseBuildEnv(
   entries: string[] | undefined,
@@ -77,25 +75,4 @@ export function parseBuildEnv(
     result[key] = value
   }
   return result
-}
-
-/**
- * Validates the post-build script path (`--post-build-script` or CAPGO_POST_BUILD_SCRIPT)
- * and returns it relative to the project, with forward slashes, as the builder expects.
- */
-export function resolvePostBuildScript(projectDir: string, scriptPath: string | undefined): string | undefined {
-  const trimmed = scriptPath?.trim()
-  if (!trimmed)
-    return undefined
-  const absolute = resolve(projectDir, trimmed)
-  if (!existsSync(absolute) || !statSync(absolute).isFile())
-    throw new Error(`--post-build-script ${trimmed}: file not found in ${projectDir}`)
-  const root = realpathSync(projectDir)
-  const rel = relative(root, realpathSync(absolute))
-  if (!rel || rel.startsWith('..') || isAbsolute(rel))
-    throw new Error(`--post-build-script ${trimmed}: must be inside the project directory`)
-  const posix = rel.split(sep).join('/')
-  if (!/^[\w./-]+$/.test(posix))
-    throw new Error(`--post-build-script ${trimmed}: use only letters, digits, . _ / - in the path`)
-  return posix
 }
