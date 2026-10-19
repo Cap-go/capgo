@@ -41,6 +41,7 @@ const EDGE_ANSWER_PATHS = new Set(['/updates', '/stats'])
 const IP_LIMIT_HOSTS = { 'api.capgo.app': 'plugin.capgo.app', 'plugin.usecapgo.com': 'plugin.capgo.app' }
 const MAX_EDGE_CHANNEL_LENGTH = 128
 const MAX_EDGE_ACTIONS = 128
+const MAX_EDGE_PROVIDER_ASNS = 64
 // Logpush header fields and the replay queue messages stay small.
 const MAX_EDGE_STAT_BODY_BYTES = 6000
 // Logpush cuts response header fields at 8192 bytes (measured); a cut stat
@@ -514,6 +515,18 @@ function isAnswerableStatsEvent(event, appId, actions) {
     && isValidStatsMetadata(event.metadata)
 }
 
+/**
+ * The app blocks provider infrastructure (fill.pa): the worker looks the IP
+ * up, the snippet can't. Requests from those networks, or of unknown network,
+ * go to the worker.
+ */
+function isProviderNetwork(request, fill) {
+  if (!isPlainObject(fill) || fill.pa === undefined)
+    return false
+  const asn = request.cf?.asn
+  return typeof asn !== 'number' || !Array.isArray(fill.pa) || fill.pa.includes(asn)
+}
+
 function isLiveEdgeFill(fill, appId, deviceId) {
   return isPlainObject(fill)
     && typeof fill.exp === 'number' && fill.exp > Date.now()
@@ -552,6 +565,8 @@ async function tryEdgeAnswer(budget, request, url, endpoint, appId, body, rawBod
   if (!EDGE_ANSWERS_ENABLED || !EDGE_ANSWER_PATHS.has(url.pathname) || request.headers.has('Origin') || rawBody.length > MAX_EDGE_STAT_BODY_BYTES || !APP_ID_RE.test(appId))
     return null
   const fill = doc.fill
+  if (isProviderNetwork(request, fill))
+    return null
 
   if (endpoint === 'updates') {
     if (!isLiveEdgeFill(fill, appId, body?.device_id) || typeof fill.r !== 'string' || !isAnswerableUpdatesBody(body, appId, fill))
@@ -588,7 +603,12 @@ async function tryEdgeAnswer(budget, request, url, endpoint, appId, body, rawBod
 function parseEdgeFill(value, endpoint) {
   try {
     const fill = JSON.parse(decodeURIComponent(value))
-    if (!isPlainObject(fill) || fill.v !== 2 || fill.e !== endpoint || typeof fill.tags !== 'string')
+    // v3 carries the provider networks (pa) the snippet must leave to the worker.
+    if (!isPlainObject(fill) || (fill.v !== 2 && fill.v !== 3) || fill.e !== endpoint || typeof fill.tags !== 'string')
+      return null
+    if ((fill.v === 3) !== (fill.pa !== undefined))
+      return null
+    if (fill.pa !== undefined && (!Array.isArray(fill.pa) || fill.pa.length > MAX_EDGE_PROVIDER_ASNS || !fill.pa.every(asn => Number.isInteger(asn))))
       return null
     if (typeof fill.bps !== 'number' || fill.bps <= 0 || fill.bps > 10000 || typeof fill.ttl !== 'number' || fill.ttl < 1 || fill.ttl > 3600)
       return null

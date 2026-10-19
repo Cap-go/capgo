@@ -36,13 +36,13 @@ function statsEvent(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function buildRequest(path: string, body: unknown, headers: Record<string, string> = {}, options: { host?: string, colo?: string } = {}) {
+function buildRequest(path: string, body: unknown, headers: Record<string, string> = {}, options: { host?: string, colo?: string, asn?: number } = {}) {
   const request = new Request(`https://${options.host ?? 'plugin.capgo.app'}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'cf-connecting-ip': '203.0.113.7', ...headers },
     body: JSON.stringify(body),
   })
-  Object.defineProperty(request, 'cf', { value: { colo: options.colo ?? 'CDG' } })
+  Object.defineProperty(request, 'cf', { value: { colo: options.colo ?? 'CDG', asn: options.asn ?? 3215 } })
   return request
 }
 
@@ -178,6 +178,38 @@ describe('cloudflare snippet edge answers', () => {
     // Another IP still gets the edge answer.
     await snippet.fetch(buildRequest('/updates', updatesBody(), { 'cf-connecting-ip': '198.51.100.9' }))
     expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('leaves provider networks to the worker for apps that block provider infrastructure', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 'ok' }), {
+      status: 200,
+      headers: { 'X-Capgo-Edge-Fill': fillHeader({ v: 3, e: 'stats', actions: ['app_moved_to_foreground'], pa: [15169, 714] }) },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    await snippet.fetch(buildRequest('/stats', statsEvent()))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    const answered = await snippet.fetch(buildRequest('/stats', statsEvent()))
+    expect(answered.headers.get('X-Capgo-Edge')).toBe('answer')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await snippet.fetch(buildRequest('/stats', statsEvent(), {}, { asn: 15169 }))
+    await snippet.fetch(buildRequest('/stats', statsEvent(), {}, { asn: 714 }))
+    const unknownNetwork = new Request('https://plugin.capgo.app/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(statsEvent()) })
+    Object.defineProperty(unknownNetwork, 'cf', { value: { colo: 'CDG' } })
+    await snippet.fetch(unknownNetwork)
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
+  it('ignores provider networks a v2 fill carries, and v3 fills without them', async () => {
+    for (const fill of [fillHeader({ e: 'stats', actions: ['app_moved_to_foreground'], pa: [15169] }), fillHeader({ v: 3, e: 'stats', actions: ['app_moved_to_foreground'] })]) {
+      cache.store.clear()
+      const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 'ok' }), { status: 200, headers: { 'X-Capgo-Edge-Fill': fill } }))
+      vi.stubGlobal('fetch', fetchMock)
+      await snippet.fetch(buildRequest('/stats', statsEvent()))
+      await snippet.fetch(buildRequest('/stats', statsEvent()))
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+    }
   })
 
   it('answers devices outside the sampled share through the worker', async () => {

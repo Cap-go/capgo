@@ -17,7 +17,7 @@ import { statsRequestSchema } from '../utils/plugin_validation.ts'
 import { getAppOwnerWithEdgeCache, getAppVersionWithEdgeCache } from '../utils/pluginEdgeCacheReads.ts'
 import { getClientIP } from '../utils/rate_limit.ts'
 import { onPremiseAppResponse } from '../utils/rateLimitInfo.ts'
-import { getSnippetEdgeAnswerBps, setSnippetStatsFill } from '../utils/snippetEdgeAnswer.ts'
+import { getSnippetEdgeAnswerBps, getSnippetEdgeReplay, setSnippetStatsFill } from '../utils/snippetEdgeAnswer.ts'
 import { planValidUntilMs, shouldUseUpdatesEdgeCache } from '../utils/updatesEdgeCache.ts'
 import { backgroundTask, INVALID_STRING_APP_ID, isInternalVersionName, isLimited, MISSING_STRING_APP_ID, reverseDomainRegex } from '../utils/utils.ts'
 import { isRunningVersionAction } from './stats_actions.ts'
@@ -29,7 +29,8 @@ const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6 = parse('6.14.25')
 type AppStatusResult = Awaited<ReturnType<typeof getAppStatus>>
 
 async function blockProviderInfrastructure(c: Context, shouldBlockProviderInfrastructure = true) {
-  if (!shouldBlockProviderInfrastructure)
+  // The snippet answered only devices outside the provider networks.
+  if (!shouldBlockProviderInfrastructure || getSnippetEdgeReplay(c))
     return null
 
   const requestIp = getClientIP(c)
@@ -486,8 +487,9 @@ async function processStatsEvents(
   const firstAppId = (events[0] as AppStats | undefined)?.app_id
   if (firstAppId && results.length > 0 && snippetFill
     && events.every(event => (event as AppStats | undefined)?.app_id === firstAppId)
-    && results.every(result => result.status === 'ok'))
+    && results.every(result => result.status === 'ok')) {
     setSnippetStatsFill(c, firstAppId, snippetFill)
+  }
   return c.json({ status: 'ok', results })
 }
 
