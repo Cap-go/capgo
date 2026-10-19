@@ -14,6 +14,22 @@ async function checksum(value: string) {
   return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
+function reminderDueAt(input: LifecycleInput, purpose: string) {
+  const idle = Math.max(ms(input.state.lastProgressAt), input.evidence ? 0 : ms(input.state.appLessSince))
+  if (!Number.isFinite(idle))
+    return null
+  if (purpose === 'reminder:24h')
+    return iso(idle + DAY)
+  let previousPurpose = 'reminder:24h'
+  let days = 2
+  if (purpose === 'reminder:final') {
+    previousPurpose = 'reminder:48h'
+    days = 5
+  }
+  const previous = input.accepted.find(item => item.purpose === previousPurpose)
+  return previous ? iso(Math.max(idle + days * DAY, ms(previous.acceptedAt) + DAY)) : null
+}
+
 function candidateDueAt(input: LifecycleInput, candidate: LifecycleDecision['candidate']) {
   if (!candidate)
     return null
@@ -23,12 +39,8 @@ function candidateDueAt(input: LifecycleInput, candidate: LifecycleDecision['can
     const window = trialWindows(input).find(item => `trial:${item.key}` === candidate.purpose)
     return window ? iso(window.due) : null
   }
-  const idle = Math.max(ms(input.state.lastProgressAt), input.evidence ? 0 : ms(input.state.appLessSince))
-  if (candidate.purpose === 'reminder:24h')
-    return Number.isFinite(idle) ? iso(idle + DAY) : null
-  const previous = input.accepted.find(item => item.purpose === (candidate.purpose === 'reminder:48h' ? 'reminder:24h' : 'reminder:48h'))
-  if (candidate.purpose === 'reminder:48h' || candidate.purpose === 'reminder:final')
-    return previous && Number.isFinite(idle) ? iso(Math.max(idle + (candidate.purpose === 'reminder:48h' ? 2 : 5) * DAY, ms(previous.acceptedAt) + DAY)) : null
+  if (candidate.purpose.startsWith('reminder:'))
+    return reminderDueAt(input, candidate.purpose)
   return input.now
 }
 
@@ -125,19 +137,22 @@ export async function recordLifecycleAttempt(db: QueryClient, user: EligibleUser
   ])
 }
 
-// Capture the allowlisted resolved request, once per physical attempt. Retries can
-// legitimately have different recipient/context under the same dispatch ID.
-export async function recordLifecycleSnapshot(db: QueryClient, user: EligibleUser, event: DispatchRecord, payload: BentoEvent, evidence?: LifecycleSendAudit) {
-  if (!lifecycle(user))
-    return
+function validateSnapshotIdentity(user: EligibleUser, event: DispatchRecord, payload: BentoEvent) {
+  const product = user.metadata.product
+  const branch = user.metadata.branch
+  if ((product !== 'ota' && product !== 'builder') || typeof branch !== 'string')
+    throw new Error('Invalid lifecycle snapshot identity')
   if (payload.email.toLowerCase() !== user.email.toLowerCase() || payload.data.dispatch_id !== event.id
     || payload.data.org_id !== user.metadata.orgId || payload.data.product !== user.metadata.product
-    || payload.event !== lifecycleBranch(String(user.metadata.product), String(user.metadata.branch)).event
+    || payload.event !== lifecycleBranch(product, branch).event
     || (payload.data.unique as { key?: unknown } | undefined)?.key !== event.id) {
     throw new Error('Invalid lifecycle snapshot identity')
   }
+}
+
+function snapshotPersonalization(payload: BentoEvent) {
   const data: Record<string, string | boolean> = {}
-  for (const key of [...contract.required_string_fields].sort()) {
+  for (const key of [...contract.required_string_fields].sort((left, right) => left.localeCompare(right, 'en'))) {
     const value = payload.data[key]
     if (typeof value !== 'string' || value.length > 16_384)
       throw new Error('Invalid lifecycle snapshot field')
@@ -155,6 +170,16 @@ export async function recordLifecycleSnapshot(db: QueryClient, user: EligibleUse
       throw new Error('Invalid lifecycle snapshot field')
     data[key] = payload.data[key] as boolean
   }
+  return data
+}
+
+// Capture the allowlisted resolved request, once per physical attempt. Retries can
+// legitimately have different recipient/context under the same dispatch ID.
+export async function recordLifecycleSnapshot(db: QueryClient, user: EligibleUser, event: DispatchRecord, payload: BentoEvent, evidence?: LifecycleSendAudit) {
+  if (!lifecycle(user))
+    return
+  validateSnapshotIdentity(user, event, payload)
+  const data = snapshotPersonalization(payload)
   const serialized = JSON.stringify({ email: payload.email.toLowerCase(), event: payload.event, data: { ...data, unique: { key: event.id } } })
   if (new TextEncoder().encode(serialized).length > 64 * 1024)
     throw new Error('Lifecycle snapshot too large')

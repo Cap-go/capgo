@@ -10,8 +10,9 @@ export interface LifecycleDecision {
   reason: string
 }
 
-export function evaluateLifecycleDecision(input: LifecycleInput): LifecycleDecision {
-  const none = (decision: LifecycleDecision['decision'], reason: string): LifecycleDecision => ({ candidate: null, decision, reason })
+const none = (decision: LifecycleDecision['decision'], reason: string): LifecycleDecision => ({ candidate: null, decision, reason })
+
+function blockedLifecycleDecision(input: LifecycleInput): LifecycleDecision | null {
   if (!input.creatorTreatment)
     return none('suppress', 'creator_ineligible')
   if (!input.consent)
@@ -24,6 +25,13 @@ export function evaluateLifecycleDecision(input: LifecycleInput): LifecycleDecis
     return none('suppress', 'support_hold')
   if (!input.billingHealthy)
     return none('unknown', 'billing_unknown')
+  return null
+}
+
+export function evaluateLifecycleDecision(input: LifecycleInput): LifecycleDecision {
+  const blocked = blockedLifecycleDecision(input)
+  if (blocked)
+    return blocked
   // Retained ready notices rely on durable organization readiness and current
   // billing, not on the health or selection of a replaceable app's telemetry.
   const trial = input.sourceHealthy || input.state.checklistCompleteAt ? trialCandidate(input) : null

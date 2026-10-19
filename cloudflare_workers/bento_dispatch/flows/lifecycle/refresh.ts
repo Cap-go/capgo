@@ -158,7 +158,7 @@ export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: An
     const nextAt = nextLifecycleEvaluation(fresh.input, candidate)
     // Fence changes that committed while gathering analytics. A late response
     // cannot write old-incarnation context into a replacement journey.
-    await db.query('BEGIN')
+    await db.query('BEGIN') // NOSONAR -- One pinned connection must finish each transaction before the next journey.
     try {
       const saved = await db.query(`UPDATE public.bento_lifecycle_journeys SET state = $4::jsonb, candidate = $5::jsonb,
       next_evaluation_at = $7::timestamptz, refresh_claim_until = NULL, refresh_claim_token = NULL
@@ -172,7 +172,7 @@ export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: An
         ARRAY(SELECT DISTINCT fact FROM pg_catalog.unnest(seen_facts || $4::text[]) AS f(fact))
         WHERE org_id = $1::uuid AND product = $2 AND app_incarnation = $3::uuid`, [input.orgId, input.product, app.id, fresh.input.evidence?.facts.map(fact => fact.id) ?? []])
       }
-      await recordLifecycleDecision(db, fresh.input, decision, fresh.revision, nextAt, {
+      await recordLifecycleDecision(db, fresh.input, decision, fresh.revision, nextAt, { // NOSONAR -- This write must commit atomically with this journey's fenced state on the pinned connection.
         originalCreatorId: fresh.row.original_creator_id,
         sourceVerifiedAt: timestamp(fresh.row.verified_at),
       })
