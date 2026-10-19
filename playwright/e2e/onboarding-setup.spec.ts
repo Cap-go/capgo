@@ -65,7 +65,7 @@ test.describe('Actionable onboarding setup checklist', () => {
 
   test('follows persisted progress, counts skipped tasks, and stops polling on completion', async ({ page }) => {
     const time = new Date('2026-09-16T12:00:00Z')
-    await page.clock.install({ time })
+    await page.clock.install({ time: new Date(time.getTime() - 60_000) })
     await page.clock.pauseAt(time)
     await page.goto(fixture)
     await page.evaluate(() => {
@@ -127,7 +127,7 @@ test.describe('Actionable onboarding setup checklist', () => {
 
   test('polls one endpoint every two seconds with consecutive N and the app id on every request', async ({ page }) => {
     const time = new Date('2026-09-16T12:00:00Z')
-    await page.clock.install({ time })
+    await page.clock.install({ time: new Date(time.getTime() - 60_000) })
     await page.clock.pauseAt(time)
     await page.goto(fixture)
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.polls.length)).toBe(1)
@@ -418,7 +418,7 @@ test.describe('Actionable onboarding setup checklist', () => {
 
   test('unchecks a deleted channel despite saved completion and rechecks a recreated channel', async ({ page }) => {
     const time = new Date('2026-09-16T12:00:00Z')
-    await page.clock.install({ time })
+    await page.clock.install({ time: new Date(time.getTime() - 60_000) })
     await page.clock.pauseAt(time)
     await page.goto(`${fixture}?channel=1&channelStatus=done`)
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.channelRequests)).toBe(1)
@@ -454,7 +454,7 @@ test.describe('Actionable onboarding setup checklist', () => {
 
   test('detects a new channel at ten seconds and retains it through progress and channel refresh failures', async ({ page }) => {
     const time = new Date('2026-09-16T12:00:00Z')
-    await page.clock.install({ time })
+    await page.clock.install({ time: new Date(time.getTime() - 60_000) })
     await page.clock.pauseAt(time)
     await page.goto(fixture)
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.channelRequests)).toBe(1)
@@ -513,7 +513,7 @@ test.describe('Actionable onboarding setup checklist', () => {
 
   test('ignores delayed channel results from the previous app and polls the new app', async ({ page }) => {
     const time = new Date('2026-09-16T12:00:00Z')
-    await page.clock.install({ time })
+    await page.clock.install({ time: new Date(time.getTime() - 60_000) })
     await page.clock.pauseAt(time)
     await page.goto(`${fixture}?channel=1&channelDelay=4000`)
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.channelRequests)).toBe(1)
