@@ -21,6 +21,11 @@ vi.mock('../cloudflare_workers/bento_dispatch/store.ts', () => ({ DispatchStore:
 } }))
 vi.mock('../cloudflare_workers/bento_dispatch/scheduler.ts', () => ({ publishDispatchJobs: publish }))
 vi.mock('../cloudflare_workers/bento_dispatch/consumer.ts', () => ({ processDispatchJob: process }))
+// Exercise Worker bindings rather than the Node test process's environment.
+vi.mock('hono/adapter', async importOriginal => ({
+  ...await importOriginal<typeof import('hono/adapter')>(),
+  env: (c: { env: Record<string, string> }) => c.env,
+}))
 vi.mock('../supabase/functions/_backend/utils/bento.ts', async importOriginal => ({
   ...await importOriginal<typeof import('../supabase/functions/_backend/utils/bento.ts')>(),
   trackBentoEvent: accepted,
