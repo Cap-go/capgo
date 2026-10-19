@@ -61,11 +61,11 @@
     }
   },
   "todo_list_v4_double_intent": {
-    "comment": "Keeps both OTA and Builder checklists available. Disabled pending the separate frontend chooser.",
+    "comment": "Keeps both OTA and Builder checklists available.",
     "audience": "self_signup",
     "intents": ["both", "exploring"],
     "label": "ToDoList V4 Double Intent",
-    "treatment_percentage": 0,
+    "treatment_percentage": 100,
     "treatment_branch": "A",
     "control_branch": "B",
     "branches": {

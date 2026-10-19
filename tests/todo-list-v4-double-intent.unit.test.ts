@@ -6,13 +6,13 @@ const name = 'todo_list_v4_double_intent'
 const at = '2026-10-18T00:00:00.000Z'
 
 describe('double intent checklist experiment', () => {
-  it('declares an independent, disabled self-signup experiment with unique tags', () => {
+  it('declares an independent self-signup experiment at 100% with unique tags', () => {
     const config = validateABTestsConfig(rawConfig)
     expect(config[name]).toMatchObject({
       label: 'ToDoList V4 Double Intent',
       audience: 'self_signup',
       intents: ['both', 'exploring'],
-      treatment_percentage: 0,
+      treatment_percentage: 100,
       treatment_branch: 'A',
       control_branch: 'B',
     })
@@ -20,16 +20,16 @@ describe('double intent checklist experiment', () => {
     expect(new Set(tags).size).toBe(tags.length)
   })
 
-  it.concurrent.each(['both', 'exploring', 'ota', 'builder', undefined])('assigns nobody at 0%% for intent %s, and preserves existing assignments', (intent) => {
+  it.concurrent.each(['both', 'exploring', 'ota', 'builder', undefined])('assigns eligible intent %s at 100%% and preserves other assignments', (intent) => {
     const config = validateABTestsConfig(rawConfig)
     const withoutNew = validateABTestsConfig(Object.fromEntries(Object.entries(rawConfig).filter(([key]) => key !== name)))
     for (const invited of [false, true]) {
-      const user = { id: 'disabled-double-intent', created_via_invite: invited, intent }
+      const user = { id: 'double-intent', created_via_invite: invited, intent }
       const baseline = createABTestAssignments(user, withoutNew, () => 0, () => new Date(at))
       const result = resolveABTestAssignments(user, baseline, config, () => 0, () => new Date(at))
-      expect(result.assignments).toEqual(baseline)
-      expect(result.changed).toBe(false)
-      expect(result.assignments).not.toHaveProperty(name)
+      const eligible = !invited && (intent === 'both' || intent === 'exploring')
+      expect(result.assignments).toEqual({ ...baseline, ...(eligible ? { [name]: { branch: 'A', assigned_at: at } } : {}) })
+      expect(result.changed).toBe(eligible)
     }
   })
 
