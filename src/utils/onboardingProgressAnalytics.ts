@@ -50,6 +50,8 @@ export type OnboardingDetailsEvent
     | 'onboarding_app_icon_picker_opened'
     | 'onboarding_app_icon_upload_failed'
     | 'onboarding_app_icon_uploaded'
+    | 'onboarding_app_id_advanced_hidden'
+    | 'onboarding_app_id_advanced_shown'
     | 'onboarding_app_name_entered'
     | 'onboarding_store_import_failed'
     | 'onboarding_store_import_hidden'
