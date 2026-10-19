@@ -194,7 +194,7 @@ WITH phase_definitions AS (
             CASE WHEN j.selected_app_incarnation IS NULL
                 THEN COALESCE(public.lifecycle_v2_parse_timestamp(j.state->>'appLessSince'),CURRENT_TIMESTAMP)
                 ELSE j.enrolled_at END) AS idle_since,
-        si.trial_at, si.status AS billing_status, si.subscription_id, o.has_usage_credits
+        si.trial_at, si.status::text AS billing_status, si.subscription_id, o.has_usage_credits
     FROM public.bento_lifecycle_due_v1 coverage
     JOIN public.bento_lifecycle_journeys j ON j.org_id = coverage.org_id AND j.product = coverage.product
     JOIN public.orgs o ON o.id = j.org_id

@@ -46,6 +46,12 @@ export function evaluateLifecycleDecision(input: LifecycleInput): LifecycleDecis
     && !input.accepted.some(item => item.product === input.product && item.purpose.startsWith('summary:') && ms(item.acceptedAt) + DAY > ms(input.now))) {
     return { candidate: withLifecycleCommercialMetadata(input, { branch: 'subscription_proposition', purpose: `offer:${input.product}`, context: input.state.checklistCompleteAt, priority: 20, expiresAt: iso(ms(input.now) + DAY) }), decision: 'send', reason: 'subscription_proposition' }
   }
+  if (input.paid)
+    return none('suppress', 'paid_commercial_suppressed')
+  if (input.compatibleCredits)
+    return none('suppress', 'usage_credits_commercial_suppressed')
+  if (input.state.checklistCompleteAt && !input.plan)
+    return none('unknown', 'plan_recommendation_unknown')
   return none('wait', 'no_candidate_due')
 }
 

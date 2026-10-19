@@ -31,7 +31,8 @@ beforeAll(async () => {
     CREATE TABLE public.apps(id uuid PRIMARY KEY,app_id text UNIQUE,owner_org uuid REFERENCES public.orgs(id),
       created_at timestamptz NOT NULL,onboarding jsonb NOT NULL DEFAULT '{}');
     CREATE INDEX finx_apps_owner_org ON public.apps(owner_org);
-    CREATE TABLE public.stripe_info(customer_id text PRIMARY KEY,status text,trial_at timestamptz,subscription_id text);
+    CREATE TYPE public.stripe_status AS ENUM('trialing','succeeded','canceled');
+    CREATE TABLE public.stripe_info(customer_id text PRIMARY KEY,status public.stripe_status,trial_at timestamptz,subscription_id text);
     CREATE TABLE public.build_requests(id uuid PRIMARY KEY,app_id text,owner_org uuid,created_at timestamptz,
       status text,completed_at timestamptz,builder_job_id text,upload_session_key text,platform text);
     CREATE TABLE public.onboarding_demo_data(app_id text,seed_id uuid,relation_name text,row_key text,
@@ -226,6 +227,9 @@ describe('durable lifecycle monitoring evidence', () => {
       expect(evaluateLifecycleDecision(input).reason).not.toBe('no_candidate_due')
       expect(evaluateLifecycle(input)).toBeNull()
     }
+    f.input.now = f.input.state.enrolledAt
+    expect(evaluateLifecycleDecision({ ...f.input, paid: true })).toMatchObject({ candidate: null, decision: 'suppress', reason: 'paid_commercial_suppressed' })
+    expect(evaluateLifecycleDecision({ ...f.input, compatibleCredits: true })).toMatchObject({ candidate: null, decision: 'suppress', reason: 'usage_credits_commercial_suppressed' })
   })
 
   it('associates positive mature milestones with their own incarnation and leaves missing outcomes unknown', async () => {
