@@ -55,12 +55,18 @@ export interface ClusterState {
   nodes: Record<string, NodeState>
 }
 
+/** Strip control characters (except newline/tab) so logged values cannot forge log lines. */
+export function clean(text: string) {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/[\u0000-\u0008\u000B-\u001F\u007F\u001B]/g, '').replace(/\r/g, '')
+}
+
 export function log(msg: string) {
-  console.log(`==> ${msg}`)
+  console.log(`==> ${clean(msg)}`)
 }
 
 export function fail(msg: string): never {
-  console.error(`Error: ${msg}`)
+  console.error(`Error: ${clean(msg)}`)
   process.exit(1)
 }
 
@@ -141,8 +147,29 @@ function uuidFrom(text: string) {
   return text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0]
 }
 
-async function cfApiRaw<T>(path: string, init: RequestInit = {}) {
-  const res = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
+const CF_API_ORIGIN = 'https://api.cloudflare.com'
+const SEGMENT_RE = /^[\w.-]{1,64}$/
+
+/**
+ * Build an account-scoped Cloudflare API URL from validated path segments
+ * (fixed origin, no traversal, every segment URL-encoded).
+ */
+function cfUrl(segments: string[], query?: Record<string, string>) {
+  const account = env('CLOUDFLARE_ACCOUNT_ID')
+  if (!/^[0-9a-f]{32}$/.test(account))
+    fail('CLOUDFLARE_ACCOUNT_ID must be 32 hex characters')
+  for (const segment of segments) {
+    if (!SEGMENT_RE.test(segment) || segment === '.' || segment === '..')
+      fail(`invalid Cloudflare API path segment: ${segment}`)
+  }
+  const url = new URL(`/client/v4/accounts/${account}/${segments.map(encodeURIComponent).join('/')}`, CF_API_ORIGIN)
+  for (const [k, v] of Object.entries(query ?? {}))
+    url.searchParams.set(k, v)
+  return url
+}
+
+async function cfApiRaw<T>(segments: string[], init: RequestInit = {}, query?: Record<string, string>) {
+  const res = await fetch(cfUrl(segments, query), {
     ...init,
     headers: {
       'authorization': `Bearer ${env('CLOUDFLARE_API_TOKEN')}`,
@@ -153,10 +180,10 @@ async function cfApiRaw<T>(path: string, init: RequestInit = {}) {
   return await res.json() as { success: boolean, result: T, errors: unknown[] }
 }
 
-export async function cfApi<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const body = await cfApiRaw<T>(path, init)
+export async function cfApi<T>(segments: string[], init: RequestInit = {}, query?: Record<string, string>): Promise<T> {
+  const body = await cfApiRaw<T>(segments, init, query)
   if (!body.success)
-    fail(`Cloudflare API ${init.method ?? 'GET'} ${path}: ${JSON.stringify(body.errors)}`)
+    fail(`Cloudflare API ${init.method ?? 'GET'} ${segments.join('/')}: ${JSON.stringify(body.errors)}`)
   return body.result
 }
 
@@ -205,16 +232,15 @@ export async function provisionTunnel(state: ClusterState, name: string, locatio
     log(`tunnel for ${name} already provisioned (${existing.tunnelId})`)
     return existing
   }
-  const account = env('CLOUDFLARE_ACCOUNT_ID')
   const resourceName = `capgo-pg-${CLUSTER_ENV}-${name}`
 
   log(`creating tunnel ${resourceName}`)
-  const found = await cfApi<{ id: string }[]>(`/accounts/${account}/cfd_tunnel?name=${resourceName}&is_deleted=false`)
-  const tunnelId = found[0]?.id ?? (await cfApi<{ id: string }>(`/accounts/${account}/cfd_tunnel`, {
+  const found = await cfApi<{ id: string }[]>(['cfd_tunnel'], {}, { name: resourceName, is_deleted: 'false' })
+  const tunnelId = found[0]?.id ?? (await cfApi<{ id: string }>(['cfd_tunnel'], {
     method: 'POST',
     body: JSON.stringify({ name: resourceName, config_src: 'cloudflare' }),
   })).id
-  const tunnelToken = await cfApi<string>(`/accounts/${account}/cfd_tunnel/${tunnelId}/token`)
+  const tunnelToken = await cfApi<string>(['cfd_tunnel', tunnelId, 'token'])
 
   log(`creating Workers VPC service ${resourceName}`)
   const vpc = await wrangler([
@@ -254,7 +280,6 @@ export async function provisionHyperdrive(state: ClusterState, name: string): Pr
   log(`creating Hyperdrive ${resourceName} (cache max-age 60s, swr 15s like the Google replicas)`)
   // REST API instead of `wrangler hyperdrive create --password`: the reader
   // password stays in the request body, never in argv or command output.
-  const account = env('CLOUDFLARE_ACCOUNT_ID')
   const createBody = JSON.stringify({
     name: resourceName,
     origin: {
@@ -269,7 +294,7 @@ export async function provisionHyperdrive(state: ClusterState, name: string): Pr
   let hyperdriveId: string | undefined
   // The tunnel connector comes up a few seconds after Postgres; retry.
   for (let attempt = 0; attempt <= 10 && !hyperdriveId; attempt++) {
-    const res = await cfApiRaw<{ id: string }>(`/accounts/${account}/hyperdrive/configs`, { method: 'POST', body: createBody })
+    const res = await cfApiRaw<{ id: string }>(['hyperdrive', 'configs'], { method: 'POST', body: createBody })
     if (res.success) {
       hyperdriveId = res.result.id
       break
@@ -291,11 +316,10 @@ export async function deprovisionNodeNetwork(state: ClusterState, name: string) 
   const node = state.nodes[name]
   if (!node)
     return
-  const account = env('CLOUDFLARE_ACCOUNT_ID')
   if (node.hyperdriveId)
-    await cfApiRaw(`/accounts/${account}/hyperdrive/configs/${node.hyperdriveId}`, { method: 'DELETE' })
+    await cfApiRaw(['hyperdrive', 'configs', node.hyperdriveId], { method: 'DELETE' })
   await wrangler(['vpc', 'service', 'delete', node.vpcServiceId], { allowFail: true, input: 'y\n' })
-  await cfApi(`/accounts/${account}/cfd_tunnel/${node.tunnelId}`, { method: 'DELETE' }).catch(() => {})
+  await cfApi(['cfd_tunnel', node.tunnelId], { method: 'DELETE' }).catch(() => {})
   delete state.nodes[name]
   saveState(state)
 }
@@ -305,7 +329,12 @@ export function clusterUrl(state: ClusterState) {
 }
 
 export async function admin<T>(state: ClusterState, method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${clusterUrl(state)}${path}`, {
+  if (!/^\/nodes(\/[a-z][a-z0-9-]{1,30}(\/restart)?)?$/.test(path))
+    fail(`invalid admin path: ${path}`)
+  const base = new URL(clusterUrl(state))
+  if (base.protocol !== 'https:')
+    fail('control worker URL must be https')
+  const res = await fetch(new URL(path, base.origin), {
     method,
     headers: { 'authorization': `Bearer ${state.adminToken}`, 'content-type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),

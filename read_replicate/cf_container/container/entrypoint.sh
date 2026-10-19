@@ -49,7 +49,8 @@ export PGUSER=postgres
 
 log() { echo "[$(date -u +%FT%TZ)] [${NODE_NAME}] $*"; }
 phase() { echo "$1" > "$PHASE_FILE"; log "phase=$1"; }
-as_pg() { gosu postgres "$@"; }
+# The image runs as the postgres user; gosu only when started as root.
+as_pg() { if [[ "$(id -u)" == "0" ]]; then gosu postgres "$@"; else "$@"; fi; }
 psql_local() { as_pg psql -X -v ON_ERROR_STOP=1 -d "$PG_DATABASE" "$@"; }
 
 PG_PID=""
@@ -121,7 +122,7 @@ prepare_dirs() {
   # WAL-G prefetches into pg_wal/.wal-g by default; it must stay on the PGDATA
   # filesystem (rename into pg_wal fails across devices).
   mkdir -p "$PGDATA" "$SOCKET_DIR"
-  chown -R postgres:postgres "$PGDATA" "$SOCKET_DIR"
+  [[ "$(id -u)" == "0" ]] && chown -R postgres:postgres "$PGDATA" "$SOCKET_DIR"
   chmod 700 "$PGDATA"
 }
 
@@ -142,7 +143,8 @@ host    all  all  ::1/128        scram-sha-256
 host    all  all  0.0.0.0/0      scram-sha-256
 host    all  all  ::/0           scram-sha-256
 HBA
-  chown postgres:postgres "$PGDATA/pg_hba.conf"
+  [[ "$(id -u)" == "0" ]] && chown postgres:postgres "$PGDATA/pg_hba.conf"
+  return 0
 }
 
 init_fresh_cluster() {

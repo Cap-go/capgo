@@ -28,5 +28,7 @@ COPY --from=bins --chmod=755 /wal-g /cloudflared /usr/local/bin/
 COPY container/schema.sql /opt/capgo/schema.sql
 COPY --chmod=755 container/entrypoint.sh container/health.sh container/health_server.pl /opt/capgo/
 
+# Postgres, WAL-G, cloudflared and the health server all run unprivileged.
+USER postgres
 EXPOSE 8080
 ENTRYPOINT ["/opt/capgo/entrypoint.sh"]

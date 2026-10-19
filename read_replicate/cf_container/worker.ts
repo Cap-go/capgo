@@ -126,7 +126,8 @@ export class PgNode extends Container<Env> {
     if (state.status !== 'running' && state.status !== 'healthy')
       return base
     try {
-      const res = await this.containerFetch('http://container/health', {}, 8080)
+      // Loopback from the Durable Object to its own container port; never leaves the host.
+      const res = await this.containerFetch('http://container/health', {}, 8080) // NOSONAR
       return { ...base, node: await res.json() }
     }
     catch (error) {
