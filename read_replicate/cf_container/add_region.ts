@@ -19,6 +19,7 @@
 import type { LocationHint } from './lib.ts'
 import {
   admin,
+  detail,
   CLUSTER_ENV,
   deprovisionNodeNetwork,
   fail,
@@ -72,4 +73,4 @@ await waitForNode(state, name, (h) => {
 
 const hyperdriveId = await provisionHyperdrive(state, name)
 log(`${name} ready`)
-console.log(`    hyperdrive: ${hyperdriveId}  (bind it in the plugin worker for ${location})`)
+detail(`hyperdrive: ${hyperdriveId}  (bind it in the plugin worker for ${location})`)

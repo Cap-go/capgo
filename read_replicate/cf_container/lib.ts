@@ -65,6 +65,11 @@ export function log(msg: string) {
   console.log(`==> ${clean(msg)}`)
 }
 
+/** Indented detail line, sanitized like log(). */
+export function detail(msg: string) {
+  console.log(`    ${clean(msg)}`)
+}
+
 export function fail(msg: string): never {
   console.error(`Error: ${clean(msg)}`)
   process.exit(1)
@@ -130,7 +135,7 @@ export async function run(cmd: string[], opts: { input?: string, allowFail?: boo
   if (code !== 0 && !opts.allowFail)
     fail(`${cmd.slice(0, 4).join(' ')} failed (exit ${code}):\n${stderr || stdout}`)
   if (!opts.quiet && stdout.trim())
-    console.log(stdout.trim())
+    console.log(clean(stdout.trim()))
   return { stdout, stderr, code }
 }
 
@@ -191,7 +196,15 @@ export async function cfApi<T>(segments: string[], init: RequestInit = {}, query
  * Supabase pooler URL -> direct libpq key/value conninfo for logical
  * replication (same conversion as read_replicate/common.sh).
  */
-export function sourceConninfo(opts: { withPassword?: boolean } = {}): string {
+function quoteConninfo(v: string) {
+  return `'${v.replace(/\\/g, '\\\\').replace(/'/g, '\\\'')}'`
+}
+
+/**
+ * Supabase pooler URL -> direct libpq key/value conninfo without the password
+ * (same conversion as read_replicate/common.sh).
+ */
+export function sourceConninfoWithoutPassword(): string {
   const url = new URL(env('MAIN_SUPABASE_DB_URL'))
   let user = decodeURIComponent(url.username)
   let host = url.hostname
@@ -204,13 +217,11 @@ export function sourceConninfo(opts: { withPassword?: boolean } = {}): string {
   else if (port === '6543') {
     port = '5432'
   }
-  const q = (v: string) => `'${v.replace(/\\/g, '\\\\').replace(/'/g, '\\\'')}'`
   return [
-    `host=${q(host)}`,
-    `port=${q(port)}`,
-    `dbname=${q(url.pathname.slice(1) || 'postgres')}`,
-    `user=${q(user)}`,
-    ...(opts.withPassword === false ? [] : [`password=${q(decodeURIComponent(url.password))}`]),
+    `host=${quoteConninfo(host)}`,
+    `port=${quoteConninfo(port)}`,
+    `dbname=${quoteConninfo(url.pathname.slice(1) || 'postgres')}`,
+    `user=${quoteConninfo(user)}`,
     'sslmode=require',
     'connect_timeout=10',
     'keepalives=1',
@@ -218,6 +229,11 @@ export function sourceConninfo(opts: { withPassword?: boolean } = {}): string {
     'keepalives_interval=5',
     'keepalives_count=3',
   ].join(' ')
+}
+
+/** Full conninfo for the container's logical subscription (secret, never logged). */
+export function sourceConninfo(): string {
+  return `${sourceConninfoWithoutPassword()} password=${quoteConninfo(sourcePassword())}`
 }
 
 /** Supabase password for local psql via PGPASSWORD (never on the command line). */
@@ -302,7 +318,7 @@ export async function provisionHyperdrive(state: ClusterState, name: string): Pr
     const reason = JSON.stringify(res.errors)
     if (attempt === 10)
       fail(`hyperdrive create failed: ${reason}`)
-    console.log(`    hyperdrive create failed, retrying in 15s: ${reason}`)
+    detail(`hyperdrive create failed, retrying in 15s: ${reason}`)
     await Bun.sleep(15_000)
   }
   if (!hyperdriveId)
@@ -361,7 +377,7 @@ export async function waitForNode(state: ClusterState, name: string, done: (h: N
     const line = `[${name}] container=${h.container.status} phase=${h.node?.phase ?? '-'} disk=${h.node?.disk ?? '-'}`
       + (pg ? ` recovery=${pg.in_recovery} lag=${pg.replay_lag_s ?? '-'}s tables_not_ready=${pg.tables_not_ready ?? '-'}` : '')
     if (line !== last) {
-      console.log(`    ${new Date().toISOString()} ${line}`)
+      detail(`${new Date().toISOString()} ${line}`)
       last = line
     }
     if (done(h))

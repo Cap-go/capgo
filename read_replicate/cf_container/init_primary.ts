@@ -28,6 +28,7 @@ import { join } from 'node:path'
 import type { ClusterState, LocationHint } from './lib.ts'
 import {
   admin,
+  detail,
   CLUSTER_ENV,
   DIR,
   env,
@@ -45,6 +46,7 @@ import {
   run,
   saveState,
   sourceConninfo,
+  sourceConninfoWithoutPassword,
   sourcePassword,
   WAL_BUCKET,
   waitForNode,
@@ -69,7 +71,7 @@ const r2Endpoint = `https://${account}.r2.cloudflarestorage.com`
 const conninfo = sourceConninfo()
 const psql = Bun.which('psql-17') ?? Bun.which('psql') ?? fail('psql not found')
 // Password goes through PGPASSWORD so it never appears in argv or error output.
-const psqlConninfo = sourceConninfo({ withPassword: false })
+const psqlConninfo = sourceConninfoWithoutPassword()
 const sourceSql = async (sql: string) => (await run([psql, psqlConninfo, '-X', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql], {
   quiet: true,
   env: { PGPASSWORD: sourcePassword() },
@@ -162,7 +164,7 @@ await waitForNode(state, 'primary', h => h.node?.phase === 'running' && h.node.p
 
 const hyperdriveId = serve ? await provisionHyperdrive(state, 'primary') : undefined
 log('primary ready')
-console.log(`    worker:     ${state.workerUrl}`)
+detail(`worker:     ${state.workerUrl}`)
 if (hyperdriveId)
-  console.log(`    hyperdrive: ${hyperdriveId}  (bind it in the plugin worker for ${location})`)
-console.log(`    add a region: bun run pgcf:add-region <name> --location <hint> --env ${CLUSTER_ENV}`)
+  detail(`hyperdrive: ${hyperdriveId}  (bind it in the plugin worker for ${location})`)
+detail(`add a region: bun run pgcf:add-region <name> --location <hint> --env ${CLUSTER_ENV}`)
