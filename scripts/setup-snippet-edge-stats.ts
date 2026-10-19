@@ -226,6 +226,11 @@ async function main() {
     wrangler(['queues', 'create', queue], dryRun, exists)
   wrangler(['r2', 'bucket', 'notification', 'create', BUCKET, '--event-type', 'object-create', '--queue', FILES_QUEUE, '--description', 'Logpush files to replay'], dryRun, exists)
 
+  const r2Source = process.env.R2_ACCESS_KEY_ID?.trim() ? 'R2_ACCESS_KEY_ID from the shell' : 'the env file'
+  console.log(`R2 keys for the Logpush destination: ${r2Source}`)
+  // R2 S3 credentials: a 32-hex access key ID and a 64-hex secret, not a Cloudflare API token.
+  if (!/^[0-9a-f]{32}$/i.test(setup.r2AccessKeyId) || !/^[0-9a-f]{64}$/i.test(setup.r2SecretAccessKey))
+    console.warn('Warning: the R2 keys do not look like R2 S3 credentials (32-hex access key ID, 64-hex secret)')
   const destination = `r2://${BUCKET}/{DATE}?account-id=${accountId}&access-key-id=${required(setup.r2AccessKeyId, 'R2_ACCESS_KEY_ID (or S3_ACCESS_KEY_ID of an R2 S3_ENDPOINT)')}&secret-access-key=${required(setup.r2SecretAccessKey, 'R2_SECRET_ACCESS_KEY (or S3_SECRET_ACCESS_KEY of an R2 S3_ENDPOINT)')}`
   if (dryRun) {
     console.log(`Would add response field ${STAT_HEADER} to ${zoneName} custom log fields`)
