@@ -421,6 +421,11 @@ await test('normalizeMachineVersion accepts dotted versions only', async () => {
 
 // ─── Summary ────────────────────────────────────────────────────────────────────
 
+await test('custom build env goes to credentials', () => {
+  const { buildCredentials } = splitPayload({ SENTRY_AUTH_TOKEN: 'sntrys_secret' }, 'ios', 'release', '7.83.0')
+  assertEquals(buildCredentials.SENTRY_AUTH_TOKEN, 'sntrys_secret')
+})
+
 console.log('\n' + '='.repeat(50))
 console.log(`\n📊 Test Results:`)
 console.log(`   ✅ Passed: ${testsPassed}`)
