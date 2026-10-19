@@ -295,6 +295,8 @@ Object.defineProperty(useMainStore(pinia), 'auth', { value: { id: '00000000-0000
 useMainStore(pinia).awaitInitialLoad = async () => true
 const organization = useOrganizationStore(pinia)
 const previewOrganization = { gid: '00000000-0000-4000-8000-000000000002', name: 'Preview organization' }
+if (params.get('lifecycleSetup') === '1')
+  Object.defineProperty(organization, 'organizations', { get: () => [{ ...previewOrganization, role: 'org_admin', is_invite: false }] })
 const selectedOrganization = ref(params.get('wrongOrg') === '1' ? { gid: '00000000-0000-4000-8000-000000000099' } : previewOrganization)
 preview.selectedOrgId.value = selectedOrganization.value.gid
 Object.defineProperty(organization, 'currentOrganization', { get: () => selectedOrganization.value })

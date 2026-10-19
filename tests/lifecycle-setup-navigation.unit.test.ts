@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import { BUILDER_STEP_IDS } from '../src/services/builderOnboardingChecklist'
 import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../supabase/functions/_backend/utils/appOnboarding.ts'
 
 const ORG = '22222222-2222-4222-8222-222222222222'
@@ -49,18 +50,36 @@ describe('lifecycle setup links at click time', () => {
 
   it('reopens a completed checklist from the same URL that was generated while pending', async () => {
     const router = await navigation()
-    mocks.rpc.mockResolvedValue({ data: checklist(true), error: null })
+    mocks.single.mockResolvedValue({ data: { app_id: APP, owner_org: ORG, onboarding: checklist(true) }, error: null })
     await router.push(emailLink)
     expect(router.currentRoute.value.path).toBe(path)
     expect(router.currentRoute.value.query.showChecklist).toBe('1')
-    expect(mocks.rpc).toHaveBeenCalledWith('verify_getting_started', { p_app_id: APP })
+    expect(mocks.select).toHaveBeenCalledWith('app_id,owner_org,onboarding')
+    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
-  it('uses verified current state rather than a stale completed app snapshot', async () => {
+  it('uses current persisted checklist state without provider refresh side effects', async () => {
     const router = await navigation()
-    mocks.single.mockResolvedValue({ data: { app_id: APP, owner_org: ORG, onboarding: checklist(true) }, error: null })
+    mocks.rpc.mockResolvedValue({ data: checklist(true), error: null })
     await router.push(`${emailLink}&showChecklist=1`)
     expect(router.currentRoute.value.query.showChecklist).toBeUndefined()
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])('retains the unfinished dual sibling when only OTA is complete (Builder complete=%s)', async (builderComplete) => {
+    const router = await navigation()
+    const onboarding = checklist(true)
+    Object.assign(onboarding.setup, {
+      builder_todo_list_version: '1',
+      paths: ['ota', 'builder'],
+      selected_path: 'builder',
+      selected_builder_platform: 'android',
+      steps: { ...onboarding.setup.steps, builder: Object.fromEntries((['ios', 'android'] as const).map(platform => [platform, Object.fromEntries(BUILDER_STEP_IDS[platform].map(id => [id, { status: builderComplete ? 'done' : 'pending' }]))])) },
+    })
+    mocks.single.mockResolvedValue({ data: { app_id: APP, owner_org: ORG, onboarding }, error: null })
+    await router.push(emailLink)
+    expect(router.currentRoute.value.query.showChecklist).toBe(builderComplete ? '1' : undefined)
+    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
   it.each(['missing app', 'wrong organization', 'read error'])('falls back to authorized app selection for %s without choosing another app', async (failure) => {
@@ -80,7 +99,7 @@ describe('lifecycle setup links at click time', () => {
     expect(mocks.from).not.toHaveBeenCalled()
   })
 
-  it.each(['error response', 'network rejection'])('retains normal setup when verification has an %s instead of forcing read-only view mode', async (failure) => {
+  it.each(['error response', 'network rejection'])('leaves normal pending setup to its own refresh even when that RPC has an %s', async (failure) => {
     const router = await navigation()
     if (failure === 'network rejection')
       mocks.rpc.mockRejectedValue(new Error('temporarily unavailable'))
@@ -89,6 +108,7 @@ describe('lifecycle setup links at click time', () => {
     await router.push(`${emailLink}&showChecklist=1`)
     expect(router.currentRoute.value.path).toBe(path)
     expect(router.currentRoute.value.query.showChecklist).toBeUndefined()
+    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
   it('retains the verified org selection when the app read rejects', async () => {

@@ -122,8 +122,9 @@ their purpose-specific actions.
 
 Current-app setup and OTA AI-help links retain the authorized organization and
 app URL, with `source=capgo_lifecycle`, `oid` and `lifecycleSetup=1`. The client
-resolver re-reads that exact app through the authenticated, organization-scoped
-client and verifies its current setup state at click time. An unfinished visit
+resolver re-reads that exact app's persisted onboarding JSON through the
+authenticated, organization-scoped client at click time, without a refresh RPC
+or write. An unfinished visit
 keeps normal setup behavior. A visit that would normally redirect after
 completion instead selects `showChecklist=1`, the completed-view interface from
 PR #3741. **PR #3741 must be deployed before lifecycle activation.** The email
@@ -134,8 +135,8 @@ setup/selection destinations against the ordinary one-pending-app shortcut.
 If org membership is lost, it removes the inaccessible `oid` and opens an
 explicit unscoped chooser (`source=capgo_lifecycle&lifecycleSelect=1`), retaining
 authentication, MFA and invitation gates.
-Failed verification retains normal setup for its own verification
-to recover. This does not promise post-send retargeting of a static delivered
+Normal setup retains its own refresh behavior. An unavailable app read opens
+the authorized chooser. This does not promise post-send retargeting of a static delivered
 URL, changed app name or body copy.
 
 The OTA secondary action is **Open setup for AI help**, styled as a quieter

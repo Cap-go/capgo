@@ -20,23 +20,16 @@ export async function lifecycleSetupNavigation(to: RouteLocationNormalized): Pro
 
     const supabase = useSupabase()
     const { data: app, error } = await supabase.from('apps')
-      .select('app_id,owner_org')
+      .select('app_id,owner_org,onboarding')
       .eq('app_id', appId)
       .eq('owner_org', orgId)
       .maybeSingle()
     if (error || !app || app.app_id !== appId || app.owner_org !== orgId)
       return selection(orgId)
 
-    // A failed verification keeps normal setup, whose own verification can
-    // recover. Never make an unfinished visit read-only on stale evidence.
-    let completedView = false
-    try {
-      const verified = await supabase.rpc('verify_getting_started', { p_app_id: appId })
-      completedView = !verified.error && verified.data != null && shouldSkipOnboardingResume(verified.data)
-    }
-    catch {
-      // The normal setup page can retry its own verification.
-    }
+    // Decide from fresh persisted state only. The normal setup page owns its
+    // refresh RPC; passive completed reopening must not trigger its writes.
+    const completedView = shouldSkipOnboardingResume(app.onboarding)
     const query = { ...to.query }
     if (completedView)
       query.showChecklist = '1'

@@ -14,6 +14,29 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
+for (const assignment of ['ota-only', 'builder-only']) {
+  const emailScope = 'oid=00000000-0000-4000-8000-000000000002&source=capgo_lifecycle&lifecycleSetup=1'
+  test(`resolves a completed ${assignment} email link without a passive refresh or onboarding writes`, async ({ page }) => {
+    await page.goto(`${gettingStarted}?assignment=${assignment}&platform=android&checklistState=completed&${emailScope}`)
+    await expect(page).toHaveURL(/showChecklist=1/)
+    await expect(page.getByRole('heading', { name: assignment === 'ota-only' ? 'Guided setup complete' : 'Your first cloud build succeeded', exact: true })).toBeVisible()
+    const state = await page.evaluate(() => {
+      const preview = (window as any).onboardingSetupPreview
+      return { setupWrites: preview.state.setupWrites, userWrites: preview.state.userWrites, refreshed: preview.events.includes('getting-started-verified') }
+    })
+    expect(state).toEqual({ setupWrites: [], userWrites: [], refreshed: false })
+  })
+
+  test(`keeps normal ${assignment} setup writes after an unfinished email link`, async ({ page }) => {
+    await page.goto(`${gettingStarted}?assignment=${assignment}&platform=android&checklistState=pending&${emailScope}`)
+    await expect(page).not.toHaveURL(/showChecklist=1/)
+    await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.setupWrites.some((write: any) => write.body?.p_feature_key))).toBe(true)
+    await page.getByRole('button', { name: 'Explore dashboard', exact: true }).click()
+    await expect(page.locator('[data-test="preview-app-dashboard"]')).toBeVisible()
+    expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.setupWrites.some((write: any) => write.body?.onboarding?.outcome === 'switched_to_manual'))).toBe(true)
+  })
+}
+
 for (const preOrg of [false, true]) {
   for (const scenario of [
     { name: 'legacy OTA', query: 'version=2', completed: 'Guided setup complete' },
