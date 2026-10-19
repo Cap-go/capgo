@@ -17,7 +17,8 @@ import { statsRequestSchema } from '../utils/plugin_validation.ts'
 import { getAppOwnerWithEdgeCache, getAppVersionWithEdgeCache } from '../utils/pluginEdgeCacheReads.ts'
 import { getClientIP } from '../utils/rate_limit.ts'
 import { onPremiseAppResponse } from '../utils/rateLimitInfo.ts'
-import { shouldUseUpdatesEdgeCache } from '../utils/updatesEdgeCache.ts'
+import { getSnippetEdgeAnswerBps, setSnippetStatsFill } from '../utils/snippetEdgeAnswer.ts'
+import { planValidUntilMs, shouldUseUpdatesEdgeCache } from '../utils/updatesEdgeCache.ts'
 import { backgroundTask, INVALID_STRING_APP_ID, isInternalVersionName, isLimited, MISSING_STRING_APP_ID, reverseDomainRegex } from '../utils/utils.ts'
 import { isRunningVersionAction } from './stats_actions.ts'
 
@@ -56,6 +57,22 @@ export interface BatchStatsResult {
   moreInfo?: Record<string, unknown>
 }
 
+interface SnippetStatsFillInput {
+  blockProviderInfraRequests: boolean
+  planValidUntil: number | null
+}
+
+/** A batch fill holds for its strictest event; one event without a fill blocks it. */
+function mergeSnippetStatsFill(current: SnippetStatsFillInput | null, next: SnippetStatsFillInput | undefined): SnippetStatsFillInput | null {
+  if (!current || !next)
+    return null
+  const until = [current.planValidUntil, next.planValidUntil].filter((value): value is number => value !== null)
+  return {
+    blockProviderInfraRequests: current.blockProviderInfraRequests || next.blockProviderInfraRequests,
+    planValidUntil: until.length > 0 ? Math.min(...until) : null,
+  }
+}
+
 interface PostResult {
   success: boolean
   response?: Response
@@ -63,6 +80,8 @@ interface PostResult {
   message?: string
   isOnprem?: boolean
   moreInfo?: Record<string, unknown>
+  /** Cloud app with a valid plan: what the snippet fill of its /stats needs. */
+  snippetFill?: SnippetStatsFillInput
 }
 
 function normalizeStatsChannelName(channelName: string | null | undefined): string | null {
@@ -115,7 +134,8 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   // Same plan actions as /updates, so both endpoints share the cached owner entry.
   const appOwner = edgeCache
     ? (await getAppOwnerWithEdgeCache(c, app_id, drizzleClient, planActions)).value
-    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions)
+    // Snippet fills must not outlive a trial: they need its end date.
+    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions, { includeTrialAt: getSnippetEdgeAnswerBps(c) > 0 })
   const allowDeviceCustomId = appOwner?.allow_device_custom_id
   const device = makeDevice(body, allowDeviceCustomId)
   const deviceDataCollection = parseDeviceDataCollection(appOwner?.device_data_collection ?? cachedAppStatus.device_data_collection)
@@ -158,7 +178,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     // when there was no update to download, so skip version validation too.
     await backgroundTask(c, createStatsMau(c, device.device_id, app_id, appOwner.owner_org, mauPlatformForCollection(device.platform, deviceDataCollection), mauVersionBuildForCollection(device.version_build, deviceDataCollection)))
     await sendStatsAndDevice(c, device, statsActions, !isRunningVersionAction(action), deviceDataCollection)
-    return { success: true }
+    return { success: true, snippetFill: { blockProviderInfraRequests: Boolean(blockProviderInfraRequests), planValidUntil: planValidUntilMs(appOwner) } }
   }
 
   // Client body.channel is ignored for version_usage; only defaultChannel and
@@ -220,7 +240,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   await backgroundTask(c, createStatsMau(c, device.device_id, app_id, appOwner.owner_org, mauPlatformForCollection(device.platform, deviceDataCollection), mauVersionBuildForCollection(device.version_build, deviceDataCollection)))
   await sendStatsAndDevice(c, device, statsActions, !isRunningVersionAction(action), deviceDataCollection)
-  return { success: true }
+  return { success: true, snippetFill: { blockProviderInfraRequests: Boolean(blockProviderInfraRequests), planValidUntil: planValidUntilMs(appOwner) } }
 }
 
 // Plugin endpoints are intentionally public device endpoints: their responses are
@@ -391,6 +411,8 @@ async function processStatsEvents(
       return onPremiseAppResponse(c)
     }
     if (result.success) {
+      if (result.snippetFill)
+        setSnippetStatsFill(c, bodyParsed.app_id, result.snippetFill)
       return c.json(BRES)
     }
     if (result.error === 'need_plan_upgrade') {
@@ -401,6 +423,7 @@ async function processStatsEvents(
 
   // For batch, collect results and handle errors per event
   const results: BatchStatsResult[] = []
+  let snippetFill: SnippetStatsFillInput | null = { blockProviderInfraRequests: false, planValidUntil: null }
 
   for (let i = 0; i < events.length; i++) {
     const event = events[i]
@@ -432,6 +455,7 @@ async function processStatsEvents(
         })
       }
       else if (result.success) {
+        snippetFill = mergeSnippetStatsFill(snippetFill, result.snippetFill)
         results.push({ status: 'ok', index: i })
       }
       else if (result.error === 'need_plan_upgrade') {
@@ -459,6 +483,11 @@ async function processStatsEvents(
   }
 
   // For batch, return array of results
+  const firstAppId = (events[0] as AppStats | undefined)?.app_id
+  if (firstAppId && results.length > 0 && snippetFill
+    && events.every(event => (event as AppStats | undefined)?.app_id === firstAppId)
+    && results.every(result => result.status === 'ok'))
+    setSnippetStatsFill(c, firstAppId, snippetFill)
   return c.json({ status: 'ok', results })
 }
 

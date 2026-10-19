@@ -2576,51 +2576,6 @@ export type Database = {
         }
         Relationships: []
       }
-      trial_extension_events: {
-        Row: {
-          created_at: string
-          customer_id: string
-          extension_days: number
-          id: number
-          new_trial_at: string
-          org_id: string
-          previous_trial_at: string
-        }
-        Insert: {
-          created_at?: string
-          customer_id: string
-          extension_days: number
-          id?: number
-          new_trial_at: string
-          org_id: string
-          previous_trial_at: string
-        }
-        Update: {
-          created_at?: string
-          customer_id?: string
-          extension_days?: number
-          id?: number
-          new_trial_at?: string
-          org_id?: string
-          previous_trial_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "trial_extension_events_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "stripe_info"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "trial_extension_events_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       tmp_users: {
         Row: {
           cancelled_at: string | null

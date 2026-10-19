@@ -88,7 +88,7 @@ assert.match(builderAuthCallback, /if \(metadata\.method\)/)
 
 const builderInitCommandSource = sourceBetween(indexSource, ".command('init')", ".command('request [appId]')")
 assert.match(builderInitCommandSource, /enableSelfUpdate: true/)
-assert.match(builderSource, /const analyticsEnabled = options\.enableSelfUpdate === true/)
+assert.match(builderSource, /const analyticsEnabled = \(options\.enableSelfUpdate === true \|\| options\.appId !== undefined\) && options\.analytics !== false/, 'direct Builder setup and verified init handoffs share progress analytics while preserving opt-out')
 assert.match(builderSource, /action: 'start_setup'/)
 assert.match(builderSource, /startSetupLookupInFlight/)
 assert.match(builderSource, /step: firstSetupStep/)

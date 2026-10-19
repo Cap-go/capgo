@@ -120,9 +120,8 @@ async function expectProtectedRouteRedirect(page: Page, targetPath: string, expe
 
 async function continueFromAppNameToIcon(page: Page) {
   await page.click('[data-test="app-onboarding-continue"]')
-  await expect(page.locator('#app-onboarding-app-id')).toBeVisible()
-  await page.click('[data-test="app-onboarding-skip-app-id"]')
   await expect(page.locator('[data-test="app-onboarding-toggle-icon-store-import"]')).toBeVisible()
+  await expect(page.locator('#app-onboarding-app-id')).toHaveCount(0)
 }
 
 async function continueFromAppNameToOrganization(page: Page) {
@@ -133,8 +132,6 @@ async function continueFromAppNameToOrganization(page: Page) {
 async function returnFromOrganizationToAppName(page: Page) {
   await page.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(page.locator('[data-test="app-onboarding-toggle-icon-store-import"]')).toBeVisible()
-  await page.getByRole('button', { name: 'Back', exact: true }).click()
-  await expect(page.locator('#app-onboarding-app-id')).toBeVisible()
   await page.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(page.locator('[data-test="app-onboarding-name"]')).toBeVisible()
 }
