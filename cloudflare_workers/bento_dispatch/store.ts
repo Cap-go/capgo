@@ -1,9 +1,10 @@
 import type { QueryResultRow } from 'pg'
 import type { PostHogQueueEnv, PostHogQueueMessage } from '../../supabase/functions/_backend/utils/posthog_queue.ts'
-import type { DispatchJob, DispatchRecord, EligibleUser, Json, QueryClient, ReadOnlyContext, RunRecord, TerminalReason } from './contracts.ts'
+import type { BentoEvent, DispatchJob, DispatchRecord, EligibleUser, Json, QueryClient, ReadOnlyContext, RunRecord, TerminalReason } from './contracts.ts'
 import { flowAudit, recordFlowEvent, safeFlowMetadata } from '../../supabase/functions/_backend/utils/bento_flow_audit.ts'
 import { enqueuePostHog } from '../../supabase/functions/_backend/utils/posthog_queue.ts'
 import { claimLifecycleBudget } from './flows/lifecycle/budget.ts'
+import { recordLifecycleAttempt, recordLifecycleSnapshot } from './flows/lifecycle/monitoring.ts'
 
 export const CLAIM_LEASE_SECONDS = 120
 export const MAX_DISPATCH_ATTEMPTS = 5
@@ -173,8 +174,8 @@ export class DispatchStore {
         return null
       }
       await client.query('SELECT pg_catalog.pg_advisory_xact_lock(1954098942, 1)')
-      if (user.flowKey.startsWith('lifecycle:v2:') && !await claimLifecycleBudget(client, user)) {
-        await this.appendRunAudit(client, run, user, 'lifecycle_budget_or_context_deferred')
+      if (user.flowKey.startsWith('lifecycle:v2:') && !await claimLifecycleBudget(client, user, reason => recordLifecycleAttempt(client, user, 'deferred', reason, undefined, run.id))) {
+        await this.appendRunAudit(client, run, user, 'lifecycle_budget_or_context_deferred', false)
         return null
       }
       const budget = await client.query<{ count: number }>(`SELECT COUNT(*)::int AS count FROM (
@@ -210,13 +211,18 @@ export class DispatchStore {
           reason = 'event_already_accepted'
         await this.appendRunAudit(client, run, user, reason)
       }
+      else {
+        await recordLifecycleAttempt(client, user, 'claimed', 'dispatch_claimed', result.rows[0], run.id)
+      }
       return result.rows[0] ?? null
     })
   }
 
-  private async appendRunAudit(client: QueryClient, run: RunRecord, user: EligibleUser, reason: string) {
+  private async appendRunAudit(client: QueryClient, run: RunRecord, user: EligibleUser, reason: string, recordEvidence = true) {
     const audit = flowAudit('bento:action_skipped', run.id, { context_key: user.contextKey, recipient_key: user.recipientKey, tag: user.tag, reason }, user.recipientKey)
     await client.query('UPDATE public.bento_evaluation_runs SET pending_audit = pending_audit || $2::jsonb WHERE id = $1', [run.id, JSON.stringify([audit])])
+    if (recordEvidence)
+      await recordLifecycleAttempt(client, user, 'deferred', reason, undefined, run.id)
   }
 
   skip(run: RunRecord, user: EligibleUser, reason: string): Promise<void> {
@@ -234,12 +240,24 @@ export class DispatchStore {
     return this.eventResult(run, event, user, safeError(code))
   }
 
+  snapshotEvent(event: DispatchRecord, user: EligibleUser, payload: BentoEvent): Promise<void> {
+    return this.transaction(async (client) => {
+      const owned = await client.query(`SELECT id FROM public.bento_event_dispatches
+        WHERE id=$1::uuid AND claim_token=$2::uuid AND status='sending' AND claim_until > CURRENT_TIMESTAMP FOR UPDATE`, [event.id, event.claim_token])
+      if (!owned.rows.length)
+        throw new Error('Dispatch claim lost')
+      await recordLifecycleSnapshot(client, user, event, payload)
+    })
+  }
+
   releaseEvent(run: RunRecord, event: DispatchRecord, user: EligibleUser, reason: string): Promise<void> {
     return this.transaction(async (client) => {
       const audit = flowAudit('bento:action_skipped', run.id, { dispatch_id: event.id, context_key: user.contextKey, recipient_key: user.recipientKey, tag: user.tag, reason }, user.recipientKey)
-      await client.query(`UPDATE public.bento_event_dispatches SET status = 'failed', claim_token = NULL,
+      const result = await client.query(`UPDATE public.bento_event_dispatches SET status = 'failed', claim_token = NULL,
         claim_until = NULL, last_error = 'selection_stale', updated_at = CURRENT_TIMESTAMP,
         pending_audit = pending_audit || $3::jsonb WHERE id = $1 AND claim_token = $2 AND status = 'sending'`, [event.id, event.claim_token, JSON.stringify([audit])])
+      if (result.rowCount === 1)
+        await recordLifecycleAttempt(client, user, 'released', reason, event, run.id)
     })
   }
 
@@ -253,6 +271,8 @@ export class DispatchStore {
         claim_token = NULL, claim_until = CASE WHEN $3 = 'failed' THEN CURRENT_TIMESTAMP + INTERVAL '1 minute' ELSE NULL END,
         last_error = $4, last_run_id = $5, updated_at = CURRENT_TIMESTAMP, pending_audit = pending_audit || $6::jsonb
         WHERE id = $1 AND claim_token = $2 AND status = 'sending'`, [event.id, event.claim_token, failure ? 'failed' : 'accepted', failure ?? null, run.id, JSON.stringify([audit])])
+      if (result.rowCount === 1)
+        await recordLifecycleAttempt(client, user, failure ? 'failed' : 'accepted', failure ?? 'provider_acknowledged', event, run.id)
       if (!failure && result.rowCount === 1 && user.flowKey.startsWith('lifecycle:v2:')) {
         await client.query(`UPDATE public.bento_lifecycle_journeys SET candidate = NULL, revision = revision + 1, next_evaluation_at = CURRENT_TIMESTAMP
           WHERE org_id = $1::uuid AND product = $2`, [user.metadata.orgId, user.metadata.product])

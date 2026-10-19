@@ -3,7 +3,7 @@ import { higherPrioritySiblingSql } from './priority.ts'
 
 // Called inside the existing short, serialized event-claim transaction. Its
 // global provider lock also serializes the organization/person collision gate.
-export async function claimLifecycleBudget(client: QueryClient, user: EligibleUser): Promise<boolean> {
+export async function claimLifecycleBudget(client: QueryClient, user: EligibleUser, recordDeferred?: (reason: string) => Promise<void>): Promise<boolean> {
   const orgId = user.metadata.orgId
   const product = user.metadata.product
   const recipientId = user.metadata.recipientId
@@ -15,25 +15,32 @@ export async function claimLifecycleBudget(client: QueryClient, user: EligibleUs
       AND j.candidate->>'context' = $6 AND (j.candidate->>'expiresAt')::timestamptz > CURRENT_TIMESTAMP
       AND NOT EXISTS (${higherPrioritySiblingSql('j.org_id', 'j.product', '(j.candidate->>\'priority\')::int')})
     FOR UPDATE`, [orgId, product, user.metadata.revision, user.tag, user.metadata.branch, user.metadata.context])
-  if (!current.rows.length)
+  if (!current.rows.length) {
+    await recordDeferred?.('lifecycle_context_or_priority_changed')
     return false
+  }
   const other = `AND NOT (flow_key = $4 AND context_key = $5 AND recipient_key = $6 AND tag = $7)`
   const recent = `flow_key LIKE 'lifecycle:v2:%' AND (status = 'accepted' OR (status = 'sending' AND claim_until > CURRENT_TIMESTAMP))`
-  const result = await client.query<{ blocked: boolean }>(`SELECT
+  const result = await client.query<{ blocked: boolean, reason: string }>(`WITH limits AS (SELECT
     EXISTS (SELECT 1 FROM public.bento_event_dispatches WHERE ${recent}
-      AND details->'metadata'->>'orgId' = $1 AND (CASE WHEN status = 'accepted' THEN event_at ELSE last_attempt_at END) > CURRENT_TIMESTAMP - INTERVAL '1 day' ${other})
-    OR EXISTS (SELECT 1 FROM public.bento_event_dispatches WHERE ${recent}
-      AND details->'metadata'->>'recipientId' = $2 AND (CASE WHEN status = 'accepted' THEN event_at ELSE last_attempt_at END) > CURRENT_TIMESTAMP - INTERVAL '1 day' ${other})
-    OR (NOT $3 AND (SELECT COUNT(*) FROM (SELECT 1 FROM public.bento_event_dispatches WHERE ${recent}
+      AND details->'metadata'->>'orgId' = $1 AND (CASE WHEN status = 'accepted' THEN event_at ELSE last_attempt_at END) > CURRENT_TIMESTAMP - INTERVAL '1 day' ${other}) AS org_daily,
+    EXISTS (SELECT 1 FROM public.bento_event_dispatches WHERE ${recent}
+      AND details->'metadata'->>'recipientId' = $2 AND (CASE WHEN status = 'accepted' THEN event_at ELSE last_attempt_at END) > CURRENT_TIMESTAMP - INTERVAL '1 day' ${other}) AS person_daily,
+    (NOT $3 AND (SELECT COUNT(*) FROM (SELECT 1 FROM public.bento_event_dispatches WHERE ${recent}
       AND details->'metadata'->>'orgId' = $1 AND tag NOT LIKE 'trial:%'
-      AND (CASE WHEN status = 'accepted' THEN event_at ELSE last_attempt_at END) > CURRENT_TIMESTAMP - INTERVAL '7 days' ${other} LIMIT 3) weekly) >= 3)
-    OR ($8 AND EXISTS (SELECT 1 FROM public.bento_event_dispatches WHERE ${recent}
+      AND (CASE WHEN status = 'accepted' THEN event_at ELSE last_attempt_at END) > CURRENT_TIMESTAMP - INTERVAL '7 days' ${other} LIMIT 3) weekly) >= 3) AS optional_weekly,
+    ($8 AND EXISTS (SELECT 1 FROM public.bento_event_dispatches WHERE ${recent}
       AND details->'metadata'->>'orgId' = $1
       AND (details->'metadata'->>'commercialOffer' = 'true'
         OR details->'metadata'->>'branch' IN ('subscription_proposition', 'checklist_complete_purchase'))
       AND tag NOT LIKE 'trial:%'
-      AND (CASE WHEN status = 'accepted' THEN event_at ELSE last_attempt_at END) > CURRENT_TIMESTAMP - INTERVAL '7 days' ${other})) AS blocked`, [orgId, recipientId, user.tag.startsWith('trial:'), user.flowKey, user.contextKey, user.recipientKey, user.tag, user.metadata.commercialOffer === true || user.metadata.branch === 'subscription_proposition' || user.metadata.branch === 'checklist_complete_purchase'])
+      AND (CASE WHEN status = 'accepted' THEN event_at ELSE last_attempt_at END) > CURRENT_TIMESTAMP - INTERVAL '7 days' ${other})) AS offer_weekly)
+    SELECT org_daily OR person_daily OR optional_weekly OR offer_weekly AS blocked,
+      CASE WHEN org_daily THEN 'organization_daily_cap' WHEN person_daily THEN 'recipient_daily_cap'
+        WHEN optional_weekly THEN 'optional_setup_weekly_cap' WHEN offer_weekly THEN 'optional_offer_weekly_cap'
+        ELSE 'budget_unknown' END AS reason FROM limits`, [orgId, recipientId, user.tag.startsWith('trial:'), user.flowKey, user.contextKey, user.recipientKey, user.tag, user.metadata.commercialOffer === true || user.metadata.branch === 'subscription_proposition' || user.metadata.branch === 'checklist_complete_purchase'])
   if (result.rows[0]?.blocked !== false) {
+    await recordDeferred?.(result.rows[0]?.reason ?? 'budget_unknown')
     // A deferred candidate must yield the front of the indexed cohort; its
     // immutable purpose remains unconsumed and is recomputed after the hold.
     await client.query(`UPDATE public.bento_lifecycle_journeys SET candidate = NULL, revision = revision + 1,

@@ -2,7 +2,8 @@ import type { QueryClient, ReadOnlyContext } from '../../contracts.ts'
 import type { Product, VerifiedAppOutcomes } from './evidence.ts'
 import { recordFlowEvent } from '../../../../supabase/functions/_backend/utils/bento_flow_audit.ts'
 import { nextLifecycleEvaluation } from './cadence.ts'
-import { evaluateLifecycle } from './evaluate.ts'
+import { evaluateLifecycleDecision } from './evaluate.ts'
+import { recordLifecycleDecision } from './monitoring.ts'
 import { reconcileProgress } from './progress.ts'
 import { loadLifecycleInput, timestamp } from './source.ts'
 import { iso, ms } from './types.ts'
@@ -152,14 +153,16 @@ export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: An
     if (!fresh.input.evidence && fresh.row.any_app)
       state.appLessSince = null
     fresh.input.state = state
-    const candidate = evaluateLifecycle(fresh.input)
+    const decision = evaluateLifecycleDecision(fresh.input)
+    const candidate = decision.candidate
+    const nextAt = nextLifecycleEvaluation(fresh.input, candidate)
     // Fence changes that committed while gathering analytics. A late response
     // cannot write old-incarnation context into a replacement journey.
     await db.query('BEGIN')
     try {
       const saved = await db.query(`UPDATE public.bento_lifecycle_journeys SET state = $4::jsonb, candidate = $5::jsonb,
       next_evaluation_at = $7::timestamptz, refresh_claim_until = NULL, refresh_claim_token = NULL
-      WHERE org_id = $1::uuid AND product = $2 AND revision = $3 AND refresh_claim_token = $6::uuid RETURNING org_id`, [input.orgId, input.product, fresh.revision, JSON.stringify(state), JSON.stringify(candidate), token, nextLifecycleEvaluation(fresh.input, candidate)])
+      WHERE org_id = $1::uuid AND product = $2 AND revision = $3 AND refresh_claim_token = $6::uuid RETURNING org_id`, [input.orgId, input.product, fresh.revision, JSON.stringify(state), JSON.stringify(candidate), token, nextAt])
       if (!saved.rowCount) {
         await db.query('ROLLBACK')
         continue
@@ -169,6 +172,10 @@ export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: An
         ARRAY(SELECT DISTINCT fact FROM pg_catalog.unnest(seen_facts || $4::text[]) AS f(fact))
         WHERE org_id = $1::uuid AND product = $2 AND app_incarnation = $3::uuid`, [input.orgId, input.product, app.id, fresh.input.evidence?.facts.map(fact => fact.id) ?? []])
       }
+      await recordLifecycleDecision(db, fresh.input, decision, fresh.revision, nextAt, {
+        originalCreatorId: fresh.row.original_creator_id,
+        sourceVerifiedAt: timestamp(fresh.row.verified_at),
+      })
       await db.query('COMMIT')
     }
     catch (error) {
