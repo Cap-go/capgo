@@ -14,34 +14,28 @@ function sliceBetween(source: string, startMarker: string, endMarker: string) {
 }
 
 describe('pre-organization onboarding v3', () => {
-  it.concurrent('splits app details into name, App ID, and icon screens', () => {
-    expect(onboardingSource).toContain('type AppDetailsStep = \'name\' | \'app_id\' | \'icon\'')
+  it.concurrent('splits app details into name and icon screens with the App ID hidden by default', () => {
+    expect(onboardingSource).toContain('type AppDetailsStep = \'name\' | \'icon\'')
     expect(onboardingSource).toContain('const appDetailsStep = ref<AppDetailsStep>(\'name\')')
-    expect(onboardingSource).toContain('const hasProvidedAppId = computed(() => Boolean(manualAppId.value.trim() || importedStoreAppId.value.trim()))')
-    expect(onboardingSource).toContain('completeAndViewAppDetailsStep(\'app_id\', { appId: generatedAppId.value, appName: appName.value.trim() })')
-    expect(onboardingSource).toContain('completeAndViewAppDetailsStep(\'icon\')')
-    expect(onboardingSource).toContain(':data-test="appDetailsStep === \'app_id\' && !hasProvidedAppId ? \'app-onboarding-skip-app-id\' : \'app-onboarding-continue\'"')
-    expect(onboardingSource).toContain('function skipAppId()')
+    expect(onboardingSource).toContain('completeAndViewAppDetailsStep(\'icon\', { appId: generatedAppId.value, appName: appName.value.trim() })')
+    expect(onboardingSource).toContain('const isAppIdAdvancedOpen = ref(false)')
+    expect(onboardingSource).toContain('data-test="app-onboarding-toggle-app-id-advanced"')
+    expect(onboardingSource).toContain('v-if="isAppIdAdvancedOpen" id="app-onboarding-app-id-advanced-panel"')
     expect(onboardingSource).toContain('function continueFromCurrentAppDetailsStep()')
-    expect(onboardingSource).toContain('manualAppId.value = \'\'')
-    expect(onboardingSource).toContain('continueFromAppId()')
-    expect(onboardingSource).not.toContain('@click="skipAppId"')
+    expect(onboardingSource).not.toContain('function skipAppId()')
     expect(onboardingSource).toContain('<div v-if="appDetailsStep === \'name\'" class="mb-6">')
   })
 
-  it.concurrent('validates the generated or entered App ID before either action advances', () => {
-    const appIdContinuation = sliceBetween(onboardingSource, 'function continueFromAppId()', 'function viewPreviousAppDetailsStep()')
-    expect(appIdContinuation).toContain('if (!ensureValidAppId())')
-    expect(appIdContinuation).toContain('function skipAppId()')
-    expect(appIdContinuation).toContain('continueFromAppId()')
+  it.concurrent('validates the generated or entered App ID before app creation', () => {
+    expect(sliceBetween(onboardingSource, 'function continuePreOrgDetails()', 'async function completePreOrgAppCreation(')).toContain('if (!ensureValidAppId())')
     expect(onboardingSource).not.toContain('app/availability')
   })
 
-  it.concurrent('keeps the full store import on the App ID screen', () => {
+  it.concurrent('keeps the full store import inside the hidden App ID panel', () => {
     expect(onboardingSource).toContain('id="app-onboarding-v2-store-url"')
     expect(onboardingSource).toContain('const isStoreImportOpen = ref(false)')
     expect(onboardingSource).toContain('data-test="app-onboarding-toggle-store-import"')
-    expect(onboardingSource).toContain('<div v-if="appDetailsStep === \'app_id\'" class="onboarding-store-import')
+    expect(onboardingSource).toContain('<div class="onboarding-store-import')
     expect(onboardingSource).toContain(':aria-expanded="isStoreImportOpen"')
     expect(onboardingSource).toContain('v-if="isStoreImportOpen" id="app-onboarding-store-import-panel"')
     expect(onboardingSource).toContain('trackDetailsEvent(isStoreImportOpen.value ? \'onboarding_store_import_shown\' : \'onboarding_store_import_hidden\')')
@@ -50,7 +44,7 @@ describe('pre-organization onboarding v3', () => {
     expect(onboardingSource).toContain('trackDetailsEvent(\'onboarding_store_import_succeeded\'')
     expect(onboardingSource).toContain('trackDetailsEvent(\'onboarding_store_import_failed\'')
     expect(onboardingSource).not.toContain('{ store_url: requestedUrl }')
-    const storeImport = sliceBetween(onboardingSource, 'id="app-onboarding-v2-store-url"', '<div v-if="appDetailsStep === \'icon\'">')
+    const storeImport = sliceBetween(onboardingSource, 'id="app-onboarding-v2-store-url"', 'onboarding-details-actions')
     expect(storeImport).toContain('class="d-btn min-h-11 w-full sm:w-auto"')
   })
 
@@ -132,11 +126,9 @@ describe('pre-organization onboarding v3', () => {
   })
 
   it.concurrent('tracks every app-details page as a standard onboarding step', () => {
-    expect(onboardingSource).toContain('type AppDetailsAnalyticsStep = \'app_name\' | \'app_id\' | \'app_icon\'')
+    expect(onboardingSource).toContain('type AppDetailsAnalyticsStep = \'app_name\' | \'app_icon\'')
     expect(onboardingSource).toContain('name: \'app_name\'')
-    expect(onboardingSource).toContain('app_id: \'app_id\'')
     expect(onboardingSource).toContain('icon: \'app_icon\'')
-    expect(onboardingSource).toContain('completeAndViewAppDetailsStep(\'app_id\'')
     expect(onboardingSource).toContain('completeAndViewAppDetailsStep(\'icon\'')
     expect(onboardingSource).not.toContain('onboarding_app_details_step_viewed')
     expect(onboardingSource).not.toContain('onboarding_app_details_step_completed')
@@ -188,22 +180,21 @@ describe('pre-organization onboarding v3', () => {
   })
 
   it.concurrent('labels the icon action as skip until an icon is provided', () => {
-    const iconAction = sliceBetween(onboardingSource, ':data-test="appDetailsStep === \'app_id\'', '<IconArrowRight v-if="!isSubmitting"')
+    const iconAction = sliceBetween(onboardingSource, 'data-test="app-onboarding-continue"', '<IconArrowRight v-if="!isSubmitting"')
     const primaryActionLabel = sliceBetween(onboardingSource, 'const appDetailsPrimaryActionLabel = computed(() => {', 'const appNameInitial = computed')
 
     expect(messages['app-onboarding-skip-icon']).toBe('Skip')
     expect(primaryActionLabel).toContain('if (appDetailsStep.value === \'icon\')')
     expect(primaryActionLabel).toContain('return iconPreview.value ? t(\'app-onboarding-continue\') : t(\'app-onboarding-skip-icon\')')
-    expect(primaryActionLabel).toContain('if (appDetailsStep.value === \'app_id\' && !hasProvidedAppId.value)')
-    expect(primaryActionLabel).toContain('return t(\'app-onboarding-skip-app-id\')')
+    expect(primaryActionLabel).not.toContain('app-onboarding-skip-app-id')
     expect(iconAction).toContain('{{ appDetailsPrimaryActionLabel }}')
     expect(iconAction).not.toContain('t(\'app-onboarding-finish-details\')')
   })
 
   it.concurrent('does not send raw onboarding field values to analytics', () => {
     expect(onboardingSource).toContain('detailsFieldTracker.schedule(\'onboarding_app_name_entered\', \'app_name\', \'app_name\'')
-    expect(onboardingSource).toContain('detailsFieldTracker.schedule(\'onboarding_app_id_entered\', \'app_id\', \'app_id\'')
-    expect(onboardingSource).toContain('detailsFieldTracker.schedule(\'onboarding_store_url_entered\', \'store_url\', \'app_id\'')
+    expect(onboardingSource).toContain('detailsFieldTracker.schedule(\'onboarding_app_id_entered\', \'app_id\', \'app_icon\'')
+    expect(onboardingSource).toContain('detailsFieldTracker.schedule(\'onboarding_store_url_entered\', \'store_url\', \'app_icon\'')
     expect(onboardingSource).toContain('detailsFieldTracker.schedule(\'onboarding_store_icon_url_entered\', \'icon_store_url\', \'app_icon\'')
     expect(onboardingSource).toContain('@input="onIconStoreUrlInput"')
     expect(onboardingSource).not.toContain('{ app_name:')
@@ -303,8 +294,9 @@ describe('pre-organization onboarding v3', () => {
 
     const conflictRecovery = sliceBetween(onboardingSource, 'function returnToAppIdAfterConflict()', 'async function uploadIcon(')
     expect(conflictRecovery).toContain('flowStep.value = \'details\'')
-    expect(conflictRecovery).toContain('appDetailsStep.value = \'app_id\'')
-    expect(conflictRecovery).toContain('progressTracker?.viewStep(\'app_id\', previousAnalyticsStep)')
+    expect(conflictRecovery).toContain('appDetailsStep.value = \'icon\'')
+    expect(conflictRecovery).toContain('isAppIdAdvancedOpen.value = true')
+    expect(conflictRecovery).toContain('progressTracker?.viewStep(\'app_icon\', previousAnalyticsStep)')
 
     const organizationCreation = sliceBetween(onboardingSource, 'async function createOrganizationAndApp()', 'async function createAppRecord(')
     expect(organizationCreation).toContain('preOrgCreatedOrganizationId.value = data.id')

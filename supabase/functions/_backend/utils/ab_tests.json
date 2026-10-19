@@ -7,36 +7,21 @@
     "treatment_branch": "A",
     "control_branch": "B",
     "branches": {
-      "A": {
-        "bento_tag": "ab:new_emails",
-        "label": "New emails"
-      },
-      "B": {
-        "bento_tag": "ab:no_new_emails",
-        "label": "Old emails"
-      }
+      "A": { "bento_tag": "ab:new_emails", "label": "New emails" },
+      "B": { "bento_tag": "ab:no_new_emails", "label": "Old emails" }
     }
   },
   "new_channel": {
     "comment": "Shows the guided channel education and creation flow.",
     "audience": "self_signup",
-    "intents": [
-      "ota",
-      "both"
-    ],
+    "intents": ["ota", "both"],
     "label": "Channel creation",
     "treatment_percentage": 0,
     "treatment_branch": "A",
     "control_branch": "B",
     "branches": {
-      "A": {
-        "bento_tag": "ab:new_channel",
-        "label": "Guided channel flow"
-      },
-      "B": {
-        "bento_tag": "ab:no_new_channel",
-        "label": "Current channel flow"
-      }
+      "A": { "bento_tag": "ab:new_channel", "label": "Guided channel flow" },
+      "B": { "bento_tag": "ab:no_new_channel", "label": "Current channel flow" }
     }
   },
   "webnativeapp_publish_intent": {
@@ -47,14 +32,8 @@
     "treatment_branch": "A",
     "control_branch": "B",
     "branches": {
-      "A": {
-        "bento_tag": "ab:webnativeapp_publish_intent",
-        "label": "WebNativeApp option"
-      },
-      "B": {
-        "bento_tag": "ab:no_webnativeapp_publish_intent",
-        "label": "Current publish options"
-      }
+      "A": { "bento_tag": "ab:webnativeapp_publish_intent", "label": "WebNativeApp option" },
+      "B": { "bento_tag": "ab:no_webnativeapp_publish_intent", "label": "Current publish options" }
     }
   },
   "webnativeapp_development_environment": {
@@ -65,53 +44,35 @@
     "treatment_branch": "C",
     "control_branch": "D",
     "branches": {
-      "C": {
-        "bento_tag": "ab:webnativeapp_development_environment",
-        "label": "Development environment question"
-      },
-      "D": {
-        "bento_tag": "ab:no_webnativeapp_development_environment",
-        "label": "Current onboarding"
-      }
+      "C": { "bento_tag": "ab:webnativeapp_development_environment", "label": "Development environment question" },
+      "D": { "bento_tag": "ab:no_webnativeapp_development_environment", "label": "Current onboarding" }
     }
   },
   "builder_todo_list_v4": {
     "audience": "all",
-    "intents": [
-      "builder"
-    ],
+    "intents": ["builder"],
     "label": "Builder setup checklist v4",
     "treatment_percentage": 100,
     "treatment_branch": "A",
     "control_branch": "B",
     "branches": {
-      "A": {
-        "bento_tag": "ab:builder_todo_list_v4",
-        "label": "Builder v1 checklist"
-      },
-      "B": {
-        "bento_tag": "ab:no_builder_todo_list_v4",
-        "label": "Current checklist"
-      }
+      "A": { "bento_tag": "ab:builder_todo_list_v4", "label": "Builder v1 checklist" },
+      "B": { "bento_tag": "ab:no_builder_todo_list_v4", "label": "Current checklist" }
     }
   },
   "onboarding_v6": {
-    "comment": "Required name step for new self-signups. Existing persisted onboarding versions are unchanged.",
+    "comment": "Prospective self-signups only. Disabled until rollout is enabled; non-treatment receives no assignment.",
     "audience": "self_signup",
-    "onboarding_version": 6,
     "label": "Onboarding V6",
-    "treatment_percentage": 100,
+    "treatment_percentage": 0,
+    "allocation": "deterministic",
+    "assign_control": false,
+    "enroll_new_users_after": "2026-10-19T10:00:54.000Z",
     "treatment_branch": "A",
     "control_branch": "B",
     "branches": {
-      "A": {
-        "bento_tag": "ab:onboarding_v6",
-        "label": "Required name step"
-      },
-      "B": {
-        "bento_tag": "ab:no_onboarding_v6",
-        "label": "Legacy onboarding"
-      }
+      "A": { "bento_tag": "ab:onboarding_v6", "label": "Required name step" },
+      "B": { "bento_tag": "ab:no_onboarding_v6", "label": "Legacy onboarding" }
     }
   },
   "new_emails_v2": {

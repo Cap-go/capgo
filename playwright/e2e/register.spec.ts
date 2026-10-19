@@ -9,6 +9,46 @@ const { ports: supabasePorts } = getSupabaseWorktreeConfig()
 const localSupabaseUrl = `http://127.0.0.1:${supabasePorts.api}`
 const localSupabaseAnonKey = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
 
+function localAdminClient() {
+  const configured = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY
+  const status = configured ? null : getSupabaseStatus()
+  const key = configured || status?.SERVICE_ROLE_KEY || status?.SECRET_KEY
+  if (!key)
+    throw new Error('Local Supabase service key is required for treatment fixtures')
+  return createClient(localSupabaseUrl, key, { auth: { persistSession: false } })
+}
+
+async function enableNameTreatmentFixture(page: Page) {
+  // Simulate future treatment in local browser tests while the shipped flag stays at 0%.
+  await page.route('**/auth/register', async (route) => {
+    const response = await route.fetch()
+    const body = await response.json()
+    if (response.ok() && body.user?.id) {
+      const admin = localAdminClient()
+      const { data, error } = await admin.from('users').select('onboarding').eq('id', body.user.id).single()
+      if (error)
+        throw error
+      const current = data.onboarding && typeof data.onboarding === 'object' && !Array.isArray(data.onboarding) ? data.onboarding : {}
+      const abtests = current.abtests && typeof current.abtests === 'object' && !Array.isArray(current.abtests) ? current.abtests : {}
+      const { error: updateError } = await admin.from('users').update({ onboarding: {
+        ...current,
+        abtests: { ...abtests, onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } },
+      } }).eq('id', body.user.id)
+      if (updateError)
+        throw updateError
+    }
+    await route.fulfill({ response })
+  })
+  await page.route('**/private/onboarding_ab_tests', async (route) => {
+    const response = await route.fetch()
+    const body = await response.json()
+    await route.fulfill({ response, json: { ...body, assignments: {
+      ...body.assignments,
+      onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' },
+    } } })
+  })
+}
+
 async function loginToOnboarding(page: Page, email: string, password: string) {
   await page.login(email, password, /\/onboarding\/(?:name|app)/)
 }
@@ -127,9 +167,8 @@ async function expectProtectedRouteRedirect(page: Page, targetPath: string, expe
 
 async function continueFromAppNameToIcon(page: Page) {
   await page.click('[data-test="app-onboarding-continue"]')
-  await expect(page.locator('#app-onboarding-app-id')).toBeVisible()
-  await page.click('[data-test="app-onboarding-skip-app-id"]')
   await expect(page.locator('[data-test="app-onboarding-toggle-icon-store-import"]')).toBeVisible()
+  await expect(page.locator('#app-onboarding-app-id')).toHaveCount(0)
 }
 
 async function continueFromAppNameToOrganization(page: Page) {
@@ -141,14 +180,29 @@ async function returnFromOrganizationToAppName(page: Page) {
   await page.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(page.locator('[data-test="app-onboarding-toggle-icon-store-import"]')).toBeVisible()
   await page.getByRole('button', { name: 'Back', exact: true }).click()
-  await expect(page.locator('#app-onboarding-app-id')).toBeVisible()
-  await page.getByRole('button', { name: 'Back', exact: true }).click()
   await expect(page.locator('[data-test="app-onboarding-name"]')).toBeVisible()
 }
 
 test.describe('Registration', () => {
   test.beforeEach(async ({ page }) => {
+    await enableNameTreatmentFixture(page)
     await page.goto('/register/')
+  })
+
+  test('keeps the name step disabled without a V6 assignment', async ({ page }) => {
+    await page.unroute('**/auth/register')
+    await page.unroute('**/private/onboarding_ab_tests')
+    const email = `v6-disabled-${Date.now()}@example.com`
+    await page.fill('[data-test="email"]', email)
+    await page.fill('[data-test="password"]', 'Password123!')
+    await page.fill('[data-test="confirm-password"]', 'Password123!')
+    await page.click('[data-test="submit"]')
+    await page.waitForURL(/\/onboarding\/app/)
+    await expect(page.locator('[data-test="onboarding-name-step"]')).toHaveCount(0)
+    const { data: profile, error } = await localAdminClient().from('users').select('onboarding').eq('email', email).single()
+    expect(error).toBeNull()
+    expect(profile?.onboarding).not.toHaveProperty('abtests.onboarding_v6')
+    expect(profile?.onboarding).not.toHaveProperty('version', 6)
   })
 
   test('should redirect new users through app-first onboarding until the org is created', async ({ page }) => {
@@ -325,7 +379,7 @@ test.describe('Registration', () => {
       expect(error).toBeNull()
       expect(profile?.first_name || '').toBe('')
       expect(profile?.last_name || '').toBe('')
-      expect(profile?.onboarding).toMatchObject({ version: 6, profile_draft: { first_name: 'Draft', last_name: 'User' } })
+      expect(profile?.onboarding).toMatchObject({ abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, profile_draft: { first_name: 'Draft', last_name: 'User' } })
       await supabase.auth.signOut()
 
       await page.reload()
@@ -357,7 +411,7 @@ test.describe('Registration', () => {
     const { data: signedUp, error: signUpError } = await supabase.auth.signUp({ email, password })
     expect(signUpError).toBeNull()
     const { error: updateError } = await supabase.from('users')
-      .upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '', onboarding: { version: 6 } }, { onConflict: 'id' })
+      .upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } }, { onConflict: 'id' })
     expect(updateError).toBeNull()
     await supabase.auth.signOut()
 
@@ -407,7 +461,7 @@ test.describe('Registration', () => {
     const { data: signedUp, error: signUpError } = await supabase.auth.signUp({ email, password })
     expect(signUpError).toBeNull()
     const { data: seededProfile, error: updateError } = await supabase.from('users')
-      .upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '', onboarding: { version: 6 } }, { onConflict: 'id' })
+      .upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } }, { onConflict: 'id' })
       .select('first_name, last_name')
       .single()
     expect(updateError).toBeNull()
@@ -462,7 +516,7 @@ test.describe('Registration', () => {
     const { data: signedUp, error: signUpError } = await supabase.auth.signUp({ email, password })
     expect(signUpError).toBeNull()
     const { error: updateError } = await supabase.from('users')
-      .upsert({ id: signedUp.user!.id, email, first_name: '', last_name: 'Existing', onboarding: { version: 6 } }, { onConflict: 'id' })
+      .upsert({ id: signedUp.user!.id, email, first_name: '', last_name: 'Existing', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } }, { onConflict: 'id' })
     expect(updateError).toBeNull()
     await supabase.auth.signOut()
 

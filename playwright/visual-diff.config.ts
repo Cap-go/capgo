@@ -1,4 +1,6 @@
 import type { Page } from '@playwright/test'
+import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../src/services/appOnboarding'
+import { BUILDER_STEP_IDS } from '../src/services/builderOnboardingChecklist'
 
 export interface VisualDiffRoute {
   slug: string
@@ -16,7 +18,7 @@ async function prepareProfileGoalScreenshot(page: Page) {
       return route.fulfill({ json: [] })
     const response = await route.fetch()
     const json = await response.json()
-    const profile = (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: { version: 6 } })
+    const profile = (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } })
     await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
   })
   await page.reload()
@@ -212,6 +214,48 @@ async function mockReleaseLive(page: Page) {
  * Add routes here when a PR touches a new screen reviewers should compare.
  */
 export const visualDiffRoutes: VisualDiffRoute[] = [
+  ...[
+    { slug: 'onboarding-dual-goals', progress: null },
+    { slug: 'onboarding-dual-live-updates', progress: 'ota' },
+    { slug: 'onboarding-dual-builder', progress: 'builder' },
+  ].map(({ slug, progress }): VisualDiffRoute => ({
+    slug,
+    path: '/apps',
+    auth: true,
+    prepare: async (page) => {
+      const onboarding = { setup: {
+        todo_list_version: 4,
+        ota_todo_list_version: '1',
+        builder_todo_list_version: '1',
+        paths: ['ota', 'builder'],
+        selected_path: 'builder',
+        selected_builder_platform: progress === 'builder' ? 'android' : null,
+        source: 'manual',
+        outcome: 'in_progress',
+        steps: {
+          ota: Object.fromEntries(APP_ONBOARDING_OTA_V1_STEP_IDS.map(id => [id, { status: progress === 'ota' && id === 'login_cli_mcp' ? 'done' : 'pending' }])),
+          builder: Object.fromEntries((['ios', 'android'] as const).map(platform => [platform, Object.fromEntries(BUILDER_STEP_IDS[platform].map(id => [id, { status: progress === 'builder' && platform === 'android' && id === 'start_setup' ? 'done' : 'pending' }]))])),
+        },
+      } }
+      // The production preview excludes development-only component fixtures.
+      // Override read responses so base and head render the same assigned app.
+      await page.route('**/rest/v1/apps?*', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json().catch(() => null)
+        const matchesApp = new URL(route.request().url()).searchParams.get('app_id') === 'eq.com.demo.app'
+        const override = (row: any) => row?.app_id === 'com.demo.app' || (matchesApp && row?.onboarding !== undefined)
+          ? { ...row, need_onboarding: true, onboarding }
+          : row
+        await route.fulfill({ response, json: Array.isArray(json) ? json.map(override) : override(json) })
+      })
+      await page.route('**/rpc/verify_getting_started', route => route.fulfill({ json: onboarding }))
+      await page.route('**/private/onboarding_progress', route => route.fulfill({ json: { onboarding, hasChannel: false, checkErrors: [] } }))
+      await page.goto('/app/com.demo.app/getting-started')
+      await page.locator('[data-test="dual-onboarding-checklists"], [data-test="builder-checklist"]').first().waitFor()
+      if (progress === 'builder')
+        await page.locator('[data-test="builder-step-start_setup"][data-status="done"]').waitFor()
+    },
+  })),
   { slug: 'login', path: '/login/', auth: false },
   { slug: 'register', path: '/register/', auth: false },
   {
@@ -243,7 +287,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.route('**/rest/v1/users?*', async (route) => {
         const response = await route.fetch()
         const json = await response.json()
-        const profile = (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: { ...row.onboarding, version: 6 } })
+        const profile = (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, ...row.onboarding, version: 6 } })
         await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
       })
       await page.reload()

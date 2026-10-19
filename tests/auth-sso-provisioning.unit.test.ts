@@ -738,8 +738,11 @@ describe('mandatory V6 name navigation', () => {
     for (const path of ['/dashboard', '/onboarding/app', '/onboarding/organization', '/onboarding/invitation', '/apikeys']) {
       it.concurrent(`blocks ${path} before names are saved (authenticated: ${alreadyAuthenticated})`, async () => {
         await withTestContext(async (context) => {
-          Object.assign(context.userRecord, { first_name: '', last_name: '', onboarding: { version: 6 } })
-          const noOrganizations = async () => { context.organizationStore.organizations = []; context.organizationStore.hasOrganizations = false }
+          Object.assign(context.userRecord, { first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } })
+          const noOrganizations = async () => {
+            context.organizationStore.organizations = []
+            context.organizationStore.hasOrganizations = false
+          }
           context.organizationStore.fetchOrganizations.mockImplementation(noOrganizations)
           context.organizationStore.dedupFetchOrganizations.mockImplementation(noOrganizations)
           if (alreadyAuthenticated) {
@@ -757,7 +760,7 @@ describe('mandatory V6 name navigation', () => {
   }
   it.concurrent('keeps the name screen accessible even with pending invitations or app setup', async () => {
     await withTestContext(async (context) => {
-      Object.assign(context.userRecord, { first_name: '', last_name: '', onboarding: { version: 6 } })
+      Object.assign(context.userRecord, { first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } })
       context.mockApps.push({ app_id: 'com.pending', need_onboarding: true })
       context.organizationStore.fetchOrganizations.mockImplementation(async () => {
         context.organizationStore.organizations = [{ gid: 'org', role: 'invite_read' }]
@@ -786,7 +789,7 @@ describe('initial profile gate failures and existing members', () => {
   })
   it.concurrent('does not send an existing V6 organization member through initial names', async () => {
     await withTestContext(async (context) => {
-      Object.assign(context.userRecord, { first_name: '', last_name: '', onboarding: { version: 6 } })
+      Object.assign(context.userRecord, { first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } })
       const guard = await getGuard()
       const next = vi.fn()
       await guard({ path: '/apps', fullPath: '/apps', meta: { middleware: 'auth' }, query: {} }, { path: '/login', meta: {}, query: {} }, next)

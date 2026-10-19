@@ -5,12 +5,17 @@ import NamePage from '../src/pages/onboarding/name.vue'
 
 const mocks = vi.hoisted(() => ({
   valid: false,
-  persist: vi.fn(), toastError: vi.fn(),
-  save: vi.fn(), reset: vi.fn(), replace: vi.fn(), logout: vi.fn(), capture: vi.fn(),
+  persist: vi.fn(),
+  toastError: vi.fn(),
+  save: vi.fn(),
+  reset: vi.fn(),
+  replace: vi.fn(),
+  logout: vi.fn(),
+  capture: vi.fn(),
   profileEmit: undefined as undefined | ((event: string, ...args: unknown[]) => void),
   route: { query: {} as Record<string, string> },
 }))
-const main = shallowReactive({ authGeneration: 1, user: { id: 'name-user', first_name: '', last_name: '', onboarding: { version: 6 } as any }, logout: mocks.logout })
+const main = shallowReactive({ authGeneration: 1, user: { id: 'name-user', first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } as any }, logout: mocks.logout })
 vi.mock('~/stores/main', () => ({ useMainStore: () => main }))
 vi.mock('~/stores/organization', () => ({ useOrganizationStore: () => ({ hasOrganizations: false }) }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
@@ -72,9 +77,13 @@ beforeEach(() => {
   mocks.save.mockResolvedValue(true)
   mocks.reset.mockResolvedValue(true)
   mocks.replace.mockResolvedValue(undefined)
-  main.user = { id: 'name-user', first_name: '', last_name: '', onboarding: { version: 6 } }
+  main.user = { id: 'name-user', first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } }
 })
-afterEach(() => { app?.unmount(); app = undefined; vi.useRealTimers() })
+afterEach(() => {
+  app?.unmount()
+  app = undefined
+  vi.useRealTimers()
+})
 
 describe('separate required name screen', () => {
   it('blocks continuing and programmatic form submission while names are invalid', async () => {

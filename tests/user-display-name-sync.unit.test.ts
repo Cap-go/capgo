@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PostHogDeliveryResult } from '../supabase/functions/_backend/utils/posthog_delivery.ts'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   deliverPosthogEventMock,
@@ -51,6 +51,50 @@ describe('user display name sync', () => {
     })
     expect(ok).toBe(false)
     expect(importBentoSubscriberProfileMock).not.toHaveBeenCalled()
+  })
+
+  it('still syncs Bento when PostHog is not configured', async () => {
+    deliverPosthogEventMock.mockResolvedValueOnce({
+      outcome: 'permanent_failure',
+      reason: 'not_configured',
+      duration_ms: 0,
+      http_status: null,
+      legacy_success: false,
+    } satisfies PostHogDeliveryResult)
+    const record = { id: 'user-id', email: 'user@example.com', first_name: 'Jane', last_name: 'Doe' }
+    expect(await syncUserDisplayNameIntegrations({} as never, record)).toBe(true)
+    expect(importBentoSubscriberProfileMock).toHaveBeenCalledWith(expect.anything(), {
+      email: record.email,
+      first_name: record.first_name,
+      last_name: record.last_name,
+    })
+  })
+
+  it('reports Bento failures so the existing update delivery can retry', async () => {
+    importBentoSubscriberProfileMock.mockResolvedValueOnce(false)
+    expect(await syncUserDisplayNameIntegrations({} as never, {
+      id: 'user-id',
+      email: 'user@example.com',
+      first_name: 'Jane',
+      last_name: 'Doe',
+    })).toBe(false)
+  })
+
+  it.each([{ first_name: '', last_name: '', name: '' }, { first_name: '', last_name: 'Doe', name: 'Doe' }])('clears stale PostHog names when stored names change: %j', async (names) => {
+    expect(await syncUserDisplayNameIntegrations({} as never, {
+      id: 'user-id',
+      email: 'user@example.com',
+      first_name: names.first_name,
+      last_name: names.last_name,
+    })).toBe(true)
+    expect(deliverPosthogEventMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      personProperties: { ...names, email: 'user@example.com' },
+    }))
+    expect(importBentoSubscriberProfileMock).toHaveBeenCalledWith(expect.anything(), {
+      email: 'user@example.com',
+      first_name: names.first_name,
+      last_name: names.last_name,
+    })
   })
 
   it('syncs both integrations when PostHog succeeds', async () => {

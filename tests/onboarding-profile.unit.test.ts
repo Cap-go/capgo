@@ -8,7 +8,7 @@ import { hasProfileOnboarding, resolveOnboardingAnalyticsVersion } from '../src/
 import { createOnboardingDetailsFieldDebouncer } from '../src/utils/onboardingProgressAnalytics'
 
 const mocks = vi.hoisted(() => ({ single: vi.fn(), update: vi.fn(), draftWrite: vi.fn(), latest: vi.fn(), setUser: vi.fn(), toast: vi.fn() }))
-const state = shallowReactive({ authGeneration: 0, user: { id: 'profile-user', email: 'profile@example.com', first_name: '', last_name: '', onboarding: { version: 6 } as Json, image_url: null } })
+const state = shallowReactive({ authGeneration: 0, user: { id: 'profile-user', email: 'profile@example.com', first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } as Json, image_url: null } })
 vi.mock('~/stores/main', () => ({ useMainStore: () => state }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('vue-sonner', () => ({ toast: { error: mocks.toast } }))
@@ -46,7 +46,7 @@ async function enter(container: HTMLElement, field: string, value: string) {
 }
 beforeEach(() => {
   vi.clearAllMocks()
-  state.user = { id: 'profile-user', email: 'profile@example.com', first_name: '', last_name: '', onboarding: { version: 6 }, image_url: null }
+  state.user = { id: 'profile-user', email: 'profile@example.com', first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 }, image_url: null }
   mocks.draftWrite.mockImplementation(async (onboarding: Json) => ({ data: { onboarding }, error: null }))
   mocks.single.mockResolvedValue({ data: { id: 'profile-user', first_name: 'Example', last_name: 'User' }, error: null })
 })
@@ -60,14 +60,14 @@ afterEach(async () => {
 })
 
 describe('profile onboarding V6', () => {
-  it('gates the form and analytics version by persisted cohort, preserving legacy experiment versions', () => {
-    expect(hasProfileOnboarding({ version: 6 })).toBe(true)
+  it('gates the form and analytics version by assignment, preserving legacy experiment versions', () => {
+    expect(hasProfileOnboarding({ abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 })).toBe(true)
     expect(hasProfileOnboarding({ version: 5 })).toBe(false)
-    expect(resolveOnboardingAnalyticsVersion({ version: 6 })).toBe(6)
+    expect(resolveOnboardingAnalyticsVersion({ abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 })).toBe(6)
     expect(resolveOnboardingAnalyticsVersion({})).toBe(4)
     const abtests = { webnativeapp_publish_intent: { assigned_at: '2026-01-01', branch: 'A' } }
     expect(resolveOnboardingAnalyticsVersion({ abtests })).toBe('5.A')
-    expect(resolveOnboardingAnalyticsVersion({ version: 6, abtests })).toBe(6)
+    expect(resolveOnboardingAnalyticsVersion({ version: 6, abtests: { ...abtests, onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } } })).toBe(6)
     state.user.onboarding = { version: 4 }
     const { container, profile } = mount()
     expect(container.querySelector('input')).toBeNull()
@@ -76,7 +76,7 @@ describe('profile onboarding V6', () => {
 
   it('autosaves both draft fields after 500 ms and restores them after remounting', async () => {
     vi.useFakeTimers()
-    state.user.onboarding = { version: 6, intent: 'ota', abtests: { retained: true } }
+    state.user.onboarding = { version: 6, intent: 'ota', abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' }, retained: true } }
     const { container } = mount()
     await enter(container, 'first-name', ' Ex ')
     await vi.advanceTimersByTimeAsync(300)
@@ -87,7 +87,7 @@ describe('profile onboarding V6', () => {
     expect(state.user.onboarding).toEqual({
       version: 6,
       intent: 'ota',
-      abtests: { retained: true },
+      abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' }, retained: true },
       profile_draft: { first_name: ' Ex ', last_name: ' User ' },
     })
     expect(state.user.first_name).toBe('')
@@ -105,7 +105,7 @@ describe('profile onboarding V6', () => {
   it('restores partial drafts and preserves an explicitly cleared prefilled name', async () => {
     vi.useFakeTimers()
     state.user.first_name = 'Existing'
-    state.user.onboarding = { version: 6, profile_draft: { last_name: 'Draft' } }
+    state.user.onboarding = { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6, profile_draft: { last_name: 'Draft' } }
     const { container, profile } = mount()
     expect(container.querySelector<HTMLInputElement>('[data-test="onboarding-first-name"]')?.value).toBe('Existing')
     await enter(container, 'first-name', '')
@@ -123,7 +123,7 @@ describe('profile onboarding V6', () => {
     let finishWrite!: (value: unknown) => void
     mocks.draftWrite.mockResolvedValueOnce({ data: null, error: null })
       .mockImplementationOnce(() => new Promise((resolve) => { finishWrite = resolve }))
-    const latest = { version: 6, step: 'intent', abtests: { concurrent: true } }
+    const latest = { version: 6, step: 'intent', abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' }, concurrent: true } }
     mocks.latest.mockResolvedValue({ data: { onboarding: latest }, error: null })
     const { container } = mount()
     await enter(container, 'first-name', 'Old')
@@ -146,7 +146,7 @@ describe('profile onboarding V6', () => {
     const { container } = mount()
     await enter(container, 'first-name', 'Example')
     await vi.advanceTimersByTimeAsync(500)
-    expect(state.user.onboarding).toEqual({ version: 6 })
+    expect(state.user.onboarding).toEqual({ abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 })
     await enter(container, 'last-name', 'User')
     app?.unmount()
     app = undefined
@@ -169,7 +169,7 @@ describe('profile onboarding V6', () => {
     await blocked
     await vi.advanceTimersByTimeAsync(0)
     expect(mocks.draftWrite).not.toHaveBeenCalled()
-    expect(state.user.onboarding).toEqual({ version: 6 })
+    expect(state.user.onboarding).toEqual({ abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 })
   })
 
   it('updates PostHog person names only after the profile is saved', async () => {
@@ -236,12 +236,12 @@ describe('profile onboarding V6', () => {
 describe('profile draft reset', () => {
   it('cancels the debounce, clears the stored draft and stays cleared after refresh', async () => {
     vi.useFakeTimers()
-    state.user.onboarding = { version: 6, profile_draft: { first_name: 'Old', last_name: 'Draft' }, abtests: { kept: true } }
+    state.user.onboarding = { version: 6, profile_draft: { first_name: 'Old', last_name: 'Draft' }, abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' }, kept: true } }
     const { container, profile } = mount()
     await enter(container, 'first-name', 'Pending')
     expect(await profile.resetDraft()).toBe(true)
     await vi.advanceTimersByTimeAsync(600)
-    expect(state.user.onboarding).toEqual({ version: 6, abtests: { kept: true } })
+    expect(state.user.onboarding).toEqual({ version: 6, abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' }, kept: true } })
     expect(container.querySelector<HTMLInputElement>('[data-test="onboarding-first-name"]')?.value).toBe('')
     app?.unmount()
     const restored = mount().container
@@ -250,10 +250,18 @@ describe('profile draft reset', () => {
   })
   it('removes unfinished drafts during wizard restart without removing account identity or metadata', () => {
     expect(mergeUserOnboardingProgress({ step: 'intent', status: 'in_progress' }, {
-      version: 6, app_name: 'Old app', app_id: 'com.old', intent: 'ota',
-      profile_draft: { first_name: 'Draft' }, profile_completed_at: '2026-10-17T00:00:00Z', abtests: { kept: true },
+      version: 6,
+      app_name: 'Old app',
+      app_id: 'com.old',
+      intent: 'ota',
+      profile_draft: { first_name: 'Draft' },
+      profile_completed_at: '2026-10-17T00:00:00Z',
+      abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' }, kept: true },
     }, { clearIntent: true, clearProfileDraft: true })).toEqual({
-      version: 6, step: 'intent', status: 'in_progress', abtests: { kept: true },
+      version: 6,
+      step: 'intent',
+      status: 'in_progress',
+      abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' }, kept: true },
     })
   })
 })

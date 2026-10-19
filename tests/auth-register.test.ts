@@ -70,6 +70,69 @@ describe('pOST /auth/register', () => {
     })
   })
 
+  it.concurrent('creates a user without first or last name', async () => {
+    const payload = buildRegisterPayload({ first_name: undefined, last_name: undefined })
+    const response = await postRegister(payload)
+    expect(response.status).toBe(200)
+
+    const body = await response.json() as {
+      user: { id: string }
+      session: { access_token: string, refresh_token: string }
+    }
+    createdUserIds.push(body.user.id)
+    expect(body.session.access_token).toBeTruthy()
+    expect(body.session.refresh_token).toBeTruthy()
+
+    const admin = getSupabaseClient()
+    const { data: profile, error: profileError } = await admin
+      .from('users')
+      .select('email, first_name, last_name')
+      .eq('id', body.user.id)
+      .single()
+    expect(profileError).toBeNull()
+    expect(profile).toEqual({ email: payload.email, first_name: '', last_name: '' })
+
+    const { data: authUser, error: authUserError } = await admin.auth.admin.getUserById(body.user.id)
+    expect(authUserError).toBeNull()
+    expect(authUser.user?.user_metadata).not.toHaveProperty('first_name')
+    expect(authUser.user?.user_metadata).not.toHaveProperty('last_name')
+  })
+
+  it.concurrent.each([true, false])('preserves signup attribution and newsletter preference %s', async (newsletter) => {
+    const attribution = {
+      ref: 'readme-example',
+      signup_source: 'plugin_example',
+      signup_plugin: 'example',
+      first_touch_type: 'plugin',
+      first_touch_path: '/plugins/example/',
+      utm_source: 'example-source',
+      utm_medium: 'readme',
+      utm_campaign: 'example-campaign',
+    }
+    const payload = buildRegisterPayload({
+      ...attribution,
+      first_name: undefined,
+      last_name: undefined,
+      opt_for_newsletters: newsletter,
+    })
+    const response = await postRegister(payload)
+    expect(response.status).toBe(200)
+    const body = await response.json() as { user: { id: string } }
+    createdUserIds.push(body.user.id)
+
+    const admin = getSupabaseClient()
+    const { data: profile, error } = await admin.from('users')
+      .select('first_name, last_name, opt_for_newsletters, onboarding')
+      .eq('id', body.user.id)
+      .single()
+    expect(error).toBeNull()
+    expect(profile).toMatchObject({ first_name: '', last_name: '', opt_for_newsletters: newsletter })
+    expect(profile?.onboarding).not.toHaveProperty('version', 6)
+    const { data: authUser, error: authError } = await admin.auth.admin.getUserById(body.user.id)
+    expect(authError).toBeNull()
+    expect(authUser.user?.user_metadata).toMatchObject(attribution)
+  })
+
   it('returns invalid_request for malformed payloads', async () => {
     const response = await postRegister({
       email: 'not-an-email',
@@ -80,21 +143,6 @@ describe('pOST /auth/register', () => {
     expect(response.status).toBe(400)
     const body = await response.json() as { error: string }
     expect(body.error).toBe('invalid_request')
-  })
-
-  it('creates a nameless profile and preserves referral attribution', async () => {
-    const payload = buildRegisterPayload({ first_name: undefined, last_name: undefined, ref: 'readme-example' })
-    const response = await postRegister(payload)
-    expect(response.status).toBe(200)
-    const body = await response.json() as { user: { id: string }, session: { access_token: string, refresh_token: string } }
-    createdUserIds.push(body.user.id)
-
-    const admin = getSupabaseClient()
-    const { data: profile, error } = await admin.from('users').select('first_name, last_name, onboarding').eq('id', body.user.id).single()
-    expect(error).toBeNull()
-    expect(profile).toMatchObject({ first_name: '', last_name: '', onboarding: { version: 6 } })
-    const { data: authUser } = await admin.auth.admin.getUserById(body.user.id)
-    expect(authUser.user?.user_metadata.ref).toBe('readme-example')
   })
 
   it('returns account_deleted for deleted-account emails', async () => {

@@ -46,8 +46,8 @@ SELECT is(
         FROM public.users
         WHERE id = tests.get_supabase_uid('onboarding_progress_user')
     ),
-    '{"version":6}'::jsonb,
-    'new users default to onboarding V6'
+    '{}'::jsonb,
+    'users.onboarding defaults to empty object'
 );
 
 SELECT lives_ok(
@@ -118,34 +118,33 @@ SELECT throws_ok(
 
 SELECT lives_ok(
     $$UPDATE public.users
-    SET onboarding = '{"version":6,"profile_draft":{"first_name":"Partial","last_name":""}}'::jsonb
+    SET onboarding = '{"abtests":{"onboarding_v6":{"branch":"A","assigned_at":"2026-10-19T10:00:54.000Z"}},"profile_draft":{"first_name":"Partial","last_name":""}}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-    'V6 partial profile drafts are accepted by the existing constraint'
+    'partial profile drafts coexist with server-managed experiment assignments'
 );
 
 SELECT lives_ok(
     $$UPDATE public.users
     SET onboarding = '{"version":4,"abtests":{"retained":{"branch":"A"}}}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
-    'legacy onboarding versions remain valid after the new-user default changes'
+    'legacy onboarding metadata remains valid'
 );
 
 SELECT tests.authenticate_as('onboarding_progress_user');
 
 SELECT lives_ok(
     $$UPDATE public.users
-    SET onboarding = '{"version":6,"status":"in_progress","step":"intent","flow":"pre_org","profile_completed_at":"2026-10-17T10:00:00.000Z"}'::jsonb
+    SET onboarding = onboarding || '{"status":"in_progress","step":"details","flow":"pre_org","profile_completed_at":"2026-10-19T10:00:54.000Z"}'::jsonb
     WHERE id = tests.get_supabase_uid('onboarding_progress_user')$$,
     'owner can update own onboarding progress through RLS'
 );
 
 SELECT is(
     (
-        SELECT onboarding ->> 'profile_completed_at'
-        FROM public.users
+        SELECT onboarding ->> 'profile_completed_at' FROM public.users
         WHERE id = tests.get_supabase_uid('onboarding_progress_user')
     ),
-    '2026-10-17T10:00:00.000Z',
+    '2026-10-19T10:00:54.000Z',
     'owner can persist name confirmation through RLS and onboarding triggers'
 );
 

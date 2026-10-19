@@ -34,18 +34,16 @@ export async function syncUserDisplayNameIntegrations(
     channel: 'user-profile',
     event: '$identify',
     personProperties: {
-      ...(firstName ? { first_name: firstName } : {}),
-      ...(lastName ? { last_name: lastName } : {}),
-      ...(displayName ? { name: displayName } : {}),
+      first_name: firstName,
+      last_name: lastName,
+      name: displayName,
       email,
     },
     user_id: record.id,
   })
 
-  if (posthogDelivery.outcome === 'permanent_failure' && posthogDelivery.reason === 'not_configured')
-    return true
-
-  if (posthogDelivery.outcome !== 'delivered' && posthogDelivery.outcome !== 'quota_limited')
+  const posthogNotConfigured = posthogDelivery.outcome === 'permanent_failure' && posthogDelivery.reason === 'not_configured'
+  if (!posthogNotConfigured && posthogDelivery.outcome !== 'delivered' && posthogDelivery.outcome !== 'quota_limited')
     return false
 
   const bentoOk = await importBentoSubscriberProfile(c, {

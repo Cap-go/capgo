@@ -6,7 +6,6 @@ export type ABTestIntent = typeof AB_TEST_INTENTS[number]
 export interface ABTestConfig {
   audience: ABTestAudience
   intents?: ABTestIntent[]
-  onboarding_version?: number
   label: string
   branches: Record<string, { bento_tag: string, label: string }>
   control_branch: ABTestBranch
@@ -26,7 +25,7 @@ export interface ABTestAssignment {
 }
 
 export type ABTestsConfig = Record<string, ABTestConfig>
-export interface AssignmentAudienceUser { created_via_invite: boolean | null, intent?: unknown, onboarding_version?: unknown, id?: string, created_at?: unknown, abtests_enrolled?: unknown }
+export interface AssignmentAudienceUser { created_via_invite: boolean | null, intent?: unknown, id?: string, created_at?: unknown, abtests_enrolled?: unknown }
 const AB_TEST_BRANCHES = ['A', 'B', 'C', 'D'] as const
 const RESERVED_TEST_NAMES = new Set(['__proto__', 'constructor', 'prototype'])
 
@@ -137,10 +136,8 @@ function validateRequirementCompatibility(
   }
 }
 
-function parseAllocationOptions(entry: Record<string, unknown>, testName: string): Pick<ABTestConfig, 'allocation' | 'assign_control' | 'enroll_new_users_after' | 'onboarding_version'> {
-  const { allocation, assign_control: assignControl, enroll_new_users_after: cutoff, onboarding_version: onboardingVersion } = entry
-  if (onboardingVersion !== undefined && (!Number.isInteger(onboardingVersion) || Number(onboardingVersion) < 1))
-    invalidConfig(testName)
+function parseAllocationOptions(entry: Record<string, unknown>, testName: string): Pick<ABTestConfig, 'allocation' | 'assign_control' | 'enroll_new_users_after'> {
+  const { allocation, assign_control: assignControl, enroll_new_users_after: cutoff } = entry
   if ((allocation !== undefined && allocation !== 'deterministic')
     || (assignControl !== undefined && typeof assignControl !== 'boolean')
     || (cutoff !== undefined && (typeof cutoff !== 'string' || !Number.isFinite(Date.parse(cutoff))))) {
@@ -151,7 +148,6 @@ function parseAllocationOptions(entry: Record<string, unknown>, testName: string
     invalidConfig(testName)
   return {
     ...(allocation === undefined ? {} : { allocation }),
-    ...(onboardingVersion === undefined ? {} : { onboarding_version: onboardingVersion as number }),
     ...(assignControl === undefined ? {} : { assign_control: assignControl }),
     ...(cutoff === undefined ? {} : { enroll_new_users_after: cutoff }),
   }
@@ -224,8 +220,6 @@ export function isProspectiveUser(createdAt: unknown, cutoff: string) {
 
 export function isEligibleForTest(user: AssignmentAudienceUser, test: ABTestConfig, testName?: string) {
   if (test.audience === 'self_signup' && user.created_via_invite)
-    return false
-  if (test.onboarding_version !== undefined && Number(user.onboarding_version) !== test.onboarding_version)
     return false
   if (test.enroll_new_users_after !== undefined
     && (!Array.isArray(user.abtests_enrolled) || !user.abtests_enrolled.includes(testName)

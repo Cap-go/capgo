@@ -83,7 +83,6 @@ async function readAssignmentUser(
                 email,
                 onboarding->'abtests_bento_sync' AS abtests_bento_sync,
                 onboarding->'abtests_enrolled' AS abtests_enrolled,
-                onboarding->>'version' AS onboarding_version,
                 onboarding->>'intent' AS intent,
                 onboarding->'abtests' AS abtests
          FROM public.users
@@ -180,8 +179,7 @@ async function reconcileBentoSyncState(
              onboarding->'abtests_bento_sync' AS abtests_bento_sync,
                 onboarding->'abtests_enrolled' AS abtests_enrolled,
              email,
-             onboarding->>'version' AS onboarding_version,
-                onboarding->>'intent' AS intent,
+             onboarding->>'intent' AS intent,
              onboarding->'abtests' AS abtests
       FROM public.users
       WHERE id = ${userId}::uuid
@@ -343,8 +341,7 @@ async function reconcileUserABTests(
                onboarding->'abtests_bento_sync' AS abtests_bento_sync,
                 onboarding->'abtests_enrolled' AS abtests_enrolled,
                email,
-               onboarding->>'version' AS onboarding_version,
-                onboarding->>'intent' AS intent,
+               onboarding->>'intent' AS intent,
                onboarding->'abtests' AS abtests
         FROM public.users
         WHERE id = ${userId}::uuid

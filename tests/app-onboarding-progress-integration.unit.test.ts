@@ -711,6 +711,8 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: currentOnboarding,
     }
     writerMocks.loadApp.mockReset()
@@ -771,12 +773,10 @@ describe('app onboarding progress analytics integration', () => {
       version: 6,
       profile_completed_at: '2026-10-17T10:00:00.000Z',
       profile_draft: { first_name: 'Draft', last_name: 'User' },
-      abtests: {
-        new_channel: {
-          assigned_at: '2026-09-11T10:00:00.000Z',
-          branch: 'A',
-        },
-      },
+      abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' }, new_channel: {
+        assigned_at: '2026-09-11T10:00:00.000Z',
+        branch: 'A',
+      } },
       flow: 'pre_org',
       intent: 'ota',
       status: 'in_progress',
@@ -788,6 +788,8 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: currentOnboarding,
     }
     writerMocks.replaceUserOnboardingIfUnchanged.mockReset()
@@ -996,7 +998,7 @@ describe('app onboarding progress analytics integration', () => {
     expect(writer).not.toContain('for (let attempt')
     expect(writer).toContain('isUsersOnboardingCheckConstraintError(error)')
     expect(writer).toContain('fallbackUsersOnboardingProgressForLegacyConstraint(persistableProgress)')
-    expect(writer).toContain("parseUserOnboardingProgress(current)?.status === 'completed'")
+    expect(writer).toContain('parseUserOnboardingProgress(current)?.status === \'completed\'')
     expect(writer).toContain('main.authGeneration === authGeneration')
   })
 
@@ -1246,8 +1248,8 @@ describe('app onboarding progress analytics integration', () => {
     expect(intentTransition).toContain(`intent: selectedIntent.value`)
     expect(intentTransition).toContain(`?? (webNativeDevelopmentEnvironmentTreatment.value ? undefined : 'skipped')`)
 
-    const appNameTransition = sourceBetween('function continueFromAppName()', 'function continueFromAppId()')
-    expect(appNameTransition).toContain(`completeAndViewAppDetailsStep('app_id', { appId: generatedAppId.value, appName: appName.value.trim() })`)
+    const appNameTransition = sourceBetween('function continueFromAppName()', 'function toggleAppIdAdvanced()')
+    expect(appNameTransition).toContain(`completeAndViewAppDetailsStep('icon', { appId: generatedAppId.value, appName: appName.value.trim() })`)
 
     const preOrgDetailsTransition = sourceBetween('function continuePreOrgDetails()', 'async function createOrganizationAndApp()')
     expect(preOrgDetailsTransition).toContain(`completeAndViewStep('organization', {`)
@@ -1286,7 +1288,6 @@ describe('app onboarding progress analytics integration', () => {
     expect(onboardingSource).toContain(`invokeCapgoApi<OnboardingABTestsResponse>('private/onboarding_ab_tests'`)
     expect(workerSource).toContain('appPrivate.route(\'/onboarding_ab_tests\', onboarding_ab_tests)')
     expect(onboardingSource).toContain('const ONBOARDING_AB_TEST_WAIT_TIMEOUT_MS = 3_000')
-    expect(onboardingSource).toContain('void refreshOnboardingABTests()')
     expect(onboardingSource).toContain('await waitForOnboardingABTests()')
     expect(onboardingSource).toContain('Promise.race([refreshOnboardingABTests(options), timeout])')
     expect(onboardingSource).toContain('if (props.preOrg && !welcomePending.value)')

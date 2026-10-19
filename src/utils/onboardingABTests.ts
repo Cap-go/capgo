@@ -16,6 +16,7 @@ import {
 export const WEBNATIVE_PUBLISH_INTENT_AB_TEST = 'webnativeapp_publish_intent'
 export const WEBNATIVE_DEVELOPMENT_ENVIRONMENT_AB_TEST = 'webnativeapp_development_environment'
 export const NEW_CHANNEL_AB_TEST = 'new_channel'
+export const PROFILE_ONBOARDING_AB_TEST = 'onboarding_v6'
 export const OTA_TODO_LIST_V3_AB_TEST = 'ota_todo_list_v3'
 
 export type OnboardingABTestBranch = 'A' | 'B' | 'C' | 'D'
@@ -55,6 +56,7 @@ export function reconcileOnboardingABTestAssignments(
 ): Record<string, OnboardingABTestAssignment> {
   const next = { ...current }
   delete next[NEW_CHANNEL_AB_TEST]
+  delete next[PROFILE_ONBOARDING_AB_TEST]
   return {
     ...next,
     ...authoritative,
@@ -93,7 +95,7 @@ export function shouldShowWebNativePublishIntent(onboarding: unknown): boolean {
 }
 
 export function hasProfileOnboarding(onboarding: unknown): boolean {
-  return isRecord(onboarding) && onboarding.version === PROFILE_ONBOARDING_ANALYTICS_VERSION
+  return getABTestBranch(onboarding, PROFILE_ONBOARDING_AB_TEST) === 'A'
 }
 
 export function resolveOnboardingAnalyticsVersion(

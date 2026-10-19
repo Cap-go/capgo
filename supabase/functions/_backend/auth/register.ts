@@ -29,7 +29,6 @@ const registerSchema = z.object({
   utm_source: z.string().trim().min(1).optional(),
   utm_medium: z.string().trim().min(1).optional(),
   utm_campaign: z.string().trim().min(1).optional(),
-
   opt_for_newsletters: z.boolean().default(false),
   captcha_token: z.string().min(1).optional(),
   registration_device_type: z.string().trim().min(1).optional(),
@@ -208,7 +207,6 @@ app.post('/', async (c) => {
     email: normalizedEmail,
     first_name: body.first_name ?? '',
     last_name: body.last_name ?? '',
-    onboarding: { version: 6 },
     opt_for_newsletters: body.opt_for_newsletters,
   })
 

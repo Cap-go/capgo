@@ -1,29 +1,32 @@
 import { describe, expect, it } from 'vitest'
+import { hasProfileOnboarding, reconcileOnboardingABTestAssignments, resolveOnboardingAnalyticsVersion } from '../src/utils/onboardingABTests'
 import { needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY, readProfileOnboardingHandoff } from '../src/utils/onboardingProfile'
-import { AB_TESTS_CONFIG, createABTestAssignments } from '../supabase/functions/_backend/utils/ab_tests'
+
+const abtests = { onboarding_v6: { branch: 'A' as const, assigned_at: '2026-10-19T11:00:00.000Z' } }
+const onboarding = { abtests }
 
 describe('required initial onboarding name', () => {
-  it.each([['', ''], ['Alice', ''], ['', 'Smith'], [' ', 'Smith']])('requires both saved names (%s, %s)', (first_name, last_name) => {
-    expect(needsInitialOnboardingName({ first_name, last_name, onboarding: { version: 6 } })).toBe(true)
+  it.each([['', ''], ['Alice', ''], ['', 'Smith'], [' ', 'Smith']])('requires both saved names for assigned users (%s, %s)', (first_name, last_name) => {
+    expect(needsInitialOnboardingName({ first_name, last_name, onboarding })).toBe(true)
   })
-  it('preserves complete profiles, invitations and legacy cohorts', () => {
-    expect(needsInitialOnboardingName({ first_name: 'Alice', last_name: 'Smith', onboarding: { version: 6 } })).toBe(true)
-    expect(needsInitialOnboardingName({ first_name: 'Alice', last_name: 'Smith', onboarding: { version: 6, profile_completed_at: '2026-10-17T00:00:00Z' } })).toBe(false)
-    expect(needsInitialOnboardingName({ created_via_invite: true, onboarding: { version: 6 } })).toBe(false)
-    for (const version of [4, 5, '5.C', undefined])
-      expect(needsInitialOnboardingName({ onboarding: { version } })).toBe(false)
+  it('requires saved confirmation but excludes invitations and existing organization members', () => {
+    expect(needsInitialOnboardingName({ first_name: 'Alice', last_name: 'Smith', onboarding })).toBe(true)
+    expect(needsInitialOnboardingName({ first_name: 'Alice', last_name: 'Smith', onboarding: { ...onboarding, profile_completed_at: '2026-10-19T11:00:00Z' } })).toBe(false)
+    expect(needsInitialOnboardingName({ created_via_invite: true, onboarding })).toBe(false)
+    expect(needsInitialOnboardingName({ onboarding }, true)).toBe(false)
     expect(needsInitialOnboardingName(undefined)).toBe(false)
-    expect(needsInitialOnboardingName({ onboarding: { version: 6 } }, true)).toBe(false)
   })
-  it('allocates every new V6 self-signup without enrolling existing cohorts or invitees', () => {
-    const config = { onboarding_v6: AB_TESTS_CONFIG.onboarding_v6 }
-    expect(config.onboarding_v6.treatment_percentage).toBe(100)
-    for (const random of [0, 0.5, 0.999999]) {
-      expect(createABTestAssignments({ created_via_invite: false, onboarding_version: 6 }, config, () => random).onboarding_v6.branch).toBe('A')
-      expect(createABTestAssignments({ created_via_invite: true, onboarding_version: 6 }, config, () => random)).toEqual({})
-    }
-    for (const onboarding_version of [undefined, 4, 5])
-      expect(createABTestAssignments({ created_via_invite: false, onboarding_version }, config)).toEqual({})
+  it.each([{}, { version: 6 }, { abtests: { onboarding_v6: { branch: 'B', assigned_at: '2026-10-19' } } }])('keeps V6 disabled without treatment A: %j', (disabled) => {
+    expect(needsInitialOnboardingName({ onboarding: disabled })).toBe(false)
+    expect(hasProfileOnboarding(disabled)).toBe(false)
+    expect(resolveOnboardingAnalyticsVersion(disabled)).not.toBe(6)
+  })
+  it('uses treatment A regardless of the legacy stored version', () => {
+    expect(hasProfileOnboarding({ ...onboarding, version: 4 })).toBe(true)
+    expect(resolveOnboardingAnalyticsVersion(onboarding)).toBe(6)
+  })
+  it('removes a stale treatment when the authoritative response omits it', () => {
+    expect(reconcileOnboardingABTestAssignments(abtests, {})).toEqual({})
   })
   it('carries the same attempt and run into the app onboarding funnel', () => {
     const identity = { attemptId: 'attempt', runId: 'run' }
