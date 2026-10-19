@@ -45,6 +45,7 @@ import {
   run,
   saveState,
   sourceConninfo,
+  sourcePassword,
   WAL_BUCKET,
   waitForNode,
   wrangler,
@@ -67,7 +68,12 @@ const r2Secret = env('PG_CF_R2_SECRET_ACCESS_KEY')
 const r2Endpoint = `https://${account}.r2.cloudflarestorage.com`
 const conninfo = sourceConninfo()
 const psql = Bun.which('psql-17') ?? Bun.which('psql') ?? fail('psql not found')
-const sourceSql = async (sql: string) => (await run([psql, conninfo, '-X', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql], { quiet: true })).stdout.trim()
+// Password goes through PGPASSWORD so it never appears in argv or error output.
+const psqlConninfo = sourceConninfo({ withPassword: false })
+const sourceSql = async (sql: string) => (await run([psql, psqlConninfo, '-X', '-At', '-v', 'ON_ERROR_STOP=1', '-c', sql], {
+  quiet: true,
+  env: { PGPASSWORD: sourcePassword() },
+})).stdout.trim()
 
 log(`env=${CLUSTER_ENV} publication=${PUBLICATION_NAME} bucket=${WAL_BUCKET}`)
 const hasPublication = await sourceSql(`SELECT count(*) FROM pg_publication WHERE pubname = '${PUBLICATION_NAME}'`)

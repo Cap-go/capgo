@@ -107,11 +107,11 @@ export function saveState(state: ClusterState) {
   chmodSync(STATE_FILE, 0o600)
 }
 
-export async function run(cmd: string[], opts: { input?: string, allowFail?: boolean, quiet?: boolean } = {}) {
+export async function run(cmd: string[], opts: { input?: string, allowFail?: boolean, quiet?: boolean, env?: Record<string, string> } = {}) {
   const proc = Bun.spawn(cmd, {
     cwd: DIR,
     // wrangler needs the account when the login has several.
-    env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: env('CLOUDFLARE_ACCOUNT_ID', false) || undefined },
+    env: { ...process.env, CLOUDFLARE_ACCOUNT_ID: env('CLOUDFLARE_ACCOUNT_ID', false) || undefined, ...opts.env },
     stdin: opts.input !== undefined ? new TextEncoder().encode(opts.input) : 'inherit',
     stdout: 'pipe',
     stderr: 'pipe',
@@ -141,7 +141,7 @@ function uuidFrom(text: string) {
   return text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0]
 }
 
-export async function cfApi<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function cfApiRaw<T>(path: string, init: RequestInit = {}) {
   const res = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
     ...init,
     headers: {
@@ -150,7 +150,11 @@ export async function cfApi<T>(path: string, init: RequestInit = {}): Promise<T>
       ...init.headers,
     },
   })
-  const body = await res.json() as { success: boolean, result: T, errors: unknown[] }
+  return await res.json() as { success: boolean, result: T, errors: unknown[] }
+}
+
+export async function cfApi<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const body = await cfApiRaw<T>(path, init)
   if (!body.success)
     fail(`Cloudflare API ${init.method ?? 'GET'} ${path}: ${JSON.stringify(body.errors)}`)
   return body.result
@@ -160,7 +164,7 @@ export async function cfApi<T>(path: string, init: RequestInit = {}): Promise<T>
  * Supabase pooler URL -> direct libpq key/value conninfo for logical
  * replication (same conversion as read_replicate/common.sh).
  */
-export function sourceConninfo(): string {
+export function sourceConninfo(opts: { withPassword?: boolean } = {}): string {
   const url = new URL(env('MAIN_SUPABASE_DB_URL'))
   let user = decodeURIComponent(url.username)
   let host = url.hostname
@@ -179,7 +183,7 @@ export function sourceConninfo(): string {
     `port=${q(port)}`,
     `dbname=${q(url.pathname.slice(1) || 'postgres')}`,
     `user=${q(user)}`,
-    `password=${q(decodeURIComponent(url.password))}`,
+    ...(opts.withPassword === false ? [] : [`password=${q(decodeURIComponent(url.password))}`]),
     'sslmode=require',
     'connect_timeout=10',
     'keepalives=1',
@@ -187,6 +191,11 @@ export function sourceConninfo(): string {
     'keepalives_interval=5',
     'keepalives_count=3',
   ].join(' ')
+}
+
+/** Supabase password for local psql via PGPASSWORD (never on the command line). */
+export function sourcePassword(): string {
+  return decodeURIComponent(new URL(env('MAIN_SUPABASE_DB_URL')).password)
 }
 
 /** Tunnel (cloudflared runs inside the container) -> Workers VPC service. */
@@ -243,33 +252,36 @@ export async function provisionHyperdrive(state: ClusterState, name: string): Pr
   const resourceName = `capgo-pg-${CLUSTER_ENV}-${name}`
   const vpcServiceId = node.vpcServiceId
   log(`creating Hyperdrive ${resourceName} (cache max-age 60s, swr 15s like the Google replicas)`)
-  const args = [
-    'hyperdrive',
-    'create',
-    resourceName,
-    '--service-id',
-    vpcServiceId,
-    '--database',
-    'postgres',
-    '--user',
-    'capgo_reader',
-    '--password',
-    state.readerPassword,
-    '--max-age',
-    '60',
-    '--swr',
-    '15',
-  ]
+  // REST API instead of `wrangler hyperdrive create --password`: the reader
+  // password stays in the request body, never in argv or command output.
+  const account = env('CLOUDFLARE_ACCOUNT_ID')
+  const createBody = JSON.stringify({
+    name: resourceName,
+    origin: {
+      service_id: vpcServiceId,
+      scheme: 'postgres',
+      database: 'postgres',
+      user: 'capgo_reader',
+      password: state.readerPassword,
+    },
+    caching: { max_age: 60, stale_while_revalidate: 15 },
+  })
+  let hyperdriveId: string | undefined
   // The tunnel connector comes up a few seconds after Postgres; retry.
-  let hd = await wrangler(args, { quiet: true, allowFail: true })
-  for (let i = 0; i < 10 && hd.code !== 0; i++) {
-    console.log(`    hyperdrive create failed, retrying in 15s: ${(hd.stderr || hd.stdout).trim().split('\n').at(-1)}`)
+  for (let attempt = 0; attempt <= 10 && !hyperdriveId; attempt++) {
+    const res = await cfApiRaw<{ id: string }>(`/accounts/${account}/hyperdrive/configs`, { method: 'POST', body: createBody })
+    if (res.success) {
+      hyperdriveId = res.result.id
+      break
+    }
+    const reason = JSON.stringify(res.errors)
+    if (attempt === 10)
+      fail(`hyperdrive create failed: ${reason}`)
+    console.log(`    hyperdrive create failed, retrying in 15s: ${reason}`)
     await Bun.sleep(15_000)
-    hd = await wrangler(args, { quiet: true, allowFail: true })
   }
-  if (hd.code !== 0)
-    fail(`hyperdrive create failed:\n${hd.stderr || hd.stdout}`)
-  const hyperdriveId = uuidFrom(hd.stdout.replace(vpcServiceId, '')) ?? fail(`cannot parse Hyperdrive id:\n${hd.stdout}`)
+  if (!hyperdriveId)
+    fail('hyperdrive create returned no id')
   node.hyperdriveId = hyperdriveId
   saveState(state)
   return hyperdriveId
@@ -281,7 +293,7 @@ export async function deprovisionNodeNetwork(state: ClusterState, name: string) 
     return
   const account = env('CLOUDFLARE_ACCOUNT_ID')
   if (node.hyperdriveId)
-    await wrangler(['hyperdrive', 'delete', node.hyperdriveId], { allowFail: true, input: 'y\n' })
+    await cfApiRaw(`/accounts/${account}/hyperdrive/configs/${node.hyperdriveId}`, { method: 'DELETE' })
   await wrangler(['vpc', 'service', 'delete', node.vpcServiceId], { allowFail: true, input: 'y\n' })
   await cfApi(`/accounts/${account}/cfd_tunnel/${node.tunnelId}`, { method: 'DELETE' }).catch(() => {})
   delete state.nodes[name]
