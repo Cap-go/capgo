@@ -307,6 +307,7 @@ await test('NON_CREDENTIAL_KEYS covers all non-secret fields', async () => {
     'CAPGO_ANDROID_PROJECT_DIR',
     'ANDROID_PROJECT_DIR',
     'CAPGO_ANDROID_FLAVOR',
+    'CAPGO_POST_BUILD_SCRIPT',
   ]
 
   assertEquals(NON_CREDENTIAL_KEYS.size, expectedKeys.length,
@@ -420,6 +421,17 @@ await test('normalizeMachineVersion accepts dotted versions only', async () => {
 })
 
 // ─── Summary ────────────────────────────────────────────────────────────────────
+
+await test('custom build env goes to credentials, post-build script to buildOptions', () => {
+  const merged = {
+    SENTRY_AUTH_TOKEN: 'sntrys_secret',
+    CAPGO_POST_BUILD_SCRIPT: 'scripts/post-build.sh',
+  }
+  const { buildOptions, buildCredentials } = splitPayload(merged, 'ios', 'release', '7.83.0')
+  assertEquals(buildCredentials.SENTRY_AUTH_TOKEN, 'sntrys_secret')
+  assertEquals(buildOptions.postBuildScript, 'scripts/post-build.sh')
+  assert(!('CAPGO_POST_BUILD_SCRIPT' in buildCredentials), 'post-build script must not be a credential')
+})
 
 console.log('\n' + '='.repeat(50))
 console.log(`\n📊 Test Results:`)

@@ -69,6 +69,7 @@ import { offerSupportUploadBeforeAi } from '../support/support-upload-prompt.js'
 import { buildCliRequestHeaders } from '../analytics/cli-headers'
 import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, trimTrailingSlashes, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { getBuilderAppId } from './app-id'
+import { parseBuildEnv, resolvePostBuildScript } from './build-env'
 import { syncAndroidVersion } from './android-version'
 import { createBuildCancellationSignalHandler, requestBuildCancellation } from './cancellation'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseAndroidPlayStoreReleaseStatus, parseAndroidPlayStoreTrack, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
@@ -834,6 +835,8 @@ interface NativeDependencies {
 
 interface ZipDirectoryOptions {
   nodeModules?: string
+  /** Project-relative files to include even outside the platform folder (post-build script). */
+  extraFiles?: string[]
 }
 
 async function extractNativeDependencies(
@@ -1223,6 +1226,10 @@ export async function zipDirectory(projectDir: string, outputPath: string, platf
   // Add files with filtering
   addDirectoryToZip(zip, projectDir, '', platform, nativeDeps, platformDir)
   addNativePackagesFromNodeModules(zip, parseNodeModulesPaths(options.nodeModules), platform, nativeDeps, platformDir)
+  for (const file of options.extraFiles ?? []) {
+    if (!zip.getEntry(file))
+      zip.addFile(file, readFileSync(join(projectDir, file)), '', 0o755 << 16)
+  }
 
   // Rewrite isolated-linker store paths to standard flat paths (node_modules/@scope/pkg).
   // Both pnpm (node_modules/.pnpm/…/node_modules/@scope/pkg) and bun's isolated linker
@@ -1339,6 +1346,7 @@ export const NON_CREDENTIAL_KEYS = new Set([
   'CAPGO_ANDROID_PROJECT_DIR',
   'ANDROID_PROJECT_DIR',
   'CAPGO_ANDROID_FLAVOR',
+  'CAPGO_POST_BUILD_SCRIPT',
 ])
 
 type LocalizedReleaseNotes = Record<string, string>
@@ -1441,6 +1449,7 @@ export function splitPayload(
     storeReleaseNotesLocalized,
     iosTestflightGroups: mergedCredentials.CAPGO_IOS_TESTFLIGHT_GROUPS,
     iosAutomaticRelease,
+    postBuildScript: mergedCredentials.CAPGO_POST_BUILD_SCRIPT,
   }
 
   const buildCredentials: Record<string, string> = {}
@@ -1664,6 +1673,18 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         ...existingLocalized,
         ...cliStoreReleaseNotesLocalized,
       })
+    }
+    // --build-env / CAPGO_BUILD_ENV: the user's own env vars (Sentry tokens, ...) for Gradle,
+    // Xcode build phases and the post-build script. Sent as credentials; names only are logged.
+    const buildEnv = parseBuildEnv(options.buildEnv)
+    if (mergedCredentials && Object.keys(buildEnv).length > 0) {
+      Object.assign(mergedCredentials, buildEnv)
+      log.info(`ℹ️  Build env: ${Object.keys(buildEnv).join(', ')}`)
+    }
+    const postBuildScript = resolvePostBuildScript(projectDir, options.postBuildScript ?? process.env.CAPGO_POST_BUILD_SCRIPT)
+    if (mergedCredentials && postBuildScript) {
+      mergedCredentials.CAPGO_POST_BUILD_SCRIPT = postBuildScript
+      log.info(`ℹ️  Post-build script: ${postBuildScript}`)
     }
     // --no-playstore-upload: null out PLAY_CONFIG_JSON so it never reaches the builder
     if (options.playstoreUpload === false && mergedCredentials) {
@@ -2166,6 +2187,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
       await zipDirectory(projectDir, zipPath, platform, config?.config, {
         nodeModules: options.nodeModules,
+        extraFiles: postBuildScript ? [postBuildScript] : [],
       })
 
       const zipStats = await stat(zipPath)
