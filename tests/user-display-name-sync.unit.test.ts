@@ -80,20 +80,20 @@ describe('user display name sync', () => {
     })).toBe(false)
   })
 
-  it('clears stale PostHog names when stored names are removed', async () => {
+  it.each([{ first_name: '', last_name: '', name: '' }, { first_name: '', last_name: 'Doe', name: 'Doe' }])('clears stale PostHog names when stored names change: %j', async (names) => {
     expect(await syncUserDisplayNameIntegrations({} as never, {
       id: 'user-id',
       email: 'user@example.com',
-      first_name: '',
-      last_name: '',
+      first_name: names.first_name,
+      last_name: names.last_name,
     })).toBe(true)
     expect(deliverPosthogEventMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
-      personProperties: { first_name: '', last_name: '', name: '', email: 'user@example.com' },
+      personProperties: { ...names, email: 'user@example.com' },
     }))
     expect(importBentoSubscriberProfileMock).toHaveBeenCalledWith(expect.anything(), {
       email: 'user@example.com',
-      first_name: '',
-      last_name: '',
+      first_name: names.first_name,
+      last_name: names.last_name,
     })
   })
 
