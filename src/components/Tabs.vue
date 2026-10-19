@@ -3,7 +3,7 @@ import type { Tab } from './comp_def'
 import { useElementSize, useScroll } from '@vueuse/core'
 import { computed, nextTick, onMounted, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { isNativeChromeEnabled, useNativeNavbarSegments } from '~/composables/useNativeChrome'
+import { nativeNavbarSegmentsSupported, useNativeNavbarSegments } from '~/composables/useNativeChrome'
 
 const props = defineProps<{
   tabs: Tab[]
@@ -123,7 +123,7 @@ const labelClass = 'md:block text-xs md:text-sm font-medium whitespace-nowrap tr
 </script>
 
 <template>
-  <div v-if="!isNativeChromeEnabled" class="w-full min-w-0 shrink-0">
+  <div v-if="!nativeNavbarSegmentsSupported" class="w-full min-w-0 shrink-0">
     <div class="min-w-0 pb-0">
       <ul ref="primaryList" :class="[ulPrimaryClass, noWrap ? noWrapClass : 'flex-wrap', primaryOverflowClass]">
         <li v-for="(tab, i) in tabs" :key="i" class="relative flex items-end mr-1 md:mr-2" :class="{ 'z-20': activeTab === tab.key }" :data-tab-group="tab.group">

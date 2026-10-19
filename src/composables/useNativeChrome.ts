@@ -71,6 +71,30 @@ const segmentSources = shallowRef<{ prefix: string, source: NavbarSegmentSource 
 let segmentSourceCount = 0
 
 /**
+ * Whether the installed native binary draws navbar segments (plugin 8.13.0+).
+ * Live updates can ship this web code to binaries built with an older plugin that
+ * ignores `segments`; tab rows stay in the web page until a probe confirms support.
+ */
+export const nativeNavbarSegmentsSupported = shallowRef(false)
+let segmentsProbed = false
+
+// An older plugin ignores `segments`, so the navbar keeps the same height with a row.
+async function probeNavbarSegments() {
+  if (segmentsProbed)
+    return
+  segmentsProbed = true
+  try {
+    const probe = [{ id: 'probe', items: [{ id: 'probe', title: ' ' }] }]
+    const withRow = await NativeNavigation.setNavbar({ hidden: false, segments: probe })
+    const withoutRow = await NativeNavigation.setNavbar({ hidden: false, segments: [] })
+    nativeNavbarSegmentsSupported.value = withRow.insets.navbarHeight > withoutRow.insets.navbarHeight
+  }
+  catch {
+    nativeNavbarSegmentsSupported.value = false
+  }
+}
+
+/**
  * Moves a web tab row into the native navbar while the component is mounted.
  * Group ids only need to be unique within one source.
  */
@@ -179,7 +203,7 @@ export function useNativeChrome() {
       title: title.value,
       backButton: { visible: showBack.value },
       rightItems: organizationLabel.value ? [{ id: 'organization', title: organizationLabel.value }] : [],
-      segments: segments.value,
+      segments: nativeNavbarSegmentsSupported.value ? segments.value : [],
       colors: { ...colors, tint: BRAND_TINT },
       animated: true,
     })
@@ -283,6 +307,9 @@ export function useNativeChrome() {
     await NativeNavigation.configure({ enabled: true, contentInsetMode: 'css' })
     if (!active)
       return
+    await probeNavbarSegments()
+    if (!active)
+      return
     await Promise.all([
       register(NativeNavigation.addListener('tabSelect', ({ id }) => {
         if (id === 'more') {
@@ -309,7 +336,7 @@ export function useNativeChrome() {
     await Promise.all([renderNavbar(), renderTabbar(), renderStatusBar(), hideNavigationBar()])
   })
 
-  watch([title, showBack, organizationLabel, isDark, segments], () => {
+  watch([title, showBack, organizationLabel, isDark, segments, nativeNavbarSegmentsSupported], () => {
     void renderNavbar()
   })
   watch([selectedTabId, isDark, () => t('more-menu')], () => {
