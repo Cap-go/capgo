@@ -37,14 +37,14 @@ for (const preOrg of [false, true]) {
         await expect(page.locator(builder ? '[data-test="builder-step-connect_google_play"]' : '[data-test="app-onboarding-cli-step-add_code"]')).toHaveAttribute('data-status', 'skipped')
       const state = await page.evaluate(() => {
         const preview = (window as any).onboardingSetupPreview
-        return { appWrites: preview.state.appWrites, userWrites: preview.state.userWrites, orgId: preview.selectedOrgId.value }
+        return { setupWrites: preview.state.setupWrites, userWrites: preview.state.userWrites, orgId: preview.selectedOrgId.value }
       })
-      expect(state).toEqual({ appWrites: [], userWrites: [], orgId: '00000000-0000-4000-8000-000000000002' })
+      expect(state).toEqual({ setupWrites: [], userWrites: [], orgId: '00000000-0000-4000-8000-000000000002' })
       // Leaving the view must not restart the user's completed onboarding either.
       await page.getByRole('button', { name: scenario.name === 'legacy OTA' ? 'Explore Capgo dashboard' : 'Open your app', exact: true }).click()
       await expect(page.locator('[data-test="preview-app-dashboard"]')).toBeVisible()
       expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.userWrites)).toEqual([])
-      expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites)).toEqual([])
+      expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.setupWrites)).toEqual([])
     })
   }
 }
@@ -52,10 +52,10 @@ for (const preOrg of [false, true]) {
 for (const assignment of ['ota-only', 'builder-only']) {
   test(`retains normal ${assignment} feature and outcome writes without the opt-in`, async ({ page }) => {
     await page.goto(`${gettingStarted}?assignment=${assignment}&platform=android&checklistState=pending`)
-    await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites.some((write: any) => write.body?.p_feature_key))).toBe(true)
+    await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.setupWrites.some((write: any) => write.body?.p_feature_key))).toBe(true)
     await page.getByRole('button', { name: 'Explore dashboard', exact: true }).click()
     await expect(page.locator('[data-test="preview-app-dashboard"]')).toBeVisible()
-    expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites.some((write: any) => write.body?.onboarding?.outcome === 'switched_to_manual'))).toBe(true)
+    expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.setupWrites.some((write: any) => write.body?.onboarding?.outcome === 'switched_to_manual'))).toBe(true)
   })
 
   test(`shows persisted done, skipped and pending ${assignment} tasks after dismissal`, async ({ page }) => {
@@ -65,10 +65,10 @@ for (const assignment of ['ota-only', 'builder-only']) {
     await expect(step(builder ? 'start_setup' : 'login_cli_mcp')).toHaveAttribute('data-status', 'done')
     await expect(step(builder ? 'connect_google_play' : 'add_updater')).toHaveAttribute('data-status', 'skipped')
     await expect(step(builder ? 'successful_cloud_build' : 'test_update')).toHaveAttribute('data-status', 'pending')
-    expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites)).toEqual([])
+    expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.setupWrites)).toEqual([])
     await page.getByRole('button', { name: 'Explore dashboard', exact: true }).click()
     await expect(page.locator('[data-test="preview-app-dashboard"]')).toBeVisible()
-    expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites)).toEqual([])
+    expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.setupWrites)).toEqual([])
   })
 
   for (const parameter of ['', '&showChecklist=0', '&showChecklist=false', '&showChecklist', '&showChecklist=1&showChecklist=0']) {
@@ -95,18 +95,18 @@ for (const showChecklist of [false, true]) {
     await page.getByRole('tab', { name: 'Live Updates', exact: true }).click()
     await expect(page.locator('[data-test="app-onboarding-cli-step-login_cli_mcp"]')).toHaveAttribute('data-status', 'done')
     if (!showChecklist)
-      await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites.some((write: any) => write.body?.p_feature_key === 'ota'))).toBe(true)
+      await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.setupWrites.some((write: any) => write.body?.p_feature_key === 'ota'))).toBe(true)
     await page.getByRole('tab', { name: 'Builder', exact: true }).click()
     await page.getByRole('button', { name: 'Explore dashboard', exact: true }).click()
     await expect(page.locator('[data-test="preview-app-dashboard"]')).toBeVisible()
     const state = await page.evaluate(() => (window as any).onboardingSetupPreview.state)
-    expect(state.appWrites.some((write: any) => write.body?.onboarding?.outcome === 'switched_to_manual')).toBe(false)
+    expect(state.setupWrites.some((write: any) => write.body?.onboarding?.outcome === 'switched_to_manual')).toBe(false)
     if (showChecklist) {
-      expect(state.appWrites).toEqual([])
+      expect(state.setupWrites).toEqual([])
       expect(state.userWrites).toEqual([])
     }
     else {
-      expect(state.appWrites.some((write: any) => write.body?.p_feature_key === 'builder')).toBe(true)
+      expect(state.setupWrites.some((write: any) => write.body?.p_feature_key === 'builder')).toBe(true)
     }
   })
 }
@@ -115,5 +115,5 @@ test('keeps unavailable apps behind the existing not-found page', async ({ page 
   await page.goto(`${gettingStarted}?showChecklist=1&unavailable=1`)
   await expect(page.getByRole('heading', { name: 'App not found', exact: true })).toBeVisible()
   await expect(page.locator('[data-test="getting-started-setup"]')).toHaveCount(0)
-  expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites)).toEqual([])
+  expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.setupWrites)).toEqual([])
 })

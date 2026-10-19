@@ -50,6 +50,7 @@ const state = {
   channelInsertDelayMs: 0,
   channelInserts: [] as Record<string, unknown>[],
   appWrites: [] as Array<{ method: string, body: unknown }>,
+  setupWrites: [] as Array<{ method: string, body: unknown }>,
   userWrites: [] as unknown[],
 }
 if (params.get('checklistState') === 'completed') {
@@ -148,6 +149,13 @@ window.fetch = async (input, init) => {
   if (url.pathname.endsWith('/users') && method === 'PATCH')
     state.userWrites.push(JSON.parse(String(init?.body)))
   if ((url.pathname.endsWith('/apps') || url.pathname.endsWith('/rpc/mark_onboarding_feature_started') || url.pathname.endsWith('/rpc/verify_getting_started') || url.pathname.includes('/app/')) && method !== 'GET' && method !== 'HEAD') {
+    state.setupWrites.push({
+      method,
+      body: init?.body ? JSON.parse(String(init.body)) : undefined,
+    })
+  }
+  // Existing component tests track app-table edits separately from setup RPCs.
+  if (url.pathname.endsWith('/apps') && method !== 'GET' && method !== 'HEAD') {
     state.appWrites.push({
       method,
       body: init?.body ? JSON.parse(String(init.body)) : undefined,
