@@ -152,7 +152,7 @@
     "test:version-detection:setup": "./test/fixtures/setup-test-projects.sh",
     "test:platform-paths": "bun test/test-platform-paths.mjs",
     "test:project-type-detection": "bun test/test-project-type-detection.mjs",
-    "test:payload-split": "bun test/test-payload-split.mjs",
+    "test:payload-split": "bun test/test-payload-split.mjs && bun test/test-build-env.mjs",
     "test:macos-signing": "bun test/test-macos-signing.mjs",
     "test:helper-dce": "bash scripts/check-helper-dce.sh",
     "test:apple-api-import-helpers": "bun test/test-apple-api-import-helpers.mjs",
