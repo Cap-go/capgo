@@ -97,16 +97,23 @@ npx @capgo/cli@latest app todo
 📋 Show your app's onboarding todo list with done, skipped, and pending tasks.
 Uses the same live progress checks as the Capgo dashboard. The app ID can be inferred from your Capacitor project.
 
+Apps with both Builder and OTA checklists show interactive tabs. Use Left/Right or Tab to switch lists, Up/Down or Page Up/Page Down to scroll, and q or Esc to close. The last viewed list remains in your terminal after closing.
+
+For scripts and AI agents, choose `--list builder` or `--list ota` to print one list and exit. This flag is required for dual checklists when input/output is redirected or the command runs in CI. Apps with a single checklist do not need the flag. Switching tabs only changes what is displayed; it does not change saved onboarding choices or completion.
+
 **Example:**
 
 ```bash
 npx @capgo/cli@latest app todo com.example.app
+npx @capgo/cli@latest app todo com.example.app --list builder
+npx @capgo/cli@latest app todo com.example.app --list ota
 ```
 
 **Options:**
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
+| **--list** | <code>builder \| ota</code> | Show one todo list and exit; required for dual checklists in non-interactive mode |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |

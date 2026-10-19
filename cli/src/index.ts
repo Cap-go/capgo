@@ -506,8 +506,11 @@ app
 
 Uses the same live progress checks as the Capgo dashboard. The app ID can be inferred from your Capacitor project.
 
+Apps with both Builder and OTA checklists show interactive tabs. For scripts and AI agents, choose --list builder or --list ota to print one list and exit.
+
 Example: npx @capgo/cli@latest app todo com.example.app`)
   .action(appTodo)
+  .addOption(new Option('--list <list>', 'Show one todo list and exit; required for dual checklists in non-interactive mode').choices(['builder', 'ota']))
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
