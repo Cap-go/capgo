@@ -184,7 +184,8 @@ async function forceWebNativeOnboardingTreatments(email: string, password: strin
   if (updateError)
     throw updateError
 
-  await supabase.auth.signOut()
+  // End only this helper session; the browser must stay signed in.
+  await supabase.auth.signOut({ scope: 'local' })
 }
 
 async function expectProtectedRouteRedirect(page: Page, targetPath: string, expectedUrl: RegExp, expectedSelector: string) {
@@ -302,7 +303,7 @@ test.describe('Registration', () => {
       .single()
     expect(profileError).toBeNull()
     expect(profile).toEqual({ first_name: 'Example', last_name: 'User' })
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
 
     await expect(page.locator('[data-test="app-onboarding-existing-yes"]')).toHaveCount(0)
     await expect(page.locator('[data-test="app-onboarding-existing-no"]')).toHaveCount(0)
@@ -415,7 +416,7 @@ test.describe('Registration', () => {
       expect(profile?.first_name || '').toBe('')
       expect(profile?.last_name || '').toBe('')
       expect(profile?.onboarding).toMatchObject({ abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, profile_draft: { first_name: 'Draft', last_name: 'User' } })
-      await supabase.auth.signOut()
+      await supabase.auth.signOut({ scope: 'local' })
 
       await page.reload()
       const resume = page.locator('[data-test="onboarding-resume-continue"]')
@@ -448,7 +449,7 @@ test.describe('Registration', () => {
     const { error: updateError } = await localAdminClient().from('users').upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } }, { onConflict: 'id' })
     expect(updateError).toBeNull()
     await seedNameTreatment(signedUp.user!.id)
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
 
     await loginToOnboarding(page, email, password)
     await page.goto('/onboarding/organization?source=org-switcher')
@@ -486,7 +487,7 @@ test.describe('Registration', () => {
       .single()
     expect(profileError).toBeNull()
     expect(profile).toEqual({ first_name: 'Example', last_name: 'User' })
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
   })
 
   test('should complete a partial profile and skip both names for subsequent organizations', async ({ page }) => {
@@ -499,7 +500,7 @@ test.describe('Registration', () => {
     expect(updateError).toBeNull()
     expect(seededProfile).toEqual({ first_name: 'Example', last_name: '' })
     await seedNameTreatment(signedUp.user!.id)
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
 
     await loginToOnboarding(page, email, password)
     await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveValue('Example')
@@ -533,7 +534,7 @@ test.describe('Registration', () => {
       .single()
     expect(profileError).toBeNull()
     expect(profile).toEqual({ first_name: 'Example', last_name: 'User' })
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
 
     await page.goto('/onboarding/organization?source=org-switcher')
     await page.click('[data-test="onboarding-intent-ota"]')
@@ -551,7 +552,7 @@ test.describe('Registration', () => {
     const { error: updateError } = await localAdminClient().from('users').upsert({ id: signedUp.user!.id, email, first_name: '', last_name: 'Existing', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } }, { onConflict: 'id' })
     expect(updateError).toBeNull()
     await seedNameTreatment(signedUp.user!.id)
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
 
     await loginToOnboarding(page, email, password)
     await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('Existing')
@@ -571,7 +572,7 @@ test.describe('Registration', () => {
       .single()
     expect(profileError).toBeNull()
     expect(profile).toEqual({ first_name: 'Example', last_name: 'Existing' })
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
   })
 
   test('should offer to continue or restart onboarding after a dropout', async ({ page }) => {
