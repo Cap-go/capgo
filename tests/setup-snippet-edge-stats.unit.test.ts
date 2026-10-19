@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { logpushJobBody, logpushJobNeedsUpdate, STAT_HEADER, withStatHeaderField } from '../scripts/setup-snippet-edge-stats.ts'
+import { logpushJobBody, logpushJobNeedsUpdate, parseEnvFile, resolveSetupEnv, STAT_HEADER, withStatHeaderField } from '../scripts/setup-snippet-edge-stats.ts'
 
 describe('snippet-edge-stats:setup', () => {
   it('adds the stat header to the custom log fields without dropping existing ones', () => {
@@ -26,5 +26,12 @@ describe('snippet-edge-stats:setup', () => {
     expect(logpushJobNeedsUpdate({ id: 1, ...current, output_options: { ...current.output_options, field_names: ['ResponseHeaders'] } })).toBe(true)
     expect(logpushJobNeedsUpdate({ id: 1, ...current, enabled: false })).toBe(true)
     expect(logpushJobNeedsUpdate({ id: 1, ...current, max_upload_records: 100_000 })).toBe(true)
+  })
+
+  it('reads unset values from the prod env file names', () => {
+    const file = parseEnvFile('# comment\nCF_ACCOUNT_ANALYTICS_ID=acc\nexport CF_ANALYTICS_TOKEN="tok"\nS3_ENDPOINT=acc.r2.cloudflarestorage.com\nS3_ACCESS_KEY_ID=key # note\nS3_SECRET_ACCESS_KEY=\'secret\'\n')
+    expect(resolveSetupEnv({}, file)).toEqual({ accountId: 'acc', apiToken: 'tok', r2AccessKeyId: 'key', r2SecretAccessKey: 'secret', zoneName: 'capgo.app' })
+    expect(resolveSetupEnv({ CLOUDFLARE_ACCOUNT_ID: 'env', CLOUDFLARE_API_TOKEN: 'env-token' }, file)).toMatchObject({ accountId: 'env', apiToken: 'env-token', r2AccessKeyId: '' })
+    expect(resolveSetupEnv({}, { ...file, S3_ENDPOINT: 'https://s3.amazonaws.com' })).toMatchObject({ r2AccessKeyId: '', r2SecretAccessKey: '' })
   })
 })
