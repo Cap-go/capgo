@@ -33,10 +33,6 @@ vi.mock('~/services/userOnboardingWriteQueue', () => ({
   serializeUserOnboardingWrite: (_id: string, write: () => unknown) => write(),
   replaceUserOnboardingWithRetry: mocks.persist,
 }))
-vi.mock('~/components/auth/AuthPageShell.vue', async () => {
-  const { defineComponent, h } = await import('vue')
-  return { default: defineComponent({ setup: (_, { slots }) => () => h('div', slots.default?.()) }) }
-})
 vi.mock('~/components/OnboardingProfile.vue', async () => {
   const { defineComponent, h, ref } = await import('vue')
   return { default: defineComponent({
@@ -85,7 +81,27 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-describe('separate required name screen', () => {
+describe('required first onboarding step', () => {
+  it('uses the shared onboarding frame and shows About you as the first progress step', async () => {
+    const container = await mount()
+    expect(container.querySelector('[data-test="onboarding-page"]')).not.toBeNull()
+    expect(container.querySelector('h1')?.textContent).toContain('onboarding-welcome-title')
+    const steps = container.querySelectorAll('nav[aria-label="app-onboarding-progress-label"] li')
+    expect(steps).toHaveLength(5)
+    expect(steps[0].getAttribute('aria-current')).toBe('step')
+    expect(steps[0].textContent).toContain('unified-onboarding-step-about-you')
+    expect(steps[1].textContent).toContain('unified-onboarding-step-intent')
+    expect(container.querySelectorAll('[data-test="onboarding-logout"]')).toHaveLength(1)
+  })
+  it('continues directly into the goal step with the same telemetry identity', async () => {
+    mocks.valid = true
+    const container = await mount()
+    await submit(container)
+    await vi.waitFor(() => expect(mocks.replace).toHaveBeenCalled())
+    expect(mocks.replace).toHaveBeenCalledWith(expect.objectContaining({ path: '/onboarding/app', state: { capgoProfileOnboardingHandoff: expect.any(Object) } }))
+    expect(mocks.capture).toHaveBeenCalledWith('onboarding_step_completed', expect.objectContaining({ step: 'name', next_step: 'intent' }))
+  })
+
   it('blocks continuing and programmatic form submission while names are invalid', async () => {
     const container = await mount()
     expect(container.querySelector<HTMLButtonElement>('[data-test="onboarding-name-continue"]')?.disabled).toBe(true)
@@ -111,7 +127,7 @@ describe('separate required name screen', () => {
     expect(main.user.onboarding.profile_completed_at).toEqual(expect.any(String))
     expect(mocks.replace).toHaveBeenCalledWith(expect.objectContaining({ path: '/onboarding/organization', query: { source: 'org-switcher' }, hash: '#details', state: { capgoProfileOnboardingHandoff: expect.objectContaining({ attemptId: expect.any(String), runId: expect.any(String) }) } }))
     expect(mocks.capture).toHaveBeenCalledWith('onboarding_profile_saved', expect.objectContaining({ step: 'name', onboarding_version: 6 }))
-    expect(mocks.capture).toHaveBeenCalledWith('onboarding_step_completed', expect.not.objectContaining({ next_step: 'welcome' }))
+    expect(mocks.capture).toHaveBeenCalledWith('onboarding_step_completed', expect.objectContaining({ next_step: 'organization' }))
   })
   it.each(['error', 'throw'])('requires persisted confirmation when its write fails with %s', async (failure) => {
     mocks.valid = true

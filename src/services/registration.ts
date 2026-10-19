@@ -5,7 +5,7 @@ interface RegistrationResult {
   session: { access_token: string, refresh_token: string }
 }
 
-export async function registerAccount(email: string, password: string, captchaToken?: string): Promise<RegistrationResult> {
+export async function registerAccount(email: string, password: string, captchaToken?: string, optForNewsletters = false): Promise<RegistrationResult> {
   const { data, error } = await invokeCapgoApi<RegistrationResult>('auth/register', {
     method: 'POST',
     allowAnonymous: true,
@@ -13,7 +13,7 @@ export async function registerAccount(email: string, password: string, captchaTo
       email,
       password,
       ...(captchaToken ? { captcha_token: captchaToken } : {}),
-      opt_for_newsletters: true,
+      opt_for_newsletters: optForNewsletters,
     },
   })
   if (error)

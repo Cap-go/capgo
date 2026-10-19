@@ -62,6 +62,7 @@
   "account-deletion-timer-in": "Used in Capgo web console areas: pages. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "account-deletion-very-soon": "Used in Capgo web console areas: pages. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "account-error": "Used in Capgo web console areas: composables, pages/settings/account. Role: toast or status message. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "account-load-failed": "Shown on the login recovery screen when an authenticated account profile could not be loaded. Retrying keeps the current session and rechecks onboarding requirements.",
   "account-id": "Used in Capgo web console areas: pages/settings/account. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "account-password-error": "Used in Capgo web console areas: pages/settings/account. Role: toast or status message. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "account-password-heading": "Used in Capgo web console areas: pages/settings/account. Role: section or dialog title. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",

@@ -53,10 +53,14 @@ export function parseOnboardingABTestAssignments(value: unknown): Record<string,
 export function reconcileOnboardingABTestAssignments(
   current: Record<string, OnboardingABTestAssignment>,
   authoritative: Record<string, OnboardingABTestAssignment>,
+  options: { authoritative?: boolean } = {},
 ): Record<string, OnboardingABTestAssignment> {
   const next = { ...current }
   delete next[NEW_CHANNEL_AB_TEST]
-  delete next[PROFILE_ONBOARDING_AB_TEST]
+  // A refresh in flight may clear intent-dependent flags, but must retain the
+  // required profile step until a successful server response replaces it.
+  if (options.authoritative !== false)
+    delete next[PROFILE_ONBOARDING_AB_TEST]
   return {
     ...next,
     ...authoritative,

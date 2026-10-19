@@ -28,7 +28,7 @@ describe('app onboarding welcome', () => {
   it.concurrent('uses DaisyUI theme colors for the welcome canvas', async () => {
     const source = await readFile(new URL('../src/components/dashboard/AppOnboardingWelcome.vue', import.meta.url), 'utf8')
     const welcomeRule = source.match(/\.onboarding-welcome\s*\{([\s\S]*?)\n\}/)?.[1] ?? ''
-    const backgroundDeclaration = welcomeRule.match(/background:\s*([\s\S]*?);/)?.[1] ?? ''
+    const backgroundDeclaration = welcomeRule.match(/background:([^;]*);/)?.[1] ?? ''
 
     expect(backgroundDeclaration).toContain('var(--color-base-100)')
     expect(backgroundDeclaration).toContain('var(--color-base-200)')
@@ -36,7 +36,7 @@ describe('app onboarding welcome', () => {
     expect(source).not.toContain(':global(.dark) .onboarding-welcome')
   })
 
-  it.concurrent('shows only for fresh or restarted desktop pre-organization onboarding', async () => {
+  it.concurrent('keeps the legacy desktop welcome and skips it after the V6 profile step', async () => {
     const source = await readFile(new URL('../src/components/dashboard/AppOnboardingFlow.vue', import.meta.url), 'utf8')
     const resumeFlow = source.slice(
       source.indexOf('async function maybeResumeSavedOnboarding()'),
@@ -47,7 +47,7 @@ describe('app onboarding welcome', () => {
     expect(source).toContain('const welcomeCanvasEligible = ref(false)')
     expect(source).toContain('const showPreOrgWelcome = computed(() => props.preOrg && welcomeCanvasEligible.value && welcomePending.value)')
     expect(source).toContain('welcomeCanvasEligible.value = window.matchMedia(WELCOME_CANVAS_MEDIA_QUERY).matches')
-    expect(source).toContain('welcomePending.value = Boolean(props.preOrg && welcomeCanvasEligible.value)')
+    expect(source).toContain('welcomePending.value = Boolean(props.preOrg && welcomeCanvasEligible.value && !initialProfileOnboarding.value)')
     expect(source).not.toContain('useMediaQuery(')
     expect(source).not.toContain('useMediaQuery(\'(min-width: 1024px)\')')
     expect(source).not.toContain('(hover: hover) and (pointer: fine)')
@@ -88,7 +88,9 @@ describe('app onboarding welcome', () => {
   it.concurrent('uses the focused naked onboarding layout with persistent account controls', async () => {
     const source = await readFile(new URL('../src/pages/onboarding/app.vue', import.meta.url), 'utf8')
 
-    expect(source).toContain('data-test="onboarding-logout"')
+    const frame = await readFile(new URL('../src/components/dashboard/AppOnboardingPageFrame.vue', import.meta.url), 'utf8')
+    expect(source).toContain('<AppOnboardingPageFrame')
+    expect(frame).toContain('data-test="onboarding-logout"')
     expect(source).not.toContain('src="/favicon.svg"')
     expect(source).toContain('layout: naked')
   })

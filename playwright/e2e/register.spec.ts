@@ -95,10 +95,10 @@ async function completeName(page: Page) {
   await page.waitForURL(/\/onboarding\/app/)
 }
 
-async function continuePastWelcome(page: Page) {
-  const continueButton = page.locator('[data-test="onboarding-welcome-continue"]')
-  await expect(continueButton).toBeVisible()
-  await continueButton.click()
+async function expectOnboardingGoal(page: Page) {
+  await expect(page.locator('[data-test="onboarding-intent-ota"]')).toBeVisible()
+  await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toHaveCount(0)
+  await expect(page.locator('nav[aria-label="Onboarding progress"] [aria-current="step"]')).toContainText('Your goal')
 }
 
 async function continuePastDevelopmentEnvironmentIfShown(page: Page) {
@@ -263,10 +263,26 @@ test.describe('Registration', () => {
 
     await page.waitForURL(/\/onboarding\/name/)
     await expectProtectedRouteRedirect(page, '/dashboard', /\/onboarding\/name/, '[data-test="onboarding-name-step"]')
+    await page.route('**/rest/v1/users?*', async (route) => {
+      if (route.request().method() === 'GET') {
+        await route.fulfill({ status: 503, json: { code: 'unavailable', message: 'Test profile load failure' } })
+        return
+      }
+      await route.fallback()
+    })
+    await page.reload()
+    await expect(page.locator('[data-test="account-load-recovery"]')).toBeVisible()
+    await expect(page.locator('[data-test="onboarding-name-step"]')).toHaveCount(0)
+    await page.unroute('**/rest/v1/users?*')
+    await page.locator('[data-test="account-load-retry"]').click()
+    await page.waitForURL(/\/onboarding\/name/)
+    await expect(page.locator('[data-test="onboarding-name-step"]')).toBeVisible()
     await expect(page.locator('[data-test="onboarding-intent-ota"]')).toHaveCount(0)
     const continueGoal = page.locator('[data-test="onboarding-name-continue"]')
     await expect(continueGoal).toBeDisabled()
     await expect(page.getByRole('heading', { name: 'About you', exact: true })).toBeVisible()
+    await expect(page.locator('nav[aria-label="Onboarding progress"] [aria-current="step"]')).toContainText('About you')
+    await expect(page.getByText('One command. Live on next launch.', { exact: true })).toHaveCount(0)
     await expect(page.locator('[data-test="onboarding-last-name"]')).toBeVisible()
     await page.fill('[data-test="onboarding-first-name"]', '   ')
     await expect(continueGoal).toBeDisabled()
@@ -289,7 +305,7 @@ test.describe('Registration', () => {
     await expect(page.locator('[data-test="app-onboarding-name"]')).toHaveCount(0)
     await page.unroute('**/rest/v1/users?*')
     await continueGoal.click()
-    await continuePastWelcome(page)
+    await expectOnboardingGoal(page)
     await page.click('[data-test="onboarding-intent-ota"]')
     await page.click('[data-test="app-onboarding-continue-intent"]')
     await continuePastDevelopmentEnvironmentIfShown(page)
@@ -432,7 +448,7 @@ test.describe('Registration', () => {
       await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeEnabled()
       await page.click('[data-test="onboarding-name-continue"]')
       if (!mobile)
-        await continuePastWelcome(page)
+        await expectOnboardingGoal(page)
       await page.click('[data-test="onboarding-intent-ota"]')
       await page.click('[data-test="app-onboarding-continue-intent"]')
       await continuePastDevelopmentEnvironmentIfShown(page)
@@ -509,7 +525,7 @@ test.describe('Registration', () => {
     await page.fill('[data-test="onboarding-last-name"]', '  User  ')
     await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeEnabled()
     await page.click('[data-test="onboarding-name-continue"]')
-    await continuePastWelcome(page)
+    await expectOnboardingGoal(page)
     await page.click('[data-test="onboarding-intent-ota"]')
     await page.click('[data-test="app-onboarding-continue-intent"]')
     await continuePastDevelopmentEnvironmentIfShown(page)
@@ -558,7 +574,7 @@ test.describe('Registration', () => {
     await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('Existing')
     await page.fill('[data-test="onboarding-first-name"]', '  Example  ')
     await page.click('[data-test="onboarding-name-continue"]')
-    await continuePastWelcome(page)
+    await expectOnboardingGoal(page)
     await page.click('[data-test="onboarding-intent-ota"]')
     await page.click('[data-test="app-onboarding-continue-intent"]')
     await continuePastDevelopmentEnvironmentIfShown(page)
@@ -588,7 +604,7 @@ test.describe('Registration', () => {
 
     await page.waitForURL(/\/onboarding\/name/)
     await completeName(page)
-    await continuePastWelcome(page)
+    await expectOnboardingGoal(page)
     await page.click('[data-test="onboarding-intent-ota"]')
     await page.click('[data-test="app-onboarding-continue-intent"]')
     await continuePastDevelopmentEnvironmentIfShown(page)
@@ -618,7 +634,7 @@ test.describe('Registration', () => {
     await expect(page.locator('[data-test="onboarding-resume-restart"]')).toBeVisible()
     await page.locator('[data-test="onboarding-resume-restart"]').click()
     await page.locator('[data-test="onboarding-name-continue"]').click()
-    await continuePastWelcome(page)
+    await expectOnboardingGoal(page)
     await expect(page.locator('[data-test="onboarding-intent-ota"]')).toBeVisible()
     await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveCount(0)
     await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveCount(0)
@@ -638,7 +654,7 @@ test.describe('Registration', () => {
 
     await page.waitForURL(/\/onboarding\/name/)
     await completeName(page)
-    await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toBeVisible()
+    await expectOnboardingGoal(page)
     await forceWebNativeOnboardingTreatments(email, password)
     await page.reload()
     await expect(page.locator('[data-test="onboarding-resume-continue"]')).toBeVisible()

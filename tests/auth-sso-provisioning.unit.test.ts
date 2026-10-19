@@ -775,7 +775,7 @@ describe('mandatory V6 name navigation', () => {
 })
 
 describe('initial profile gate failures and existing members', () => {
-  it.concurrent('blocks navigation if the profile cannot be loaded', async () => {
+  it.concurrent('offers a recoverable login without allowing a missing profile past the name gate', async () => {
     await withTestContext(async (context) => {
       context.mockFrom.mockImplementation(() => ({
         select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: null, error: { code: 'unavailable' } }) }) }),
@@ -784,7 +784,9 @@ describe('initial profile gate failures and existing members', () => {
       const guard = await getGuard()
       const next = vi.fn()
       await guard({ path: '/onboarding/app', fullPath: '/onboarding/app', meta: { middleware: 'auth' }, query: {} }, { path: '/login', meta: {}, query: {} }, next)
-      expect(next).toHaveBeenCalledWith(false)
+      expect(next).toHaveBeenCalledWith({ path: '/login', query: { profile_unavailable: '1', to: '/onboarding/app' } })
+      expect(context.mainStore.auth?.id).toBe('user-123')
+      expect(context.mockSignOut).not.toHaveBeenCalled()
     })
   })
   it.concurrent('does not send an existing V6 organization member through initial names', async () => {

@@ -14,8 +14,15 @@ describe('console registration API client', () => {
     expect(invokeMock).toHaveBeenCalledWith('auth/register', {
       method: 'POST',
       allowAnonymous: true,
-      body: { email: 'signup@example.com', password: 'Password123!', captcha_token: 'captcha', opt_for_newsletters: true },
+      body: { email: 'signup@example.com', password: 'Password123!', captcha_token: 'captcha', opt_for_newsletters: false },
     })
+  })
+
+  it('only enables newsletters when explicitly requested', async () => {
+    const result = { user: { id: 'fake-user' }, session: { access_token: 'fake-access', refresh_token: 'fake-refresh' } }
+    invokeMock.mockResolvedValue({ data: result, error: null })
+    await registerAccount('signup@example.com', 'Password123!', undefined, true)
+    expect(invokeMock.mock.calls[0][1].body.opt_for_newsletters).toBe(true)
   })
 
   it('omits a missing CAPTCHA and rejects an incomplete API session', async () => {

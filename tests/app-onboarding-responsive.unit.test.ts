@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 const flowSource = readFileSync(new URL('../src/components/dashboard/AppOnboardingFlow.vue', import.meta.url), 'utf8')
 const pageSource = readFileSync(new URL('../src/pages/onboarding/app.vue', import.meta.url), 'utf8')
-const pageStyles = pageSource.slice(pageSource.indexOf('<style scoped>'), pageSource.indexOf('</style>'))
+const frameSource = readFileSync(new URL('../src/components/dashboard/AppOnboardingPageFrame.vue', import.meta.url), 'utf8')
+const pageStyles = frameSource.slice(frameSource.indexOf('<style scoped>'), frameSource.indexOf('</style>'))
 
 describe('app-creation onboarding responsive layout', () => {
   it.concurrent('gates every step-specific compact selector behind app creation', () => {
@@ -18,6 +19,7 @@ describe('app-creation onboarding responsive layout', () => {
     expect(pageStyles).not.toMatch(/onboarding-flow-header\s+nav[^}]*display:\s*none/)
     expect(pageStyles).not.toMatch(/onboarding-(?:details|intent)-actions[^}]*display:\s*none/)
     expect(pageStyles).not.toMatch(/onboarding-page-actions[^}]*display:\s*none/)
-    expect(pageSource).toContain('data-test="onboarding-logout"')
+    expect(pageSource).toContain('<AppOnboardingPageFrame')
+    expect(frameSource).toContain('data-test="onboarding-logout"')
   })
 })

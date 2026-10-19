@@ -105,6 +105,7 @@
   "account-restore-failed": "We could not restore your account right now",
   "account-restore-reauth-required": "Please sign in again before restoring your account",
   "account-error": "Error while updating your account",
+  "account-load-failed": "We couldn't load your account. Please try again.",
   "account-id": "Account id",
   "account-password-error": "Error happened, please try again",
   "account-password-heading": "Change my password",

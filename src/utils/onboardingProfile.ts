@@ -53,3 +53,17 @@ export function initialProfileOnboardingSteps(onboarding: unknown, showWelcome: 
     'setup',
   ]
 }
+
+export function initialProfileOnboardingProgressSteps(onboarding: unknown): Array<{
+  id: 'name' | 'intent' | 'details' | 'organization' | 'channel' | 'setup'
+  labelKey: string
+}> {
+  return [
+    { id: 'name', labelKey: 'unified-onboarding-step-about-you' },
+    { id: 'intent', labelKey: 'unified-onboarding-step-intent' },
+    { id: 'details', labelKey: 'app-onboarding-step-details' },
+    { id: 'organization', labelKey: 'unified-onboarding-step-organization' },
+    ...(hasNewChannelTreatment(onboarding) ? [{ id: 'channel' as const, labelKey: 'unified-onboarding-step-channel' }] : []),
+    { id: 'setup', labelKey: 'unified-onboarding-step-setup' },
+  ]
+}

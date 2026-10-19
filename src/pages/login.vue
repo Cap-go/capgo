@@ -58,6 +58,7 @@ const passwordPathReady = ref(false)
 const domainCheckTimeoutMs = 5000
 const domainCheckDebounceMs = 350
 const isCheckingSavedSession = ref(true)
+const profileUnavailable = computed(() => route.query.profile_unavailable === '1')
 const captchaStatus = ref<'disabled' | 'loading' | 'ready' | 'unavailable'>(captchaKey.value ? 'loading' : 'disabled')
 let captchaInitTimeout: ReturnType<typeof setTimeout> | null = null
 let domainCheckTimer: ReturnType<typeof setTimeout> | null = null
@@ -797,6 +798,10 @@ async function handleAppleOAuthLanding(parsedUrl: URL) {
 
 async function checkLogin() {
   try {
+    if (profileUnavailable.value) {
+      hideLoader()
+      return
+    }
     const parsedUrl = new URL(route.fullPath, globalThis.location.origin)
     if (await handleAppleOAuthLanding(parsedUrl))
       return
@@ -1007,7 +1012,15 @@ onMounted(checkLogin)
           </div>
 
           <div class="relative mt-5 sm:mt-6">
-            <div v-if="hasQuerySession" :class="authStepCardClass">
+            <div v-if="profileUnavailable" class="space-y-4" data-test="account-load-recovery">
+              <p role="alert" class="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {{ t('account-load-failed') }}
+              </p>
+              <button type="button" :class="authPrimaryButtonClass" :disabled="isLoading" data-test="account-load-retry" @click="nextLogin">
+                {{ t('retry') }}
+              </button>
+            </div>
+            <div v-else-if="hasQuerySession" :class="authStepCardClass">
               <div class="space-y-4 text-slate-500 dark:text-slate-300" :class="authCardBodyClass">
                 <p class="text-sm">
                   {{ t('login-query-session-prompt') }}

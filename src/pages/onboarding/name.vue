@@ -5,14 +5,15 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconLoader from '~icons/lucide/loader-2'
-import AuthPageShell from '~/components/auth/AuthPageShell.vue'
-import { authGhostButtonClass, authPrimaryButtonClass } from '~/components/auth/pageStyles'
+import AppOnboardingHeader from '~/components/dashboard/AppOnboardingHeader.vue'
+import AppOnboardingPageFrame from '~/components/dashboard/AppOnboardingPageFrame.vue'
 import OnboardingProfile from '~/components/OnboardingProfile.vue'
 import { getLocalConfig } from '~/services/supabase'
 import { replaceUserOnboardingWithRetry, serializeUserOnboardingWrite } from '~/services/userOnboardingWriteQueue'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-import { initialProfileOnboardingSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY } from '~/utils/onboardingProfile'
+import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
+import { initialProfileOnboardingProgressSteps, initialProfileOnboardingSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY } from '~/utils/onboardingProfile'
 import { createOnboardingDetailsFieldDebouncer, createOnboardingProgressTracker, createOnboardingTelemetryIdentity } from '~/utils/onboardingProgressAnalytics'
 import { validateRedirectPath } from '~/utils/safeRedirect'
 
@@ -23,9 +24,13 @@ const route = useRoute()
 const { t } = useI18n()
 const profileForm = ref<InstanceType<typeof OnboardingProfile> | null>(null)
 const isSaving = ref(false)
-const targetPath = computed(() => validateRedirectPath(typeof route.query.to === 'string' ? route.query.to : '', '/dashboard', { blockedPrefixes: ['/onboarding/name'] }))
+const isLoggingOut = ref(false)
+const targetPath = computed(() => validateRedirectPath(typeof route.query.to === 'string' ? route.query.to : '', '/onboarding/app', { blockedPrefixes: ['/onboarding/name'] }))
+const progressSteps = computed(() => initialProfileOnboardingProgressSteps(main.user?.onboarding)
+  .filter(step => !targetPath.value.startsWith('/onboarding/organization') || step.id === 'name' || step.id === 'organization')
+  .map(step => ({ id: step.id, label: t(step.labelKey) })))
 const identity = createOnboardingTelemetryIdentity({ flow: 'pre_org', onboardingVersion: () => 6, supaHost: getLocalConfig().supaHost })
-const tracker = createOnboardingProgressTracker({ flow: 'pre_org', onboardingVersion: () => 6, resumed: false, steps: initialProfileOnboardingSteps(main.user?.onboarding, window.matchMedia('(min-width: 640px) and (min-height: 640px)').matches), supaHost: getLocalConfig().supaHost, onboardingAttemptId: identity.attemptId, onboardingRunId: identity.runId })
+const tracker = createOnboardingProgressTracker({ flow: 'pre_org', onboardingVersion: () => 6, resumed: false, steps: targetPath.value.startsWith('/onboarding/organization') ? ['name', 'organization'] : initialProfileOnboardingSteps(main.user?.onboarding, false), supaHost: getLocalConfig().supaHost, onboardingAttemptId: identity.attemptId, onboardingRunId: identity.runId })
 const fields = createOnboardingDetailsFieldDebouncer((event, step, properties) => tracker.trackDetailsEvent(event, step, properties), 500)
 
 function trackField(field: 'first_name' | 'last_name', value: string) {
@@ -73,7 +78,7 @@ async function continueAfterName() {
     }
     fields.dispose()
     tracker.trackStepEvent('onboarding_profile_saved', 'name')
-    tracker.completeStep('name')
+    tracker.completeStep('name', { nextStep: targetPath.value.startsWith('/onboarding/organization') ? 'organization' : 'intent' })
     const destination = router.resolve(targetPath.value)
     await router.replace({ path: destination.path, query: destination.query, hash: destination.hash, state: { [PROFILE_ONBOARDING_HANDOFF_KEY]: { attemptId: identity.attemptId, runId: identity.runId } } })
   }
@@ -97,8 +102,20 @@ async function restartName() {
 }
 
 async function logout() {
-  await main.logout()
-  await router.replace('/login')
+  if (isLoggingOut.value || isSaving.value)
+    return
+  isLoggingOut.value = true
+  try {
+    await main.logout()
+    await router.replace('/login')
+  }
+  catch (error) {
+    console.error('Failed to log out from name onboarding', error)
+    toast.error(t('cannot-sign-off'))
+  }
+  finally {
+    isLoggingOut.value = false
+  }
 }
 
 function visibilityChanged() {
@@ -127,27 +144,42 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <AuthPageShell :card-title="t('unified-onboarding-step-about-you')" :card-kicker="t('onboarding-name-kicker')" :card-description="t('onboarding-name-description')">
-    <form class="space-y-6" data-test="onboarding-name-step" @submit.prevent="continueAfterName">
-      <OnboardingProfile ref="profileForm" initial :disabled="isSaving" @field-input="trackField" @save-failed="tracker.trackStepEvent('onboarding_profile_save_failed', 'name')" />
-      <p class="text-sm leading-6 text-slate-500 dark:text-slate-400">
-        {{ t('onboarding-name-required') }}
-      </p>
-      <button type="submit" class="max-sm:transition-none max-sm:hover:translate-y-0" :class="authPrimaryButtonClass" :disabled="!profileForm?.isValid || isSaving" data-test="onboarding-name-continue">
-        <IconLoader v-if="isSaving" class="h-4 w-4 animate-spin" />
-        {{ t('continue') }}
-        <IconArrowRight v-if="!isSaving" class="h-4 w-4" />
-      </button>
-      <div class="flex items-center justify-between border-t border-slate-200 pt-4 dark:border-slate-700">
-        <button type="button" :class="authGhostButtonClass" :disabled="isSaving" data-test="onboarding-name-restart" @click="restartName">
-          {{ t('onboarding-resume-restart') }}
-        </button>
-        <button type="button" :class="authGhostButtonClass" :disabled="isSaving" data-test="onboarding-logout" @click="logout">
-          {{ t('sign-out') }}
-        </button>
+  <AppOnboardingPageFrame :is-logging-out="isLoggingOut" :disabled="isSaving" @logout="logout">
+    <section class="onboarding-flow-shell onboarding-flow-app-creation onboarding-flow-details-name h-full min-h-0 flex-1 overflow-y-auto bg-slate-50 px-4 py-6 sm:px-6 lg:px-8 dark:bg-slate-950">
+      <div class="onboarding-flow-content mx-auto w-full max-w-3xl space-y-6">
+        <AppOnboardingHeader :title="t('onboarding-welcome-title')" :steps="progressSteps" current-step-id="name" />
+        <form class="onboarding-details-card rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95" data-test="onboarding-name-step" @submit.prevent="continueAfterName">
+          <div class="onboarding-details-card-content space-y-6">
+            <div class="onboarding-details-heading">
+              <p class="text-sm font-semibold text-primary-500 dark:text-slate-300">
+                {{ t('onboarding-name-kicker') }}
+              </p>
+              <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
+                {{ t('unified-onboarding-step-about-you') }}
+              </h2>
+              <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                {{ t('onboarding-name-description') }}
+              </p>
+            </div>
+            <OnboardingProfile ref="profileForm" initial :disabled="isSaving" @field-input="trackField" @save-failed="tracker.trackStepEvent('onboarding_profile_save_failed', 'name')" />
+            <p class="text-sm leading-6 text-slate-500 dark:text-slate-400">
+              {{ t('onboarding-name-required') }}
+            </p>
+            <div class="onboarding-details-actions flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between dark:border-white/15">
+              <button type="button" class="d-btn min-h-12" :class="onboardingSecondaryButtonClass" :disabled="isSaving" data-test="onboarding-name-restart" @click="restartName">
+                {{ t('onboarding-resume-restart') }}
+              </button>
+              <button type="submit" class="d-btn min-h-12" :class="onboardingPrimaryButtonClass" :disabled="!profileForm?.isValid || isSaving" data-test="onboarding-name-continue">
+                <IconLoader v-if="isSaving" class="h-4 w-4 animate-spin" />
+                {{ t('continue') }}
+                <IconArrowRight v-if="!isSaving" class="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
-    </form>
-  </AuthPageShell>
+    </section>
+  </AppOnboardingPageFrame>
 </template>
 
 <route lang="yaml">

@@ -28,6 +28,14 @@ describe('required initial onboarding name', () => {
   it('removes a stale treatment when the authoritative response omits it', () => {
     expect(reconcileOnboardingABTestAssignments(abtests, {})).toEqual({})
   })
+  it('preserves the required name gate and V6 tracking while a forced refresh is pending or fails', () => {
+    const retained = reconcileOnboardingABTestAssignments(abtests, {}, { authoritative: false })
+    expect(retained).toEqual(abtests)
+    const retainedOnboarding = { abtests: { onboarding_v6: { ...retained.onboarding_v6 } } }
+    expect(needsInitialOnboardingName({ onboarding: retainedOnboarding })).toBe(true)
+    expect(resolveOnboardingAnalyticsVersion(retainedOnboarding)).toBe(6)
+    expect(reconcileOnboardingABTestAssignments(retained, {})).toEqual({})
+  })
   it('consumes the handoff once so a refresh starts a new telemetry run', () => {
     const identity = { attemptId: 'attempt', runId: 'run' }
     let state: Record<string, unknown> = { position: 3, [PROFILE_ONBOARDING_HANDOFF_KEY]: identity }

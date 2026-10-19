@@ -37,8 +37,10 @@ async function updateUser(
 
     let userRecord = data ?? null
 
-    if (error && error.code !== 'PGRST116')
+    if (error && error.code !== 'PGRST116') {
       console.error('Failed to fetch public user profile', error)
+      return
+    }
 
     if (!userRecord && main.auth) {
       const { data: inserted, error: insertError } = await supabase
@@ -231,8 +233,10 @@ async function guard(
   }
 
   function requiredNameRedirect(organizationsLoaded: boolean) {
+    // An unknown profile cannot establish treatment eligibility. Offer a retry
+    // without letting the user bypass required names or stranding navigation.
     if (!main.user)
-      return false
+      return { path: '/login', query: { profile_unavailable: '1', to: to.fullPath } }
     if (!needsInitialOnboardingName(main.user))
       return null
     // Scope is unknown after an org fetch failure. Retry rather than forcing

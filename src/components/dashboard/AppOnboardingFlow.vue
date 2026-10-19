@@ -25,7 +25,6 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconCopy from '~icons/ion/copy-outline'
-import IconArrowLeft from '~icons/lucide/arrow-left'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconCheck from '~icons/lucide/check'
 import IconChevronDown from '~icons/lucide/chevron-down'
@@ -86,7 +85,7 @@ import {
 } from '~/utils/onboardingAppDraft'
 import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { withOnboardingChannelOrigin } from '~/utils/onboardingChannelAnalytics'
-import { consumeProfileOnboardingHandoff, needsInitialOnboardingName } from '~/utils/onboardingProfile'
+import { consumeProfileOnboardingHandoff, initialProfileOnboardingProgressSteps, needsInitialOnboardingName } from '~/utils/onboardingProfile'
 import {
   createOnboardingDetailsFieldDebouncer,
   createOnboardingProgressTracker,
@@ -114,6 +113,7 @@ import {
 import AppOnboardingBuilderChecklist from './AppOnboardingBuilderChecklist.vue'
 import AppOnboardingCliSteps from './AppOnboardingCliSteps.vue'
 import AppOnboardingDualChecklist from './AppOnboardingDualChecklist.vue'
+import AppOnboardingHeader from './AppOnboardingHeader.vue'
 import AppOnboardingIconInput from './AppOnboardingIconInput.vue'
 import AppOnboardingSetupChecklist from './AppOnboardingSetupChecklist.vue'
 import AppOnboardingWelcome from './AppOnboardingWelcome.vue'
@@ -180,7 +180,7 @@ type AppRow = Omit<Database['public']['Tables']['apps']['Row'], 'onboarding'> & 
 type StandardFlowStep = 'details' | 'channel' | 'setup'
 type PreOrgFlowStep = 'intent' | 'publish_app_question' | 'details' | 'organization' | 'channel' | 'setup'
 type OnboardingFlowStep = StandardFlowStep | PreOrgFlowStep
-type OnboardingProgressStepId = OnboardingFlowStep
+type OnboardingProgressStepId = OnboardingFlowStep | 'name'
 type AppDetailsStep = 'name' | 'icon'
 type AppDetailsAnalyticsStep = 'app_name' | 'app_icon'
 type SetupStage = UserOnboardingSetupStage
@@ -250,6 +250,7 @@ const skippedPublishAppQuestion = ref(false)
 const billingAccount = ref<'ee' | 'us' | undefined>()
 const selectedIntent = ref<OnboardingIntent | null>(null)
 const profileOnboarding = computed(() => hasProfileOnboarding(main.user?.onboarding))
+const initialProfileOnboarding = computed(() => props.preOrg && !props.newOrganization && !props.setupAppId && profileOnboarding.value)
 const intentStepLabel = computed(() => t('unified-onboarding-step-intent'))
 const onboardingAnalyticsVersion = () => resolveOnboardingAnalyticsVersion(onboardingForABTests.value, selectedIntent.value)
 const setupHandoff = props.setupAppId ? consumeSetupHandoff(props.setupAppId) : null
@@ -334,10 +335,11 @@ function consumeSetupHandoff(appId: string) {
   return handoff
 }
 
-function applyOnboardingABTestAssignments(assignments: Record<string, OnboardingABTestAssignment>) {
+function applyOnboardingABTestAssignments(assignments: Record<string, OnboardingABTestAssignment>, options: { authoritative?: boolean } = {}) {
   onboardingABTestAssignments.value = reconcileOnboardingABTestAssignments(
     onboardingABTestAssignments.value,
     assignments,
+    options,
   )
   if (!main.user)
     return
@@ -348,7 +350,7 @@ function applyOnboardingABTestAssignments(assignments: Record<string, Onboarding
     ...main.user,
     onboarding: {
       ...currentOnboarding,
-      abtests: reconcileOnboardingABTestAssignments(currentABTests, assignments),
+      abtests: reconcileOnboardingABTestAssignments(currentABTests, assignments, options),
     } as unknown as Json,
   }
   void redirectToRequiredInitialName()
@@ -364,7 +366,7 @@ function refreshOnboardingABTests(options: { force?: boolean } = {}): Promise<vo
   }
 
   if (options.force)
-    applyOnboardingABTestAssignments({})
+    applyOnboardingABTestAssignments({}, { authoritative: false })
 
   const request = (async () => {
     const { data, error } = await invokeCapgoApi<OnboardingABTestsResponse>('private/onboarding_ab_tests', {
@@ -574,10 +576,10 @@ const appOnboardingSteps = computed<Array<{ id: OnboardingFlowStep, label: strin
   ]
 })
 const stepperStepId = computed(() => flowStep.value === 'publish_app_question' ? 'intent' : flowStep.value)
-const onboardingProgressSteps = computed<Array<{ id: OnboardingProgressStepId, label: string }>>(() => appOnboardingSteps.value)
+const onboardingProgressSteps = computed<Array<{ id: OnboardingProgressStepId, label: string }>>(() => initialProfileOnboarding.value
+  ? initialProfileOnboardingProgressSteps(onboardingForABTests.value).map(step => ({ id: step.id, label: t(step.labelKey) }))
+  : appOnboardingSteps.value)
 const currentProgressStepId = computed<OnboardingProgressStepId>(() => stepperStepId.value)
-const currentStepIndex = computed(() => Math.max(0, onboardingProgressSteps.value.findIndex(entry => entry.id === currentProgressStepId.value)))
-const stepProgress = computed(() => `${((currentStepIndex.value + 1) / onboardingProgressSteps.value.length) * 100}%`)
 const userCountStops = computed<UserCountStop[]>(() => {
   const planStops = planNameOrder.map(planName => main.plans.find(plan => plan.name === planName)).flatMap((plan) => {
     if (!plan?.mau)
@@ -942,7 +944,7 @@ async function resetOnboardingForm() {
 }
 
 function showWelcomeOnDesktop() {
-  welcomePending.value = Boolean(props.preOrg && welcomeCanvasEligible.value)
+  welcomePending.value = Boolean(props.preOrg && welcomeCanvasEligible.value && !initialProfileOnboarding.value)
 }
 
 async function continueFromWelcome() {
@@ -2841,65 +2843,15 @@ defineExpose({
       </div>
 
       <div v-else class="onboarding-flow-content space-y-6">
-        <header v-if="!showDualChecklist && !showSetupChecklist && !showBuilderChecklist && (!props.setupAppId || showSetupBackButton)" class="onboarding-flow-header">
-          <div class="flex items-center gap-2">
-            <button
-              v-if="showSetupBackButton"
-              type="button"
-              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:-translate-x-0.5 hover:border-slate-300 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-300 dark:hover:border-white/30 dark:hover:text-white"
-              data-test="onboarding-setup-back"
-              :aria-label="t('button-back')"
-              :title="t('button-back')"
-              @click="goBackFromSetupStage"
-            >
-              <IconArrowLeft class="h-4 w-4" aria-hidden="true" />
-            </button>
-            <div v-if="!props.setupAppId" class="onboarding-flow-badge inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-200">
-              <IconSparkles class="h-4 w-4" />
-              {{ t('app-onboarding-badge') }}
-            </div>
-          </div>
-          <template v-if="!props.setupAppId">
-            <h1 class="onboarding-flow-title mt-4 text-2xl font-semibold text-slate-950 sm:text-3xl dark:text-white">
-              {{ props.onboarding
-                ? t('app-onboarding-title-first')
-                : t('app-onboarding-title-return') }}
-            </h1>
-
-            <nav class="mt-6" :aria-label="t('app-onboarding-step-details')">
-              <ol class="flex items-center gap-2">
-                <li
-                  v-for="(entry, index) in onboardingProgressSteps"
-                  :key="entry.id"
-                  class="flex min-w-0 flex-1 items-center gap-2"
-                  :aria-current="currentProgressStepId === entry.id ? 'step' : undefined"
-                >
-                  <span
-                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                    :class="index < currentStepIndex ? 'bg-emerald-500 text-white' : currentProgressStepId === entry.id ? 'bg-primary-500 text-white' : 'bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400'"
-                  >
-                    <IconCheck v-if="index < currentStepIndex" class="h-3.5 w-3.5" />
-                    <span v-else>{{ index + 1 }}</span>
-                  </span>
-                  <span
-                    class="hidden truncate text-sm font-medium sm:block"
-                    :class="currentProgressStepId === entry.id ? 'text-slate-950 dark:text-white' : index < currentStepIndex ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400 dark:text-slate-500'"
-                  >
-                    {{ entry.label }}
-                  </span>
-                  <span
-                    v-if="index < onboardingProgressSteps.length - 1"
-                    class="mx-1 hidden h-px flex-1 bg-slate-200 sm:block dark:bg-white/15"
-                    aria-hidden="true"
-                  />
-                </li>
-              </ol>
-              <div class="mt-3 h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" aria-hidden="true">
-                <div class="h-full rounded-full bg-primary-500 transition-all duration-300" :style="{ width: stepProgress }" />
-              </div>
-            </nav>
-          </template>
-        </header>
+        <AppOnboardingHeader
+          v-if="!showDualChecklist && !showSetupChecklist && !showBuilderChecklist && (!props.setupAppId || showSetupBackButton)"
+          :title="initialProfileOnboarding ? t('onboarding-welcome-title') : props.onboarding ? t('app-onboarding-title-first') : t('app-onboarding-title-return')"
+          :steps="onboardingProgressSteps"
+          :current-step-id="currentProgressStepId"
+          :show-intro="!props.setupAppId"
+          :show-back="showSetupBackButton"
+          @back="goBackFromSetupStage"
+        />
 
         <div v-if="props.preOrg && (flowStep === 'intent' || flowStep === 'publish_app_question')" class="onboarding-intent-card rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95">
           <div class="onboarding-intent-card-content space-y-6">
