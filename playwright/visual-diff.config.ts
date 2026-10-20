@@ -30,6 +30,9 @@ async function prepareProfileGoalScreenshot(page: Page) {
     return
   if (await welcome.isVisible())
     await welcome.click()
+  await name.or(goal).waitFor()
+  if (await name.isVisible())
+    return
   await goal.click()
 }
 

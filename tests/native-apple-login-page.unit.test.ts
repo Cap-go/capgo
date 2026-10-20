@@ -23,11 +23,12 @@ const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
   setSession: vi.fn(),
   fullPath: '/login',
+  query: { to: '/apps' } as Record<string, string>,
   assign: vi.fn(),
 }))
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => mocks.available } }))
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: { to: '/apps' }, fullPath: mocks.fullPath, hash: '' }),
+  useRoute: () => ({ query: mocks.query, fullPath: mocks.fullPath, hash: '' }),
   useRouter: () => ({ replace: mocks.replace }),
 }))
 vi.mock('vue-sonner', () => ({ toast: { error: mocks.error, warning: mocks.warning, success: vi.fn() } }))
@@ -77,6 +78,7 @@ beforeEach(() => {
   mocks.available = true
   mocks.getClaims.mockResolvedValue({ data: { claims: null } })
   mocks.fullPath = '/login'
+  mocks.query = { to: '/apps' }
   sessionStorage.clear()
   vi.stubEnv('DEV', true)
   vi.stubEnv('VITE_WEB_APPLE_LOGIN_ENABLED', 'false')
@@ -251,5 +253,35 @@ describe('native Apple login page', () => {
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
     expect(mocks.replace).not.toHaveBeenCalled()
     expect(mocks.error).toHaveBeenCalledWith(messages['apple-login-failed'])
+  })
+})
+
+describe('account profile recovery', () => {
+  it('lets the user sign out and clears the recovery query', async () => {
+    mocks.query = { profile_unavailable: '1', to: '/apps' }
+    const root = await mount()
+    const logout = root.querySelector<HTMLButtonElement>('[data-test="account-load-logout"]')
+    expect(logout).not.toBeNull()
+    logout!.click()
+    await settle()
+    expect(mocks.signOut).toHaveBeenCalledOnce()
+    expect(mocks.replace).toHaveBeenCalledWith('/login')
+  })
+
+  it.each(['returned', 'thrown'])('keeps recovery available when logout fails (%s)', async (failure) => {
+    mocks.query = { profile_unavailable: '1', to: '/apps' }
+    if (failure === 'returned')
+      mocks.signOut.mockResolvedValue({ error: new Error('Sign out unavailable') })
+    else
+      mocks.signOut.mockRejectedValue(new Error('Sign out unavailable'))
+    const root = await mount()
+    const logout = root.querySelector<HTMLButtonElement>('[data-test="account-load-logout"]')
+    expect(logout).not.toBeNull()
+    logout!.click()
+    await settle()
+    expect(mocks.error).toHaveBeenCalledWith(messages['cannot-sign-off'])
+    expect(mocks.replace).not.toHaveBeenCalled()
+    expect(logout!.disabled).toBe(false)
+    expect(root.querySelector('[data-test="account-load-retry"]')).not.toBeNull()
   })
 })

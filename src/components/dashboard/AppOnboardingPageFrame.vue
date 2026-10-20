@@ -11,7 +11,8 @@ const { t } = useI18n()
 
 <template>
   <div class="relative flex h-full min-h-0 flex-col overflow-hidden bg-slate-50 dark:bg-slate-950" data-test="onboarding-page">
-    <header class="onboarding-page-actions absolute right-0 top-0 z-20 flex shrink-0 items-center justify-end px-2 py-2 sm:px-6 sm:py-3 lg:px-10">
+    <header class="onboarding-page-actions absolute right-0 top-0 z-20 flex shrink-0 items-center justify-end gap-2 px-2 py-2 sm:px-6 sm:py-3 lg:px-10">
+      <slot name="actions" />
       <button
         v-if="props.canCancel"
         type="button"

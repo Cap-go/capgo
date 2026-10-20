@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import Banner from '~/components/Banner.vue'
 import AppOnboardingFlow from '~/components/dashboard/AppOnboardingFlow.vue'
 import AppOnboardingPageFrame from '~/components/dashboard/AppOnboardingPageFrame.vue'
 import { useDisplayStore } from '~/stores/display'
@@ -53,6 +54,12 @@ onMounted(async () => {
 
 <template>
   <AppOnboardingPageFrame :can-cancel="isNewOrganization" :is-logging-out="isLoggingOut" @cancel="router.push('/dashboard')" @logout="logoutFromOnboarding">
+    <template #actions>
+      <!-- Keep trial status visible on wide screens without overlapping the title. -->
+      <div class="hidden xl:flex">
+        <Banner desktop />
+      </div>
+    </template>
     <PageLoader v-if="!isReady" class="min-h-0 flex-1" />
     <div v-else class="min-h-0 flex-1">
       <AppOnboardingFlow ref="onboardingFlow" pre-org onboarding :new-organization="isNewOrganization" />

@@ -719,6 +719,7 @@ describe('onboarding progress analytics', () => {
       existing_app: true,
       intent: 'ota',
       org_id: 'org-id',
+      placement: 'checklist',
       setup_command: 'ota',
     })
 
@@ -734,6 +735,7 @@ describe('onboarding progress analytics', () => {
         onboarding_run_id: RUN_R1,
         onboarding_version: ONBOARDING_ANALYTICS_VERSION,
         org_id: 'org-id',
+        placement: 'checklist',
         resumed: true,
         setup_command: 'ota',
         step: 'setup',

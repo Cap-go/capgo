@@ -43,7 +43,7 @@ const writerMocks = vi.hoisted(() => ({
   route: { query: {} as Record<string, string> },
   router: {
     push: vi.fn(),
-    replace: vi.fn(async () => undefined),
+    replace: vi.fn<(...args: unknown[]) => Promise<unknown>>(async () => undefined),
   },
   sendOnboardingEvent: vi.fn(),
 }))
@@ -1455,5 +1455,66 @@ it('requires names when treatment arrives after the bounded startup wait', async
     if (descriptor)
       Object.defineProperty(window, 'matchMedia', descriptor)
     vi.useRealTimers()
+  }
+})
+
+it.each(['aborted', 'rejected', 'treatment-removed'])('recovers a failed required-name navigation (%s) without saving wizard progress', async (failure) => {
+  const previousUser = writerMocks.main.user
+  const previousAssignments = writerMocks.abTestAssignments
+  const descriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
+  const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => undefined)
+  const assignments = { onboarding_v6: { branch: 'A', assigned_at: '2026-10-20T10:00:00.000Z' } }
+  writerMocks.abTestAssignments = assignments
+  writerMocks.main.user = { id: 'name-redirect-retry', image_url: '', onboarding: { abtests: assignments } }
+  writerMocks.router.replace.mockReset()
+  if (failure !== 'rejected')
+    writerMocks.router.replace.mockResolvedValueOnce({ type: 4 })
+  else
+    writerMocks.router.replace.mockRejectedValueOnce(new Error('Navigation failed'))
+  writerMocks.router.replace.mockResolvedValue(undefined)
+  writerMocks.replaceUserOnboardingIfUnchanged.mockClear()
+  Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => ({ matches: false }) })
+  const app = createApp(AppOnboardingFlow, { onboarding: true, preOrg: true })
+  app.config.warnHandler = () => undefined
+  const root = document.createElement('div')
+  try {
+    app.mount(root)
+    for (let i = 0; i < 80; i++) {
+      await Promise.resolve()
+      await nextTick()
+    }
+    const retry = root.querySelector<HTMLButtonElement>('[data-test="onboarding-name-redirect-retry"]')
+    expect(retry).not.toBeNull()
+    expect(root.querySelector('.onboarding-intent-card')).toBeNull()
+    expect(writerMocks.replaceUserOnboardingIfUnchanged).not.toHaveBeenCalled()
+    expect(retry!.disabled).toBe(false)
+    if (failure === 'treatment-removed')
+      writerMocks.main.user.onboarding = { abtests: {} }
+    retry!.click()
+    for (let i = 0; i < 20; i++) {
+      await Promise.resolve()
+      await nextTick()
+    }
+    if (failure === 'treatment-removed') {
+      expect(reload).toHaveBeenCalledOnce()
+      expect(writerMocks.router.replace).toHaveBeenCalledTimes(1)
+    }
+    else {
+      expect(reload).not.toHaveBeenCalled()
+      expect(writerMocks.router.replace).toHaveBeenCalledTimes(2)
+      expect(writerMocks.router.replace).toHaveBeenLastCalledWith({ path: '/onboarding/name', query: { to: '/onboarding/app' } })
+    }
+    app.unmount()
+    await nextTick()
+    expect(writerMocks.replaceUserOnboardingIfUnchanged).not.toHaveBeenCalled()
+  }
+  finally {
+    app.unmount()
+    writerMocks.main.user = previousUser
+    writerMocks.abTestAssignments = previousAssignments
+    writerMocks.router.replace.mockReset().mockResolvedValue(undefined)
+    reload.mockRestore()
+    if (descriptor)
+      Object.defineProperty(window, 'matchMedia', descriptor)
   }
 })

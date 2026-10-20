@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Json } from '~/types/supabase.types'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { setUser } from '~/services/posthog'
@@ -19,6 +19,7 @@ const emit = defineEmits<{
 const main = useMainStore()
 const supabase = useSupabase()
 const { t } = useI18n()
+const inputId = useId()
 const firstName = ref(main.user?.first_name ?? '')
 const lastName = ref(main.user?.last_name ?? '')
 const needsProfileName = computed(() => hasProfileOnboarding(main.user?.onboarding) && (props.initial || !main.user?.first_name?.trim() || !main.user?.last_name?.trim()))
@@ -188,11 +189,11 @@ defineExpose({ isValid, resetDraft, save })
 <template>
   <div v-if="needsProfileName" class="grid gap-4 sm:grid-cols-2">
     <div>
-      <label for="onboarding-first-name" class="text-sm font-medium text-slate-800 dark:text-slate-200">
+      <label :for="`${inputId}-first-name`" class="text-sm font-medium text-slate-800 dark:text-slate-200">
         {{ t('first-name') }}
       </label>
       <input
-        id="onboarding-first-name"
+        :id="`${inputId}-first-name`"
         :value="firstName"
         type="text"
         autocomplete="given-name"
@@ -204,11 +205,11 @@ defineExpose({ isValid, resetDraft, save })
       >
     </div>
     <div>
-      <label for="onboarding-last-name" class="text-sm font-medium text-slate-800 dark:text-slate-200">
+      <label :for="`${inputId}-last-name`" class="text-sm font-medium text-slate-800 dark:text-slate-200">
         {{ t('last-name') }}
       </label>
       <input
-        id="onboarding-last-name"
+        :id="`${inputId}-last-name`"
         :value="lastName"
         type="text"
         autocomplete="family-name"

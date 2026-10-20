@@ -51,7 +51,7 @@ describe('app onboarding welcome', () => {
     expect(source).not.toContain('useMediaQuery(')
     expect(source).not.toContain('useMediaQuery(\'(min-width: 1024px)\')')
     expect(source).not.toContain('(hover: hover) and (pointer: fine)')
-    expect(source).toContain('v-if="showPreOrgWelcome && !isLoading"')
+    expect(source).toContain('v-else-if="showPreOrgWelcome && !isLoading"')
     expect(resumeFlow).toContain('showWelcomeOnDesktop()')
 
     const restartBranch = resumeFlow.slice(

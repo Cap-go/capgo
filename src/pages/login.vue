@@ -232,6 +232,25 @@ async function nextLogin() {
   }, 500)
 }
 
+async function logoutFromProfileRecovery() {
+  if (isLoading.value)
+    return
+  isLoading.value = true
+  try {
+    const { error } = await supabase.auth.signOut()
+    if (error)
+      throw error
+    await router.replace('/login')
+  }
+  catch (error) {
+    console.error('Failed to sign out from account recovery', error)
+    toast.error(t('cannot-sign-off'))
+  }
+  finally {
+    isLoading.value = false
+  }
+}
+
 async function checkMfa() {
   const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
   if (mfaError) {
@@ -1018,6 +1037,9 @@ onMounted(checkLogin)
               </p>
               <button type="button" :class="authPrimaryButtonClass" :disabled="isLoading" data-test="account-load-retry" @click="nextLogin">
                 {{ t('retry') }}
+              </button>
+              <button type="button" :class="authSecondaryButtonClass" :disabled="isLoading" data-test="account-load-logout" @click="logoutFromProfileRecovery">
+                {{ t('logout') }}
               </button>
             </div>
             <div v-else-if="hasQuerySession" :class="authStepCardClass">
