@@ -159,7 +159,7 @@ export async function createStripeCustomer(c: Context, org: OrgRow) {
 
   const customer = await createCustomer(c, current.management_email, current.created_by, current.id, current.name, billingAccount)
   // Direct-offer (paid ads) creators get no trial; everyone else gets the standard trial.
-  const trial_at = await resolveNewOrgTrialEnd(c, current.created_by)
+  const trial_at = await resolveNewOrgTrialEnd(c, supabaseAdmin(c), current.created_by)
   cloudlog({ requestId: c.get('requestId'), message: 'createInfo', plan: selectedPlan, customer, billingAccount })
 
   const { error: createInfoError } = await supabaseAdmin(c)

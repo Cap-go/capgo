@@ -267,6 +267,29 @@ describe('first-organization lifecycle on user registration', () => {
     }
   })
 
+  it('tags direct-offer signups offer=direct in Bento', async () => {
+    mockRegistrationMetadata({ offer: 'direct' })
+
+    const response = await postUser()
+
+    expect(response.status).toBe(200)
+    expect(syncBentoSubscriberTagsMock).toHaveBeenCalledWith(expect.anything(), {
+      deleteSegments: [],
+      email: 'new.user@example.com',
+      segments: ['offer=direct'],
+    })
+  })
+
+  it('does not add the offer tag for standard signups', async () => {
+    mockRegistrationMetadata({ offer: 'Direct' })
+
+    const response = await postUser()
+    const sentSegments = syncBentoSubscriberTagsMock.mock.calls.flatMap(call => Array.isArray(call[1]) ? call[1].flatMap(item => item.segments) : call[1].segments)
+
+    expect(response.status).toBe(200)
+    expect(sentSegments).not.toContain('offer=direct')
+  })
+
   it('fails for retry when Bento rejects the mobile registration event', async () => {
     mockRegistrationMetadata({ registration_device_type: 'mobile' })
     trackBentoEventMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false)

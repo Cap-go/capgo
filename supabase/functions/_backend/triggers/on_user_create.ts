@@ -3,8 +3,9 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { syncNewUserABTests } from '../utils/ab_tests.ts'
-import { trackBentoEvent } from '../utils/bento.ts'
+import { syncBentoSubscriberTags, trackBentoEvent } from '../utils/bento.ts'
 import { normalizeBentoEmail, prepareNewUserProvisioning, syncBentoFirstOrgOnUserCreate } from '../utils/bento_first_org.ts'
+import { DIRECT_OFFER_BENTO_TAG, isDirectOfferMetadata } from '../utils/direct_offer.ts'
 import { BRES, middlewareAPISecret, quickError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { trackOpenAIRegistration } from '../utils/openai_ads.ts'
@@ -39,6 +40,17 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'INSERT'), async (c
   cloudlog({ requestId: c.get('requestId'), message: 'createCustomer stripe' })
   await syncUserPreferenceTags(c, normalizeBentoEmail(record.email), record)
   await syncBentoFirstOrgOnUserCreate(c, record)
+  if (isDirectOfferMetadata(registrationMetadata)) {
+    // Direct-offer (paid ads) signups: tag offer=direct so lifecycle emails can
+    // target them; they never get trial tags. Tag writes are idempotent on retry.
+    const tagged = await syncBentoSubscriberTags(c, {
+      email: normalizeBentoEmail(record.email),
+      segments: [DIRECT_OFFER_BENTO_TAG],
+      deleteSegments: [],
+    })
+    if (tagged === false)
+      quickError(500, 'bento_direct_offer_tag_failed', 'Bento direct offer tag delivery failed')
+  }
   const deviceType = registrationMetadata.registration_device_type
   if (deviceType === 'mobile' || deviceType === 'tablet') {
     const result = await trackBentoEvent(c, normalizeBentoEmail(record.email), {

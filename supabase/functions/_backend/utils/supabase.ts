@@ -8,8 +8,9 @@ import type { Database } from './supabase.types.ts'
 import type { ChannelDeviceOverrideIds, ChannelDevicePlatform, DeviceWithoutCreatedAt, NativeActiveDevicesByPlatformRow, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsInsightsParams, ReadStatsParams, StatsInsightsResult, StatsMetadata, VersionUsage, VersionUsageChannel } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
 import { HTTPException } from 'hono/http-exception'
-import { buildBillingPlanBentoTags } from './billing_bento_tags.ts'
+import { applyDirectOfferBentoTags, buildBillingPlanBentoTags } from './billing_bento_tags.ts'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
+import { isDirectOfferUser } from './direct_offer.ts'
 import { quickError, simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from './pg.ts'
@@ -1186,6 +1187,31 @@ export async function createApiKey(c: Context, userId: string) {
 }
 
 export async function customerToSegmentOrg(
+  c: Context,
+  orgId: string,
+  price_id?: string | null,
+  plan?: Database['public']['Tables']['plans']['Row'] | null,
+  trialPlanNamesToRemove?: readonly string[] | null,
+): Promise<{ segments: string[], deleteSegments: string[] }> {
+  // Direct-offer (paid ads) orgs never had a trial: tag offer=direct and strip trial tags.
+  const isDirectOffer = await isDirectOfferOrg(c, orgId)
+  return applyDirectOfferBentoTags(await customerToSegmentOrgBase(c, orgId, price_id, plan, trialPlanNamesToRemove), isDirectOffer)
+}
+
+async function isDirectOfferOrg(c: Context, orgId: string) {
+  const { data, error } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('created_by')
+    .eq('id', orgId)
+    .maybeSingle()
+  if (error || !data) {
+    cloudlog({ requestId: c.get('requestId'), message: 'isDirectOfferOrg org lookup failed', orgId, error })
+    return false
+  }
+  return await isDirectOfferUser(c, supabaseAdmin(c), data.created_by)
+}
+
+async function customerToSegmentOrgBase(
   c: Context,
   orgId: string,
   price_id?: string | null,

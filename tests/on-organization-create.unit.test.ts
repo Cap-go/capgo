@@ -10,7 +10,11 @@ const {
   resolveSignupAttributionForUserMock,
   resolveSignupAttributionForOrgMock,
   orgSignupPluginUpdateMock,
+  syncBentoSubscriberTagsMock,
+  creatorMetadata,
 } = vi.hoisted(() => ({
+  syncBentoSubscriberTagsMock: vi.fn(async (..._args: unknown[]) => undefined),
+  creatorMetadata: { value: {} as Record<string, unknown> },
   createStripeCustomerMock: vi.fn(async () => 'Solo'),
   finalizePendingStripeCustomerMock: vi.fn(async () => 'Solo'),
   backgroundTaskMock: vi.fn(async (c: unknown, task: unknown) => task),
@@ -51,7 +55,7 @@ vi.mock('../supabase/functions/_backend/utils/tracking.ts', () => ({
 }))
 
 vi.mock('../supabase/functions/_backend/utils/bento.ts', () => ({
-  syncBentoSubscriberTags: vi.fn(async () => undefined),
+  syncBentoSubscriberTags: syncBentoSubscriberTagsMock,
 }))
 
 vi.mock('../supabase/functions/_backend/utils/posthog.ts', () => ({
@@ -91,6 +95,11 @@ function createOrg(customerId: string | null) {
 
 function mockOrgReload(customerId: string | null) {
   supabaseAdminMock.mockImplementation(() => ({
+    auth: {
+      admin: {
+        getUserById: async () => ({ data: { user: { user_metadata: creatorMetadata.value } }, error: null }),
+      },
+    },
     from: (table: string) => {
       if (table === 'orgs') {
         return {
@@ -129,6 +138,47 @@ describe('on_organization_create stripe bootstrap', () => {
     finalizePendingStripeCustomerMock.mockResolvedValue('Solo')
     resolveSignupAttributionForUserMock.mockResolvedValue({})
     resolveSignupAttributionForOrgMock.mockResolvedValue({})
+    creatorMetadata.value = {}
+  })
+
+  it('tags standard trial creators with the trial plan in Bento', async () => {
+    mockOrgReload(`pending_${ORG_ID}`)
+    const { app } = await import('../supabase/functions/_backend/triggers/on_organization_create.ts')
+
+    const response = await app.request('http://localhost/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ table: 'orgs', type: 'INSERT', record: createOrg(null) }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(syncBentoSubscriberTagsMock).toHaveBeenCalledWith(expect.anything(), {
+      email: 'owner@example.com',
+      segments: ['trial-plan:Solo'],
+      deleteSegments: [],
+    })
+  })
+
+  it('tags direct-offer creators offer=direct without any trial tag', async () => {
+    creatorMetadata.value = { offer: 'direct' }
+    mockOrgReload(`pending_${ORG_ID}`)
+    const { app } = await import('../supabase/functions/_backend/triggers/on_organization_create.ts')
+
+    const response = await app.request('http://localhost/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ table: 'orgs', type: 'INSERT', record: createOrg(null) }),
+    })
+
+    expect(response.status).toBe(200)
+    expect(syncBentoSubscriberTagsMock).toHaveBeenCalledWith(expect.anything(), {
+      email: 'owner@example.com',
+      segments: ['offer=direct'],
+      deleteSegments: ['trial-plan:Solo'],
+    })
+    const sentSegments = (syncBentoSubscriberTagsMock.mock.calls as unknown as Array<[unknown, { segments: string[] }]>)
+      .flatMap(call => call[1].segments)
+    expect(sentSegments.some(tag => tag.startsWith('trial'))).toBe(false)
   })
 
   it('persists signup_plugin and attaches attribution tags on Org Created', async () => {

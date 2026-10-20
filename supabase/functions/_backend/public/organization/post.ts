@@ -76,7 +76,7 @@ async function createPendingStripeInfo(c: Context<MiddlewareKeyVariables>, orgId
   const billingAccount = resolvePlanBillingAccount(c, plan, requestedBillingAccount, explicit)
   const pendingCustomerId = `pending_${orgId}`
   // Direct-offer (paid ads) creators get no trial; everyone else gets the standard trial.
-  const trialAt = await resolveNewOrgTrialEnd(c, creatorId)
+  const trialAt = await resolveNewOrgTrialEnd(c, supabaseAdmin(c), creatorId)
 
   const { error } = await supabaseAdmin(c)
     .from('stripe_info')
