@@ -4,7 +4,7 @@ import { intro, log, outro, spinner } from '@clack/prompts'
 import { check2FAComplianceForApp } from '../api/app'
 import { getPendingOnboardingChecks } from '../onboarding/background-workers'
 import { CliUserError } from '../shared/cli-user-error'
-import { canPromptInteractively, createSupabaseClient, findSavedKey, formatCapgoCliInvokeError, getAppId, getCapgoCliHttpStatus, getConfig, invokeCapgoCliApi } from '../utils'
+import { canPromptInteractively, createCapgoClient, findSavedKey, formatCapgoCliInvokeError, getAppId, getCapgoCliHttpStatus, getConfig, invokeCapgoCliApi } from '../utils'
 import { formatBuilderOnlyChecklist, getBuilderChecklist, getBuilderOnlyChecklist } from './builder-checklist'
 
 export type AppTodoList = 'builder' | 'ota'
@@ -292,7 +292,7 @@ export async function appTodo(appId: string | undefined, options: AppTodoOptions
     throw new CliUserError(message)
   }
 
-  const supabase = await createSupabaseClient(apikey, options.supaHost, options.supaAnon)
+  const client = await createCapgoClient(apikey, options.apiHost)
   const interactive = canPromptInteractively()
   const loading = interactive ? spinner() : null
   if (loading)
@@ -302,7 +302,7 @@ export async function appTodo(appId: string | undefined, options: AppTodoOptions
 
   let progress: AppTodoProgress
   try {
-    await check2FAComplianceForApp(supabase, appId)
+    await check2FAComplianceForApp(client, appId)
     progress = await readAppTodoProgress(appId, { ...options, apikey })
     loading?.stop('Todo list loaded')
   }

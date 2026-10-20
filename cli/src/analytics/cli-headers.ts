@@ -36,7 +36,7 @@ function invalidAuthHeaderMessage(headerName: string): string {
   if (headerName.toLowerCase() === 'x-capgo-log-token')
     return 'Build log token contains invalid characters (only ASCII is allowed). Re-run the build command to get a fresh token.'
   if (headerName.toLowerCase() === 'authorization')
-    return 'Authorization header contains invalid characters (only ASCII is allowed). Check your Capgo API key or Supabase anon key configuration.'
+    return 'Authorization header contains invalid characters (only ASCII is allowed). Check your Capgo API key configuration.'
   return 'Capgo API key contains invalid characters (only ASCII is allowed). Copy the key from the Capgo dashboard.'
 }
 
