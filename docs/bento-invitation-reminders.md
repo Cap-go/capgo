@@ -10,10 +10,16 @@ queue publication does not shift the cadence, and old or duplicate ticks cannot
 start a second execution of an already handled slot. After a delay, the next
 available tick evaluates the current cohort rather than replaying missed slots.
 
-The worker's `HYPERDRIVE_CAPGO_DIRECT_EU` binding uses `capgo-direct-eu-nocache`
-on the primary database, with query caching disabled. Audit relays read immediately
-after writes, so cached results can leave completion audits pending and delay the
-next evaluation. Hyperdrive connection pooling remains enabled.
+The worker keeps the existing cached `HYPERDRIVE_CAPGO_DIRECT_EU` binding as its
+default. Only `scheduleDispatch` explicitly passes `{ bypassCache: true }` to
+`withDatabase`, selecting the separate `HYPERDRIVE_CAPGO_DIRECT_EU_NOCACHE`
+binding (`capgo-direct-eu-nocache`) for the cron's audit recovery and enqueue
+decisions. This lets each tick see pending completion audits and clear them
+before scheduling the next minute. The queue consumer and all callers without
+that explicit option keep using the existing cached connection. Merely binding
+the uncached resource does not opt any caller into it; if the cron's requested
+binding is missing, scheduling fails visibly instead of falling back to cached
+reads. Both connections target the primary and retain Hyperdrive pooling.
 
 One evaluation queue delivers one `{ version: 1, evaluationKey, runId }` message
 per invocation. A pending publication retries the same durable UUID. Queue receipt also records

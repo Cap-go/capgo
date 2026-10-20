@@ -13,6 +13,7 @@ import { DispatchStore } from './store.ts'
 
 export interface DispatchEnv extends PostHogQueueEnv {
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive
+  HYPERDRIVE_CAPGO_DIRECT_EU_NOCACHE?: Hyperdrive
   DISPATCH_QUEUE: Queue<DispatchJob>
   BENTO_PUBLISHABLE_KEY?: string
   BENTO_SECRET_KEY?: string
@@ -41,11 +42,14 @@ function senderContext(env: DispatchEnv, runId: string): HonoContext {
   return c
 }
 
-async function withDatabase<T>(env: DispatchEnv, operation: (db: Client) => Promise<T>): Promise<T> {
-  if (!env.HYPERDRIVE_CAPGO_DIRECT_EU?.connectionString)
+export async function withDatabase<T>(env: DispatchEnv, operation: (db: Client) => Promise<T>, options: { bypassCache?: boolean } = {}): Promise<T> {
+  // Binding presence never changes routing: only an explicit caller opt-in
+  // selects the uncached primary. Do not fall back to cached reads on that path.
+  const database = options.bypassCache === true ? env.HYPERDRIVE_CAPGO_DIRECT_EU_NOCACHE : env.HYPERDRIVE_CAPGO_DIRECT_EU
+  if (!database?.connectionString)
     throw new Error('Missing dispatch database')
   const db = new Client({
-    connectionString: env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString,
+    connectionString: database.connectionString,
     connectionTimeoutMillis: 5_000,
     query_timeout: 5_000,
     statement_timeout: 5_000,
@@ -72,7 +76,7 @@ export async function scheduleDispatch(controller: ScheduledController, env: Dis
       catch { console.error(JSON.stringify({ event: 'bento_dispatch_audit_pending' })) }
       senderContext(env, 'bento-dispatch-scheduler')
       await publishDispatchJobs(env.DISPATCH_QUEUE, store, bentoFlows, controller.scheduledTime)
-    })
+    }, { bypassCache: true })
   }
   catch {
     console.error(JSON.stringify({ event: 'bento_dispatch_schedule_failed' }))

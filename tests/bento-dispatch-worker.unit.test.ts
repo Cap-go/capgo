@@ -1,16 +1,18 @@
 import type { DispatchEnv } from '../cloudflare_workers/bento_dispatch/index.ts'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { consumeDispatch, scheduleDispatch } from '../cloudflare_workers/bento_dispatch/index.ts'
+import { consumeDispatch, scheduleDispatch, withDatabase } from '../cloudflare_workers/bento_dispatch/index.ts'
 
-const { db, store, publish, process, accepted } = vi.hoisted(() => ({
+const { db, databaseOptions, store, publish, process, accepted } = vi.hoisted(() => ({
   db: { connect: vi.fn(), end: vi.fn(), query: vi.fn(), on: vi.fn() },
+  databaseOptions: vi.fn(),
   store: { relayPendingAudit: vi.fn() },
   publish: vi.fn(),
   process: vi.fn(),
   accepted: vi.fn(),
 }))
 vi.mock('pg', () => ({ Client: class {
-  constructor() {
+  constructor(options: unknown) {
+    databaseOptions(options)
     return db
   }
 } }))
@@ -34,7 +36,7 @@ vi.mock('../supabase/functions/_backend/utils/bento.ts', async importOriginal =>
 const job = { version: 1, evaluationKey: 'org:invite_existing_user_reminder_1', runId: '11111111-1111-4111-8111-111111111111' }
 const controller = { scheduledTime: Date.UTC(2026, 0, 1, 10) } as ScheduledController
 function environment(): DispatchEnv {
-  return { HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'postgres://local' } as Hyperdrive, DISPATCH_QUEUE: { send: vi.fn() } as never, POSTHOG_QUEUE: { send: vi.fn() }, BENTO_PUBLISHABLE_KEY: 'configured', BENTO_SECRET_KEY: 'configured', BENTO_SITE_UUID: 'configured', WEBAPP_URL: 'https://console.example.com' }
+  return { HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'postgres://cached' } as Hyperdrive, HYPERDRIVE_CAPGO_DIRECT_EU_NOCACHE: { connectionString: 'postgres://uncached' } as Hyperdrive, DISPATCH_QUEUE: { send: vi.fn() } as never, POSTHOG_QUEUE: { send: vi.fn() }, BENTO_PUBLISHABLE_KEY: 'configured', BENTO_SECRET_KEY: 'configured', BENTO_SITE_UUID: 'configured', WEBAPP_URL: 'https://console.example.com' }
 }
 function message(body: unknown = job, attempts = 1) {
   return { body, attempts, ack: vi.fn(), retry: vi.fn() } as unknown as Message<unknown>
@@ -51,6 +53,32 @@ beforeEach(() => {
 })
 afterEach(() => vi.restoreAllMocks())
 describe('dedicated evaluation Worker', () => {
+  it('keeps the cached database as the default even when an uncached binding exists', async () => {
+    await withDatabase(environment(), async () => {})
+    expect(databaseOptions).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ connectionString: 'postgres://cached' }))
+  })
+  it('requires an explicit option to use the uncached database', async () => {
+    await withDatabase(environment(), async () => {}, { bypassCache: true })
+    expect(databaseOptions).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ connectionString: 'postgres://uncached' }))
+  })
+  it('opts only cron scheduling into the uncached database', async () => {
+    await scheduleDispatch(controller, environment())
+    expect(databaseOptions).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ connectionString: 'postgres://uncached' }))
+    databaseOptions.mockClear()
+    await consumeDispatch(batch([message()]), environment())
+    expect(databaseOptions).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ connectionString: 'postgres://cached' }))
+  })
+  it('fails cron visibly when its explicitly requested uncached binding is absent', async () => {
+    const env = environment()
+    delete env.HYPERDRIVE_CAPGO_DIRECT_EU_NOCACHE
+    await expect(scheduleDispatch(controller, env)).rejects.toThrow('Bento dispatch scheduling failed')
+    expect(publish).not.toHaveBeenCalled()
+    expect(databaseOptions).not.toHaveBeenCalled()
+    const msg = message()
+    await consumeDispatch(batch([msg]), env)
+    expect(msg.ack).toHaveBeenCalledOnce()
+    expect(databaseOptions).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ connectionString: 'postgres://cached' }))
+  })
   it('sweeps audits independently and still schedules evaluations during analytics failure', async () => {
     store.relayPendingAudit.mockRejectedValue(new Error('unavailable'))
     await scheduleDispatch(controller, environment())
