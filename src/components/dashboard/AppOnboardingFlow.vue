@@ -67,7 +67,7 @@ import { useOrganizationStore } from '~/stores/organization'
 import { isValidAppId } from '~/utils/appId'
 import { shouldSkipOnboardingResume } from '~/utils/appOnboardingProgress'
 import { useBeforeUnloadWarning } from '~/utils/beforeUnloadWarning'
-import { hasDualOnboardingChecklists } from '~/utils/dualOnboardingChecklists'
+import { hasDualOnboardingChecklists, resolveSetupScreen } from '~/utils/dualOnboardingChecklists'
 import {
   hasNewChannelTreatment,
   hasWebNativeDevelopmentEnvironmentTreatment,
@@ -312,9 +312,8 @@ const usesOtaTodoList = computed(() => !!createdApp.value && hasSupportedOtaTodo
 const usesDualTodoList = computed(() => !!createdApp.value && hasDualOnboardingChecklists(createdApp.value.onboarding))
 const activeChecklistPath = ref<ChecklistPath | null>(null)
 const usesBuilderTodoList = computed(() => usesDualTodoList.value ? activeChecklistPath.value === 'builder' : !!createdApp.value && isBuilderTodoListSelected(createdApp.value.onboarding))
-// Every new app gets the OTA checklist, so the builder intent must win over it
-// outside the dual checklist; otherwise builder users are sent to `capgo i`.
-const usesBuilderSetupCommand = computed(() => usesBuilderTodoList.value || (!usesDualTodoList.value && (selectedIntent.value === 'builder' || selectedIntent.value === 'publish')))
+const setupScreen = computed(() => resolveSetupScreen({ otaTodoList: usesOtaTodoList.value, dualTodoList: usesDualTodoList.value, builderTodoList: usesBuilderTodoList.value, intent: selectedIntent.value }))
+const usesBuilderSetupCommand = computed(() => setupScreen.value.builderCommand)
 const markedOnboardingFeatures = new Set<string>()
 let onboardingABTestsRequest: Promise<void> | null = null
 
@@ -607,7 +606,7 @@ const setupTitle = computed(() => usesBuilderSetupCommand.value ? t('unified-onb
 const setupSubtitle = computed(() => usesBuilderSetupCommand.value ? t('unified-onboarding-setup-builder-subtitle') : t('unified-onboarding-setup-ota-subtitle'))
 const showDualChecklist = computed(() => flowStep.value === 'setup' && usesDualTodoList.value)
 const showBuilderChecklist = computed(() => flowStep.value === 'setup' && !!createdApp.value && usesBuilderTodoList.value)
-const showSetupChecklist = computed(() => flowStep.value === 'setup' && usesOtaTodoList.value && !usesBuilderSetupCommand.value)
+const showSetupChecklist = computed(() => flowStep.value === 'setup' && setupScreen.value.otaChecklist)
 
 function emitPendingAppOnboardingReady() {
   const app = createdApp.value

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../src/services/appOnboarding'
 import { BUILDER_STEP_IDS } from '../src/services/builderOnboardingChecklist'
 import { shouldShowGettingStartedNav, shouldSkipOnboardingResume } from '../src/utils/appOnboardingProgress'
-import { hasDualOnboardingChecklists, isDualOtaChecklistComplete, loadChecklistPreference, resolveDualChecklistResume, saveChecklistPreference } from '../src/utils/dualOnboardingChecklists'
+import { hasDualOnboardingChecklists, isDualOtaChecklistComplete, loadChecklistPreference, resolveDualChecklistResume, resolveSetupScreen, saveChecklistPreference } from '../src/utils/dualOnboardingChecklists'
 
 function fixture() {
   return { setup: {
@@ -133,5 +133,21 @@ describe('browser checklist preference', () => {
     expect(loadChecklistPreference('fake-user-b', 'com.example.one')).toEqual({})
     expect(loadChecklistPreference('fake-user-a', 'com.example.two')).toEqual({})
     expect(loadChecklistPreference(null, 'com.example.one')).toEqual({})
+  })
+})
+
+describe('setup screen selection', () => {
+  const ota = { otaTodoList: true, dualTodoList: false, builderTodoList: false }
+  it.each([
+    ['OTA checklist + ota intent', { ...ota, intent: 'ota' }, { builderCommand: false, otaChecklist: true }],
+    ['OTA checklist + builder intent', { ...ota, intent: 'builder' }, { builderCommand: true, otaChecklist: false }],
+    ['OTA checklist + publish intent', { ...ota, intent: 'publish' }, { builderCommand: true, otaChecklist: false }],
+    ['OTA checklist + unknown intent', { ...ota, intent: null }, { builderCommand: false, otaChecklist: true }],
+    ['Builder v4 checklist', { otaTodoList: false, dualTodoList: false, builderTodoList: true, intent: 'builder' }, { builderCommand: true, otaChecklist: false }],
+    ['legacy list + builder intent', { otaTodoList: false, dualTodoList: false, builderTodoList: false, intent: 'builder' }, { builderCommand: true, otaChecklist: false }],
+    ['dual checklist on OTA tab', { otaTodoList: true, dualTodoList: true, builderTodoList: false, intent: 'builder' }, { builderCommand: false, otaChecklist: true }],
+    ['dual checklist on Builder tab', { otaTodoList: true, dualTodoList: true, builderTodoList: true, intent: 'ota' }, { builderCommand: true, otaChecklist: false }],
+  ])('%s', (_name, state, expected) => {
+    expect(resolveSetupScreen(state)).toEqual(expected)
   })
 })
