@@ -1,7 +1,9 @@
 # Bento evaluation runner and invitation reminders
 
 The dedicated `capgo-bento-dispatch-prod` Worker runs named evaluations declared
-in `cloudflare_workers/bento_dispatch/bentoFlows.ts`. The minutely cron uses
+in `cloudflare_workers/bento_dispatch/bentoFlows.ts`. Cron only publishes checks
+and an audit-recovery delivery; finders, lifecycle preparation, Vault/analytics
+lookups and audit relay execute in the queue. The minutely cron uses
 Cloudflare's `controller.scheduledTime` to calculate each evaluation's aligned
 `everyMinutes` slot. All four invitation evaluations run once per scheduled
 minute when the previous execution and analytics handoff have finished; a
@@ -98,9 +100,15 @@ copying the details into a bounded analytics envelope.
 Each table's `pending_audit` array holds its own unhanded intents, with stable
 PostHog `event_id` UUIDs. There is no third outbox table or extra analytics queue.
 Helpers promptly relay touched event audits; completion relays its run audit.
-The cron separately recovers pending intents with a 100-event/10-second budget,
-regardless of evaluation cadence or paused sending. A relay outage does not prevent scheduling
-independent evaluations. A saved Bento acceptance remains accepted when analytics
+Each cron tick also publishes `{ version: 1, operation: 'audit_recovery' }`
+on the same queue. Its consumer recovers pending intents with the existing
+100-event/10-second budget, independently of evaluation cadence and Bento
+credentials. This typed maintenance delivery owns no evaluation row or audit
+intent: otherwise its own unhanded completion telemetry could prevent its next
+invocation and deadlock all checks after an outage. Failed recovery preserves
+stable intents; the next tick can publish recovery even after five failed
+deliveries. No extra queue, cron or scheduling-state mechanism is introduced.
+A relay outage does not prevent publishing independent evaluations. A saved Bento acceptance remains accepted when analytics
 handoff fails, so audit-only recovery does not send that event again.
 
 Each provider request has a ten-second timeout. Provider concurrency is five per
@@ -212,9 +220,11 @@ exhausted attempt counts.
 A local benchmark with 100,000 closed ledger rows and 25 live source-backed
 invitations of each variant used the active-start partial index and unique event
 history lookups. The new/existing cohort plans each returned 25 rows in about
-1.9 ms with cached buffers. A separate 100,000-row run-history benchmark used the
-enqueue index for cadence in 0.035 ms. These checks prove exclusion of closed
-history and bounded run-history lookups. Local source tables were small;
+1.9 ms with cached buffers. Evaluation state now has one row per key rather than run history. Native
+PostgreSQL tests cover aligned scheduled slots, delayed publication, duplicate
+ticks, eight-way rollover contention, busy/failed invocations and stale owners
+and messages. The historical cohort benchmark proves exclusion of closed
+event history; it does not describe the new unique scheduling-state layout. Local source tables were small;
 production-cardinality membership/source-table performance is not established by
 this benchmark. No plugin endpoint or public PostgREST query uses these tables.
 
@@ -225,3 +235,9 @@ a whole-cohort read-only finder and a handler using the shared helpers. Choose
 stable flow/context/recipient/tag identities. Include safe decision metadata and
 termination candidates, and supply a fresh-source resolver for each send or end.
 No database enrollment trigger or recipient scheduling table is needed.
+
+Queued preparation tasks are registered explicitly with a key and cadence, use
+the same invocation claims and completion handling, and receive a fenced task
+context. They do not receive recipient mutation helpers or an eligibility list.
+The lifecycle preparation task discovers and claims existing due journeys in one
+bounded query; it does not enroll or scan every Capgo organization.

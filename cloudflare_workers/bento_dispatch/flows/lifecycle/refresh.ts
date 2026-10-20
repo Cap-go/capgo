@@ -13,7 +13,8 @@ export interface VerifiedSnapshot extends VerifiedAppOutcomes {
   otaUploadId?: string | null
   fundingDeniedAt?: string | null
 }
-interface DueJourney { org_id: string, product: Product, revision: string | number, refresh_claim_token: string }
+interface DueJourney { org_id: string, product: Product, revision: string | number, refresh_claim_token: string, next_evaluation_at: string | Date }
+export const LIFECYCLE_REFRESH_BATCH_SIZE = 20
 export type AnalyticsReader = (query: string) => Promise<Array<Record<string, string>>>
 const quoted = (value: string) => `'${value.replace(/\\/g, '\\\\').replace(/'/g, '\'\'')}'`
 const cfTime = (value: string) => new Date(value).toISOString().slice(0, 19).replace('T', ' ')
@@ -71,21 +72,30 @@ async function databaseOutcomes(read: ReadOnlyContext, app: { app_id: string, id
   return { builderJobId: outcome?.id ?? null, builderSucceededAt: timestamp(outcome?.completed_at), demoApp: false, runningUntil: running?.running ? iso(Date.now() + 10 * 60 * 1000) : null }
 }
 
-// At most twenty org/product rows per cron, with a due-time index and leased
+// At most twenty org/product rows per queued task, with a due-time index and leased
 // SKIP LOCKED claims. Provider reads are batched; no primary plugin path writes.
-export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: AnalyticsReader | null, now = () => new Date().toISOString()) {
-  const deadline = Date.now() + 35_000
-  const due = await db.query<DueJourney>(`WITH due AS (
+export function claimDueLifecycleJourneys(db: QueryClient) {
+  return db.query<DueJourney>(`WITH due AS (
     SELECT org_id, product FROM public.bento_lifecycle_journeys
     WHERE next_evaluation_at <= CURRENT_TIMESTAMP
       AND (refresh_claim_until IS NULL OR refresh_claim_until <= CURRENT_TIMESTAMP)
-    ORDER BY next_evaluation_at, org_id, product LIMIT 20 FOR UPDATE SKIP LOCKED
+    ORDER BY next_evaluation_at, org_id, product LIMIT $1 FOR UPDATE SKIP LOCKED
   ) UPDATE public.bento_lifecycle_journeys j SET refresh_claim_until = CURRENT_TIMESTAMP + INTERVAL '120 seconds', refresh_claim_token = pg_catalog.gen_random_uuid()
-    FROM due WHERE j.org_id = due.org_id AND j.product = due.product RETURNING j.org_id, j.product, j.revision, j.refresh_claim_token`)
+    FROM due WHERE j.org_id = due.org_id AND j.product = due.product
+    RETURNING j.org_id, j.product, j.revision, j.refresh_claim_token, j.next_evaluation_at`, [LIFECYCLE_REFRESH_BATCH_SIZE])
+}
+
+export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: AnalyticsReader | null, now = () => new Date().toISOString()) {
+  const started = Date.now()
+  const deadline = started + 35_000
+  const loadDeadline = started + 10_000
+  const due = await claimDueLifecycleJourneys(db)
   const read: ReadOnlyContext = { query: async (sql, values) => (await db.query(sql, values)).rows as never }
   const loaded = []
   for (const item of due.rows) {
-    if (Date.now() >= deadline - 10_000)
+    // Reserve time for processing instead of repeatedly spending the entire
+    // batch budget loading snapshots and deferring every claimed journey.
+    if (Date.now() >= deadline - 5_000 || (loaded.length > 0 && Date.now() >= loadDeadline))
       break
     loaded.push(await loadLifecycleInput(read, item.org_id, item.product))
   }
@@ -110,7 +120,7 @@ export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: An
   }
   let refreshed = 0
   for (const current of loaded) {
-    if (!current || Date.now() >= deadline - 10_000)
+    if (!current || Date.now() >= deadline - 5_000)
       continue
     const token = due.rows.find(item => item.org_id === current.input.orgId && item.product === current.input.product)!.refresh_claim_token
     const { input, row } = current
@@ -182,5 +192,11 @@ export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: An
     }
     refreshed++
   }
-  return refreshed
+  return {
+    claimed: due.rows.length,
+    processed: refreshed,
+    deferred: due.rows.length - refreshed,
+    oldestDueAt: due.rows.length ? iso(Math.min(...due.rows.map(row => ms(timestamp(row.next_evaluation_at))))) : null,
+    saturated: due.rows.length === LIFECYCLE_REFRESH_BATCH_SIZE,
+  }
 }

@@ -99,6 +99,7 @@ describe('bento evaluation PostgreSQL store', () => {
           expect(await f.store.markEnqueued(previous.id, previous.enqueue_claim_token!)).toBe(false)
           await f.store.publicationFailed(previous.id, previous.enqueue_claim_token!)
           await expect(f.store.completeRun(previous, {})).rejects.toThrow('Evaluation claim lost')
+          await expect(f.store.runTask(previous, async () => ({ processed: 1 }))).rejects.toThrow('Evaluation claim lost')
         }
         await f.store.saveSelection(run, [selected(f)], [])
         await f.store.completeRun(run, { selected: 1 })

@@ -7,7 +7,7 @@ import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../supabase/functions/_backend/u
 
 const createdAt = '2026-10-17T15:00:00.000Z'
 const assignedAt = '2026-10-17T15:01:00.000Z'
-const migration = readFileSync('supabase/migrations/20261019102456_organization_lifecycle_v2.sql', 'utf8')
+const migration = readFileSync('supabase/migrations/20261020145512_organization_lifecycle_v2.sql', 'utf8')
 let db: Database
 
 function treatment(branch = 'A') {

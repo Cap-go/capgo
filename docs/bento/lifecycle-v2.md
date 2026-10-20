@@ -236,16 +236,23 @@ creator-enrollment proof above. The index removes idle-cohort scanning; `LIMIT 2
 does not cap how many populated candidates rejected by the other predicates
 may need examination.
 
-Each cron leases at most 20 due organization/product rows through the due-time
-index and SKIP LOCKED. Tokens and revisions fence expired refreshes; observation
+The unchanged minutely scheduler publishes the registered lifecycle checks and
+`lifecycle:v2:prepare` through the same unique invocation framework. Readiness,
+Vault, analytics, source, progress and outcome work runs only in queue consumers.
+The preparation task leases at most 20 due organization/product rows through the
+due-time index and SKIP LOCKED, ordered by deadline, organization and product.
+This is one combined batch, not one message or selection query per organization. Tokens and revisions fence expired refreshes; observation
 IDs and state updates commit together. Lifecycle handlers resolve/send
 sequentially on each pinned connection, avoiding concurrent source transactions
 spending a claim lease behind one another; independent queue deliveries still
 run in parallel. Analytics requests are batched and capped
 at 8KB per query, five seconds each, with at most 2,001 grouped version results.
-Overflow is unhealthy coverage. The refresher has a 35-second soft deadline,
-checks remaining time between rows, and never holds a transaction over network
-I/O. Unfinished leases are reclaimable after 120 seconds.
+Overflow is unhealthy coverage. The refresher has a 35-second soft deadline. It initially reserves source
+loading to ten seconds (allowing an in-flight keyed lookup to finish), leaves
+time for processing, and checks remaining time between rows. It never holds a
+transaction over network I/O. Results report claimed/processed/deferred counts,
+the oldest claimed deadline and batch saturation; saturation is not an exact
+backlog count. Twenty is an initial safety bound, not a capacity certificate. Unfinished leases are reclaimable after 120 seconds.
 
 Fixed batch/reminder/Trial boundaries schedule the next evaluation exactly.
 Passive unresolved apps use distributed hourly slots; paid/ineligible/held
@@ -253,6 +260,14 @@ journeys sleep seven days, exhausted journeys daily. Relevant user/org/app/build
 billing changes wake them immediately. A 500-journey simulation at 20 evaluations
 per minute proves ordinary polling fits the hourly capacity and pending batches
 remain timely, avoiding permanent five-minute churn from completed cohorts.
-This is console-scale coordination; it does not scan manifests or fan out per
+The actual due-claim query is also explained with the normal planner over
+200,000 journeys, including 199,960 future rows, two due groups and an empty
+claim, after vacuuming dead entries left by the fixture’s earlier wholesale
+timestamp updates. This isolates steady-state selection, not churn/autovacuum
+capacity. Native PostgreSQL tests prove disjoint claims on separate connections,
+future-row preservation and revision fencing during a real organization wakeup.
+A controlled slow-source fixture proves processing advances instead of loading
+until every claim must be deferred. These measurements do not certify
+production throughput. This is console-scale coordination; it does not scan manifests or fan out per
 plugin request. Actual backlog/refresh failure logs must be checked before
 increasing rollout volume.

@@ -4,9 +4,9 @@ import type { Product } from '../cloudflare_workers/bento_dispatch/flows/lifecyc
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createPgliteEngine, Database } from 'tinbase'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { lifecycleEvaluation } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/index.ts'
-import { refreshLifecycleJourneys } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/refresh.ts'
+import { claimDueLifecycleJourneys, refreshLifecycleJourneys } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/refresh.ts'
 
 interface PlanNode {
   'Node Type': string
@@ -58,7 +58,7 @@ it('bounds actual recurring selection over 200,000 mostly-idle journeys with spa
         row_key text NOT NULL, PRIMARY KEY(seed_id,relation_name,row_key), UNIQUE(app_id,relation_name,row_key));
     `)
     await db.exec(readFileSync('supabase/migrations/20261017131933_bento_invitation_dispatches.sql', 'utf8'))
-    await db.exec(readFileSync('supabase/migrations/20261019102456_organization_lifecycle_v2.sql', 'utf8'))
+    await db.exec(readFileSync('supabase/migrations/20261020145512_organization_lifecycle_v2.sql', 'utf8'))
     await db.query(`INSERT INTO public.users(id,created_at,email)
       SELECT md5($1 || ':user:' || n)::uuid,CURRENT_TIMESTAMP,'selection-' || n || '@example.com'
       FROM generate_series(1,$2::integer) n`, [seed, organizations])
@@ -89,7 +89,7 @@ it('bounds actual recurring selection over 200,000 mostly-idle journeys with spa
         return { rows: result.rows, rowCount: result.affectedRows ?? result.rows.length, command: '', oid: 0, fields: [] }
       },
     }
-    expect(await refreshLifecycleJourneys(client, null)).toBe(20)
+    expect(await refreshLifecycleJourneys(client, null)).toMatchObject({ claimed: 20, processed: 20, deferred: 0, oldestDueAt: '2025-01-01T00:00:00.000Z', saturated: true })
     expect((await nullState()).rows).toEqual([{ sql_null: true, json_null: null }])
     expect((await db.query('SELECT count(*)::integer AS count FROM public.bento_lifecycle_journeys WHERE candidate IS NOT NULL')).rows).toEqual([{ count: 0 }])
 
@@ -147,6 +147,59 @@ it('bounds actual recurring selection over 200,000 mostly-idle journeys with spa
     await db.exec('UPDATE public.bento_lifecycle_journeys SET candidate=NULL WHERE candidate IS NOT NULL; ANALYZE public.bento_lifecycle_journeys;')
     await select('ota', 'empty', 0)
     await select('builder', 'empty', 0)
+
+    // Charge one second per real SQL request. Gathering the entire batch must
+    // not consume the processing budget and defer every claimed journey.
+    let time = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => time)
+    try {
+      const slow: QueryClient = { query: async (sql, values) => {
+        time += 1000
+        return client.query(sql, values)
+      } }
+      const result = await refreshLifecycleJourneys(slow, null)
+      expect(result.claimed).toBe(20)
+      expect(result.processed).toBeGreaterThan(0)
+      expect(result.deferred).toBeGreaterThan(0)
+      expect(result.processed + result.deferred).toBe(result.claimed)
+    }
+    finally {
+      clock.mockRestore()
+    }
+
+    await db.exec('UPDATE public.bento_lifecycle_journeys SET next_evaluation_at=\'2099-01-01T00:00:00Z\',refresh_claim_until=NULL,refresh_claim_token=NULL;')
+    await db.query(`UPDATE public.bento_lifecycle_journeys SET next_evaluation_at='2000-01-01T00:00:00Z'
+      WHERE org_id IN (SELECT md5($1 || ':org:' || n)::uuid FROM generate_series(101,120) n)`, [seed])
+    // Prior phases moved every timestamp. Remove their dead index entries
+    // before measuring a steady mostly-future cohort; this is not a churn or
+    // autovacuum-capacity benchmark. Planner settings remain unchanged.
+    await db.exec('VACUUM (ANALYZE) public.bento_lifecycle_journeys;')
+    for (const expected of [20, 20, 0]) {
+      const claiming: QueryClient = { query: async <T extends QueryResultRow>(sql: string, values?: unknown[]) => {
+        await db.exec('BEGIN; SAVEPOINT claim_plan;')
+        try {
+          const { rows } = await db.query(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${sql}`, values)
+          const analyzed = rows[0]['QUERY PLAN'][0]
+          const plan = nodes(analyzed.Plan)
+          console.info(`Lifecycle due claim plan: ${JSON.stringify({ journeys: organizations * 2, future: organizations * 2 - 40, returned: expected, executionMs: analyzed['Execution Time'], sharedHitBlocks: analyzed.Plan['Shared Hit Blocks'], sharedReadBlocks: analyzed.Plan['Shared Read Blocks'] })}`)
+          expect(plan.some(node => node['Index Name'] === 'bento_lifecycle_due')).toBe(true)
+          expect(plan.filter(node => node['Relation Name'] === 'bento_lifecycle_journeys' && node['Node Type'] === 'Seq Scan')).toEqual([])
+          expect(analyzed.Plan['Shared Hit Blocks'] + analyzed.Plan['Shared Read Blocks']).toBeLessThan(2000)
+          expect(analyzed.Plan['Actual Rows']).toBe(expected)
+          await db.exec('ROLLBACK TO SAVEPOINT claim_plan;')
+          const result = await client.query<T>(sql, values)
+          await db.exec('COMMIT;')
+          return result
+        }
+        catch (error) {
+          await db.exec('ROLLBACK;')
+          throw error
+        }
+      } }
+      expect((await claimDueLifecycleJourneys(claiming)).rows).toHaveLength(expected)
+    }
+    expect((await db.query(`SELECT count(*)::integer AS count FROM public.bento_lifecycle_journeys
+      WHERE next_evaluation_at='2099-01-01T00:00:00Z' AND refresh_claim_token IS NULL`)).rows).toEqual([{ count: organizations * 2 - 40 }])
   }
   finally {
     await db.close()

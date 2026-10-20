@@ -1,5 +1,5 @@
 import type { PostHogQueueEnv } from '../../supabase/functions/_backend/utils/posthog_queue.ts'
-import type { BentoEvent, EligibleUser, MutationContext, ReadOnlyContext, ResolveAction, RunRecord, SendOutcome } from './contracts.ts'
+import type { BentoEvent, EligibleUser, MutationContext, QueryClient, ReadOnlyContext, ResolveAction, RunRecord, SendOutcome, TaskContext } from './contracts.ts'
 import type { DispatchStore } from './store.ts'
 
 export function createMutationContext(store: DispatchStore, run: RunRecord, send: (event: BentoEvent) => Promise<boolean>, settings: Readonly<Record<string, string>> = {}, now = Date.now, queue?: PostHogQueueEnv['POSTHOG_QUEUE']): MutationContext {
@@ -9,7 +9,7 @@ export function createMutationContext(store: DispatchStore, run: RunRecord, send
       await store.flushFlowAudit(user, queue)
     }
     catch {
-      // Pending stable intents remain for cron; never undo acceptance.
+      // Pending stable intents remain for queued recovery; never undo acceptance.
     }
   }
   const endFlow: MutationContext['endFlow'] = async (user, resolve) => {
@@ -96,4 +96,11 @@ export function createMutationContext(store: DispatchStore, run: RunRecord, send
     endFlow,
   }
   return Object.freeze(context)
+}
+
+export function createTaskContext(store: DispatchStore, run: RunRecord, settings: Readonly<Record<string, string>> = {}): TaskContext {
+  return Object.freeze({
+    settings: Object.freeze({ ...settings }),
+    run: <T>(operation: (db: QueryClient) => Promise<T>) => store.runTask(run, operation),
+  })
 }

@@ -48,6 +48,15 @@ export class DispatchStore {
     } })), true)
   }
 
+  runTask<T>(run: RunRecord, operation: (db: QueryClient) => Promise<T>): Promise<T> {
+    // Tasks own their short transactions. Do not hold a run-row lock or a DB
+    // transaction while a task gathers provider evidence.
+    return this.serial(async () => {
+      await this.assertRun(this.client, run)
+      return operation(this.client)
+    })
+  }
+
   async schedule(evaluationKey: string, everyMinutes: number, scheduledTime: number): Promise<RunRecord | null> {
     if (!Number.isSafeInteger(everyMinutes) || everyMinutes < 1)
       throw new Error('Invalid evaluation cadence')

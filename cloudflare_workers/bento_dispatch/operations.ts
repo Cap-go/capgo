@@ -1,4 +1,4 @@
-import type { DispatchJob, InvitationDetails } from './contracts.ts'
+import type { DispatchJob, DispatchQueueJob, InvitationDetails } from './contracts.ts'
 
 import { escapeHtml } from '../api/email_templates/render.ts'
 
@@ -17,6 +17,16 @@ export function parseDispatchJob(body: unknown, registry: Readonly<Record<string
     throw new Error('Invalid dispatch job')
   }
   return value as DispatchJob
+}
+
+export function parseDispatchQueueJob(body: unknown, registry: Readonly<Record<string, unknown>>): DispatchQueueJob {
+  if (body && typeof body === 'object' && !Array.isArray(body)
+    && Object.keys(body).sort().join(',') === 'operation,version'
+    && 'version' in body && body.version === 1
+    && 'operation' in body && body.operation === 'audit_recovery') {
+    return { version: 1, operation: 'audit_recovery' }
+  }
+  return parseDispatchJob(body, registry)
 }
 
 export function buildInvitationEvent(record: { id: string, tag: string }, invitation: InvitationDetails, webappUrl: string) {
