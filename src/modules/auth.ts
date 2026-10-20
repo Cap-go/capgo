@@ -213,6 +213,12 @@ async function guard(
     }
   }
 
+  function resolveLifecycleTarget(organizationsLoaded: boolean) {
+    if (isLifecycleUnscopedSelection(to.path, to.query))
+      return undefined
+    return lifecycleOrganizationTarget(to.query, organizationsLoaded ? organizationStore.organizations : [])
+  }
+
   async function loadPlansIfNeeded() {
     if (main.plans.length > 0)
       return
@@ -391,7 +397,7 @@ async function guard(
       })
     }
 
-    const lifecycleTarget = isLifecycleUnscopedSelection(to.path, to.query) ? undefined : lifecycleOrganizationTarget(to.query, organizationsLoaded ? organizationStore.organizations : [])
+    const lifecycleTarget = resolveLifecycleTarget(organizationsLoaded)
     if (lifecycleTarget === null)
       return next({ path: '/apps', query: { source: 'capgo_lifecycle', lifecycleSelect: '1' } })
     if (lifecycleTarget)
@@ -460,7 +466,7 @@ async function guard(
       })
     }
 
-    const lifecycleTarget = isLifecycleUnscopedSelection(to.path, to.query) ? undefined : lifecycleOrganizationTarget(to.query, organizationsLoaded ? organizationStore.organizations : [])
+    const lifecycleTarget = resolveLifecycleTarget(organizationsLoaded)
     if (lifecycleTarget === null)
       return next({ path: '/apps', query: { source: 'capgo_lifecycle', lifecycleSelect: '1' } })
     if (lifecycleTarget)

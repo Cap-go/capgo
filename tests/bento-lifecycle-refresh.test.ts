@@ -104,3 +104,51 @@ it('keeps a concurrent real organization wakeup from being overwritten by an old
     await f.cleanup()
   }
 })
+
+it('releases and backs off missing-source journeys so they stop taking the oldest due slots', async () => {
+  const f = await cohort(10)
+  const client = await pool.connect()
+  try {
+    await executeSQL(`UPDATE public.bento_lifecycle_journeys SET candidate='{"branch":"pending"}'::jsonb,
+      state='{"consumed":["last-resort"]}'::jsonb WHERE org_id=$1`, [f.ids[0]])
+    await executeSQL('DELETE FROM public.org_lifecycle_creators WHERE org_id=$1', [f.ids[0]])
+    expect(await refreshLifecycleJourneys(client, null)).toMatchObject({ claimed: 20, processed: 20, deferred: 0 })
+    const rows = await executeSQL(`SELECT candidate IS NULL AS no_candidate,state,refresh_claim_token,refresh_claim_until,
+      next_evaluation_at BETWEEN CURRENT_TIMESTAMP + INTERVAL '6 days 23 hours' AND CURRENT_TIMESTAMP + INTERVAL '7 days 1 minute' AS backed_off
+      FROM public.bento_lifecycle_journeys WHERE org_id=$1`, [f.ids[0]])
+    expect(rows).toHaveLength(2)
+    expect(rows.every(row => row.refresh_claim_token === null && row.refresh_claim_until === null && row.backed_off)).toBe(true)
+    expect(rows.every(row => row.no_candidate && JSON.stringify(row.state) === '{"consumed":["last-resort"]}')).toBe(true)
+  }
+  finally {
+    client.release()
+    await f.cleanup()
+  }
+})
+
+it('does not delay a new organization wakeup when an older missing-source read returns', async () => {
+  const f = await cohort(10)
+  const client = await pool.connect()
+  let woke = false
+  const db: QueryClient = { query: async <T extends QueryResultRow>(sql: string, values?: unknown[]) => {
+    const result = await client.query<T>(sql, values)
+    if (sql === LIFECYCLE_SOURCE_SQL && values![0] === f.ids[0] && !result.rows.length && !woke) {
+      woke = true
+      await executeSQL(`UPDATE public.orgs SET email_preferences='{"onboarding":false}'::jsonb WHERE id=$1`, [f.ids[0]])
+    }
+    return result
+  } }
+  try {
+    await executeSQL('DELETE FROM public.org_lifecycle_creators WHERE org_id=$1', [f.ids[0]])
+    const result = await refreshLifecycleJourneys(db, null)
+    expect(woke).toBe(true)
+    expect(result).toMatchObject({ claimed: 20, processed: 18, deferred: 2 })
+    const rows = await executeSQL(`SELECT next_evaluation_at<=CURRENT_TIMESTAMP AS due
+      FROM public.bento_lifecycle_journeys WHERE org_id=$1`, [f.ids[0]])
+    expect(rows).toEqual([{ due: true }, { due: true }])
+  }
+  finally {
+    client.release()
+    await f.cleanup()
+  }
+})

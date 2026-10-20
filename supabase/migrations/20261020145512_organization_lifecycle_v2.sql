@@ -216,6 +216,15 @@ CREATE FUNCTION public.enroll_lifecycle_org_products() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE p text;
 BEGIN
+  -- Equal-value writes must preserve pending candidates and worker snapshots.
+  IF TG_OP = 'UPDATE' THEN
+    IF (NEW.onboarding, NEW.email_preferences, NEW.management_email,
+        NEW.created_by, NEW.customer_id, NEW.has_usage_credits)
+      IS NOT DISTINCT FROM (OLD.onboarding, OLD.email_preferences, OLD.management_email,
+        OLD.created_by, OLD.customer_id, OLD.has_usage_credits) THEN
+      RETURN NEW;
+    END IF;
+  END IF;
   IF EXISTS (SELECT 1 FROM public.org_lifecycle_creators c JOIN public.users u ON u.id = c.original_creator_id
     WHERE c.org_id = NEW.id AND public.lifecycle_v2_user_eligible(u.onboarding, u.created_at, u.created_via_invite)) THEN
     FOREACH p IN ARRAY ARRAY['ota', 'builder'] LOOP

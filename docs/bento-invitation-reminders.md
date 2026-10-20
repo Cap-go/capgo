@@ -92,7 +92,8 @@ Business mutations append a correlated PostHog intent in the same database
 transaction. This includes send claims/attempts, acknowledgement or unconfirmed
 provider outcomes, stale skips, terminal facts and evaluation completion/failure.
 Failures identify their safe phase (`finder`, `selection_persist`,
-`eligibility_queue`, `handler`, or `completion`), without raw exception content.
+`eligibility_queue`, `handler`, or `completion`; queued preparation uses
+`task_audit` or `task`), without raw exception content.
 External fact details are retained unchanged in the private ledger, including
 large/deep domain JSON and legitimate reserved-name fields. Fact audits carry a
 concise ledger UUID reference and flow/context/recipient/tag/reason, rather than

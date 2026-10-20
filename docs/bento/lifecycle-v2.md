@@ -196,6 +196,14 @@ Publishing and verifying the matching sender is a separate authorized operator
 step; configured Worker credentials alone never enable lifecycle dispatch or
 legacy lifecycle suppression.
 
+The merged [legacy Stripe bridge](../legacy-stripe-trial-bento.md) is additive:
+signed EE/US `customer.created` events target exactly one normalized Stripe
+customer email, which can differ from the original creator. Optional organization
+context is not cohort eligibility; unlinked US customers can also emit the event.
+Duplicate Stripe deliveries can repeat enrollment. Its merge does not prove
+deployment, a switch away from Bento's native Stripe Trial root, or session-level
+legacy handoff. None of the three lifecycle gates can be inferred from it.
+
 ## Execution model and capacity
 
 No plugin request path gains a primary database read/write. Trigger work starts
@@ -253,6 +261,11 @@ time for processing, and checks remaining time between rows. It never holds a
 transaction over network I/O. Results report claimed/processed/deferred counts,
 the oldest claimed deadline and batch saturation; saturation is not an exact
 backlog count. Twenty is an initial safety bound, not a capacity certificate. Unfinished leases are reclaimable after 120 seconds.
+Missing source rows clear their candidate and release their refresh claim with a
+seven-day backoff, guarded by both the claimed revision and token. A concurrent
+source wakeup or replacement claim cannot be overwritten by that stale read.
+Equal-value writes to watched organization fields preserve candidates, revisions,
+deadlines and claims; actual source changes still wake evaluation immediately.
 
 Fixed batch/reminder/Trial boundaries schedule the next evaluation exactly.
 Passive unresolved apps use distributed hourly slots; paid/ineligible/held
@@ -271,3 +284,24 @@ until every claim must be deferred. These measurements do not certify
 production throughput. This is console-scale coordination; it does not scan manifests or fan out per
 plugin request. Actual backlog/refresh failure logs must be checked before
 increasing rollout volume.
+
+## Monitoring the queued producer
+
+Keep scheduling, preparation, provider acceptance and email delivery separate:
+
+| Evidence | Meaning and correlation |
+| --- | --- |
+| `bento_evaluation_runs.evaluation_key`, `id`, `scheduled_for`, `status` | Current invocation state for one registered check. Queue `runId` and invocation-audit `run_id` identify that invocation; the ID changes when its single row is recycled. Scheduling or queue publication does not prove evaluation completed. |
+| `lifecycle:v2:prepare` result | `ready: false` means the closed or unavailable readiness gates prevented preparation. With readiness true, `bento_lifecycle_batch` logs and the durable result report `claimed`, `processed`, `deferred`, `oldestDueAt` and `saturated`. Processed includes successfully fenced missing-source backoffs; these counts are journeys, not email counts. Saturation is not a backlog count. |
+| Invocation completion/failure | `completed` records the handler result, including zero eligible actions. Preparation failure phases are `task_audit` or `task`; ordinary selection/handler phases remain documented in the shared dispatcher. Completion does not prove a Bento event or email was sent. |
+| `bento_event_dispatches.id`, flow/context/recipient/tag, `last_run_id` | Durable logical fact/send identity and its latest correlated run where provided. Provider details and send audits use `dispatch_id`; retries retain it. `recorded` is a local fact. `accepted` and `bento:provider_accepted` mean Bento acknowledged the event, not an email send or delivery. |
+| `pending_audit[].event_id` | Stable identity of a PostHog handoff intent, distinct from dispatch and email identities. Recovery retains it across retries. Publishing to `POSTHOG_QUEUE` and downstream PostHog HTTP delivery are different boundaries. |
+| Bento visitor email history and delivery evidence | Required to establish an actual email send, rendered subject/body/links and delivery outcome. An accepted event can produce no email while the matching sender is draft. |
+
+The typed `audit_recovery` pulse has no invocation row or audit intent of its own.
+It runs before business enablement checks and drains a bounded portion of pending
+intents. Its successful acknowledgement alone does not prove every pending audit
+was drained. Monitor the remaining private ledger intents. A failure publishing
+to `POSTHOG_QUEUE` can block ordinary audit-before-business execution and row
+reuse; a downstream HTTP failure after successful queue publication is a distinct
+failure mode. Recovery must remain independently publishable in either case.
