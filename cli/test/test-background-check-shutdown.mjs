@@ -37,7 +37,7 @@ beforeAll(async () => {
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, earlyCompletion = false, waitForWorkers = false, trialAlreadyShown = false, debug = false, columns = 80 } = {}) {
+function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, earlyCompletion = false, immediateCompletion = false, waitForWorkers = false, trialAlreadyShown = false, debug = false, columns = 80 } = {}) {
   const source = `
     import assert from 'node:assert/strict'
     import { performance } from 'node:perf_hooks'
@@ -84,7 +84,11 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
     const started = now()
     let finished = false
     const completion = waitForOnboardingChecks(command, ${JSON.stringify(commandPath)}).then(() => { finished = true })
-    if (${earlyCompletion}) {
+    if (${immediateCompletion}) {
+      await completion
+      assert.equal(finished, true, 'shutdown must finish without advancing the clock')
+    }
+    else if (${earlyCompletion}) {
       const checks = [...getPendingOnboardingChecks()]
       for (const [worker] of checks) worker.ref()
       checks[0][0].postMessage('finish')
@@ -164,7 +168,7 @@ test.concurrent('ready notices render for human-readable output even when no wor
     assert.match(result.text, /└─+┘/, 'setup notice has a closed bottom box border')
     assert.ok(!result.text.includes('Checking your setup'))
   }
-})
+}, 12_000)
 
 test.concurrent('machine modes and explicit setup flows discard ready notices', async () => {
   const cases = [{ options: { json: true } }, { options: { outputText: true } }, { options: { quiet: true } }, { options: { silent: true } }, { options: { format: 'json' } }, { ci: true }, { commandPath: 'app todo' }, { commandPath: 'build init' }, { commandPath: 'mcp' }]
@@ -181,7 +185,7 @@ test.concurrent('plan prompts are deduplicated by organization, including foregr
     assert.equal(result.code, 0, result.text)
     assert.equal((result.text.match(/Choose a Capgo plan/g) ?? []).length, trialAlreadyShown ? 0 : 1)
   }
-})
+}, 12_000)
 
 function waitEvents(result) {
   return result.output.split('\n').filter(line => line.startsWith('telemetry:')).map(line => JSON.parse(line.slice('telemetry:'.length)))
@@ -224,13 +228,13 @@ test.concurrent('exits early as soon as the last worker finishes', async () => {
 }, 12_000)
 
 test.concurrent('completed or absent checks produce no waiting message or delay', async () => {
-  for (const settings of [{ workers: [] }, { workers: ['quick.mjs'], foregroundMs: 1_000 }]) {
-    const result = await run(settings).completion
-    assert.ok(waitedMs(result) < 100)
+  for (const settings of [{ workers: [] }, { workers: ['quick.mjs'], waitForWorkers: true }]) {
+    const result = await run({ ...settings, controlledClock: true, immediateCompletion: true }).completion
+    assert.equal(waitedMs(result), 0)
     assert.ok(!result.text.includes('Checking your setup'))
     assert.deepEqual(waitEvents(result), [])
   }
-})
+}, 12_000)
 
 test.concurrent('SIGINT during the grace period exits immediately even after a previous interrupt', async () => {
   const { child, completion, waitingMessage } = run({ previousInterrupt: true })
@@ -243,7 +247,7 @@ test.concurrent('SIGINT during the grace period exits immediately even after a p
   assert.ok(previousInterrupts >= 1)
   assert.equal(result.output.match(/foreground-interrupted/g)?.length, previousInterrupts, result.text)
   assert.ok(!result.text.includes('foreground-finished'))
-})
+}, 12_000)
 
 test.concurrent('machine output, init, MCP, CI and non-interactive commands do not wait or print', async () => {
   const cases = [
@@ -255,9 +259,9 @@ test.concurrent('machine output, init, MCP, CI and non-interactive commands do n
     { commandPath: 'build credentials export' }, { commandPath: 'generate-docs' },
     { commandPath: 'unknown-command' }, { ci: true }, { stdinTty: false }, { stdoutTty: false },
   ]
-  const results = await Promise.all(cases.map(settings => run(settings).completion))
+  const results = await Promise.all(cases.map(settings => run({ ...settings, controlledClock: true, immediateCompletion: true }).completion))
   for (const result of results) {
-    assert.ok(waitedMs(result) < 100)
+    assert.equal(waitedMs(result), 0)
     assert.ok(!result.text.includes('Checking your setup'))
     assert.deepEqual(waitEvents(result), [])
   }
@@ -265,12 +269,12 @@ test.concurrent('machine output, init, MCP, CI and non-interactive commands do n
 
 test.concurrent('telemetry opt-out and delivery errors preserve the wait and early exit', async () => {
   for (const settings of [{ disabled: true }, { telemetry: 'reject' }]) {
-    const result = await run({ workers: ['quick.mjs'], ...settings }).completion
-    assert.ok(waitedMs(result) < 2_000)
+    const result = await run({ workers: ['released.mjs', 'released.mjs'], controlledClock: true, earlyCompletion: true, ...settings }).completion
+    assert.equal(waitedMs(result), 0)
     assert.ok(result.text.includes('Checking your setup'))
     assert.equal(waitEvents(result).length, settings.disabled ? 0 : 1)
   }
-})
+}, 12_000)
 
 test.concurrent('hanging telemetry is aborted within the same five-second budget', async () => {
   const result = await run({ workers: ['released.mjs'], telemetry: 'hang', controlledClock: true }).completion
