@@ -22,7 +22,7 @@ import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { getRetryablePostgrestStatus, isRetryablePostgrestError } from '../utils/retry.ts'
 import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
 import { ensureCustomerMetadata, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
-import { buildTransferInvoiceFooter, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
+import { buildTransferInvoiceFooter, getStripeCustomerEmailFromEvent, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { trackUsChargeRefunded, trackUsChargeSucceeded } from '../utils/us_revenue_tracking.ts'
@@ -1496,9 +1496,11 @@ async function handleCustomerProfileStripeEvent(
   stripeEvent: Stripe.Event,
   stripeData: StripeData,
 ) {
-  await syncStripeCustomerCountry(c, stripeData.data.customer_id)
   const org = await getOrgForCustomerId(c, stripeData.data.customer_id)
   if (org) {
+    const customer = await loadStripeCustomer(c, stripeData)
+    await assertStripeBillingAccount(c, customer)
+    await syncStripeCustomerCountry(c, stripeData.data.customer_id)
     await ensureCustomerMetadata(c, stripeData.data.customer_id, org.id, org.created_by)
     const billingOrg = await syncOrgManagementEmailFromStripeCustomer(
       c,
@@ -1507,6 +1509,39 @@ async function handleCustomerProfileStripeEvent(
       stripeEvent,
     )
     await syncBillingBentoTagsFromStoredStripeInfo(c, billingOrg, stripeData.data.customer_id)
+  }
+
+  if (stripeEvent.type === 'customer.created') {
+    // Compatibility with the native Stripe -> Bento trigger: one Stripe customer
+    // email, even before provisioning links the org. Never fan out to org members.
+    // This contract includes every customer.created on both accounts; org metadata
+    // provides optional context, not a product/cohort eligibility check for US.
+    const email = getStripeCustomerEmailFromEvent(stripeEvent)
+    const event = 'org:legacy_stripe_trial_started'
+    const context = {
+      customer_id: stripeData.data.customer_id,
+      stripe_event_id: stripeEvent.id,
+      billing_account: getWebhookBillingAccount(c),
+    }
+    if (!email || !isBentoConfigured(c)) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Skipping legacy Stripe trial Bento event',
+        event,
+        reason: !email ? 'missing_customer_email' : 'bento_not_configured',
+        ...context,
+      })
+    }
+    else {
+      const orgId = org?.id || stripeEvent.data.object.metadata?.org_id
+      const accepted = await trackBentoEvent(c, email, {
+        ...context,
+        created_at: new Date(stripeEvent.created * 1000).toISOString(),
+        ...(orgId ? { org_id: orgId } : {}),
+      }, event)
+      if (accepted !== true)
+        throw quickError(503, 'stripe_trial_bento_failed', 'Failed to forward Stripe customer creation to Bento', context)
+    }
   }
   return c.json(BRES)
 }
