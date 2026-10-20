@@ -63,6 +63,7 @@ import { observeCommand } from './observe/command'
 import { startOnboardingChecks } from './onboarding/background'
 import { waitForOnboardingChecks } from './onboarding/background-shutdown'
 import { finishOnboardingCommand } from './onboarding/background-workers'
+import { setupDebug } from './onboarding/setup-diagnostics'
 import { addOrganization, deleteOrganization, inviteMember, listMembers, listOrganizations, removeMember, setMemberRole, setOrganization } from './organization'
 import { capturePosthogException, getCommandPath, shouldCapturePosthogException } from './posthog'
 import { getPreviewQr } from './preview/qr'
@@ -1680,7 +1681,10 @@ applyRawCommandAnalyticsOptOut(process.argv)
 void (async () => {
   try {
     await program.parseAsync()
+    const analyticsStarted = Date.now()
+    setupDebug('analytics before wait started')
     await flushAnalytics()
+    setupDebug('analytics before wait finished', { duration_ms: Date.now() - analyticsStarted })
     if (currentActionCommand)
       await waitForOnboardingChecks(currentActionCommand, currentCommandPath)
   }

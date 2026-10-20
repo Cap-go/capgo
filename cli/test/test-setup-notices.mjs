@@ -180,3 +180,25 @@ test('successful local reports reconcile a stale snapshot without changing unrel
   assert.equal(JSON.stringify(progress), before)
   assert.equal(reconcileSetupProgress(fixture(['builder']), ['add_code']).onboarding.setup.steps.ota, undefined)
 })
+
+
+test('setup copy separates the next step and one primary command from a brief secondary product mention', () => {
+  const progress = fixture()
+  progress.onboarding.setup.selected_path = 'builder'
+  progress.onboarding.setup.steps.builder.ios.start_setup.status = 'done'
+  const text = message(progress)
+  assert.equal(text.split('\n')[0], 'Continue Capgo Builder setup')
+  assert.match(text, /\nApp: com\.example\.setup\n\nNext step: /)
+  assert.match(text, /\n\nResume setup:\nnpx @capgo\/cli@latest build init --platform ios/)
+  assert.match(text, /\n\nAlso continue OTA live updates\.$/)
+  assert.equal(text.match(/npx @capgo\/cli@latest/g)?.length, 1)
+})
+
+test('completed setup copy gives the trial and plan link their own lines without a raw timestamp', () => {
+  const text = message(finish(fixture(), 'ota'))
+  assert.equal(text.split('\n')[0], 'OTA setup is complete')
+  assert.match(text, /\nApp: com\.example\.setup\n\n/)
+  assert.match(text, /trial ends in 1 day, 12 hours\./)
+  assert.match(text, /\n\nChoose a Capgo plan:\nhttps:\/\//)
+  assert.doesNotMatch(text, /2026-01-03|T00:00:00/)
+})

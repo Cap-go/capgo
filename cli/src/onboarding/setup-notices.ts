@@ -2,6 +2,12 @@ import type { AppTodoProgress } from '../app/todo'
 import { getBuilderChecklist, onboardingRecord } from '../app/builder-checklist'
 import { getAppTodoNextStep, getAppTodoSteps, getAvailableAppTodoLists } from '../app/todo'
 import { defaultHostWeb } from '../utils'
+import { setupDebug } from './setup-diagnostics'
+
+function suppressNotice(reason: string): undefined {
+  setupDebug('notice suppressed', { reason })
+  return undefined
+}
 
 export type LocalOnboardingStep = 'add_code' | 'add_updater'
 interface Billing {
@@ -37,14 +43,14 @@ export function getSetupNotice(appId: string, progress: AppTodoProgress, webHost
   const raw = onboardingRecord(progress.onboarding)
   const setup = Object.hasOwn(raw, 'setup') ? onboardingRecord(raw.setup) : raw
   if (setup.todo_list_version !== 4 || setup.outcome === 'skipped')
-    return
+    return suppressNotice('unsupported_version_or_skipped')
   const lists = getAvailableAppTodoLists(progress)
   const ota = lists.includes('ota') && setup.ota_todo_list_version === '1' && !progress.checkErrors?.length
     ? getAppTodoSteps(progress, 'ota')
     : undefined
   const builder = lists.includes('builder') ? getBuilderChecklist(progress.onboarding) : null
   if (!ota && !builder)
-    return
+    return suppressNotice('no_supported_checklist')
   const complete = (steps: { status: string }[]) => steps.length > 0 && steps.every(step => step.status === 'done' || step.status === 'skipped')
   const started = (steps: { status: string }[]) => steps.some(step => step.status !== 'pending')
   const platforms = (['ios', 'android'] as const).map((platform) => {
@@ -58,10 +64,14 @@ export function getSetupNotice(appId: string, progress: AppTodoProgress, webHost
   const completed = [...(otaComplete ? ['OTA'] : []), ...finishedBuilder.map(entry => `Builder for ${platformLabel(entry.platform)}`)]
   const todo = (list: string) => `npx @capgo/cli@latest app todo ${appId} --list ${list}`
   const build = (platform?: string) => `npx @capgo/cli@latest build init${platform ? ` --platform ${platform}` : ''}`
+  setupDebug('checklists evaluated', { ota_available: !!ota, builder_available: !!builder, ota_complete: otaComplete, builder_complete: finishedBuilder.length > 0 })
   if (completed.length) {
     const billing = readBilling(progress.billing, webHost)
-    if (!billing)
-      return
+    if (!billing) {
+      const data = onboardingRecord(progress.billing)
+      setupDebug('billing evaluated', { available: data.status === 'available', is_paying: data.isPaying === true, has_credits: data.hasCredits === true })
+      return suppressNotice(data.status !== 'available' ? 'billing_unavailable' : data.isPaying === true ? 'already_paying' : data.hasCredits === true ? 'has_credits' : 'invalid_billing')
+    }
     const secondary = [
       ...(builder && finishedBuilder.length ? platforms.filter(entry => !entry.complete).map(entry => `set up ${platformLabel(entry.platform)}`) : []),
       ...(builder && !finishedBuilder.length ? ['explore Capgo Builder'] : []),
@@ -74,7 +84,7 @@ export function getSetupNotice(appId: string, progress: AppTodoProgress, webHost
   // Normal API-key polling records OTA's first step. Do not invent copy for an
   // all-pending dual snapshot from an older or incomplete backend response.
   if (ota && builder && !otaStarted && !builderStarted)
-    return
+    return suppressNotice('both_checklists_not_started')
   const useBuilder = !!builder && (!ota || (builderStarted && (!otaStarted || setup.selected_path === 'builder')))
   if (useBuilder) {
     const platform = platforms.find(entry => entry.platform === builder.selectedPlatform)
@@ -86,7 +96,7 @@ export function getSetupNotice(appId: string, progress: AppTodoProgress, webHost
       product: 'Capgo Builder',
       title: next?.title,
       action: build(platform?.platform),
-      secondary: ota ? [`${otaStarted ? 'continue' : 'explore'} OTA live updates with ${todo('ota')}`] : [],
+      secondary: ota ? [`${otaStarted ? 'continue' : 'explore'} OTA live updates`] : [],
     }
   }
   const next = getAppTodoNextStep(progress, 'ota')
@@ -95,15 +105,15 @@ export function getSetupNotice(appId: string, progress: AppTodoProgress, webHost
     appId,
     product: 'OTA live updates',
     title: next?.title,
-    action: `${next?.action ? `${next.action}\n` : ''}Continue your checklist: ${todo('ota')}`,
-    secondary: builder ? [`${builderStarted ? 'continue' : 'explore'} Capgo Builder with ${build(builder.selectedPlatform)}`] : [],
+    action: todo('ota'),
+    secondary: builder ? [`${builderStarted ? 'continue' : 'explore'} Capgo Builder`] : [],
   }
 }
 
 function remainingTrial(trialEndsAt: string, now: number): string {
   const minutes = Math.floor((Date.parse(trialEndsAt) - now) / 60_000)
   if (minutes < 0)
-    return `Your organization's trial has ended (${trialEndsAt}).`
+    return `Your organization's trial has ended.`
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
   const unit = (count: number, name: string) => `${count} ${name}${count === 1 ? '' : 's'}`
@@ -112,16 +122,31 @@ function remainingTrial(trialEndsAt: string, now: number): string {
     : hours > 0
       ? [unit(hours, 'hour'), ...(minutes % 60 ? [unit(minutes % 60, 'minute')] : [])].join(', ')
       : minutes > 0 ? unit(minutes, 'minute') : 'less than a minute'
-  return `Your organization's trial ends in ${remaining} (${trialEndsAt}).`
+  return `Your organization's trial ends in ${remaining}.`
 }
 
 export function formatSetupNotice(notice: SetupNotice | undefined, now = Date.now()): string | undefined {
   if (!notice)
     return
+  const app = `App: ${notice.appId}`
   const primary = notice.kind === 'setup'
-    ? [`Continue ${notice.product} setup for ${notice.appId}.${notice.title ? ` Next: ${notice.title}.` : ''}`, notice.action]
-    : [`${notice.completed.join(' and ')} setup is complete for ${notice.appId}.`, ...(notice.billing.trialEndsAt ? [remainingTrial(notice.billing.trialEndsAt, now)] : []), `Choose a Capgo plan: ${notice.billing.plansUrl}`]
-  return [...primary, ...(notice.secondary.length ? [`Also ${notice.secondary.join('; or ')}.`] : [])].join('\n')
+    ? [
+        `Continue ${notice.product} setup`,
+        app,
+        '',
+        ...(notice.title ? [`Next step: ${notice.title}`, ''] : []),
+        notice.product === 'Capgo Builder' ? 'Resume setup:' : 'View your checklist:',
+        notice.action,
+      ]
+    : [
+        `${notice.completed.join(' and ')} setup is complete`,
+        app,
+        '',
+        ...(notice.billing.trialEndsAt ? [remainingTrial(notice.billing.trialEndsAt, now), ''] : []),
+        'Choose a Capgo plan:',
+        notice.billing.plansUrl,
+      ]
+  return [...primary, ...(notice.secondary.length ? ['', `Also ${notice.secondary.join('; or ')}.`] : [])].join('\n')
 }
 
 export function reconcileSetupProgress(progress: AppTodoProgress, reported: readonly LocalOnboardingStep[]): AppTodoProgress {

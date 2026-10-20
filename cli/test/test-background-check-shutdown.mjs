@@ -35,7 +35,7 @@ beforeAll(async () => {
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, waitForWorkers = false, trialAlreadyShown = false } = {}) {
+function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, waitForWorkers = false, trialAlreadyShown = false, debug = false } = {}) {
   const source = `
     import assert from 'node:assert/strict'
     import { performance } from 'node:perf_hooks'
@@ -112,7 +112,7 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
   `
   const runner = join(dir, `run-${++runnerCount}.mjs`)
   writeFileSync(runner, source)
-  const child = spawn('node', [runner], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CI: ci ? 'true' : 'false', CAPGO_DISABLE_TELEMETRY: disabled ? 'true' : '', CAPGO_DISABLE_POSTHOG: '' } })
+  const child = spawn('node', [runner], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CI: ci ? 'true' : 'false', CAPGO_DISABLE_TELEMETRY: disabled ? 'true' : '', CAPGO_DISABLE_POSTHOG: '', CAPGO_SETUP_DEBUG: debug ? '1' : '' } })
   let output = ''
   let errors = ''
   let waiting
@@ -143,6 +143,8 @@ test.concurrent('ready notices render for human-readable output even when no wor
     const result = await run({ commandPath: 'bundle list', workers: ['notice.mjs', 'notice.mjs'], waitForWorkers: true, tty }).completion
     assert.equal(result.code, 0, result.text)
     assert.equal(result.text.match(/Continue OTA live updates setup/g)?.length, 1, 'deduplicate the app notice')
+    assert.match(result.text, /[─-]+[╮+]/, 'setup notice has a top box border')
+    assert.match(result.text, /[─-]+[╯+]/, 'setup notice has a bottom box border')
     assert.ok(!result.text.includes('Waiting for background checks'))
   }
 })
@@ -261,3 +263,19 @@ test.concurrent('hanging telemetry is aborted within the same five-second budget
   assert.equal(waitEvents(result).length, 1)
   assert.ok(result.output.includes('telemetry-aborted'))
 }, 12_000)
+
+
+test.concurrent('opt-in diagnostics distinguish shutdown timeout from a non-TTY skip', async () => {
+  const timed = await run({ commandPath: 'bundle list', debug: true, controlledClock: true }).completion
+  assert.equal(timed.code, 0, timed.text)
+  assert.match(timed.errors, /\[setup-debug /)
+  assert.match(timed.errors, /shutdown deadline reached/)
+  assert.match(timed.errors, /pending_workers=1/)
+  const piped = await run({ commandPath: 'bundle list', debug: true, tty: false }).completion
+  assert.equal(piped.code, 0, piped.text)
+  assert.match(piped.errors, /shutdown wait skipped/)
+  assert.match(piped.errors, /stdout_tty=false/)
+  assert.doesNotMatch(piped.output, /\[setup-debug /, 'diagnostics must not pollute stdout')
+  const normal = await run({ commandPath: 'bundle list', tty: false }).completion
+  assert.doesNotMatch(normal.text, /\[setup-debug /, 'logging is off by default')
+})

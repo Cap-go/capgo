@@ -16,7 +16,7 @@ const progress = () => ({
   billing: { status: 'available', orgId: '00000000-0000-4000-8000-000000000001', trialEndsAt: '2030-01-01T00:00:00Z', isPaying: false, hasCredits: false },
 })
 
-async function run({ putStatus = 200, command = 'bundle list', mutation = false } = {}) {
+async function run({ putStatus = 200, command = 'bundle list', mutation = false, debug = false } = {}) {
   const fixture = mkdtempSync(join(tmpdir(), 'capgo-parallel-notice-'))
   let child
   let releaseProgress
@@ -80,7 +80,7 @@ async function run({ putStatus = 200, command = 'bundle list', mutation = false 
       ${mutation ? `process.stdin.once('data', () => worker.postMessage({ type: 'command-succeeded' }))` : ''}
       worker.on('exit', code => process.exit(code))
     `
-    child = spawn('node', ['--input-type=module', '-e', runner], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, CAPGO_DISABLE_TELEMETRY: '', CAPGO_DISABLE_POSTHOG: '' } })
+    child = spawn('node', ['--input-type=module', '-e', runner], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, CAPGO_DISABLE_TELEMETRY: '', CAPGO_DISABLE_POSTHOG: '', CAPGO_SETUP_DEBUG: debug ? '1' : '' } })
     let output = ''
     let errors = ''
     child.stdout.on('data', value => { output += value })
@@ -94,7 +94,8 @@ async function run({ putStatus = 200, command = 'bundle list', mutation = false 
     const result = await Promise.race([exited, delay(5000).then(() => ['timeout'])])
     assert.equal(result[0], 0, errors)
     const notices = output.trim().split('\n').filter(Boolean).map(line => JSON.parse(line)).filter(message => message.type === 'setup-notice').map(message => message.notice)
-    return { notices, requests }
+    const diagnostics = output.trim().split('\n').filter(Boolean).map(line => JSON.parse(line)).filter(message => message.type === 'setup-debug').map(message => message.line).join('\n')
+    return { notices, requests, diagnostics }
   }
   finally {
     releaseProgress()
@@ -125,4 +126,16 @@ test('a mutating command refreshes after success without waiting for the initial
   assert.equal(requests.filter(entry => entry.path.endsWith('/private/onboarding_progress')).length, 2)
   assert.equal(notices[0].kind, 'setup')
   assert.equal(notices[0].title, 'Run your app on a device')
+}, 15000)
+
+
+test('diagnostics relay both scanner threads and the request result without credentials', async () => {
+  const { diagnostics, notices } = await run({ debug: true })
+  assert.match(diagnostics, /progress request started/)
+  assert.match(diagnostics, /progress response received.*status=200/)
+  assert.match(diagnostics, /local scan finished.*scan=add_code.*result=found/)
+  assert.match(diagnostics, /local scan finished.*scan=add_updater.*result=found/)
+  assert.match(diagnostics, /notice ready.*kind=plan/)
+  assert.doesNotMatch(diagnostics, /fake-key|fake-anon|fixture-org|com\.example/)
+  assert.equal(notices.length, 1)
 }, 15000)

@@ -5,25 +5,32 @@ import { exit } from 'node:process'
 import { parentPort, Worker, workerData } from 'node:worker_threads'
 import { setCurrentCliCommand } from './analytics/cli-headers'
 import { prepareOnboardingCheck } from './onboarding/background-preparation'
+import { relaySetupDebug, setupDebug, setupError } from './onboarding/setup-diagnostics'
 import { readSetupProgress } from './onboarding/setup-notice-evaluation'
 import { shouldRefreshSetupProgress } from './onboarding/setup-notice-policy'
 import { getSetupNotice, reconcileSetupProgress } from './onboarding/setup-notices'
 
-function runScanWorker(workerUrl: URL, data: object): Promise<LocalOnboardingStep | undefined> {
+function runScanWorker(workerUrl: URL, data: object, scan: string): Promise<LocalOnboardingStep | undefined> {
   return new Promise((resolve) => {
     try {
+      setupDebug('scan worker starting', { scan })
       const worker = new Worker(workerUrl, { workerData: data, stdout: true, stderr: true })
       worker.stdout?.destroy()
       worker.stderr?.destroy()
       let reported: LocalOnboardingStep | undefined
       worker.on('message', (message) => {
+        relaySetupDebug(message)
         if (message?.type === 'onboarding-step' && (message.step === 'add_code' || message.step === 'add_updater'))
           reported = message.step
       })
-      worker.on('error', () => {})
-      worker.once('exit', () => resolve(reported))
+      worker.on('error', error => setupDebug('scan worker failed', { scan, error: setupError(error) }))
+      worker.once('exit', (code) => {
+        setupDebug('scan worker exited', { scan, exit_code: code, reported: reported ?? 'none' })
+        resolve(reported)
+      })
     }
-    catch {
+    catch (error) {
+      setupDebug('scan worker start failed', { scan, error: setupError(error) })
       resolve(undefined)
     }
   })
@@ -41,7 +48,10 @@ async function runOnboardingChecks(options: OnboardingCheckOptions): Promise<voi
         })
       })
     : Promise.resolve()
+  const started = Date.now()
+  setupDebug('preparation started', { notice_enabled: options.setupNotice, refresh })
   const prepared = await prepareOnboardingCheck(options)
+  setupDebug('preparation finished', { duration_ms: Date.now() - started, prepared: !!prepared })
   if (!prepared)
     return
 
@@ -52,23 +62,28 @@ async function runOnboardingChecks(options: OnboardingCheckOptions): Promise<voi
   // startup request or local scans are slow. Never queue two request budgets.
   const progressRead = refresh
     ? foregroundFinished.then(() => {
+        setupDebug('progress refresh after foreground success')
         earlyController.abort()
         return readSetupProgress(prepared)
       })
     : earlyProgress
   const [progress, ...reports] = await Promise.all([
     progressRead,
-    runScanWorker(new URL('./notify-app-ready-worker.js', import.meta.url), { ...prepared, attemptId: attemptIds[0] }),
-    runScanWorker(new URL('./updater-installed-worker.js', import.meta.url), { ...prepared, attemptId: attemptIds[1] }),
+    runScanWorker(new URL('./notify-app-ready-worker.js', import.meta.url), { ...prepared, attemptId: attemptIds[0] }, 'app_ready'),
+    runScanWorker(new URL('./updater-installed-worker.js', import.meta.url), { ...prepared, attemptId: attemptIds[1] }, 'updater'),
   ])
+  setupDebug('parallel checks finished', { has_progress: !!progress, accepted_reports: reports.filter(Boolean).length })
   if (progress) {
     const updated = reports.filter((step): step is LocalOnboardingStep => step !== undefined)
     const notice = getSetupNotice(prepared.project.appId, reconcileSetupProgress(progress, updated), prepared.webHost)
-    if (notice)
+    if (notice) {
+      setupDebug('notice ready', { kind: notice.kind })
       parentPort?.postMessage({ type: 'setup-notice', notice })
+    }
   }
 }
 
-void runOnboardingChecks(workerData as OnboardingCheckOptions).catch(() => {
+void runOnboardingChecks(workerData as OnboardingCheckOptions).catch((error) => {
+  setupDebug('evaluation failed', { error: setupError(error) })
   // Optional onboarding checks must never affect the requested command.
 }).finally(() => exit(0))

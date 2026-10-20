@@ -1,9 +1,10 @@
 import type { Command } from 'commander'
 import process from 'node:process'
-import { log } from '@clack/prompts'
+import { log, note } from '@clack/prompts'
 import { isCI } from 'ci-info'
 import { flushAnalytics, trackEvent } from '../analytics/track'
 import { getPendingOnboardingChecks, takeSetupNotices } from './background-workers'
+import { setupDebug } from './setup-diagnostics'
 import { ONBOARDING_CHECK_GRACE_MS as gracePeriodMs, shouldEvaluateSetupNotice } from './setup-notice-policy'
 import { formatSetupNotice } from './setup-notices'
 import { markTrialNoticeShown, wasTrialNoticeShown } from './trial-notice-state'
@@ -56,15 +57,20 @@ function shouldWaitForOnboardingChecks(commandPath: string, options: Record<stri
 
 function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPath: string): void {
   const notices = takeSetupNotices()
+  setupDebug('render checked', { available_notices: notices.length })
   if (!shouldEvaluateSetupNotice(commandPath, command.optsWithGlobals(), isCI))
     return
   const shownApps = new Set<string>()
   for (const notice of notices) {
-    if (shownApps.has(notice.appId) || (notice.kind === 'plan' && wasTrialNoticeShown(notice.billing.orgId)))
+    if (shownApps.has(notice.appId) || (notice.kind === 'plan' && wasTrialNoticeShown(notice.billing.orgId))) {
+      setupDebug('render suppressed', { reason: 'already_shown' })
       continue
+    }
     const text = formatSetupNotice(notice)
     if (text) {
-      log.info(text)
+      const [title, ...body] = text.split('\n')
+      note(body.join('\n'), title, { format: line => line })
+      setupDebug('render shown', { kind: notice.kind })
       shownApps.add(notice.appId)
       if (notice.kind === 'plan')
         markTrialNoticeShown(notice.billing.orgId)
@@ -73,8 +79,11 @@ function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPa
 }
 
 export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGlobals'>, commandPath: string): Promise<void> {
+  const started = Date.now()
   const pendingChecks = getPendingOnboardingChecks()
+  setupDebug('shutdown entered', { pending_workers: pendingChecks.size, stdin_tty: !!process.stdin.isTTY, stdout_tty: !!process.stdout.isTTY, ci: isCI })
   if (!shouldWaitForOnboardingChecks(commandPath, command.optsWithGlobals()) || pendingChecks.size === 0) {
+    setupDebug('shutdown wait skipped', { pending_workers: pendingChecks.size, stdout_tty: !!process.stdout.isTTY })
     // Human-readable non-TTY commands only consume already available results.
     renderSetupNotices(command, commandPath)
     return
@@ -85,6 +94,7 @@ export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGl
   // Take precedence over any command-specific cancellation handler still attached.
   process.prependOnceListener('SIGINT', onInterrupt)
   try {
+    setupDebug('shutdown wait started', { budget_ms: gracePeriodMs })
     log.info('Waiting for background checks to finish (up to 5 seconds). Press Ctrl-C to exit immediately.')
     const checks = [...pendingChecks.values()]
     const options = command.optsWithGlobals()
@@ -105,7 +115,10 @@ export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGl
       Promise.allSettled([...checks.map(check => check.completion), flushAnalytics(gracePeriodMs)]),
       new Promise<void>((resolve) => {
         // This timer keeps the process alive while the workers remain unreferenced.
-        timer = setTimeout(resolve, gracePeriodMs)
+        timer = setTimeout(() => {
+          setupDebug('shutdown deadline reached', { pending_workers: pendingChecks.size })
+          resolve()
+        }, gracePeriodMs)
       }),
     ])
   }
@@ -113,6 +126,7 @@ export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGl
     if (timer)
       clearTimeout(timer)
     process.removeListener('SIGINT', onInterrupt)
+    setupDebug('shutdown wait finished', { duration_ms: Date.now() - started, pending_workers: pendingChecks.size })
     // A hanging request must not outlive the shared shutdown budget.
     for (const worker of pendingChecks.keys())
       void worker.terminate().catch(() => {})

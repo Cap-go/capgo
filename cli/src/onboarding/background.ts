@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { cwd } from 'node:process'
 import { Worker } from 'node:worker_threads'
 import { registerOnboardingCheck } from './background-workers'
+import { setupDebug, setupError } from './setup-diagnostics'
 import { shouldEvaluateSetupNotice } from './setup-notice-policy'
 
 export interface OnboardingCheckOptions {
@@ -43,17 +44,20 @@ export function startOnboardingCheck(command: Command, commandPath: string, work
       supaAnon: text(options.supaAnon),
       setupNotice: shouldEvaluateSetupNotice(commandPath, options, ci),
     }
+    setupDebug('worker starting', { command: commandPath, notice_enabled: workerData.setupNotice, ci })
     const worker = new Worker(workerUrl, { workerData, stdout: true, stderr: true })
     // Discovery/config loading must not write into terminal UIs or MCP stdout.
     // Discard captured streams so incoming output cannot reference the worker's IPC port.
     worker.stdout?.destroy()
     worker.stderr?.destroy()
-    worker.on('error', () => {})
+    worker.on('online', () => setupDebug('worker online'))
+    worker.on('error', error => setupDebug('worker failed', { error: setupError(error) }))
     registerOnboardingCheck(worker, attemptIds ?? [attemptId])
     // Both detection and reporting can be abandoned when the command exits.
     worker.unref()
   }
-  catch {
+  catch (error) {
+    setupDebug('worker start failed', { error: setupError(error) })
     // Optional onboarding detection must never affect the requested command.
   }
 }
