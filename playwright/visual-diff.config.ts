@@ -12,14 +12,28 @@ export interface VisualDiffRoute {
 }
 
 async function prepareProfileGoalScreenshot(page: Page) {
+  const assignments = { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }
+  let profile: Record<string, unknown> | undefined
+  await page.route('**/private/onboarding_ab_tests', route => route.fulfill({ json: { assignments } }))
   await page.route('**/rest/v1/rpc/get_orgs_v7', route => route.fulfill({ json: [] }))
   await page.route('**/rest/v1/users?*', async (route) => {
+    // Welcome persists a draft before opening About you. Keep those writes local
+    // instead of returning an empty conditional-update result or altering seed data.
+    if (route.request().method() === 'PATCH' && profile) {
+      Object.assign(profile, route.request().postDataJSON())
+      return route.fulfill({ json: [profile] })
+    }
     if (route.request().method() !== 'GET')
       return route.fulfill({ json: [] })
+    if (profile)
+      return route.fulfill({ json: [profile] })
     const response = await route.fetch()
     const json = await response.json()
-    const profile = (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } })
-    await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
+    const row = Array.isArray(json) ? json[0] : json
+    if (!row)
+      throw new Error('The visual profile fixture requires an existing test user')
+    profile = { ...row, first_name: '', last_name: '', onboarding: { abtests: assignments, version: 6 } }
+    await route.fulfill({ response, json: [profile] })
   })
   await page.reload()
   const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
