@@ -850,13 +850,12 @@ async function checkLogin() {
     }
     else if (!session && route.query.code && typeof route.query.code === 'string') {
       const { data, error } = await supabase.auth.exchangeCodeForSession(route.query.code)
-      if (!error && data.session) {
-        await nextLogin()
-      }
-      else {
+      if (error || !data.session) {
         isLoading.value = false
         hideLoader()
+        return
       }
+      await nextLogin()
     }
     else if (!session && route.hash) {
       await checkMagicLink()
@@ -1054,7 +1053,7 @@ onMounted(checkLogin)
                 >
                   <svg
                     v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
-                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading" aria-hidden="true"
                   >
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                     <path
@@ -1109,7 +1108,7 @@ onMounted(checkLogin)
                         >
                           <svg
                             v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading" aria-hidden="true"
                           >
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                             <path
@@ -1193,7 +1192,7 @@ onMounted(checkLogin)
                         >
                           <svg
                             v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading" aria-hidden="true"
                           >
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                             <path
@@ -1230,7 +1229,7 @@ onMounted(checkLogin)
                         >
                           <svg
                             v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading" aria-hidden="true"
                           >
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                             <path

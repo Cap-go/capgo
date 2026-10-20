@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   error: vi.fn(),
   warning: vi.fn(),
   getClaims: vi.fn(),
+  exchangeCodeForSession: vi.fn(),
   rpc: vi.fn(),
   signOut: vi.fn(),
   listFactors: vi.fn(),
@@ -41,6 +42,7 @@ vi.mock('~/services/supabase', () => ({
     rpc: mocks.rpc,
     auth: {
       getClaims: mocks.getClaims,
+      exchangeCodeForSession: mocks.exchangeCodeForSession,
       getSession: async () => ({ data: { session: null } }),
       signOut: mocks.signOut,
       setSession: mocks.setSession,
@@ -77,6 +79,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.available = true
   mocks.getClaims.mockResolvedValue({ data: { claims: null } })
+  mocks.exchangeCodeForSession.mockResolvedValue({ data: { session: null }, error: null })
   mocks.fullPath = '/login'
   mocks.query = { to: '/apps' }
   sessionStorage.clear()
@@ -283,5 +286,24 @@ describe('account profile recovery', () => {
     expect(mocks.replace).not.toHaveBeenCalled()
     expect(logout!.disabled).toBe(false)
     expect(root.querySelector('[data-test="account-load-retry"]')).not.toBeNull()
+  })
+})
+
+describe('authorization code login bootstrap', () => {
+  it('continues to the validated destination after exchanging the code', async () => {
+    mocks.query = { code: 'one-time-code', to: '/apps' }
+    mocks.exchangeCodeForSession.mockResolvedValue({ data: { session: { user: { id: 'code-user' } } }, error: null })
+    await mount()
+    expect(mocks.exchangeCodeForSession).toHaveBeenCalledWith('one-time-code')
+    expect(mocks.replace).toHaveBeenCalledWith('/apps')
+  })
+
+  it.each(['error', 'missing-session'])('keeps the login available after an unsuccessful code exchange (%s)', async (failure) => {
+    mocks.query = { code: 'one-time-code', to: '/apps' }
+    mocks.exchangeCodeForSession.mockResolvedValue({ data: { session: failure === 'error' ? { user: { id: 'code-user' } } : null }, error: failure === 'error' ? new Error('Code expired') : null })
+    const root = await mount()
+    expect(mocks.exchangeCodeForSession).toHaveBeenCalledWith('one-time-code')
+    expect(mocks.replace).not.toHaveBeenCalled()
+    expect(root.querySelector('input[type="email"]')).not.toBeNull()
   })
 })
