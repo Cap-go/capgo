@@ -107,6 +107,7 @@ export function createMutationContext(store: DispatchStore, run: RunRecord, send
 
 export function createTaskContext(store: DispatchStore, run: RunRecord, settings: Readonly<Record<string, string>> = {}): TaskContext {
   return Object.freeze({
+    runId: run.id,
     settings: Object.freeze({ ...settings }),
     run: <T>(operation: (db: QueryClient) => Promise<T>) => store.runTask(run, operation),
   })

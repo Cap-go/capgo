@@ -2,8 +2,10 @@ import type { DispatchRecord, EligibleUser, QueryClient } from '../cloudflare_wo
 import type { LifecycleInput } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/types.ts'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import { stdout } from 'node:process'
 import { createPgliteEngine, Database } from 'tinbase'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { bentoFlows } from '../cloudflare_workers/bento_dispatch/bentoFlows.ts'
 import { evaluateLifecycle, evaluateLifecycleDecision } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/evaluate.ts'
 import { buildAppEvidence } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/evidence.ts'
 import { recordLifecycleAttempt, recordLifecycleDecision, recordLifecycleSnapshot } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/monitoring.ts'
@@ -16,6 +18,15 @@ let db: Database
 let client: QueryClient
 const after = (hours: number, from = Date.now()) => new Date(from + hours * 3_600_000).toISOString()
 const treatment = { intent: 'ota', abtests_enrolled: ['new_emails_v2'], abtests: { new_emails_v2: { branch: 'A', assigned_at: '2026-10-18T01:00:00.000Z' } } }
+
+interface MonitoringPlan {
+  Plans?: MonitoringPlan[]
+  [key: string]: unknown
+}
+
+function planNodes(plan: MonitoringPlan): MonitoringPlan[] {
+  return [plan, ...(plan.Plans ?? []).flatMap(planNodes)]
+}
 
 beforeAll(async () => {
   db = await Database.create(await createPgliteEngine())
@@ -42,7 +53,7 @@ beforeAll(async () => {
       status text,completed_at timestamptz,builder_job_id text,upload_session_key text,platform text);
     CREATE TABLE public.onboarding_demo_data(app_id text,seed_id uuid,relation_name text,row_key text,
       PRIMARY KEY(seed_id,relation_name,row_key),UNIQUE(app_id,relation_name,row_key));`)
-  for (const name of ['20261017131933_bento_invitation_dispatches', '20261019102456_organization_lifecycle_v2', '20261019103827_lifecycle_monitoring_evidence'])
+  for (const name of ['20261017131933_bento_invitation_dispatches', '20261019130017_bento_evaluation_state', '20261020145512_organization_lifecycle_v2', '20261020160725_lifecycle_monitoring_evidence'])
     await db.exec(readFileSync(`supabase/migrations/${name}.sql`, 'utf8'))
   client = { query: async (sql, values) => {
     const result = await db.query(sql, values)
@@ -100,15 +111,118 @@ async function fixture() {
 }
 
 describe('durable lifecycle monitoring evidence', () => {
+  it('bounds retained-purpose history and preserves indexed single-decision inspection', async () => {
+    const f = await fixture()
+    const background = await fixture()
+    await recordLifecycleDecision(client, f.input, f.decision, 1, after(1), { originalCreatorId: f.creatorId, sourceVerifiedAt: f.input.now })
+    for (const [orgId, purposes] of [[f.orgId, 1000], [background.orgId, 5000]] as const) {
+      await db.query(`INSERT INTO public.bento_lifecycle_decisions
+        (org_id,product,purpose,evaluated_at,decision,reason,creator_cohort,policy_version,source_healthy,fingerprint)
+        SELECT $1::uuid,'ota',CASE WHEN n=0 THEN NULL ELSE 'summary:retained-' || n END,
+          CURRENT_TIMESTAMP-(4-version)*INTERVAL '1 hour','wait','retained-version-' || version,
+          'treatment','retained-plan-fixture',true,pg_catalog.repeat('a',64)
+        FROM pg_catalog.generate_series(0,$2::integer-1) n CROSS JOIN pg_catalog.generate_series(1,4) version`, [orgId, purposes])
+    }
+    await db.exec('ANALYZE public.bento_lifecycle_decisions; ANALYZE public.bento_lifecycle_evaluation_coverage')
+    const query = `SELECT * FROM public.bento_lifecycle_monitor_v1 WHERE org_id=$1::uuid AND product='ota'
+      AND (purpose LIKE 'summary:retained-%' OR purpose IS NULL) LIMIT 20`
+    const analyzed = (await db.query<{ 'QUERY PLAN': Array<{ 'Plan': MonitoringPlan, 'Execution Time': number }> }>(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${query}`, [f.orgId])).rows[0]['QUERY PLAN'][0]
+    const nodes = planNodes(analyzed.Plan)
+    const comparisons = nodes.reduce((sum, node) => sum + Number(node['Rows Removed by Join Filter'] ?? 0), 0)
+    expect(comparisons).toBeLessThan(2000)
+    expect(nodes.filter(node => node['Relation Name'] === 'bento_lifecycle_decisions' && node['Node Type'] === 'Seq Scan')).toEqual([])
+    const rows = (await db.query(query, [f.orgId])).rows
+    expect(rows).toHaveLength(20)
+    expect(rows.every(row => row.reason === 'retained-version-4')).toBe(true)
+    expect(new Set(rows.map(row => row.purpose)).size).toBe(20)
+    expect((await db.query(`SELECT reason FROM public.bento_lifecycle_monitor_v1 WHERE org_id=$1::uuid AND product='ota' AND purpose IS NULL`, [f.orgId])).rows).toEqual([{ reason: 'retained-version-4' }])
+    const id = (await db.query(`SELECT id FROM public.bento_lifecycle_decisions WHERE org_id=$1::uuid
+      AND purpose='summary:retained-999' ORDER BY evaluated_at DESC,id DESC LIMIT 1`, [f.orgId])).rows[0].id
+    const detail = (await db.query<{ 'QUERY PLAN': Array<{ 'Plan': MonitoringPlan, 'Execution Time': number }> }>(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
+      SELECT * FROM public.bento_lifecycle_monitor_v1 WHERE decision_id=$1::uuid`, [id])).rows[0]['QUERY PLAN'][0]
+    expect(planNodes(detail.Plan).some(node => node['Index Name'] === 'bento_lifecycle_decisions_pkey')).toBe(true)
+    expect(detail.Plan['Actual Rows']).toBe(1)
+    const rangeQuery = `SELECT * FROM public.bento_lifecycle_monitor_v1
+      WHERE COALESCE(due_at,decision_changed_at)>=$1::timestamptz AND COALESCE(due_at,decision_changed_at)<$2::timestamptz
+        AND (is_current OR dispatch_id IS NOT NULL OR last_attempt_at IS NOT NULL)
+      ORDER BY evaluated_at DESC LIMIT 2001`
+    // A single real current decision gives the positive range a result; retained
+    // history has older timestamps and must not be scanned for either window.
+    const current = (await db.query('SELECT evaluated_at,due_at FROM public.bento_lifecycle_decisions WHERE org_id=$1 AND purpose IS NOT NULL AND fingerprint<>pg_catalog.repeat(\'a\',64)', [f.orgId])).rows[0]
+    const clock = new Date(current.due_at ?? current.evaluated_at).getTime()
+    const rangeMetrics = []
+    for (const [from, to, count] of [[clock - 1000, clock + 1000, 1], [Date.parse(after(48)), Date.parse(after(49)), 0]]) {
+      const bounds = [new Date(from).toISOString(), new Date(to).toISOString()]
+      const range = (await db.query<{ 'QUERY PLAN': Array<{ 'Plan': MonitoringPlan, 'Execution Time': number }> }>(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${rangeQuery}`, bounds)).rows[0]['QUERY PLAN'][0]
+      expect(planNodes(range.Plan).some(node => node['Index Name'] === 'bento_lifecycle_decision_monitor_time')).toBe(true)
+      expect(planNodes(range.Plan).filter(node => node['Relation Name'] === 'bento_lifecycle_decisions' && node['Node Type'] === 'Seq Scan')).toEqual([])
+      expect(range.Plan['Actual Rows']).toBe(count)
+      rangeMetrics.push({ returned: count, executionMs: range['Execution Time'], buffers: range.Plan['Shared Hit Blocks'] })
+    }
+    stdout.write(`Lifecycle retained-history plan: ${JSON.stringify({ decisions: 24001, purposes: 6000, returned: rows.length, joinFilterComparisons: comparisons, executionMs: analyzed['Execution Time'], detailExecutionMs: detail['Execution Time'], rangeMetrics })}\n`)
+  })
+
+  it('lists the real logical checks while keeping the audit maintenance delivery out of invocation state', async () => {
+    const rows = (await db.query('SELECT * FROM public.bento_evaluation_checks_v1 ORDER BY evaluation_key')).rows
+    expect(rows.map(row => ({ key: row.evaluation_key, kind: row.check_kind, cadence: row.every_minutes }))).toEqual(
+      Object.values(bentoFlows).map(check => ({ key: check.key, kind: 'execute' in check ? 'task' : 'event', cadence: check.everyMinutes })).sort((a, b) => a.key.localeCompare(b.key)),
+    )
+    expect(rows.every(row => row.status === 'never_observed' && row.run_id === null)).toBe(true)
+    expect(rows.some(row => row.evaluation_key === 'audit_recovery')).toBe(false)
+  })
+
+  it('retains safe invocation transitions after reusable check state rotates and ignores audit-only updates', async () => {
+    const store = new DispatchStore(client)
+    const key = `monitor-history:${randomUUID()}`
+    const first = (await store.schedule(key, 1, Date.now()))!
+    await store.markEnqueued(first.id, first.enqueue_claim_token!)
+    const run = (await store.claimRun({ version: 1, evaluationKey: key, runId: first.id }))!
+    await store.completeRun(run, { selected: 3, accepted: 1, failed: 1, skipped: 1, ready: true, claimed: 20, processed: 19, deferred: 1, saturated: true, oldestDueAt: '2026-10-20T14:00:00Z', secret: 'never-archive-this', provider_body: 'never-archive-this' })
+    const history = (await db.query('SELECT * FROM public.bento_evaluation_history_v1 WHERE run_id=$1 ORDER BY event_sequence', [first.id])).rows
+    expect(history.map(row => row.status)).toEqual(['pending_enqueue', 'pending_enqueue', 'queued', 'running', 'completed'])
+    expect(history.at(-1)).toMatchObject({ run_id: first.id, evaluation_key: key, result: { selected: 3, accepted: 1, failed: 1, skipped: 1, ready: true, claimed: 20, processed: 19, deferred: 1, saturated: true } })
+    expect(JSON.stringify(history)).not.toContain('never-archive-this')
+    await db.query('UPDATE public.bento_evaluation_runs SET pending_audit=\'[]\' WHERE evaluation_key=$1', [key])
+    expect((await db.query('SELECT id FROM public.bento_evaluation_events WHERE run_id=$1', [first.id])).rows).toHaveLength(history.length)
+    const second = (await store.schedule(key, 1, Date.now() + 60_000))!
+    expect(second.id).not.toBe(first.id)
+    expect((await db.query('SELECT id FROM public.bento_evaluation_runs WHERE evaluation_key=$1', [key])).rows).toEqual([{ id: second.id }])
+    expect((await db.query('SELECT run_id FROM public.bento_evaluation_history_v1 WHERE evaluation_key=$1 GROUP BY run_id', [key])).rows).toHaveLength(2)
+    await expect(db.query('UPDATE public.bento_evaluation_events SET status=\'failed\' WHERE run_id=$1', [first.id])).rejects.toThrow('append-only')
+  })
+
+  it('uses bounded history indexes without copying arbitrary run result data', async () => {
+    const runId = randomUUID()
+    const key = `monitor-plan:${randomUUID()}`
+    await db.query(`INSERT INTO public.bento_evaluation_events(run_id,evaluation_key,scheduled_for,status,
+        enqueue_attempt_count,execution_attempt_count,result)
+      SELECT $1,$2,CURRENT_TIMESTAMP,'completed',1,1,'{}'::jsonb FROM generate_series(1,5000)`, [runId, key])
+    await db.exec('ANALYZE public.bento_evaluation_events')
+    const plan = await db.query(`EXPLAIN (ANALYZE, FORMAT JSON) SELECT * FROM public.bento_evaluation_history_v1
+      WHERE evaluation_key=$1 AND recorded_at>=CURRENT_TIMESTAMP-INTERVAL '1 day'
+      ORDER BY recorded_at DESC,event_sequence DESC LIMIT 25`, [key])
+    expect(JSON.stringify(plan.rows)).toContain('bento_evaluation_events_check_time')
+    expect(JSON.stringify(plan.rows)).not.toContain('Seq Scan')
+    expect(plan.rows[0]['QUERY PLAN'][0].Plan['Actual Rows']).toBe(25)
+    const current = await db.query(`EXPLAIN (ANALYZE, FORMAT JSON) SELECT * FROM public.bento_evaluation_checks_v1`)
+    expect(current.rows[0]['QUERY PLAN'][0].Plan['Actual Rows']).toBe(Object.keys(bentoFlows).length)
+  })
+
   it('keeps changed decisions append-only and leaves decision cohorts unchanged on a heartbeat', async () => {
     const f = await fixture()
-    const provenance = { originalCreatorId: f.creatorId, sourceVerifiedAt: f.input.now }
+    const provenance = { runId: randomUUID(), originalCreatorId: f.creatorId, sourceVerifiedAt: f.input.now }
     await recordLifecycleDecision(client, f.input, f.decision, 1, after(1), provenance)
     const first = (await db.query('SELECT * FROM public.bento_lifecycle_monitor_v1 WHERE org_id=$1', [f.orgId])).rows[0]
+    const firstRun = provenance.runId
+    provenance.runId = randomUUID()
     f.input.now = after(0.1)
     provenance.sourceVerifiedAt = f.input.now
     await recordLifecycleDecision(client, f.input, evaluateLifecycleDecision(f.input), 1, after(2), provenance)
     const second = (await db.query('SELECT * FROM public.bento_lifecycle_monitor_v1 WHERE org_id=$1', [f.orgId])).rows[0]
+    expect(second.decision_run_id).toBe(firstRun)
+    expect(second.last_evaluation_run_id).toBe(provenance.runId)
+    expect(second.preparation_check_key).toBe('lifecycle:v2:prepare')
+    expect(second.send_check_key).toBe('lifecycle:v2:ota')
     expect(second.decision_id).toBe(first.decision_id)
     expect(second.evaluated_at).toEqual(first.evaluated_at)
     expect(new Date(second.source_verified_at).getTime()).toBe(Date.parse(f.input.now))
@@ -173,7 +287,7 @@ describe('durable lifecycle monitoring evidence', () => {
     // actual PostgreSQL migration rather than mirrored query mocks.
     await db.query('DELETE FROM public.bento_event_dispatches WHERE id=$1', [f.event.id])
     const store = new DispatchStore(client)
-    const queued = (await store.schedule(`monitor-test:${randomUUID()}`, 1))!
+    const queued = (await store.schedule(`monitor-test:${randomUUID()}`, 1, Date.now()))!
     await store.markEnqueued(queued.id, queued.enqueue_claim_token!)
     const run = (await store.claimRun({ version: 1, evaluationKey: queued.evaluation_key, runId: queued.id }))!
     await store.recordFlowEvent(run, f.user, 'flow:started', 'fixture_enrolled')
@@ -185,7 +299,9 @@ describe('durable lifecycle monitoring evidence', () => {
     const ctx = createMutationContext(store, run, send)
     expect(await ctx.sendBentoEvent(f.user, async () => ({ action: 'send', buildEvent: id => buildLifecycleEvent(f.input, f.decision.candidate!, id, 'https://console.example.com') }))).toMatchObject({ outcome: 'accepted' })
     expect(send).toHaveBeenCalledOnce()
-    const events = (await db.query('SELECT kind FROM public.bento_lifecycle_timeline_v1 WHERE org_id=$1 ORDER BY recorded_at,evidence_id', [f.orgId])).rows.map(row => row.kind)
+    const timeline = (await db.query('SELECT kind,run_id,evaluation_key FROM public.bento_lifecycle_timeline_v1 WHERE org_id=$1 ORDER BY recorded_at,evidence_id', [f.orgId])).rows
+    expect(timeline.every(row => row.run_id === run.id && row.evaluation_key === 'lifecycle:v2:ota')).toBe(true)
+    const events = timeline.map(row => row.kind)
     expect(events).toContain('claimed')
     expect(events).toContain('provider_request')
     expect(events).toContain('accepted')
@@ -223,7 +339,7 @@ describe('durable lifecycle monitoring evidence', () => {
     await db.query(`UPDATE public.bento_event_dispatches SET claim_until=CURRENT_TIMESTAMP-INTERVAL '1 minute' WHERE id=$1`, [f.event.id])
     expect((await db.query('SELECT * FROM public.bento_lifecycle_claims_v1 WHERE org_id=$1', [f.orgId])).rows).toEqual([])
     const views = ['monitor', 'due', 'clock_candidates', 'timeline', 'snapshots', 'claims', 'outcomes'].map(name => `bento_lifecycle_${name}_v1`)
-    for (const name of [...views, 'bento_lifecycle_decisions', 'bento_lifecycle_evaluation_coverage', 'bento_lifecycle_attempts', 'bento_lifecycle_send_snapshots']) {
+    for (const name of [...views, 'bento_evaluation_checks_v1', 'bento_evaluation_history_v1', 'bento_evaluation_events', 'bento_lifecycle_decisions', 'bento_lifecycle_evaluation_coverage', 'bento_lifecycle_attempts', 'bento_lifecycle_send_snapshots']) {
       const result = (await db.query(`SELECT has_table_privilege('anon',$1,'SELECT') AS anon_read,
         has_table_privilege('authenticated',$1,'SELECT') AS member_read,
         has_table_privilege('service_role',$1,'SELECT') AS internal_read`, [`public.${name}`])).rows[0]
@@ -276,7 +392,7 @@ describe('durable lifecycle monitoring evidence', () => {
     await db.query(`INSERT INTO public.role_bindings VALUES('user',$1,'org',$2,true,NULL)`, [f.creatorId, f.orgId])
     await db.query(`INSERT INTO public.stripe_info(customer_id,status,trial_at) VALUES($1,'created',CURRENT_TIMESTAMP+INTERVAL '100 days')`, [f.orgId])
     await db.query(`UPDATE public.orgs SET customer_id=$2 WHERE id=$1`, [f.orgId, f.orgId])
-    expect(await refreshLifecycleJourneys(client, null)).toBe(1)
+    expect(await refreshLifecycleJourneys(client, null)).toMatchObject({ processed: 1 })
     const row = (await db.query('SELECT * FROM public.bento_lifecycle_monitor_v1 WHERE org_id=$1 AND is_current', [f.orgId])).rows[0]
     expect(row).toMatchObject({ original_creator_id: f.creatorId, source_healthy: true, recipient_id: f.creatorId, recipient_email: 'creator@example.com', sender_ready: true })
     // This stacked base can lack PR3732's runtime config. The actual source

@@ -19,12 +19,16 @@ CREATE TABLE public.bento_lifecycle_decisions (
     policy_version text NOT NULL,
     source_healthy boolean NOT NULL,
     source_verified_at timestamptz,
+    run_id uuid,
     fingerprint text NOT NULL CHECK (fingerprint ~ '^[a-f0-9]{64}$'),
     context_key text
 );
 CREATE INDEX bento_lifecycle_decision_identity ON public.bento_lifecycle_decisions
     (org_id, product, purpose, evaluated_at DESC, id DESC);
 CREATE INDEX bento_lifecycle_decision_time ON public.bento_lifecycle_decisions(evaluated_at DESC, id);
+-- Match the dashboard's due/changed time window without scanning retained history.
+CREATE INDEX bento_lifecycle_decision_monitor_time ON public.bento_lifecycle_decisions
+    ((COALESCE(due_at, evaluated_at)));
 
 CREATE TABLE public.bento_lifecycle_evaluation_coverage (
     org_id uuid NOT NULL REFERENCES public.orgs(id) ON DELETE CASCADE,
@@ -36,6 +40,7 @@ CREATE TABLE public.bento_lifecycle_evaluation_coverage (
     sender_ready boolean NOT NULL,
     source_healthy boolean NOT NULL,
     source_verified_at timestamptz,
+    run_id uuid,
     PRIMARY KEY(org_id, product)
 );
 
@@ -122,6 +127,8 @@ CREATE VIEW public.bento_lifecycle_monitor_v1 AS
 SELECT 'bento-lifecycle-monitor-v1'::text AS contract_version, d.id AS decision_id,
     d.org_id, d.product, d.purpose, d.due_at, d.evaluated_at, c.evaluated_at AS last_evaluated_at, d.evaluated_at AS decision_changed_at,
     d.decision, d.reason, dispatch.id AS dispatch_id, dispatch.status AS dispatch_status,
+    d.run_id AS decision_run_id, c.run_id AS last_evaluation_run_id, dispatch.last_run_id AS dispatch_run_id,
+    'lifecycle:v2:prepare'::text AS preparation_check_key, 'lifecycle:v2:' || d.product AS send_check_key,
     COALESCE(s.recipient_id, d.recipient_id) AS recipient_id,
     COALESCE(s.recipient_email, d.recipient_email) AS recipient_email,
     d.original_creator_id, d.creator_cohort,
@@ -153,11 +160,17 @@ LEFT JOIN LATERAL (
         AND attempt.recorded_at >= d.evaluated_at
     ORDER BY attempt.recorded_at DESC, attempt.id DESC LIMIT 1
 ) latest_attempt ON true
-WHERE NOT EXISTS (
+-- Keep each purpose lookup fully indexable, including the NULL-purpose group.
+-- A correlated filter also preserves primary-key pushdown for decision inspection.
+WHERE CASE WHEN d.purpose IS NULL THEN NOT EXISTS (
     SELECT 1 FROM public.bento_lifecycle_decisions newer
-    WHERE newer.org_id = d.org_id AND newer.product = d.product AND newer.purpose IS NOT DISTINCT FROM d.purpose
+    WHERE newer.org_id = d.org_id AND newer.product = d.product AND newer.purpose IS NULL
         AND (newer.evaluated_at, newer.id) > (d.evaluated_at, d.id)
-);
+) ELSE NOT EXISTS (
+    SELECT 1 FROM public.bento_lifecycle_decisions newer
+    WHERE newer.org_id = d.org_id AND newer.product = d.product AND newer.purpose = d.purpose
+        AND (newer.evaluated_at, newer.id) > (d.evaluated_at, d.id)
+) END;
 
 -- This source starts from prospective creator provenance and declared product
 -- intent, independently of journey enrollment, candidate JSON and the outbox.
@@ -273,11 +286,13 @@ WHERE clocks.due_at IS NOT NULL AND (clocks.expires_at IS NULL OR clocks.due_at 
 CREATE VIEW public.bento_lifecycle_timeline_v1 AS
 SELECT 'bento-lifecycle-monitor-v1'::text AS contract_version, d.id AS evidence_id, d.id AS decision_id,
     d.org_id, d.product, d.purpose, d.evaluated_at AS recorded_at, 'decision'::text AS kind,
-    d.reason, NULL::uuid AS dispatch_id, NULL::smallint AS attempt_number, d.recipient_id, d.recipient_email
+    d.reason, NULL::uuid AS dispatch_id, NULL::smallint AS attempt_number, d.recipient_id, d.recipient_email,
+    d.run_id, 'lifecycle:v2:prepare'::text AS evaluation_key
 FROM public.bento_lifecycle_decisions d
 UNION ALL
 SELECT 'bento-lifecycle-monitor-v1'::text, a.id, NULL::uuid, a.org_id, a.product, a.purpose,
-    a.recorded_at, a.kind, a.reason, a.dispatch_id, a.attempt_number, a.recipient_id, a.recipient_email
+    a.recorded_at, a.kind, a.reason, a.dispatch_id, a.attempt_number, a.recipient_id, a.recipient_email,
+    a.run_id, 'lifecycle:v2:' || a.product
 FROM public.bento_lifecycle_attempts a;
 
 CREATE VIEW public.bento_lifecycle_snapshots_v1 AS
@@ -374,3 +389,102 @@ GRANT SELECT ON public.bento_lifecycle_monitor_v1, public.bento_lifecycle_due_v1
     public.bento_lifecycle_clock_candidates_v1, public.bento_lifecycle_timeline_v1,
     public.bento_lifecycle_snapshots_v1, public.bento_lifecycle_claims_v1, public.bento_lifecycle_outcomes_v1 TO service_role;
 COMMENT ON VIEW public.bento_lifecycle_snapshots_v1 IS 'Restricted expected resolved request content. Never archived rendered HTML, inbox delivery or proof of exact template execution.';
+
+
+-- Evaluation rows rotate their run UUID in place. This append-only projection
+-- retains invocation state without eligibility snapshots, tokens or raw errors.
+CREATE TABLE public.bento_evaluation_events (
+    event_sequence bigint GENERATED ALWAYS AS IDENTITY,
+    id uuid PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
+    recorded_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
+    run_id uuid NOT NULL,
+    evaluation_key text NOT NULL,
+    scheduled_for timestamptz NOT NULL,
+    status text NOT NULL,
+    enqueued_at timestamptz,
+    started_at timestamptz,
+    finished_at timestamptz,
+    enqueue_attempt_count smallint NOT NULL,
+    execution_attempt_count smallint NOT NULL,
+    result jsonb NOT NULL,
+    error_code text
+);
+CREATE INDEX bento_evaluation_events_check_time ON public.bento_evaluation_events(evaluation_key,recorded_at DESC,event_sequence DESC);
+CREATE INDEX bento_evaluation_events_run_time ON public.bento_evaluation_events(run_id,recorded_at DESC,event_sequence DESC);
+ALTER TABLE public.bento_evaluation_events OWNER TO postgres;
+ALTER TABLE public.bento_evaluation_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.bento_evaluation_events FROM PUBLIC,anon,authenticated,service_role;
+GRANT SELECT ON public.bento_evaluation_events TO service_role;
+CREATE POLICY evaluation_events_deny ON public.bento_evaluation_events AS RESTRICTIVE FOR ALL TO anon,authenticated USING(false) WITH CHECK(false);
+CREATE TRIGGER evaluation_events_immutable BEFORE UPDATE ON public.bento_evaluation_events
+FOR EACH ROW EXECUTE FUNCTION public.deny_lifecycle_evidence_update();
+
+-- Fixed-key projection, no table reads, one row per changed queue state on the
+-- seven low-volume checks. Audit-only drains cannot append another state row.
+CREATE FUNCTION public.capture_bento_evaluation_state() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+    safe_result jsonb := '{}'::jsonb;
+    key text;
+    due_at timestamptz;
+BEGIN
+    FOREACH key IN ARRAY ARRAY['selected','accepted','failed','skipped','deferred','ended','claimed','processed'] LOOP
+        IF pg_catalog.jsonb_typeof(NEW.result->key) = 'number' AND NEW.result->>key ~ '^[0-9]{1,9}$' THEN
+            safe_result := safe_result || pg_catalog.jsonb_build_object(key,(NEW.result->>key)::integer);
+        END IF;
+    END LOOP;
+    FOREACH key IN ARRAY ARRAY['ready','saturated'] LOOP
+        IF pg_catalog.jsonb_typeof(NEW.result->key) = 'boolean' THEN
+            safe_result := safe_result || pg_catalog.jsonb_build_object(key,NEW.result->key);
+        END IF;
+    END LOOP;
+    due_at := public.lifecycle_v2_parse_timestamp(NEW.result->>'oldestDueAt');
+    IF due_at IS NOT NULL THEN
+        safe_result := safe_result || pg_catalog.jsonb_build_object('oldestDueAt',due_at);
+    END IF;
+    INSERT INTO public.bento_evaluation_events(run_id,evaluation_key,scheduled_for,status,enqueued_at,started_at,finished_at,
+        enqueue_attempt_count,execution_attempt_count,result,error_code)
+    VALUES(NEW.id,NEW.evaluation_key,NEW.scheduled_for,NEW.status,NEW.enqueued_at,NEW.started_at,NEW.finished_at,
+        NEW.enqueue_attempt_count,NEW.execution_attempt_count,safe_result,
+        CASE WHEN NEW.last_error IN ('attempts_exhausted','evaluation_failed','publication_failed') THEN NEW.last_error END);
+    RETURN NEW;
+END;
+$$;
+ALTER FUNCTION public.capture_bento_evaluation_state() OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.capture_bento_evaluation_state() FROM PUBLIC,anon,authenticated,service_role;
+CREATE TRIGGER evaluation_state_insert AFTER INSERT ON public.bento_evaluation_runs
+FOR EACH ROW EXECUTE FUNCTION public.capture_bento_evaluation_state();
+CREATE TRIGGER evaluation_state_update AFTER UPDATE ON public.bento_evaluation_runs
+FOR EACH ROW WHEN ((OLD.id,OLD.status,OLD.enqueued_at,OLD.started_at,OLD.finished_at,OLD.enqueue_attempt_count,
+    OLD.execution_attempt_count,OLD.result,OLD.last_error) IS DISTINCT FROM
+    (NEW.id,NEW.status,NEW.enqueued_at,NEW.started_at,NEW.finished_at,NEW.enqueue_attempt_count,
+    NEW.execution_attempt_count,NEW.result,NEW.last_error))
+EXECUTE FUNCTION public.capture_bento_evaluation_state();
+
+CREATE VIEW public.bento_evaluation_checks_v1 AS
+WITH registry(evaluation_key,check_kind,every_minutes) AS (VALUES
+    ('org:invite_new_user_reminder_1','event',1),('org:invite_new_user_reminder_2','event',1),
+    ('org:invite_existing_user_reminder_1','event',1),('org:invite_existing_user_reminder_2','event',1),
+    ('lifecycle:v2:ota','event',1),('lifecycle:v2:builder','event',1),('lifecycle:v2:prepare','task',1)
+)
+SELECT 'bento-lifecycle-monitor-v1'::text AS contract_version,registry.evaluation_key,registry.check_kind,registry.every_minutes,
+    state.id AS run_id,state.scheduled_for,COALESCE(state.status,'never_observed') AS status,
+    state.enqueued_at,state.started_at,state.finished_at,state.evaluated_at,
+    state.enqueue_attempt_count,state.execution_attempt_count,
+    latest.recorded_at AS last_state_observed_at,latest.result,latest.error_code,
+    'reusable_current_state'::text AS evidence_scope
+FROM registry LEFT JOIN public.bento_evaluation_runs state ON state.evaluation_key=registry.evaluation_key
+LEFT JOIN LATERAL (SELECT event.recorded_at,event.result,event.error_code FROM public.bento_evaluation_events event
+    WHERE event.run_id=state.id ORDER BY event.recorded_at DESC,event.event_sequence DESC LIMIT 1) latest ON true;
+
+CREATE VIEW public.bento_evaluation_history_v1 AS
+SELECT 'bento-lifecycle-monitor-v1'::text AS contract_version,id AS evidence_id,event_sequence,recorded_at,
+    run_id,evaluation_key,scheduled_for,status,enqueued_at,started_at,finished_at,
+    enqueue_attempt_count,execution_attempt_count,result,error_code,'observed_state_transition'::text AS evidence_scope
+FROM public.bento_evaluation_events;
+ALTER VIEW public.bento_evaluation_checks_v1 OWNER TO postgres;
+ALTER VIEW public.bento_evaluation_history_v1 OWNER TO postgres;
+REVOKE ALL ON public.bento_evaluation_checks_v1,public.bento_evaluation_history_v1 FROM PUBLIC,anon,authenticated,service_role;
+GRANT SELECT ON public.bento_evaluation_checks_v1,public.bento_evaluation_history_v1 TO service_role;
+COMMENT ON VIEW public.bento_evaluation_checks_v1 IS 'Seven logical queued checks and latest reusable invocation state. audit_recovery is a separate queue maintenance delivery with no invocation row.';
+COMMENT ON VIEW public.bento_evaluation_history_v1 IS 'Append-only observed queue state transitions, not one row per run or email. Group by run_id; no historical backfill or provider-send proof.';

@@ -45,7 +45,7 @@ it('bounds actual recurring selection over 200,000 mostly-idle journeys with spa
       CREATE TABLE public.apps(id uuid PRIMARY KEY, app_id text NOT NULL UNIQUE, owner_org uuid NOT NULL REFERENCES public.orgs(id),
         created_at timestamptz NOT NULL, onboarding jsonb NOT NULL DEFAULT '{}');
       CREATE INDEX finx_apps_owner_org ON public.apps(owner_org);
-      CREATE TABLE public.stripe_info(customer_id text PRIMARY KEY, status text, trial_at timestamptz, subscription_id text,
+      CREATE TABLE public.stripe_info(customer_id text PRIMARY KEY, status text, trial_at timestamptz, subscription_id text,paid_at timestamptz,
         build_time_exceeded boolean,subscription_anchor_start timestamptz,subscription_anchor_end timestamptz);
       CREATE TABLE public.role_bindings(principal_type text,principal_id uuid,scope_type text,org_id uuid,is_direct boolean,expires_at timestamptz);
       CREATE TABLE public.org_metrics_cache(org_id uuid,start_date date,end_date date,cached_at timestamptz,
@@ -58,7 +58,9 @@ it('bounds actual recurring selection over 200,000 mostly-idle journeys with spa
         row_key text NOT NULL, PRIMARY KEY(seed_id,relation_name,row_key), UNIQUE(app_id,relation_name,row_key));
     `)
     await db.exec(readFileSync('supabase/migrations/20261017131933_bento_invitation_dispatches.sql', 'utf8'))
+    await db.exec(readFileSync('supabase/migrations/20261019130017_bento_evaluation_state.sql', 'utf8'))
     await db.exec(readFileSync('supabase/migrations/20261020145512_organization_lifecycle_v2.sql', 'utf8'))
+    await db.exec(readFileSync('supabase/migrations/20261020160725_lifecycle_monitoring_evidence.sql', 'utf8'))
     await db.query(`INSERT INTO public.users(id,created_at,email)
       SELECT md5($1 || ':user:' || n)::uuid,CURRENT_TIMESTAMP,'selection-' || n || '@example.com'
       FROM generate_series(1,$2::integer) n`, [seed, organizations])

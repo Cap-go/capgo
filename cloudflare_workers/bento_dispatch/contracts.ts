@@ -43,6 +43,7 @@ export interface Evaluation {
   handleEligibleUsers: (ctx: MutationContext, users: EligibleUser[]) => Promise<Record<string, Json>>
 }
 export interface TaskContext {
+  readonly runId?: string
   settings: Readonly<Record<string, string>>
   run: <T>(operation: (db: QueryClient) => Promise<T>) => Promise<T>
 }

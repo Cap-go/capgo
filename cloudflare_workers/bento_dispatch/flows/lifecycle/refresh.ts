@@ -86,7 +86,7 @@ export function claimDueLifecycleJourneys(db: QueryClient) {
     RETURNING j.org_id, j.product, j.revision, j.refresh_claim_token, j.next_evaluation_at`, [LIFECYCLE_REFRESH_BATCH_SIZE])
 }
 
-export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: AnalyticsReader | null, now = () => new Date().toISOString()) {
+export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: AnalyticsReader | null, now = () => new Date().toISOString(), runId?: string) {
   const started = Date.now()
   const deadline = started + 35_000
   const loadDeadline = started + 10_000
@@ -198,6 +198,7 @@ export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: An
         WHERE org_id = $1::uuid AND product = $2 AND app_incarnation = $3::uuid`, [input.orgId, input.product, app.id, fresh.input.evidence?.facts.map(fact => fact.id) ?? []])
       }
       await recordLifecycleDecision(db, fresh.input, decision, fresh.revision, nextAt, { // NOSONAR -- This write must commit atomically with this journey's fenced state on the pinned connection.
+        runId,
         originalCreatorId: fresh.row.original_creator_id,
         sourceVerifiedAt: timestamp(fresh.row.verified_at),
       })
@@ -208,7 +209,7 @@ export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: An
       throw error
     }
     if (fresh.input.creatorTreatment && fresh.input.email) {
-      await recordFlowEvent(db, { flowKey: 'lifecycle:v2:org', contextKey: input.orgId, recipientKey: `org:${input.orgId}`, email: fresh.input.email, tag: 'flow:started', reason: 'original_creator_enrolled', details: { orgId: input.orgId, product: input.product } })
+      await recordFlowEvent(db, { flowKey: 'lifecycle:v2:org', contextKey: input.orgId, recipientKey: `org:${input.orgId}`, email: fresh.input.email, tag: 'flow:started', runId, reason: 'original_creator_enrolled', details: { orgId: input.orgId, product: input.product } })
     }
     refreshed++
   }

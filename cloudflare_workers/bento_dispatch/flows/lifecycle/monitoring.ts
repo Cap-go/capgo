@@ -45,6 +45,7 @@ function candidateDueAt(input: LifecycleInput, candidate: LifecycleDecision['can
 }
 
 export interface DecisionProvenance {
+  runId?: string
   originalCreatorId: string | null
   sourceVerifiedAt: string | null
 }
@@ -83,16 +84,16 @@ export async function recordLifecycleDecision(db: QueryClient, input: LifecycleI
       INSERT INTO public.bento_lifecycle_decisions
         (org_id, product, purpose, due_at, evaluated_at, decision, reason, recipient_id, recipient_email,
          original_creator_id, creator_cohort, app_incarnation, event_name, variant, policy_version,
-         source_healthy, source_verified_at, fingerprint, context_key)
-      SELECT $1::uuid,$2,$3,$4::timestamptz,$5::timestamptz,$6,$7,$8::uuid,$9,$10::uuid,$11,$12::uuid,$13,$14,$15,$16,$17::timestamptz,$18,$19
+         source_healthy, source_verified_at, fingerprint, context_key, run_id)
+      SELECT $1::uuid,$2,$3,$4::timestamptz,$5::timestamptz,$6,$7,$8::uuid,$9,$10::uuid,$11,$12::uuid,$13,$14,$15,$16,$17::timestamptz,$18,$19,$22::uuid
       WHERE NOT EXISTS (SELECT 1 FROM previous WHERE fingerprint = $18)
       RETURNING id
     ) INSERT INTO public.bento_lifecycle_evaluation_coverage
-      (org_id,product,evaluated_at,next_evaluation_at,revision,latest_decision_id,sender_ready,source_healthy,source_verified_at)
-      VALUES($1::uuid,$2,$5::timestamptz,$20::timestamptz,$21,COALESCE((SELECT id FROM inserted),(SELECT id FROM previous)),true,$16,$17::timestamptz)
+      (org_id,product,evaluated_at,next_evaluation_at,revision,latest_decision_id,sender_ready,source_healthy,source_verified_at,run_id)
+      VALUES($1::uuid,$2,$5::timestamptz,$20::timestamptz,$21,COALESCE((SELECT id FROM inserted),(SELECT id FROM previous)),true,$16,$17::timestamptz,$22::uuid)
       ON CONFLICT(org_id,product) DO UPDATE SET evaluated_at=EXCLUDED.evaluated_at,
         next_evaluation_at=EXCLUDED.next_evaluation_at,revision=EXCLUDED.revision,latest_decision_id=EXCLUDED.latest_decision_id,
-        sender_ready=EXCLUDED.sender_ready,source_healthy=EXCLUDED.source_healthy,source_verified_at=EXCLUDED.source_verified_at`, [
+        sender_ready=EXCLUDED.sender_ready,source_healthy=EXCLUDED.source_healthy,source_verified_at=EXCLUDED.source_verified_at,run_id=EXCLUDED.run_id`, [
     input.orgId,
     input.product,
     fields.purpose,
@@ -114,6 +115,7 @@ export async function recordLifecycleDecision(db: QueryClient, input: LifecycleI
     fields.context,
     nextAt,
     revision,
+    provenance.runId ?? null,
   ])
 }
 
@@ -183,7 +185,7 @@ function snapshotPersonalization(payload: BentoEvent) {
 
 // Capture the allowlisted resolved request, once per physical attempt. Retries can
 // legitimately have different recipient/context under the same dispatch ID.
-export async function recordLifecycleSnapshot(db: QueryClient, user: EligibleUser, event: DispatchRecord, payload: BentoEvent, evidence?: LifecycleSendAudit) {
+export async function recordLifecycleSnapshot(db: QueryClient, user: EligibleUser, event: DispatchRecord, payload: BentoEvent, evidence?: LifecycleSendAudit, runId?: string) {
   if (!lifecycle(user))
     return
   validateSnapshotIdentity(user, event, payload)
@@ -218,5 +220,5 @@ export async function recordLifecycleSnapshot(db: QueryClient, user: EligibleUse
     WHERE dispatch_id=$1::uuid AND attempt_number=$2`, [event.id, event.attempt_count])
   if (saved.rows[0]?.snapshot_checksum !== digest || saved.rows[0]?.billing_customer_fingerprint !== billingFingerprint)
     throw new Error('Lifecycle snapshot already differs')
-  await recordLifecycleAttempt(db, user, 'provider_request', 'resolved_payload_archived', event)
+  await recordLifecycleAttempt(db, user, 'provider_request', 'resolved_payload_archived', event, runId)
 }

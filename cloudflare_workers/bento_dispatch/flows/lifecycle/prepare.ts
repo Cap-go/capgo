@@ -27,7 +27,7 @@ export const lifecyclePreparation: TaskEvaluation = {
         return result.data
       }
       : null
-    const result = await refreshLifecycleJourneys(db, reader)
+    const result = await refreshLifecycleJourneys(db, reader, undefined, ctx.runId)
     console.log(JSON.stringify({ event: 'bento_lifecycle_batch', ...result }))
     return { ready: true, ...result }
   }),

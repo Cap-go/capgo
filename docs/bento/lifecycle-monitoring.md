@@ -56,6 +56,10 @@ possible. The heartbeat alone is mutable. These tables contain private recipient
 and organization context and must never be exported into source fixtures, public
 PRs or analytics payloads.
 
+Evidence is retained for the lifetime of its organization. This change adds no
+automatic purge, retention cron or historical backfill; organization deletion
+cascades through the evidence tables.
+
 ## Versioned read views
 
 Every view includes `contract_version = 'bento-lifecycle-monitor-v1'`. No view is
@@ -114,15 +118,82 @@ stays unknown. No read view reveals the fingerprint or billing customer ID.
 
 ## Execution and validation
 
-No plugin request path gains primary database I/O. The only new trigger rejects
-updates to the three evidence tables; it reads no table, runs once per attempted
-UPDATE and is unreachable through ordinary client roles. Source views use the
+No plugin request path gains primary database I/O. Evidence immutability triggers
+reject updates without reading tables. Queue-state capture performs one bounded
+insert per changed internal evaluation state; ordinary client roles cannot reach
+these write paths. Source views use the
 bounded prospective creator/journey cohort and keyed org, user, observation,
 accepted-purpose and dispatch indexes. Private dashboard requests must add time,
 organization and row bounds. They must not scan or return an unbounded timeline.
+The latest-purpose filter uses separate indexed probes for NULL and non-NULL
+purposes. Decision inspection retains primary-key predicate pushdown, and the
+dashboard's `COALESCE(due_at, decision_changed_at)` range uses the matching
+`COALESCE(due_at, evaluated_at)` expression index. Normal-planner regressions
+cover retained purposes, NULL grouping, decision-ID inspection and populated and
+empty time ranges. These fixture measurements do not establish production capacity.
 
-The monitoring unit suite applies all three actual migrations to embedded
+The monitoring unit suite applies all four actual migrations to embedded
 PostgreSQL and exercises views, privileges, immutable retries, the real dispatch
 store/provider boundary, missing enrollment, changed-decision heartbeats and
 independent clocks. Fixtures use fake identities only. No live events or test
 emails are needed for verification.
+
+
+## Queued checks and invocation history
+
+The ordinary minute Worker cron publishes the existing registered evaluations.
+`lifecycle:v2:prepare` owns readiness-gated business refresh, billing and progress
+source reads, eligibility decisions and bounded indexed `next_evaluation_at`
+claims in its existing queue handler. OTA and Builder sends remain independent
+logical checks. The same queue also receives `audit_recovery` maintenance
+messages; these create no invocation row, eligibility selection or audit intent.
+No monitoring change alters cron cadence, queue semantics or lifecycle clocks.
+
+`bento_evaluation_checks_v1` lists the seven current registered logical checks
+and left joins their reusable `bento_evaluation_runs` state. `evaluation_key`
+identifies a check; `run_id` rotates per scheduled invocation. A missing state is
+`never_observed`, never a count of zero historical checks. The current-state row
+cannot prove the history or number of earlier invocations.
+
+`bento_evaluation_history_v1` exposes append-only observed state transitions,
+identified by `evidence_id`, `run_id` and `evaluation_key`. Monotonic
+`event_sequence` breaks ties when multiple transitions share a timestamp. Group by `run_id` to
+count invocations; one state transition is neither one invocation nor one email.
+Capture begins with this migration and makes no historical backfill claim. Its
+fixed projection retains only status and timing fields, attempt counts, known
+nonnegative count results, readiness/saturation booleans and parsed oldest-due
+time. Eligibility snapshots, credentials, tokens and provider error bodies are
+excluded. Audit-only state updates do not append history. The capture trigger
+performs no table reads and inserts one bounded row for each changed state of
+these low-volume checks; history lookups must use check/run indexes and time and
+row limits. Dashboard readers receive SELECT only on these views.
+
+Lifecycle monitor fields `decision_run_id` and `last_evaluation_run_id` refer to
+the preparation invocation that originally changed the decision and most recently
+verified it, respectively. `dispatch_run_id` identifies the send evaluation that
+last attempted the logical event. `preparation_check_key` and `send_check_key`
+name those distinct checks. Timeline `run_id`/`evaluation_key` joins the real
+queue invocation to each observed decision or attempt. An organization/product
+journey and a logical `dispatch_id` can span multiple invocations and physical
+attempts. Provider acceptance does not establish a provider message identifier
+or an actual send. Missing older correlation remains null.
+
+## Separate legacy Stripe evidence
+
+The independently signed EE and US `customer.created` bridge emits
+`org:legacy_stripe_trial_started` to exactly one normalized Stripe customer
+email, normally the organization's management email. It does not fan out to an
+owner or member audience, and does not require v2 A/B eligibility. An unlinked
+customer can have no organization metadata. The event includes `stripe_event_id`
+and verified `billing_account`; those identify the source event together, while
+`customer_id` is private billing context and `org_id` is optional explicit context.
+See [the bridge contract](../legacy-stripe-trial-bento.md).
+
+Track these legacy events separately from v2 organization journeys and do not
+infer organization linkage, legacy/v2 exclusion, rollout, actual send or delivery
+from a merged PR. Missing email/configuration skips and configured forwarding
+failures preserve the bridge's existing skip/503 retry behavior. Duplicates can
+forward again. There is no durable bridge acceptance/skip/retry ledger in this
+contract and no proven event-to-provider-message foreign key. Email/template/time
+similarity supplies only a candidate association. Later observed Bento message
+previews remain observations at capture time, not immutable historical sent HTML.

@@ -77,7 +77,8 @@ it('keeps a concurrent real organization wakeup from being overwritten by an old
     }
     return result
   } }
-  const work = refreshLifecycleJourneys(db, null)
+  const runId = randomUUID()
+  const work = refreshLifecycleJourneys(db, null, undefined, runId)
   try {
     const before = await Promise.race([snapshot, work.then(() => {
       throw new Error('Expected an in-flight source snapshot')
@@ -91,6 +92,13 @@ it('keeps a concurrent real organization wakeup from being overwritten by an old
     expect(result.claimed).toBe(20)
     expect(result.processed).toBe(19)
     expect(result.deferred).toBe(1)
+    const evidence = await executeSQL(`SELECT d.org_id,d.product,d.run_id,c.run_id AS coverage_run_id
+      FROM public.bento_lifecycle_evaluation_coverage c
+      JOIN public.bento_lifecycle_decisions d ON d.id=c.latest_decision_id
+      WHERE c.org_id=ANY($1::uuid[]) AND c.run_id=$2`, [f.ids, runId])
+    expect(evidence).toHaveLength(19)
+    expect(evidence.every(row => row.run_id === runId && row.coverage_run_id === runId)).toBe(true)
+    expect(evidence.some(row => row.org_id === before.orgId && row.product === before.product)).toBe(false)
     const [after] = await executeSQL<{ revision: string, state: unknown, candidate: unknown }>(`SELECT revision,state,candidate FROM public.bento_lifecycle_journeys
       WHERE org_id=$1 AND product=$2`, [before.orgId, before.product])
     expect(Number(after!.revision)).toBeGreaterThan(before.revision)

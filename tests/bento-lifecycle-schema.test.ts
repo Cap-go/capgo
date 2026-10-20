@@ -59,6 +59,38 @@ function completedChecklist() {
 }
 
 describe('lifecycle schema on full PostgreSQL', () => {
+  it.concurrent('keeps all nine monitoring views private and excludes billing fingerprints from their columns', async () => {
+    await transaction(async (client) => {
+      const views = [
+        'bento_lifecycle_monitor_v1',
+        'bento_lifecycle_due_v1',
+        'bento_lifecycle_clock_candidates_v1',
+        'bento_lifecycle_timeline_v1',
+        'bento_lifecycle_snapshots_v1',
+        'bento_lifecycle_claims_v1',
+        'bento_lifecycle_outcomes_v1',
+        'bento_evaluation_checks_v1',
+        'bento_evaluation_history_v1',
+      ]
+      const { rows } = await client.query(`SELECT c.relname,
+        pg_catalog.has_table_privilege('anon',c.oid,'SELECT') AS anon_read,
+        pg_catalog.has_table_privilege('authenticated',c.oid,'SELECT') AS user_read,
+        pg_catalog.has_table_privilege('service_role',c.oid,'SELECT') AS internal_read,
+        pg_catalog.has_table_privilege('service_role',c.oid,'INSERT,UPDATE,DELETE') AS internal_write
+        FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND c.relname=ANY($1::text[]) AND c.relkind='v'`, [views])
+      expect(rows).toHaveLength(9)
+      expect(rows.every(row => !row.anon_read && !row.user_read && row.internal_read && !row.internal_write)).toBe(true)
+      expect((await client.query(`SELECT column_name FROM information_schema.columns
+        WHERE table_schema='public' AND table_name=ANY($1::text[])
+          AND column_name IN ('billing_customer_fingerprint','customer_id','claim_token')`, [views])).rows).toEqual([])
+      await client.query('SAVEPOINT public_read')
+      await client.query('SET LOCAL ROLE anon')
+      await expect(client.query('SELECT * FROM public.bento_evaluation_checks_v1 LIMIT 1')).rejects.toMatchObject({ code: '42501' })
+      await client.query('ROLLBACK TO SAVEPOINT public_read')
+    })
+  })
+
   it.concurrent('excludes an invited original creator even with a stale treatment marker', async () => {
     await transaction(async (client) => {
       const creator = await seedUser(client, {}, true)
