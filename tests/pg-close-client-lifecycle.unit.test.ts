@@ -70,17 +70,14 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', async (importOriginal) 
 })
 
 function createContext(env: Record<string, any> = {}) {
+  const variables = new Map<string, unknown>([['requestId', 'request-id']])
   return {
     env: {
       HYPERDRIVE_CAPGO_READ_EU: { connectionString: 'postgres://hyperdrive-eu' },
       ...env,
     },
-    get: (key: string) => {
-      if (key === 'requestId')
-        return 'request-id'
-      return undefined
-    },
-    set: vi.fn(),
+    get: (key: string) => variables.get(key),
+    set: (key: string, value: unknown) => variables.set(key, value),
     req: {
       raw: {
         cf: { continent: 'EU' },
@@ -167,5 +164,26 @@ describe('main pg.ts Hyperdrive pg Client lifecycle', () => {
     expect(cloudlogErr).toHaveBeenCalledWith(expect.objectContaining({
       message: 'PG client end failed',
     }))
+  })
+
+  it('logs primary-read rollback failures without masking the request error or ending Hyperdrive', async () => {
+    const query = vi.fn().mockResolvedValueOnce({}).mockRejectedValue(new Error('connection lost'))
+    ClientMock.mockImplementation(function (this: any) {
+      this.on = clientOnMock
+      this.connect = clientConnectMock
+      this.query = query
+      this.end = vi.fn()
+      return this
+    })
+    const { getPgClient, closeClient } = await import('../supabase/functions/_backend/utils/pg.ts')
+    const { cloudlogErr } = await import('../supabase/functions/_backend/utils/logging.ts')
+    const c = createContext({
+      HYPERDRIVE_CAPGO_READ_EU: undefined,
+      HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'postgres://hyperdrive-primary' },
+    })
+    const reader = await getPgClient(c, true)
+    await expect(closeClient(c, reader)).resolves.toBeUndefined()
+    expect(reader.end).not.toHaveBeenCalled()
+    expect(cloudlogErr).toHaveBeenCalledWith(expect.objectContaining({ message: 'PG read transaction cleanup failed' }))
   })
 })

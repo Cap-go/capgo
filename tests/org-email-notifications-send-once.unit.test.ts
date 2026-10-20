@@ -177,6 +177,20 @@ describe('sendNotifToOrgMembersOnce', () => {
     expect(sendNotifOrgOnceMock).not.toHaveBeenCalled()
   })
 
+  it('closes its owned primary reader when recipient lookup returns no organization', async () => {
+    getDrizzleClientMock.mockReturnValue(createDrizzleStub({ failTables: ['orgs'] }))
+    const { sendEmailToOrgMembers } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
+    await expect(sendEmailToOrgMembers(createContext(), 'user:need_onboarding', 'onboarding', {}, 'test-org')).resolves.toBe(0)
+    expect(closeClientMock).toHaveBeenCalledWith(expect.anything(), { id: 'owned-pg-client' })
+  })
+
+  it('leaves an injected notification reader owned by its caller', async () => {
+    const { sendEmailToOrgMembers } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
+    await sendEmailToOrgMembers(createContext(), 'user:need_onboarding', 'onboarding', {}, 'test-org', createDrizzleStub({ failTables: ['orgs'] }))
+    expect(getPgClientMock).not.toHaveBeenCalled()
+    expect(closeClientMock).not.toHaveBeenCalled()
+  })
+
   it('treats an existing org-level claim as already delivered without sending recipients again', async () => {
     hasNotifOrgClaimMock.mockResolvedValue(true)
 

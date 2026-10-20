@@ -13,6 +13,7 @@ import { getClientDbRegionSB } from './geolocation.ts'
 import { freshQueryArgs } from './hyperdriveFreshRead.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { isReadOnlyPgConnectionRetryError } from './pg_errors.ts'
+import { closePrimaryReadClient, configureTransactionAccessMode, readOnlyStartupOptions, restrictPrimaryReadClient } from './pg_transaction_mode.ts'
 import { serializePostgresError, serializePostgresLogValue } from './postgres_error.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
@@ -419,8 +420,7 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PluginP
   const requestId = c.get('requestId')
   const appName = c.res.headers.get('X-Worker-Source') ?? 'unknown source'
   const dbName = String(c.get('databaseSource') ?? c.res.headers.get('X-Database-Source') ?? 'unknown source')
-  const isPooler = dbName.startsWith('sb_pooler')
-  const readOnlyOptions = readOnly && !isPooler ? '-c default_transaction_read_only=on' : undefined
+  const readOnlyOptions = readOnlyStartupOptions(dbName, readOnly)
   const isWorkerd = getRuntimeKey() === 'workerd'
   // Match on the actual connection string (not just databaseSource metadata) so the
   // Hyperdrive Client contract cannot silently become Pool+end() if c.set is missed.
@@ -439,7 +439,7 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PluginP
     })
     await client.connect()
     skipEndClients.add(client)
-    return client
+    return restrictPrimaryReadClient(client, dbName, readOnly, true)
   }
 
   const pool = new Pool({
@@ -457,7 +457,7 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PluginP
     cloudlogErr({ requestId, message: 'PG Pool Error', databaseSource: dbName, error: serializePostgresError(err) })
   })
 
-  return pool
+  return restrictPrimaryReadClient(pool, dbName, readOnly, false)
 }
 
 /**
@@ -472,6 +472,7 @@ export interface LazyPgClient {
 }
 
 const lazyPgQueryCounts = new WeakMap<object, number>()
+const lazyPgClients = new WeakMap<object, () => Promise<PluginPgClient>>()
 const LAZY_PG_CONNECT_ERROR = Symbol('lazy-pg-connect-error')
 
 function markLazyPgConnectError(error: unknown) {
@@ -516,6 +517,7 @@ export function createLazyPgClient(c: Context, readOnly = false): LazyPgClient {
       return ensure().then(db => (db.query as (...queryArgs: unknown[]) => unknown)(...queryArgs))
     },
   } as unknown as PluginPgClient
+  lazyPgClients.set(client, ensure)
   return {
     client,
     isConnected: () => inner !== null,
@@ -532,7 +534,14 @@ export function createLazyPgClient(c: Context, readOnly = false): LazyPgClient {
 export function getDrizzleClient(db: PluginPgClient, options?: { logger?: boolean }) {
   // Keep SQL logging on by default for API/trigger diagnostics.
   // Plugin hot paths pass `{ logger: false }` to avoid per-request log CPU/volume.
-  return drizzle({ client: db, logger: options?.logger ?? true })
+  const database = configureTransactionAccessMode(drizzle({ client: db, logger: options?.logger ?? true }), db)
+  const resolve = lazyPgClients.get(db)
+  if (resolve) {
+    // Resolve only when a transaction is requested, then use the real handle's
+    // access mode and Pool checkout. A lazy proxy has neither of those itself.
+    database.transaction = async (run, config) => getDrizzleClient(await resolve(), options).transaction(run, config)
+  }
+  return database
 }
 
 export interface ReadOnlyPgSession {
@@ -659,6 +668,13 @@ export function logPgError(
 }
 
 export function closeClient(c: Context, db: PluginPgClient) {
+  const closingRead = closePrimaryReadClient(db)
+  if (closingRead) {
+    return backgroundTask(c, closingRead.catch((error: unknown) => {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'PG read transaction cleanup failed', error: serializePostgresError(error) })
+    }))
+  }
+
   // Hyperdrive: do not end() — connection-lifecycle docs say GC cleans the edge hop.
   // https://developers.cloudflare.com/hyperdrive/concepts/connection-lifecycle/
   if (skipEndClients.has(db))

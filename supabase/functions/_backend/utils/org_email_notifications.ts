@@ -501,8 +501,17 @@ export async function sendEmailToOrgMembers(
   if (isLegacyLifecycleEvent(eventName) && await shouldUseLifecycleV2(c, orgId))
     return 0
 
-  const client = drizzleClient ?? getDrizzleClient(await getPgClient(c, true))
-  const { recipients } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, client)
+  const ownedPgClient = drizzleClient ? undefined : await getPgClient(c, true)
+  let targets: Awaited<ReturnType<typeof getPreparedEligibleEmailTargets>>
+  try {
+    const client = drizzleClient ?? getDrizzleClient(ownedPgClient!)
+    targets = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, client)
+  }
+  finally {
+    if (ownedPgClient)
+      await closeClient(c, ownedPgClient)
+  }
+  const { recipients } = targets
   if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendEmailToOrgMembers: org not found', orgId })
     return 0
