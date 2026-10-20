@@ -59,6 +59,21 @@ async function prepareProfileGoalScreenshot(page: Page, completed = false) {
   await goal.click()
 }
 
+async function prepareProfileResumeScreenshot(page: Page) {
+  await prepareProfileGoalScreenshot(page)
+  const firstName = page.locator('[data-test="onboarding-first-name"]')
+  // The base branch can still show Your goal without a separate name page.
+  if (!await firstName.isVisible())
+    return
+  const saved = page.waitForResponse(response => response.request().method() === 'PATCH'
+    && response.url().includes('/rest/v1/users?')
+    && response.request().postDataJSON()?.onboarding?.profile_draft?.first_name === 'Example')
+  await firstName.fill('Example')
+  await saved
+  await page.reload()
+  await page.locator('[data-test="onboarding-name-step"]').or(page.locator('[data-test="onboarding-resume-continue"]')).waitFor()
+}
+
 const nativeObserveDays = ['2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28', '2026-09-29', '2026-09-30']
 
 const nativeObserveActionRows: Array<[string, number, number, number | null, number | null, number | null, boolean]> = [
@@ -303,6 +318,21 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     prepare: async (page) => {
       await page.setViewportSize({ width: 390, height: 844 })
       await prepareProfileGoalScreenshot(page)
+    },
+  },
+  {
+    slug: 'onboarding-profile-resume',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: prepareProfileResumeScreenshot,
+  },
+  {
+    slug: 'onboarding-profile-resume-mobile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await prepareProfileResumeScreenshot(page)
     },
   },
   {

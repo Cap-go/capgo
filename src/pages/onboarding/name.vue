@@ -22,6 +22,8 @@ import { validateRedirectPath } from '~/utils/safeRedirect'
 
 const main = useMainStore()
 const dialogStore = useDialogV2Store()
+const initialUserId = main.user?.id
+const initialAuthGeneration = main.authGeneration
 const organizationStore = useOrganizationStore()
 const router = useRouter()
 const route = useRoute()
@@ -40,8 +42,8 @@ const progressSteps = computed(() => initialProfileOnboardingProgressSteps(main.
   .filter(step => !targetPath.value.startsWith('/onboarding/organization') || step.id === 'name' || step.id === 'organization')
   .map(step => ({ id: step.id, label: t(step.labelKey) })))
 const profileHandoff = consumeProfileOnboardingHandoff(window.history)
-const resumePending = ref(hasSavedDraft && !profileHandoff)
-const identity = createOnboardingTelemetryIdentity({ continueFrom: profileHandoff ?? (!resumePending.value && !showWelcome.value && typeof savedOnboarding.onboarding_attempt_id === 'string' ? { attemptId: savedOnboarding.onboarding_attempt_id } : null), flow: 'pre_org', onboardingVersion: () => 6, supaHost: getLocalConfig().supaHost })
+const resumePending = ref(!showWelcome.value && !profileHandoff)
+const identity = createOnboardingTelemetryIdentity({ continueFrom: profileHandoff, flow: 'pre_org', onboardingVersion: () => 6, supaHost: getLocalConfig().supaHost })
 const analyticsSteps = targetPath.value.startsWith('/onboarding/organization') ? ['welcome', 'name', 'organization'] as const : initialProfileOnboardingSteps(main.user?.onboarding, true)
 let tracker: ReturnType<typeof createOnboardingProgressTracker> | undefined
 let disposed = false
@@ -52,10 +54,10 @@ function trackField(field: 'first_name' | 'last_name', value: string) {
 }
 
 async function persistProfileProgress(patch: Record<string, Json> | ((current: Json) => Json)) {
-  const userId = main.user?.id
-  if (!userId)
+  const userId = initialUserId
+  if (!userId || main.user?.id !== userId || main.authGeneration !== initialAuthGeneration)
     return false
-  const authGeneration = main.authGeneration
+  const authGeneration = initialAuthGeneration
   return serializeUserOnboardingWrite(userId, async () => {
     const isCurrentUser = () => !disposed && main.user?.id === userId && main.authGeneration === authGeneration
     if (!isCurrentUser())
@@ -172,7 +174,7 @@ onMounted(async () => {
       buttons: [
         { text: t('onboarding-resume-restart'), id: 'onboarding-resume-restart', role: 'secondary', handler: async () => {
           try {
-            if (await persistProfileProgress(current => mergeUserOnboardingProgress({}, current, { clearIntent: true, clearProfileDraft: true })))
+            if (await persistProfileProgress(current => mergeUserOnboardingProgress({ onboarding_attempt_id: identity.attemptId, last_run_id: identity.runId }, current, { clearIntent: true, clearProfileDraft: true })))
               return true
           }
           catch (error) {
@@ -186,7 +188,7 @@ onMounted(async () => {
     })
     identity.recordResumeDialogViewed()
     await dialogStore.onDialogDismiss()
-    if (disposed)
+    if (disposed || main.user?.id !== initialUserId || main.authGeneration !== initialAuthGeneration)
       return
     if (dialogStore.lastButtonRole === 'onboarding-resume-restart') {
       identity.recordResumeRestarted()
