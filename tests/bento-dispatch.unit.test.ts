@@ -45,15 +45,16 @@ describe('bento evaluation contracts', () => {
   it('publishes only claimed due evaluations and preserves their durable run UUID on retry', async () => {
     const queue = { send: vi.fn().mockResolvedValue(undefined) }
     const store = { schedule: vi.fn().mockResolvedValueOnce({ id: job.runId, enqueue_claim_token: 'claim' }).mockResolvedValue(null), markEnqueued: vi.fn(), publicationFailed: vi.fn() }
-    await publishDispatchJobs(queue, store, bentoFlows)
+    await publishDispatchJobs(queue, store, bentoFlows, Date.UTC(2026, 0, 1, 10))
     expect(queue.send).toHaveBeenCalledExactlyOnceWith(job)
     expect(store.markEnqueued).toHaveBeenCalledWith(job.runId, 'claim')
+    expect(store.schedule).toHaveBeenCalledWith(expect.any(String), 1, Date.UTC(2026, 0, 1, 10))
   })
 
   it('attempts independent evaluations after a failed publication', async () => {
     const queue = { send: vi.fn().mockRejectedValueOnce(new Error('unavailable')).mockResolvedValue(undefined) }
     const store = { schedule: vi.fn().mockResolvedValue({ id: job.runId, enqueue_claim_token: 'claim' }), markEnqueued: vi.fn(), publicationFailed: vi.fn() }
-    await expect(publishDispatchJobs(queue, store, bentoFlows)).rejects.toThrow('Queue publication failed')
+    await expect(publishDispatchJobs(queue, store, bentoFlows, Date.UTC(2026, 0, 1, 10))).rejects.toThrow('Queue publication failed')
     expect(queue.send).toHaveBeenCalledTimes(4)
     expect(store.publicationFailed).toHaveBeenCalledOnce()
   })

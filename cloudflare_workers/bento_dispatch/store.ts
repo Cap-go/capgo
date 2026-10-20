@@ -47,39 +47,54 @@ export class DispatchStore {
     } })), true)
   }
 
-  async schedule(evaluationKey: string, everyMinutes: number): Promise<RunRecord | null> {
-    if (!Number.isInteger(everyMinutes) || everyMinutes < 1)
+  async schedule(evaluationKey: string, everyMinutes: number, scheduledTime: number): Promise<RunRecord | null> {
+    if (!Number.isSafeInteger(everyMinutes) || everyMinutes < 1)
       throw new Error('Invalid evaluation cadence')
+    const interval = everyMinutes * 60_000
+    const scheduledFor = new Date(Math.floor(scheduledTime / interval) * interval)
+    if (!Number.isSafeInteger(scheduledTime) || scheduledTime < 0 || !Number.isFinite(scheduledFor.getTime()))
+      throw new Error('Invalid scheduled time')
     return this.transaction(async (client) => {
       await client.query('SELECT pg_catalog.pg_advisory_xact_lock(1954098942, pg_catalog.hashtext($1))', [evaluationKey])
-      const unfinished = await client.query<RunRecord & { busy: boolean, exhausted: boolean }>(`
+      const state = await client.query<RunRecord & { busy: boolean, exhausted: boolean }>(`
         SELECT *, (enqueue_claim_until > CURRENT_TIMESTAMP OR execution_claim_until > CURRENT_TIMESTAMP
-          OR (status = 'queued' AND enqueued_at > CURRENT_TIMESTAMP - INTERVAL '2 minutes')) IS TRUE AS busy,
+          OR (status = 'queued' AND enqueued_at > CURRENT_TIMESTAMP - INTERVAL '10 minutes')) IS TRUE AS busy,
           (enqueue_attempt_count >= 5 OR execution_attempt_count >= 5) AS exhausted
         FROM public.bento_evaluation_runs WHERE evaluation_key = $1
-          AND status IN ('pending_enqueue', 'queued', 'running') FOR UPDATE`, [evaluationKey])
-      let run = unfinished.rows[0]
-      if (run?.busy)
+        FOR UPDATE`, [evaluationKey])
+      let run = state.rows[0]
+      const active = run && ['pending_enqueue', 'queued', 'running'].includes(run.status)
+      if (active && run.busy)
         return null
-      if (run?.exhausted) {
+      if (active && run.exhausted) {
         const audit = flowAudit('bento:evaluation_failed', run.id, { evaluation_key: evaluationKey, reason: 'attempts_exhausted' })
         await client.query(`UPDATE public.bento_evaluation_runs SET status = 'failed', finished_at = CURRENT_TIMESTAMP,
           enqueue_claim_token = NULL, enqueue_claim_until = NULL, execution_claim_token = NULL, execution_claim_until = NULL,
           last_error = 'attempts_exhausted', pending_audit = pending_audit || $2::jsonb WHERE id = $1`, [run.id, JSON.stringify([audit])])
         return null
       }
-      if (!run) {
-        const recent = await client.query(`SELECT 1 FROM public.bento_evaluation_runs WHERE evaluation_key = $1
-          AND enqueued_at > CURRENT_TIMESTAMP - ($2 * INTERVAL '1 minute') ORDER BY enqueued_at DESC LIMIT 1`, [evaluationKey, everyMinutes])
-        if (recent.rows.length)
+      if (run && !active) {
+        // Never discard reports or a retry snapshot to make room for a new run.
+        // Actual publication latency cannot move the cadence's scheduled slot.
+        if (new Date(run.scheduled_for).getTime() >= scheduledFor.getTime() || run.pending_audit.length)
           return null
+        const reset = await client.query<typeof run>(`UPDATE public.bento_evaluation_runs SET
+          id = pg_catalog.gen_random_uuid(), scheduled_for = $2, status = 'pending_enqueue',
+          enqueued_at = NULL, started_at = NULL, finished_at = NULL,
+          enqueue_claim_token = NULL, enqueue_claim_until = NULL, enqueue_attempt_count = 0,
+          execution_claim_token = NULL, execution_claim_until = NULL, execution_attempt_count = 0,
+          eligible_users = NULL, evaluated_at = NULL, result = '{}'::jsonb, last_error = NULL,
+          created_at = CURRENT_TIMESTAMP WHERE evaluation_key = $1 RETURNING *`, [evaluationKey, scheduledFor])
+        run = reset.rows[0]!
+      }
+      if (!run) {
         const created = await client.query<RunRecord>(`INSERT INTO public.bento_evaluation_runs (evaluation_key, scheduled_for)
-          VALUES ($1, CURRENT_TIMESTAMP) RETURNING *`, [evaluationKey])
+          VALUES ($1, $2) RETURNING *`, [evaluationKey, scheduledFor])
         run = created.rows[0] as typeof run
       }
       const audit = flowAudit('bento:evaluation_publication_attempt', run!.id, { evaluation_key: evaluationKey, reason: 'cadence_due_or_recovery' })
       const claimed = await client.query<RunRecord>(`UPDATE public.bento_evaluation_runs SET status = 'pending_enqueue',
-        enqueue_claim_token = pg_catalog.gen_random_uuid(), enqueue_claim_until = CURRENT_TIMESTAMP + INTERVAL '120 seconds',
+        enqueue_claim_token = pg_catalog.gen_random_uuid(), enqueue_claim_until = CURRENT_TIMESTAMP + INTERVAL '10 minutes',
         enqueue_attempt_count = enqueue_attempt_count + 1, pending_audit = pending_audit || $2::jsonb
         WHERE id = $1 RETURNING *`, [run!.id, JSON.stringify([audit])])
       return claimed.rows[0]!
@@ -109,7 +124,7 @@ export class DispatchStore {
       const { rows } = await client.query<RunRecord>(`UPDATE public.bento_evaluation_runs SET status = 'running',
         enqueued_at = COALESCE(enqueued_at, CURRENT_TIMESTAMP),
         started_at = COALESCE(started_at, CURRENT_TIMESTAMP), execution_claim_token = pg_catalog.gen_random_uuid(),
-        execution_claim_until = CURRENT_TIMESTAMP + INTERVAL '120 seconds', execution_attempt_count = execution_attempt_count + 1,
+        execution_claim_until = CURRENT_TIMESTAMP + INTERVAL '10 minutes', execution_attempt_count = execution_attempt_count + 1,
         pending_audit = pending_audit || $3::jsonb
         WHERE id = $1 AND evaluation_key = $2 AND status IN ('pending_enqueue', 'queued', 'running')
           AND execution_attempt_count < 5 AND (execution_claim_until IS NULL OR execution_claim_until <= CURRENT_TIMESTAMP)
