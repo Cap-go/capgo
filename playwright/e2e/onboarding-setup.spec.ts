@@ -57,6 +57,7 @@ test.describe('Actionable onboarding setup checklist', () => {
     await expect(page.locator(instructions).getByRole('heading', { name: 'Run your app on a device' })).toBeVisible()
     await expect(page.locator(instructions)).toContainText('Choose iOS or Android, build your app with Capgo installed')
     await expect(page.locator('[data-test="setup-checklist-start-actions"]')).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Copy AI setup prompt', exact: true })).toBeVisible()
     await expect(page.locator(instructions).getByRole('button', { name: 'Copy AI setup prompt', exact: true })).toHaveCount(0)
     await page.locator('[data-test="setup-checklist-ai-agent-copy"]').click()
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.events.filter((event: string) => event === 'copy-ai').length)).toBe(1)

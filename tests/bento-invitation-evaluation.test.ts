@@ -24,7 +24,7 @@ async function fixture(kind: 'new' | 'existing', tokenAge = '3 days') {
   const client = await pool.connect()
   const store = new DispatchStore(client)
   const key = `test:invitation-eval:${orgId}`
-  const scheduled = (await store.schedule(key, 1))!
+  const scheduled = (await store.schedule(key, 1, Date.now()))!
   await store.markEnqueued(scheduled.id, scheduled.enqueue_claim_token!)
   const run = (await store.claimRun({ version: 1, evaluationKey: key, runId: scheduled.id }))!
   const details = { kind, orgId, invitationId: source!.id, userId: kind === 'existing' ? USER_ID_NONMEMBER : null, generation: request!.id, tokenCreatedAt: request!.token_at }
