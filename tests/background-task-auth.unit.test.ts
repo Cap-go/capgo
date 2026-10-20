@@ -30,6 +30,26 @@ afterEach(() => {
 })
 
 describe('background task completion header', () => {
+  it('awaits the task when the EdgeRuntime global is absent', async () => {
+    delete runtime.EdgeRuntime
+    const task = Promise.resolve('completed')
+
+    const result = backgroundTask(createContext(), task)
+
+    expect(result).toBe(task)
+    await expect(result).resolves.toBe('completed')
+  })
+
+  it('awaits the task when EdgeRuntime has no waitUntil hook', async () => {
+    runtime.EdgeRuntime = {}
+    const task = Promise.resolve('completed')
+
+    const result = backgroundTask(createContext(), task)
+
+    expect(result).toBe(task)
+    await expect(result).resolves.toBe('completed')
+  })
+
   it('keeps an untrusted completion header in the background', async () => {
     const waitUntil = vi.fn()
     runtime.EdgeRuntime = { waitUntil }
