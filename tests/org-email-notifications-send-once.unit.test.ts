@@ -233,9 +233,7 @@ describe('sendNotifToOrgMembersOnce', () => {
   })
 
   it('keeps org claim write failures retryable and reports duplicate claims as terminal', async () => {
-    hasNotifOrgClaimMock
-      .mockResolvedValueOnce(false)
-      .mockResolvedValue(true)
+    sendNotifOrgOnceMock.mockResolvedValue({ sent: true, cleanupFailed: false })
     const { sendNotifToOrgMembersOnceWithResult } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
     const send = () => sendNotifToOrgMembersOnceWithResult(
       createContext(),
@@ -250,10 +248,6 @@ describe('sendNotifToOrgMembersOnce', () => {
     claimNotifOrgOnceMock.mockResolvedValue('failed')
     await expect(send()).resolves.toBe('failed')
 
-    hasNotifOrgClaimMock
-      .mockReset()
-      .mockResolvedValueOnce(false)
-      .mockResolvedValue(true)
     claimNotifOrgOnceMock.mockResolvedValue(false)
     await expect(send()).resolves.toBe('already_claimed')
   })
@@ -283,15 +277,14 @@ describe('sendNotifToOrgMembersOnce', () => {
     }))
   })
 
-  it('backfills the org-level claim once all recipient claims already exist', async () => {
+  it('treats all-recipient-claims-already-present as already_claimed without writing the org claim', async () => {
     hasNotifOrgClaimMock
       .mockResolvedValueOnce(false)
       .mockResolvedValue(true)
-    claimNotifOrgOnceMock.mockResolvedValue(true)
 
-    const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
+    const { sendNotifToOrgMembersOnceWithResult } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
 
-    const sent = await sendNotifToOrgMembersOnce(
+    await expect(sendNotifToOrgMembersOnceWithResult(
       createContext(),
       'user:need_onboarding',
       'onboarding',
@@ -299,17 +292,10 @@ describe('sendNotifToOrgMembersOnce', () => {
       'org-123',
       'org-123',
       createDrizzleStub(),
-    )
+    )).resolves.toBe('already_claimed')
 
-    expect(sent).toBe(true)
     expect(sendNotifOrgOnceMock).not.toHaveBeenCalled()
-    expect(claimNotifOrgOnceMock).toHaveBeenCalledWith(
-      expect.anything(),
-      'user:need_onboarding',
-      'org-123',
-      'org-123',
-      expect.anything(),
-    )
+    expect(claimNotifOrgOnceMock).not.toHaveBeenCalled()
     expect(hasNotifOrgClaimMock).toHaveBeenNthCalledWith(
       2,
       expect.anything(),
@@ -317,35 +303,6 @@ describe('sendNotifToOrgMembersOnce', () => {
       'user:need_onboarding',
       'org-123',
       expect.any(String),
-    )
-  })
-
-  it('returns false when recipient claims exist but the org-level backfill claim fails', async () => {
-    hasNotifOrgClaimMock
-      .mockResolvedValueOnce(false)
-      .mockResolvedValue(true)
-    claimNotifOrgOnceMock.mockResolvedValue(false)
-
-    const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
-
-    const sent = await sendNotifToOrgMembersOnce(
-      createContext(),
-      'user:need_onboarding',
-      'onboarding',
-      { org_id: 'org-123' },
-      'org-123',
-      'org-123',
-      createDrizzleStub(),
-    )
-
-    expect(sent).toBe(false)
-    expect(sendNotifOrgOnceMock).not.toHaveBeenCalled()
-    expect(claimNotifOrgOnceMock).toHaveBeenCalledWith(
-      expect.anything(),
-      'user:need_onboarding',
-      'org-123',
-      'org-123',
-      expect.anything(),
     )
   })
 

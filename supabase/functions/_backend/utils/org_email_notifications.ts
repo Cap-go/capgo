@@ -726,8 +726,14 @@ export async function sendNotifToOrgMembersOnceWithResult(
         preferenceKey,
         orgId,
       })
-      // Claim anyway so once-dedup (SQL + retries) does not re-queue forever.
-      const claim = await claimNotifOrgOnceWithResult(c, eventName, orgId, uniqId, writeClient)
+      // Claim with a dedicated suffix so retention cleanup gates do not treat this as a delivered warning.
+      const claim = await claimNotifOrgOnceWithResult(
+        c,
+        eventName,
+        orgId,
+        `${uniqId}:no_recipients`,
+        writeClient,
+      )
       return claim === 'failed' ? 'failed' : 'no_recipients'
     }
 
@@ -786,6 +792,12 @@ export async function sendNotifToOrgMembersOnceWithResult(
     const unresolvedResults = sendResults.filter(result => !result.sent && !result.wasAlreadyClaimedBeforeRun)
     if (unresolvedResults.length > 0)
       return 'failed'
+
+    // Do not write the aggregate org claim when this run did not deliver mail.
+    // Recipient-level claims may already exist from a concurrent attempt; the
+    // exact org uniq_id must not be created without a fresh send (retention gates).
+    if (sentEmails.length === 0)
+      return 'already_claimed'
 
     const orgClaim = await claimNotifOrgOnceWithResult(c, eventName, orgId, uniqId, writeClient)
     if (orgClaim === 'failed')
