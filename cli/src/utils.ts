@@ -32,6 +32,7 @@ import { getActiveUploadReporter } from './bundle/reporter'
 import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from './capacitor-cli'
 import { getChecksum } from './checksum'
 import { loadConfig, loadConfigForWrite, writeConfig } from './config'
+import { setupDebug, setupError } from './onboarding/setup-diagnostics'
 import { IOS_SYNC_VALIDATION_FAILED_MESSAGE, isTruthyEnvValue } from './posthog'
 import { getCliLoginCommand } from './runner-command'
 import { nativePackageSchema } from './schemas/common'
@@ -1938,6 +1939,7 @@ type SendEventPayload = TrackOptions & { nonPersonTags?: Record<string, unknown>
 )
 
 export async function sendEvent(capgkey: string, payload: SendEventPayload, verbose?: boolean, signal?: AbortSignal, apiHost?: string, redirect?: RequestInit['redirect']): Promise<void> {
+  const started = Date.now()
   const telemetryDisabled = isTruthyEnvValue(env.CAPGO_DISABLE_TELEMETRY) || isTruthyEnvValue(env.CAPGO_DISABLE_POSTHOG)
   if (telemetryDisabled && !payload.notifyConsole)
     return
@@ -1979,6 +1981,7 @@ export async function sendEvent(capgkey: string, payload: SendEventPayload, verb
       : controller.signal
 
     try {
+      setupDebug('telemetry request started')
       const fetchResponse = await fetch(`${trimTrailingSlashes(hostApi)}/private/events`, {
         method: 'POST',
         body: JSON.stringify(enrichedPayload),
@@ -1990,6 +1993,7 @@ export async function sendEvent(capgkey: string, payload: SendEventPayload, verb
         redirect,
       })
 
+      setupDebug('telemetry response received', { duration_ms: Date.now() - started, status: fetchResponse.status })
       clearTimeout(timeoutId)
 
       if (!fetchResponse.ok) {
@@ -2007,6 +2011,7 @@ export async function sendEvent(capgkey: string, payload: SendEventPayload, verb
     }
   }
   catch (error) {
+    setupDebug('telemetry request failed', { duration_ms: Date.now() - started, error: setupError(error) })
     if (verbose) {
       log.error('Failed to send Stats event details:')
       log.error(formatError(error))

@@ -2,10 +2,10 @@ import type { OptionsBase } from '../schemas/base'
 import { env, stdout } from 'node:process'
 import { intro, log, outro, spinner } from '@clack/prompts'
 import { check2FAComplianceForApp } from '../api/app'
-import { formatBuilderOnlyChecklist, getBuilderChecklist, getBuilderOnlyChecklist } from './builder-checklist'
 import { getPendingOnboardingChecks } from '../onboarding/background-workers'
 import { CliUserError } from '../shared/cli-user-error'
 import { canPromptInteractively, createCapgoClient, findSavedKey, formatCapgoCliInvokeError, getAppId, getCapgoCliHttpStatus, getConfig, invokeCapgoCliApi } from '../utils'
+import { formatBuilderOnlyChecklist, getBuilderChecklist, getBuilderOnlyChecklist } from './builder-checklist'
 
 export type AppTodoList = 'builder' | 'ota'
 
@@ -14,14 +14,28 @@ interface AppTodoOptions extends Partial<OptionsBase> {
 }
 
 const V2_STEP_IDS = [
-  'login_cli_mcp', 'add_channel', 'add_updater', 'add_code', 'add_encryption',
-  'select_platform', 'build_project', 'run_device', 'add_code_change',
-  'upload_bundle', 'test_update', 'completion',
+  'login_cli_mcp',
+  'add_channel',
+  'add_updater',
+  'add_code',
+  'add_encryption',
+  'select_platform',
+  'build_project',
+  'run_device',
+  'add_code_change',
+  'upload_bundle',
+  'test_update',
+  'completion',
 ] as const
 
 const V3_STEP_IDS = [
-  'login_cli_mcp', 'add_channel', 'add_updater', 'add_code',
-  'run_device', 'upload_bundle', 'test_update',
+  'login_cli_mcp',
+  'add_channel',
+  'add_updater',
+  'add_code',
+  'run_device',
+  'upload_bundle',
+  'test_update',
 ] as const
 
 const STEP_TITLES = {
@@ -85,6 +99,7 @@ export interface AppTodoProgress {
   onboarding: unknown
   hasChannel?: boolean
   checkErrors?: string[]
+  billing?: unknown
 }
 
 export const TODO_BACKGROUND_WAIT_MS = 10_000
@@ -117,7 +132,7 @@ export async function waitForTodoBackgroundChecks(
       Promise.allSettled(checks).then(() => true),
       new Promise<false>((resolve) => {
         // Keep the process alive while the background workers remain unreferenced.
-        timer = setTimeout(() => resolve(false), timeoutMs)
+        timer = setTimeout(resolve, timeoutMs, false)
       }),
     ])
   }
@@ -210,21 +225,30 @@ export function formatAppTodoList(appId: string, progress: AppTodoProgress, opti
   const markers = { done: '[x] Done', skipped: '[-] Skipped', pending: '[ ] Pending' }
   const colors = { done: '32', skipped: '2', pending: '33' }
   const colorize = (value: string, code: string) => options.color ? `\u001B[${code}m${value}\u001B[0m` : value
-  const next = version === 3 || version === 4 ? steps.find(step => step.status === 'pending') : undefined
-  const help = next ? V3_NEXT_STEP_HELP[next.id as typeof V3_STEP_IDS[number]] : undefined
+  const next = getAppTodoNextStep(progress, options.list)
   return [
     colorize(`App: ${appId} — Todo list v${version}${options.list === 'ota' ? ' — OTA checklist' : ''}`, '1'),
     `${done + skipped}/${steps.length} completed (${done} done, ${skipped} skipped, ${steps.length - done - skipped} pending)`,
     '',
     ...steps.map(step => `${colorize(markers[step.status], colors[step.status])}: ${step.title}`),
-    ...(next && help ? [
-      '',
-      colorize(`Next step: ${next.title}`, '1;36'),
-      `  ${help.action}`,
-      `  Done when: ${help.doneWhen}`,
-      '  Run this command again to recheck progress.',
-    ] : []),
+    ...(next
+      ? [
+          '',
+          colorize(`Next step: ${next.title}`, '1;36'),
+          `  ${next.action}`,
+          `  Done when: ${next.doneWhen}`,
+          '  Run this command again to recheck progress.',
+        ]
+      : []),
   ].join('\n')
+}
+
+export function getAppTodoNextStep(progress: AppTodoProgress, list?: AppTodoList) {
+  const { version, path, steps } = getAppTodoSteps(progress, list)
+  if (path !== 'ota' || (version !== 3 && version !== 4))
+    return
+  const next = steps.find(step => step.status === 'pending')
+  return next ? { ...next, ...V3_NEXT_STEP_HELP[next.id as typeof V3_STEP_IDS[number]] } : undefined
 }
 
 export async function readAppTodoProgress(appId: string, options: OptionsBase): Promise<AppTodoProgress> {
@@ -237,7 +261,8 @@ export async function readAppTodoProgress(appId: string, options: OptionsBase): 
     const status = getCapgoCliHttpStatus(error)
     if (status === 401 || status === 403) {
       throw new CliUserError('Cannot access app todo list. Check that your API key is valid and has app.read permission for this app.', {
-        appId, requiredPermissionKey: 'app.read',
+        appId,
+        requiredPermissionKey: 'app.read',
       })
     }
     if (status === 404)
@@ -308,8 +333,9 @@ export async function appTodo(appId: string | undefined, options: AppTodoOptions
     let started = false
     const finished = await waitForTodoBackgroundChecks(checks, waiting
       ? (seconds) => {
-          if (started)
+          if (started) {
             waiting.message(waitMessage(seconds))
+          }
           else {
             waiting.start(waitMessage(seconds))
             started = true

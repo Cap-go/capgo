@@ -1,5 +1,6 @@
 import type { CapgoClient } from '../utils'
 import { log } from '@clack/prompts'
+import { markTrialNoticeShown } from '../onboarding/trial-notice-state'
 import { CliUserError } from '../shared/cli-user-error'
 import { isTransientNetworkError } from '../shared/network-error'
 import {
@@ -71,9 +72,10 @@ function isCliWarning(value: unknown): value is { message: string, fatal: boolea
     && typeof (value as { fatal?: unknown }).fatal === 'boolean'
 }
 
-async function plansUrl() {
+async function plansUrl(orgId?: string | null) {
   const config = await getRemoteConfig()
-  return `${config.hostWeb}/settings/organization/plans`
+  const base = `${config.hostWeb}/settings/organization/plans`
+  return orgId ? `${base}?oid=${encodeURIComponent(orgId)}` : base
 }
 
 function printWarnings(warnings: unknown[]) {
@@ -133,7 +135,7 @@ async function throwPreflightError(request: CliPreflightRequest, error: Error, o
       throw new CliUserError(options.permissionDeniedErrorMessage ?? message, context)
     }
     case 'plan_upgrade_required': {
-      const url = await plansUrl()
+      const url = await plansUrl(request.orgId)
       log.error(`You need to upgrade your plan to continue to use capgo.\n Upgrade here: ${url}\n`)
       await openExternalUrl(url)
       throw new CliUserError(request.plan === 'upload' ? 'Plan upgrade required for upload' : 'Plan upgrade required')
@@ -211,8 +213,12 @@ export async function runCliPreflight(
   }
 
   printWarnings(data?.warnings ?? [])
-  if (result.trialDaysLeft !== null && options.warnTrial !== false)
-    log.warn(`WARNING !!\nTrial expires in ${result.trialDaysLeft} days, upgrade here: ${await plansUrl()}\n`)
+  if (result.trialDaysLeft !== null && options.warnTrial !== false) {
+    const orgId = result.orgId ?? request.orgId
+    log.warn(`WARNING !!\nTrial expires in ${result.trialDaysLeft} days, upgrade here: ${await plansUrl(orgId)}\n`)
+    if (orgId)
+      markTrialNoticeShown(orgId)
+  }
 
   return result
 }
