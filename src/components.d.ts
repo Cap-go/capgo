@@ -19,7 +19,7 @@ declare module 'vue' {
     AppDeleteDialogContent: typeof import('./components/dashboard/AppDeleteDialogContent.vue')['default']
     AppleSignInButton: typeof import('./components/auth/AppleSignInButton.vue')['default']
     AppNotFoundModal: typeof import('./components/AppNotFoundModal.vue')['default']
-    AppOnboardingAiAgentCard: typeof import('./components/dashboard/AppOnboardingAiAgentCard.vue')['default']
+    AppOnboardingAiButton: typeof import('./components/dashboard/AppOnboardingAiButton.vue')['default']
     AppOnboardingBuilderChecklist: typeof import('./components/dashboard/AppOnboardingBuilderChecklist.vue')['default']
     AppOnboardingCliSteps: typeof import('./components/dashboard/AppOnboardingCliSteps.vue')['default']
     AppOnboardingDualChecklist: typeof import('./components/dashboard/AppOnboardingDualChecklist.vue')['default']

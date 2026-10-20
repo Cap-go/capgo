@@ -114,7 +114,7 @@ test('preserves inspected tasks across Builder platforms and continues the unfin
   await expect(page.locator('[data-test="builder-checklist-instructions"] h2')).toHaveText('Start guided Builder setup')
 })
 
-test('copies commands and OTA AI instructions for the active tab rather than signup intent', async ({ page }) => {
+test('keeps AI setup available for later tasks and copies the active checklist prompt', async ({ page }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'clipboard', { value: {
       writeText: async (text: string) => {
@@ -130,10 +130,22 @@ test('copies commands and OTA AI instructions for the active tab rather than sig
   await page.getByRole('tab', { name: 'Live Updates', exact: true }).click()
   await page.locator('[data-test="app-onboarding-command-copy"]').click()
   await expect.poll(() => page.evaluate(() => (window as any).copiedSetupText)).toContain('@capgo/cli@latest i ')
+  await page.locator('[data-test="setup-checklist-toggle"]').click()
+  await page.locator('[data-test="app-onboarding-cli-step-add_updater"] button').click()
   await page.locator('[data-test="setup-checklist-copy-ai"]').click()
   await expect.poll(() => page.evaluate(() => (window as any).copiedSetupText)).toContain('OTA todo list progress checks')
   const prompt = await page.evaluate(() => (window as any).copiedSetupText as string)
   expect(prompt).not.toContain('start_capgo_builder_onboarding')
+
+  await page.getByRole('tab', { name: 'Builder', exact: true }).click()
+  await page.locator('[data-test="builder-step-prepare_keystore"] button').click()
+  const taskActions = page.locator('[data-test="builder-checklist-task-actions"]')
+  await expect(taskActions.locator('button, a')).toHaveCount(3)
+  const actionPositions = await taskActions.locator('button, a').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().top))
+  expect(Math.max(...actionPositions) - Math.min(...actionPositions)).toBeLessThan(1)
+  await page.locator('[data-test="builder-checklist-copy-ai"]').click()
+  await expect.poll(() => page.evaluate(() => (window as any).copiedSetupText)).toContain('start_capgo_builder_onboarding')
+  expect(await page.evaluate(() => (window as any).copiedSetupText)).not.toContain('OTA todo list progress checks')
 })
 
 test('uses newly saved Builder progress when opening that tab for the first time', async ({ page }) => {

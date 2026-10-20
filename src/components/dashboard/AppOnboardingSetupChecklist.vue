@@ -10,14 +10,13 @@ import IconCircle from '~icons/lucide/circle'
 import IconFileText from '~icons/lucide/file-text'
 import IconInfo from '~icons/lucide/info'
 import IconLoader from '~icons/lucide/loader-2'
-import IconMessageCircle from '~icons/lucide/message-circle'
 import IconMinus from '~icons/lucide/minus'
 import { useAppOnboardingCliProgress } from '~/composables/useAppOnboardingCliProgress'
 import { getAppOnboardingStepIds } from '~/services/appOnboarding'
 import { isAppOnboardingChecklistStep } from '~/utils/appOnboardingChecklist'
 import { APP_ONBOARDING_STEP_GUIDES } from '~/utils/appOnboardingGuides'
 import { hasDualOnboardingChecklists } from '~/utils/dualOnboardingChecklists'
-import AppOnboardingAiAgentCard from './AppOnboardingAiAgentCard.vue'
+import AppOnboardingAiButton from './AppOnboardingAiButton.vue'
 import ChannelSetupOnboardingDialog from './ChannelSetupOnboardingDialog.vue'
 import TechnicalTeammateInviteCard from './TechnicalTeammateInviteCard.vue'
 
@@ -123,9 +122,6 @@ function statusLabel(status: string | undefined) {
         {{ t('setup-checklist-subtitle') }}
       </p>
     </header>
-
-    <!-- The first task already offers the AI prompt next to the CLI command; keep it reachable for every later task too. -->
-    <AppOnboardingAiAgentCard v-if="!completed && !isFirstStep" @copy="emit('copyAi', 'checklist')" />
 
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6" data-test="setup-checklist-progress">
       <p class="shrink-0 text-sm font-medium text-slate-800 dark:text-slate-200" aria-live="polite" aria-atomic="true">
@@ -235,19 +231,12 @@ function statusLabel(status: string | undefined) {
             <output v-else class="mt-5 block rounded-2xl bg-slate-950 p-5 text-sm text-slate-300">
               {{ t('app-onboarding-command-apikey-loading') }}
             </output>
-            <div class="mt-5 grid gap-3 sm:grid-cols-2" data-test="setup-checklist-start-actions">
+            <div class="mt-5 flex flex-wrap gap-3" data-test="setup-checklist-start-actions">
               <button type="button" class="d-btn h-auto min-h-14 border-primary-500 bg-primary-500 px-3 py-3 text-base text-white hover:border-primary-600 hover:bg-primary-600 focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2" data-test="setup-checklist-copy-command" :disabled="!command" @click="emit('copyCommand')">
                 <IconCopy class="h-4 w-4 shrink-0" aria-hidden="true" />
                 {{ t('setup-checklist-copy-command') }}
               </button>
-              <button type="button" class="d-btn h-auto min-h-14 border-azure-500 bg-white px-3 py-3 text-base text-sky-700 hover:border-azure-600 hover:bg-azure-500/5 focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 dark:bg-slate-900 dark:text-azure-300 dark:hover:bg-azure-500/10" data-test="setup-checklist-copy-ai" @click="emit('copyAi')">
-                <IconMessageCircle class="h-5 w-5 shrink-0" aria-hidden="true" />
-                {{ t('setup-checklist-ai-action') }}
-              </button>
             </div>
-            <p class="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
-              {{ t('setup-checklist-ai-description') }}
-            </p>
           </template>
           <button
             v-if="selectedStep.id === 'add_channel' && selectedStep.status !== 'done'"
@@ -280,16 +269,16 @@ function statusLabel(status: string | undefined) {
             </button>
           </output>
 
-          <button v-if="!isSelectedCurrent && currentStep" type="button" class="d-btn d-btn-ghost mt-4 min-h-11 self-start text-sky-700 dark:text-azure-300" @click="selectStep(currentStep.id)">
-            {{ t('setup-checklist-return-current') }}
-            <IconArrowRight class="h-4 w-4" aria-hidden="true" />
-          </button>
-
-          <a :href="guideHref" target="_blank" rel="noopener noreferrer" class="mt-auto inline-flex min-h-11 max-w-full items-center gap-2 self-start rounded-sm text-left font-normal text-sky-700 underline-offset-4 outline-none hover:text-sky-800 hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-4 focus-visible:outline-azure-500 dark:text-azure-300 dark:hover:text-azure-200" data-test="setup-checklist-manual-guide">
-            <IconFileText class="h-5 w-5 shrink-0" aria-hidden="true" />
-            {{ guideLabel }}
-            <IconArrowRight class="h-4 w-4 shrink-0" aria-hidden="true" />
-          </a>
+          <div class="mt-auto flex flex-wrap items-stretch gap-2 pt-4" data-test="setup-checklist-task-actions">
+            <AppOnboardingAiButton @copy="emit('copyAi', 'checklist')" />
+            <button v-if="!isSelectedCurrent && currentStep" type="button" class="d-btn d-btn-ghost h-auto min-h-11 gap-2 rounded-lg border-slate-200 bg-transparent px-3 py-2 text-sm font-medium text-slate-600 shadow-none hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 dark:border-white/15 dark:text-slate-300 dark:hover:border-white/25 dark:hover:bg-white/5 dark:hover:text-white dark:focus-visible:ring-offset-slate-900 shrink-0" @click="selectStep(currentStep.id)">
+              {{ t('setup-checklist-return-current') }}
+            </button>
+            <a :href="guideHref" target="_blank" rel="noopener noreferrer" class="d-btn d-btn-ghost h-auto min-h-11 gap-2 rounded-lg border-slate-200 bg-transparent px-3 py-2 text-sm font-medium text-slate-600 shadow-none hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 dark:border-white/15 dark:text-slate-300 dark:hover:border-white/25 dark:hover:bg-white/5 dark:hover:text-white dark:focus-visible:ring-offset-slate-900 min-w-0 max-w-full text-left whitespace-normal" data-test="setup-checklist-manual-guide">
+              <IconFileText class="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>{{ guideLabel }}</span>
+            </a>
+          </div>
         </template>
       </div>
     </div>
