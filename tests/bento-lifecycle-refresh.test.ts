@@ -27,6 +27,7 @@ async function cohort(count: number) {
     cleanup: async () => {
       await executeSQL('DELETE FROM public.bento_event_dispatches WHERE context_key=ANY($1::text[]) AND flow_key LIKE \'lifecycle:v2:%\'', [ids])
       await executeSQL('DELETE FROM public.orgs WHERE id=ANY($1::uuid[])', [ids])
+      await executeSQL('DELETE FROM public.stripe_info WHERE customer_id=ANY($1::text[])', [ids.map(id => `pending_${id}`)])
     },
   }
 }

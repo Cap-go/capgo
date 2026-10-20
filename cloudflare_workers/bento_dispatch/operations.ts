@@ -21,7 +21,7 @@ export function parseDispatchJob(body: unknown, registry: Readonly<Record<string
 
 export function parseDispatchQueueJob(body: unknown, registry: Readonly<Record<string, unknown>>): DispatchQueueJob {
   if (body && typeof body === 'object' && !Array.isArray(body)
-    && Object.keys(body).sort().join(',') === 'operation,version'
+    && Object.keys(body).sort((left, right) => left.localeCompare(right)).join(',') === 'operation,version'
     && 'version' in body && body.version === 1
     && 'operation' in body && body.operation === 'audit_recovery') {
     return { version: 1, operation: 'audit_recovery' }
