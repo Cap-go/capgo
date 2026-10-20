@@ -4,6 +4,7 @@ import { DrizzleError, entityKind, TransactionRollbackError } from 'drizzle-orm'
 import { sendDiscordAlert500 } from './discord.ts'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { isTransientDatabaseError, readPgErrorCode, readQuickErrorOriginalCause } from './pg_errors.ts'
+import { applyPreviewXRobotsTag, isPreviewCapgoHost } from '../files/preview-host-headers.ts'
 import { capturePosthogException } from './posthog.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -70,6 +71,16 @@ function readRequestHeader(c: Context, name: string): string | undefined {
   if (fromHono)
     return fromHono
   return c.req.raw.headers.get(name) ?? undefined
+}
+
+async function withPreviewHostErrorHeaders(c: Context, response: Response | Promise<Response>): Promise<Response> {
+  const resolved = await response
+  const hostname = readRequestHeader(c, 'host') || new URL(c.req.url).hostname
+  if (!isPreviewCapgoHost(hostname))
+    return resolved
+
+  applyPreviewXRobotsTag(resolved.headers)
+  return resolved
 }
 
 function parsePositiveInteger(value: string | undefined): number | null {
@@ -175,7 +186,7 @@ export function onError(functionName: string) {
       const originalCause = readQuickErrorOriginalCause(e)
       if (originalCause !== undefined && isTransientDatabaseError(originalCause)) {
         logTransientPgError(c, functionName, originalCause, isDrizzleErrorObject(originalCause) ? 'drizzle_error' : 'transient_pg_error')
-        return c.json(upstreamUnavailableResponse, 503)
+        return await withPreviewHostErrorHeaders(c, c.json(upstreamUnavailableResponse, 503))
       }
     }
 
@@ -253,11 +264,11 @@ export function onError(functionName: string) {
           status: e.status,
         }))
       }
-      return c.json(res, e.status)
+      return await withPreviewHostErrorHeaders(c, c.json(res, e.status))
     }
     if (isTransientDatabaseError(e)) {
       logTransientPgError(c, functionName, e, isDrizzleError ? 'drizzle_error' : 'transient_pg_error')
-      return c.json(upstreamUnavailableResponse, 503)
+      return await withPreviewHostErrorHeaders(c, c.json(upstreamUnavailableResponse, 503))
     }
     if (isDrizzleError) {
       cloudlogErr({
@@ -279,7 +290,7 @@ export function onError(functionName: string) {
         kind: 'drizzle_error',
         status: 500,
       }))
-      return c.json(defaultResponse, 500)
+      return await withPreviewHostErrorHeaders(c, c.json(defaultResponse, 500))
     }
     // Non-HTTP errors: log with stack and return 500
     const suppressQueueRetryAlert = shouldSuppressQueueRetryAlert(c)
@@ -304,6 +315,6 @@ export function onError(functionName: string) {
         status: 500,
       }))
     }
-    return c.json(defaultResponse, 500)
+    return await withPreviewHostErrorHeaders(c, c.json(defaultResponse, 500))
   }
 }
