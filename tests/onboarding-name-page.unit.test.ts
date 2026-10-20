@@ -12,10 +12,12 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
   logout: vi.fn(),
   capture: vi.fn(),
+  dialog: { openDialog: vi.fn(), closeDialog: vi.fn(), onDialogDismiss: vi.fn(), lastButtonRole: '', dialogOptions: { id: '' } },
   profileEmit: undefined as undefined | ((event: string, ...args: unknown[]) => void),
   route: { query: {} as Record<string, string> },
 }))
 const main = shallowReactive({ authGeneration: 1, user: { id: 'name-user', first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } as any }, logout: mocks.logout })
+vi.mock('~/stores/dialogv2', () => ({ useDialogV2Store: () => mocks.dialog }))
 vi.mock('~/stores/main', () => ({ useMainStore: () => main }))
 vi.mock('~/stores/organization', () => ({ useOrganizationStore: () => ({ hasOrganizations: false }) }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
@@ -29,7 +31,8 @@ vi.mock('vue-router', () => ({
 vi.mock('vue-sonner', () => ({ toast: { error: mocks.toastError } }))
 vi.mock('~/services/supabase', () => ({ getLocalConfig: () => ({ supaHost: 'https://example.com' }), isLocal: () => false }))
 vi.mock('~/services/onboardingTracking', () => ({ sendOnboardingEvent: mocks.capture }))
-vi.mock('~/services/userOnboardingWriteQueue', () => ({
+vi.mock('~/services/userOnboardingWriteQueue', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/services/userOnboardingWriteQueue')>(),
   serializeUserOnboardingWrite: (_id: string, write: () => unknown) => write(),
   replaceUserOnboardingWithRetry: mocks.persist,
 }))
@@ -50,6 +53,7 @@ vi.mock('~/components/OnboardingProfile.vue', async () => {
   }) }
 })
 
+let dismissResume: (() => void) | undefined
 let app: ReturnType<typeof createApp> | undefined
 async function mount(openName = true) {
   const container = document.createElement('div')
@@ -72,6 +76,15 @@ async function submit(container: HTMLElement) {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.valid = false
+  mocks.dialog.lastButtonRole = ''
+  mocks.dialog.openDialog.mockImplementation((options: { id: string }) => {
+    mocks.dialog.dialogOptions.id = options.id
+  })
+  mocks.dialog.closeDialog.mockImplementation(() => dismissResume?.())
+  dismissResume = undefined
+  mocks.dialog.onDialogDismiss.mockImplementation(() => new Promise<void>((resolve) => {
+    dismissResume = resolve
+  }))
   mocks.persist.mockImplementation(async (_id: string, current: unknown, build: (current: unknown) => unknown) => ({ status: 'persisted', onboarding: build(current) }))
   mocks.route.query = {}
   mocks.save.mockResolvedValue(true)
@@ -114,12 +127,75 @@ describe('welcome followed by required About you', () => {
     const previousRun = 'ir_36473744-0000-4000-8000-000000000002'
     main.user.onboarding = { ...main.user.onboarding, onboarding_attempt_id: attemptId, last_run_id: previousRun, profile_draft: { first_name: 'Draft', last_name: '' } }
     const container = await mount(false)
-    expect(container.querySelector('form')).not.toBeNull()
+    expect(mocks.dialog.openDialog).toHaveBeenCalledWith(expect.objectContaining({
+      title: 'onboarding-resume-title',
+      preventAccidentalClose: true,
+    }))
+    expect(container.querySelector('form')).toBeNull()
+    expect(mocks.capture).toHaveBeenCalledWith('onboarding_resume_dialog_viewed', expect.objectContaining({
+      saved_step: 'name',
+      resume_onboarding_attempt_id: attemptId,
+      resumed_from_run_id: previousRun,
+    }))
+    expect(mocks.capture.mock.calls.some(call => call[0] === 'onboarding_step_viewed')).toBe(false)
+    mocks.dialog.lastButtonRole = 'onboarding-resume-continue'
+    dismissResume!()
+    await vi.waitFor(() => expect(container.querySelector('form')).not.toBeNull())
     expect(container.querySelector('[data-test="onboarding-welcome"]')).toBeNull()
     expect(main.user.onboarding.profile_draft.first_name).toBe('Draft')
+    expect(mocks.capture).toHaveBeenCalledWith('onboarding_resume_continued', expect.objectContaining({
+      onboarding_attempt_id: attemptId,
+      resumed_from_run_id: previousRun,
+    }))
     expect(mocks.capture).toHaveBeenCalledWith('onboarding_step_viewed', expect.objectContaining({ step: 'name', resumed: true, step_index: 1, onboarding_attempt_id: attemptId, onboarding_run_id: expect.not.stringMatching(previousRun) }))
     expect(main.user.onboarding.onboarding_attempt_id).toBe(attemptId)
   })
+  it('restarts a saved name draft at Welcome while retaining account identity and AB assignments', async () => {
+    const oldAttempt = '36473744-0000-4000-8000-000000000001'
+    const assignments = main.user.onboarding.abtests
+    main.user = { ...main.user, first_name: 'Saved', last_name: 'User', onboarding: {
+      ...main.user.onboarding,
+      onboarding_attempt_id: oldAttempt,
+      profile_draft: { first_name: 'Unfinished', last_name: '' },
+      status: 'in_progress',
+      flow: 'pre_org',
+      step: 'details',
+      intent: 'ota',
+      app_name: 'Old app',
+    } }
+    const container = await mount(false)
+    expect(mocks.dialog.openDialog).toHaveBeenCalled()
+    const restart = mocks.dialog.openDialog.mock.calls[0][0].buttons.find((button: { id: string }) => button.id === 'onboarding-resume-restart')
+    expect(await restart.handler()).not.toBe(false)
+    mocks.dialog.lastButtonRole = 'onboarding-resume-restart'
+    dismissResume!()
+    await vi.waitFor(() => expect(container.querySelector('[data-test="onboarding-welcome"]')).not.toBeNull())
+    expect(container.querySelector('form')).toBeNull()
+    expect(main.user.onboarding).toMatchObject({ abtests: assignments, version: 6 })
+    for (const field of ['profile_draft', 'profile_completed_at', 'app_name', 'intent', 'step'])
+      expect(main.user.onboarding).not.toHaveProperty(field)
+    expect(main.user.first_name).toBe('Saved')
+    expect(mocks.capture).toHaveBeenCalledWith('onboarding_resume_restarted', expect.objectContaining({ resume_onboarding_attempt_id: oldAttempt }))
+    expect(main.user.onboarding.onboarding_attempt_id).not.toBe(oldAttempt)
+    container.querySelector<HTMLButtonElement>('[data-test="onboarding-welcome-continue"]')!.click()
+    await vi.waitFor(() => expect(container.querySelector('form')).not.toBeNull())
+    expect(main.user.onboarding.profile_draft).toEqual({ first_name: 'Saved', last_name: 'User' })
+  })
+
+  it('keeps the resume dialog open and saved progress intact when Restart cannot be persisted', async () => {
+    main.user.onboarding = { ...main.user.onboarding, profile_draft: { first_name: 'Draft', last_name: '' } }
+    const container = await mount(false)
+    expect(mocks.dialog.openDialog).toHaveBeenCalled()
+    const restart = mocks.dialog.openDialog.mock.calls[0][0].buttons.find((button: { id: string }) => button.id === 'onboarding-resume-restart')
+    mocks.persist.mockResolvedValueOnce({ status: 'error', error: new Error('network unavailable') })
+    expect(await restart.handler()).toBe(false)
+    expect(container.querySelector('form')).toBeNull()
+    expect(container.querySelector('[data-test="onboarding-welcome"]')).toBeNull()
+    expect(main.user.onboarding.profile_draft.first_name).toBe('Draft')
+    expect(mocks.toastError).toHaveBeenCalled()
+    expect(mocks.capture.mock.calls.some(call => call[0] === 'onboarding_resume_restarted')).toBe(false)
+  })
+
   it('stays on welcome and offers retry if starting the name draft fails', async () => {
     const container = await mount(false)
     mocks.persist.mockResolvedValueOnce({ status: 'error', error: new Error('network unavailable') })
