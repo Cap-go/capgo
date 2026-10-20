@@ -565,6 +565,13 @@ test.describe('Actionable onboarding setup checklist', () => {
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
     await expect(page.locator(instructions).getByRole('heading', { name: 'Run your app on a device' })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+    await page.setViewportSize({ width: 320, height: 844 })
+    const returnButton = page.getByRole('button', { name: 'Back to the current task', exact: true })
+    await returnButton.evaluate(element => element.style.fontSize = '28px')
+    const actionsBox = await page.locator('[data-test="setup-checklist-task-actions"]').boundingBox()
+    const returnBox = await returnButton.boundingBox()
+    expect(returnBox!.x + returnBox!.width).toBeLessThanOrEqual(actionsBox!.x + actionsBox!.width)
+    expect(await returnButton.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
   })
 
   test('renders desktop, mobile, dark and loading states without console errors', async ({ page }) => {
