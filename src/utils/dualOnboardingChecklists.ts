@@ -20,6 +20,13 @@ export function hasDualOnboardingChecklists(value: unknown) {
     && Array.isArray(setup.paths) && setup.paths.includes('ota') && setup.paths.includes('builder')
 }
 
+// Every new app gets the OTA checklist, so the builder intent must win over it
+// outside the dual checklist; otherwise builder users are sent to `capgo i`.
+export function resolveSetupScreen(state: { otaTodoList: boolean, dualTodoList: boolean, builderTodoList: boolean, intent: string | null }) {
+  const builderCommand = state.builderTodoList || (!state.dualTodoList && (state.intent === 'builder' || state.intent === 'publish'))
+  return { builderCommand, otaChecklist: state.otaTodoList && !builderCommand }
+}
+
 function progress(steps: Record<string, unknown>, ids: readonly string[]) {
   const saved = ids.map(id => record(steps[id]))
   // Pending steps (including initialized timestamps) and tab views are not work.
