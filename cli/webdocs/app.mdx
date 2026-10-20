@@ -98,10 +98,6 @@ npx @capgo/cli@latest app todo
 Uses the same live progress checks as the Capgo dashboard. The app ID can be inferred from your Capacitor project.
 Apps with both Builder and OTA checklists show interactive tabs. For scripts and AI agents, choose --list builder or --list ota to print one list and exit.
 
-Other app-specific commands can show a standalone rectangular setup notice after success. It explains the next task and shows one primary command or organization plans link, without an app ID, status symbol, or guide line. The notice focuses on your unfinished OTA or Builder checklist; a second product is mentioned briefly when available. Completing OTA or either Builder platform switches the focus to your trial and plan, with other setup options kept secondary. Paying organizations, available usage credits, and unavailable billing suppress purchase prompts. `app todo` displays its checklist directly and does not add a duplicate setup notice. Terminal colors highlight headings and primary actions, with yellow trial reminders and dim secondary suggestions. `NO_COLOR` and piped output stay uncolored.
-
-To investigate a missing setup notice, set `CAPGO_SETUP_DEBUG=1`. Background timings, HTTP status, and suppression reasons are written to stderr without credentials or response bodies. Keep stdout attached to your terminal: piping or redirecting stdout skips the five-second wait. Redirect only stderr if you want to save the diagnostics.
-
 **Example:**
 
 ```bash
