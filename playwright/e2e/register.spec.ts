@@ -182,7 +182,6 @@ test.describe('Registration', () => {
   test('returns from Your goal to saved names and retains the selected goal', async ({ page }) => {
     await page.fill('[data-test="email"]', `profile-back-${Date.now()}@example.com`)
     await page.fill('[data-test="password"]', 'Password123!')
-    await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
     await page.waitForURL(/\/onboarding\/name/)
     await continuePastProfileWelcome(page)
@@ -222,7 +221,6 @@ test.describe('Registration', () => {
     await expect(page.locator('[data-test="last_name"]')).toHaveCount(0)
     await page.fill('[data-test="email"]', email)
     await page.fill('[data-test="password"]', 'Password123!')
-    await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.route('**/auth/v1/signup', route => route.abort())
     const registrationRequest = page.waitForRequest(request => request.url().endsWith('/auth/register') && request.method() === 'POST')
     await page.click('[data-test="submit"]')
@@ -346,7 +344,6 @@ test.describe('Registration', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.fill('[data-test="email"]', `mobile-profile-e2e-${Date.now()}@example.com`)
     await page.fill('[data-test="password"]', 'Password123!')
-    await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
     await page.waitForURL(/\/onboarding\/name/)
     await continuePastProfileWelcome(page)
@@ -379,7 +376,6 @@ test.describe('Registration', () => {
       const password = 'Password123!'
       await page.fill('[data-test="email"]', email)
       await page.fill('[data-test="password"]', password)
-      await page.fill('[data-test="confirm-password"]', password)
       await page.click('[data-test="submit"]')
       await page.waitForURL(/\/onboarding\/name/)
       await continuePastProfileWelcome(page)
@@ -578,7 +574,6 @@ test.describe('Registration', () => {
 
     await page.fill('[data-test="email"]', email)
     await page.fill('[data-test="password"]', password)
-    await page.fill('[data-test="confirm-password"]', password)
     await page.click('[data-test="submit"]')
 
     await page.waitForURL(/\/onboarding\/name/)
@@ -630,7 +625,6 @@ test.describe('Registration', () => {
 
     await page.fill('[data-test="email"]', email)
     await page.fill('[data-test="password"]', password)
-    await page.fill('[data-test="confirm-password"]', password)
     await page.click('[data-test="submit"]')
 
     await page.waitForURL(/\/onboarding\/name/)
@@ -672,7 +666,6 @@ test.describe('Registration', () => {
 
     await page.fill('[data-test="email"]', email)
     await page.fill('[data-test="password"]', 'Password123!')
-    await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
 
     await page.waitForURL(/\/onboarding\/name/)
@@ -687,7 +680,6 @@ test.describe('Registration', () => {
   test('should show error for existing email', async ({ page }) => {
     await page.fill('[data-test="email"]', 'test@capgo.app')
     await page.fill('[data-test="password"]', 'Password123!')
-    await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
     await expect(page.locator('[data-test="form-error"]')).toContainText('User already registered')
   })
@@ -695,17 +687,8 @@ test.describe('Registration', () => {
   test('should show error for deleted account email', async ({ page }) => {
     await page.fill('[data-test="email"]', 'deleted@capgo.app')
     await page.fill('[data-test="password"]', 'Password123!')
-    await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
     await expect(page.locator('[data-test="form-error"]')).toContainText('Account with this email used to exist, cannot recreate')
-  })
-
-  test('should show error for password mismatch', async ({ page }) => {
-    await page.fill('[data-test="email"]', 'new@example.com')
-    await page.fill('[data-test="password"]', 'Password123!')
-    await page.fill('[data-test="confirm-password"]', 'Password456!')
-    await page.click('[data-test="submit"]')
-    await expect(page.locator('.formkit-messages [data-message-type="validation"]')).toContainText('Password confirmation does not match')
   })
 
   test('should require a number before submitting to the registration API', async ({ page }) => {
@@ -716,7 +699,6 @@ test.describe('Registration', () => {
     })
     await page.fill('[data-test="email"]', 'password-policy@example.com')
     await page.fill('[data-test="password"]', 'Password!')
-    await page.fill('[data-test="confirm-password"]', 'Password!')
     await page.click('[data-test="submit"]')
     await expect(page.locator('.formkit-messages [data-message-type="validation"]')).toContainText(/number/i)
     expect(requests).toBe(0)

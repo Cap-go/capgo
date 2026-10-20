@@ -84,27 +84,21 @@ async function submit(form: { password: string, email: string }) {
           />
         </div>
 
-        <FormKit
-          type="password"
-          name="password"
-          :prefix-icon="iconPassword"
-          autocomplete="new-password"
-          :label="t('password')"
-          data-test="password"
-          validation="required|length:6|contains_alpha|contains_uppercase|contains_lowercase|contains_numeric|contains_symbol"
-          validation-visibility="dirty"
-        />
-        <FormKit
-          type="password"
-          name="password_confirm"
-          :prefix-icon="iconPassword"
-          :label="t('confirm-password')"
-          autocomplete="new-password"
-          data-test="confirm-password"
-          validation="required|confirm"
-          validation-visibility="dirty"
-          :validation-label="t('password-confirmatio')"
-        />
+        <div class="md:col-span-2">
+          <FormKit
+            type="password"
+            name="password"
+            :prefix-icon="iconPassword"
+            autocomplete="new-password"
+            :label="t('password')"
+            data-test="password"
+            validation="required|length:6|contains_alpha|contains_uppercase|contains_lowercase|contains_numeric|contains_symbol"
+            validation-visibility="dirty"
+            :classes="{
+              outer: 'mb-0!',
+            }"
+          />
+        </div>
 
         <div v-if="captchaKey" class="md:col-span-2 overflow-hidden">
           <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
