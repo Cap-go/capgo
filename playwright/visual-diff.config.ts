@@ -325,7 +325,6 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       }
       await appName.fill('Example App')
       await page.locator('[data-test="app-onboarding-continue"]').click()
-      await page.locator('[data-test="app-onboarding-skip-app-id"]').click()
       await page.locator('[data-test="app-onboarding-continue"]').click()
       await page.locator('[data-test="onboarding-org-name"]').waitFor()
     },
