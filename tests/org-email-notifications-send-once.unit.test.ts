@@ -27,7 +27,7 @@ const {
   shouldUseLifecycleV2Mock: vi.fn(),
 }))
 
-vi.mock('../supabase/functions/_backend/utils/lifecycle_v2_rollout.ts', async (importOriginal) => ({
+vi.mock('../supabase/functions/_backend/utils/lifecycle_v2_rollout.ts', async importOriginal => ({
   ...await importOriginal<typeof import('../supabase/functions/_backend/utils/lifecycle_v2_rollout.ts')>(),
   shouldUseLifecycleV2: shouldUseLifecycleV2Mock,
 }))
