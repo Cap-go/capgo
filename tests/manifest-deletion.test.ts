@@ -306,4 +306,25 @@ describe('manifest deletion Postgres effects', () => {
     await onVersionUpdateTestUtils.deleteManifest(c, record(1))
     expect(await state(1)).toMatchObject({ rows: 0, manifest_count: '0', manifest_bundle_count: '0' })
   })
+
+  it('registers a manifest on a reused backend whose session default is read-only', async () => {
+    await seedVersion(1, 0, false)
+    const client = await pool.connect()
+    try {
+      await client.query('SET default_transaction_read_only = on')
+      // This is the same row-lock failure as a plain BEGIN on a contaminated pool.
+      await expect(client.query('SELECT id FROM public.app_versions WHERE id = 1 FOR UPDATE')).rejects.toMatchObject({ code: '25006' })
+      getPgClient.mockResolvedValue(client)
+      await expect(persistVersionManifestEntries(c, record(1), [
+        { file_name: 'file.js', file_hash: 'hash', s3_path: 'delta/file.js', file_size: 5 },
+      ], { trustFileSizes: true })).resolves.toEqual({ inserted: 1, alreadyPresent: false })
+      expect(await state(1)).toMatchObject({ rows: 1, manifest_count: '1', manifest_bundle_count: '1' })
+      expect((await client.query('SHOW default_transaction_read_only')).rows[0].default_transaction_read_only).toBe('on')
+    }
+    finally {
+      getPgClient.mockResolvedValue(pool)
+      await client.query('RESET default_transaction_read_only')
+      client.release()
+    }
+  })
 })
