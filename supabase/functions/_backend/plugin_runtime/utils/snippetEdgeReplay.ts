@@ -1,6 +1,7 @@
 import type { Queue, R2Bucket } from '@cloudflare/workers-types'
 import type { SnippetEdgeReplay } from './snippetEdgeAnswer.ts'
 import { cloudlog } from './logging.ts'
+import { queueRetryHeaderNames } from './on_error.ts'
 import { markSnippetEdgeReplay } from './snippetEdgeAnswer.ts'
 
 /**
@@ -244,15 +245,15 @@ export function getR2NotificationObjectKey(body: unknown): string | null {
   return typeof object?.key === 'string' ? object.key : null
 }
 
-/** Queue retry headers: onError skips the alert of an attempt that gets another one. */
 const SNIPPET_EDGE_REPLAY_QUEUE_NAME = 'capgo-snippet-edge-stats-replay'
 
+/** Carries the queue retry headers: onError skips the alert of an attempt that gets another one. */
 export function buildReplayRequest(record: SnippetEdgeStatRecord, attempt = 1) {
   const headers = new Headers({
     'Content-Type': 'application/json',
-    'x-capgo-queue-name': SNIPPET_EDGE_REPLAY_QUEUE_NAME,
-    'x-capgo-queue-read-count': String(attempt),
-    'x-capgo-queue-max-reads': String(MAX_REPLAY_ATTEMPTS),
+    [queueRetryHeaderNames.name]: SNIPPET_EDGE_REPLAY_QUEUE_NAME,
+    [queueRetryHeaderNames.readCount]: String(attempt),
+    [queueRetryHeaderNames.maxReads]: String(MAX_REPLAY_ATTEMPTS),
   })
   if (record.ip)
     headers.set('cf-connecting-ip', record.ip)
