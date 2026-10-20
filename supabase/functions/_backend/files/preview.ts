@@ -11,7 +11,7 @@ import { simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask, getEnv, isValidAppId } from '../utils/utils.ts'
-import { applyPreviewXRobotsTag, PREVIEW_X_ROBOTS_TAG } from './preview-host-headers.ts'
+import { applyPreviewXRobotsTag } from './preview-host-headers.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 
 export { PREVIEW_X_ROBOTS_TAG } from './preview-host-headers.ts'
