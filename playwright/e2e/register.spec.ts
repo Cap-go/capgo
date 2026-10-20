@@ -99,6 +99,10 @@ async function loginToOnboarding(page: Page, email: string, password: string) {
 async function continuePastProfileWelcome(page: Page) {
   const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
   const name = page.locator('[data-test="onboarding-name-step"]')
+  const resume = page.locator('[data-test="onboarding-resume-continue"]')
+  await expect(welcome.or(name).or(resume)).toBeVisible()
+  if (await resume.isVisible())
+    await resume.click()
   await expect(welcome.or(name)).toBeVisible()
   if (await welcome.isVisible()) {
     await expect(name).toHaveCount(0)
@@ -215,6 +219,8 @@ async function expectProtectedRouteRedirect(page: Page, targetPath: string, expe
   try {
     await redirectedPage.goto(targetPath, { waitUntil: 'commit' })
     await redirectedPage.waitForURL(expectedUrl)
+    if (new URL(redirectedPage.url()).pathname === '/onboarding/name')
+      await continuePastProfileWelcome(redirectedPage)
     await expect(redirectedPage.locator(expectedSelector)).toBeVisible()
   }
   finally {
@@ -487,10 +493,24 @@ test.describe('Registration', () => {
 
       await page.reload()
       const firstName = page.locator('[data-test="onboarding-first-name"]')
+      await expect(page.locator('[data-test="onboarding-resume-continue"]')).toBeVisible()
+      await expect(firstName).toHaveCount(0)
+      await page.click('[data-test="onboarding-resume-continue"]')
       await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toHaveCount(0)
       await expect(firstName).toHaveValue('Draft')
       await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('User')
       await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeEnabled()
+
+      await page.reload()
+      await expect(page.locator('[data-test="onboarding-resume-restart"]')).toBeVisible()
+      await page.click('[data-test="onboarding-resume-restart"]')
+      await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toBeVisible()
+      await continuePastProfileWelcome(page)
+      await expect(firstName).toHaveValue('')
+      await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('')
+      await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeDisabled()
+      await firstName.fill('Draft')
+      await page.fill('[data-test="onboarding-last-name"]', 'User')
       await page.click('[data-test="onboarding-name-continue"]')
       if (!mobile)
         await expectOnboardingGoal(page)
@@ -514,6 +534,7 @@ test.describe('Registration', () => {
 
     await loginToOnboarding(page, email, password)
     await page.goto('/onboarding/organization?source=org-switcher')
+    await continuePastProfileWelcome(page)
     await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveValue('Example')
     await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('')
     await expect(page).toHaveURL(/\/onboarding\/name/)
