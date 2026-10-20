@@ -55,12 +55,48 @@ export async function restrictPrimaryReadClient(db: PgHandle, source: string, re
     throw error
   }
   accessModes.set(client, 'read only')
+  const rawQuery = client.query.bind(client) as (...args: unknown[]) => Promise<unknown>
+  let pending = Promise.resolve()
   let closing: Promise<void> | undefined
+  let recoveryFailure: Error | undefined
+  client.query = ((...args: unknown[]) => {
+    const callback = typeof args.at(-1) === 'function' ? args.pop() as (error: unknown, result?: unknown) => void : undefined
+    const result = closing
+      ? Promise.reject(new Error('Primary read session is closed'))
+      : pending.then(async () => {
+          if (recoveryFailure)
+            throw recoveryFailure
+          try {
+            return await rawQuery(...args)
+          }
+          catch (error) {
+            // Recover the transaction, never replay the failed statement. Serialize
+            // queries with recovery so queued reads cannot run between ROLLBACK and
+            // BEGIN READ ONLY, or inherit an aborted transaction from another read.
+            try {
+              await rawQuery('ROLLBACK')
+              await rawQuery('BEGIN READ ONLY')
+            }
+            catch (cause) {
+              recoveryFailure = new Error('Primary read session recovery failed', { cause })
+            }
+            throw error
+          }
+        })
+    pending = result.then(() => {}, () => {})
+    if (callback) {
+      void result.then(value => callback(null, value), error => callback(error))
+      return
+    }
+    return result
+  }) as typeof client.query
   primaryReadSessions.set(client, {
     close: () => closing ??= (async () => {
       try {
-        // ROLLBACK also clears an aborted read transaction after a query error.
-        await client.query('ROLLBACK')
+        await pending
+        // Cleanup must bypass recovery: a failed ROLLBACK must not start a new
+        // transaction while returning the origin connection to Hyperdrive.
+        await rawQuery('ROLLBACK')
       }
       finally {
         if (!hyperdrive) {

@@ -50,8 +50,9 @@ describe('pooled PostgreSQL transaction access modes', () => {
       await close(c, reader)
       if (runtimeKey === 'workerd') {
         // close() must roll back, but Hyperdrive owns ending the edge connection.
-        expect((await reader.query('SHOW transaction_read_only')).rows[0].transaction_read_only).toBe('off')
-        expect((await reader.query('SHOW default_transaction_read_only')).rows[0].default_transaction_read_only).toBe('off')
+        const rawQuery = Client.prototype.query.bind(reader as Client) as (text: string) => Promise<{ rows: Record<string, string>[] }>
+        expect((await rawQuery('SHOW transaction_read_only')).rows[0].transaction_read_only).toBe('off')
+        expect((await rawQuery('SHOW default_transaction_read_only')).rows[0].default_transaction_read_only).toBe('off')
         await reader.end()
       }
       runtime.key = 'node'
@@ -176,6 +177,56 @@ describe('pooled PostgreSQL transaction access modes', () => {
     }
     finally {
       await lazy.close()
+    }
+  })
+
+  it('allows a caught failed primary read to fall back inside a fresh read-only transaction', async () => {
+    const c = context()
+    const reader = await getPgClient(c, true)
+    try {
+      await expect(reader.query('SELECT nonexistent_transaction_mode_column')).rejects.toMatchObject({ code: '42703' })
+      expect((await reader.query('SHOW transaction_read_only')).rows[0].transaction_read_only).toBe('on')
+      expect((await getDrizzleClient(reader, { logger: false }).execute(sql`SELECT 1 AS ok`)).rows[0]).toMatchObject({ ok: 1 })
+      expect((await reader.query('SHOW default_transaction_read_only')).rows[0].default_transaction_read_only).toBe('off')
+    }
+    finally {
+      await closeClient(c, reader)
+    }
+  })
+
+  it('keeps queued reads protected while recovering an earlier query failure', async () => {
+    const c = context()
+    const reader = await getPgClient(c, true)
+    try {
+      const results = await Promise.allSettled([
+        reader.query('SELECT nonexistent_transaction_mode_column'),
+        reader.query('SHOW transaction_read_only'),
+      ])
+      expect(results[0]).toMatchObject({ status: 'rejected', reason: { code: '42703' } })
+      expect(results[1]).toMatchObject({ status: 'fulfilled', value: { rows: [{ transaction_read_only: 'on' }] } })
+    }
+    finally {
+      await closeClient(c, reader)
+    }
+  })
+
+  it('preserves callback queries when recovering a failed primary read', async () => {
+    const c = context()
+    const reader = await getPgClient(c, true)
+    try {
+      await new Promise<void>((resolve) => {
+        reader.query('SELECT nonexistent_transaction_mode_column', (error) => {
+          expect(error).toMatchObject({ code: '42703' })
+          resolve()
+        })
+      })
+      const result = await new Promise((resolve, reject) => {
+        reader.query('SHOW transaction_read_only', (error, result) => error ? reject(error) : resolve(result))
+      })
+      expect(result).toMatchObject({ rows: [{ transaction_read_only: 'on' }] })
+    }
+    finally {
+      await closeClient(c, reader)
     }
   })
 })

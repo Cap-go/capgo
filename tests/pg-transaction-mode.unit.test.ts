@@ -33,7 +33,8 @@ describe('primary read transaction lifecycle', () => {
 
   it('releases the pinned connection even if rollback fails, without duplicate cleanup', async () => {
     const error = new Error('rollback failed')
-    const client = { query: vi.fn().mockResolvedValueOnce({}).mockRejectedValue(error), release: vi.fn() }
+    const rawQuery = vi.fn().mockResolvedValueOnce({}).mockRejectedValue(error)
+    const client = { query: rawQuery, release: vi.fn() }
     const pool = { connect: vi.fn().mockResolvedValue(client), end: vi.fn() } as unknown as Pool
     const reader = await restrictPrimaryReadClient(pool, 'sb_pooler_main', true, false)
     const closing = closePrimaryReadClient(reader)
@@ -41,13 +42,41 @@ describe('primary read transaction lifecycle', () => {
     await expect(closing).rejects.toBe(error)
     expect(client.release).toHaveBeenCalledOnce()
     expect(pool.end).toHaveBeenCalledOnce()
+    expect(rawQuery).toHaveBeenCalledTimes(2)
   })
 
   it('rolls back a Hyperdrive read without ending its connection', async () => {
-    const client = { query: vi.fn().mockResolvedValue({}), end: vi.fn() } as unknown as Client
+    const rawQuery = vi.fn().mockResolvedValue({})
+    const client = { query: rawQuery, end: vi.fn() } as unknown as Client
     const reader = await restrictPrimaryReadClient(client, 'HYPERDRIVE_CAPGO_DIRECT_EU', true, true)
     await closePrimaryReadClient(reader)
-    expect(client.query).toHaveBeenLastCalledWith('ROLLBACK')
+    expect(rawQuery).toHaveBeenLastCalledWith('ROLLBACK')
     expect(client.end).not.toHaveBeenCalled()
+  })
+
+  it('rejects reads after cleanup instead of using an unprotected connection', async () => {
+    const rawQuery = vi.fn().mockResolvedValue({})
+    const client = { query: rawQuery, end: vi.fn() } as unknown as Client
+    const reader = await restrictPrimaryReadClient(client, 'HYPERDRIVE_CAPGO_DIRECT_EU', true, true)
+    await closePrimaryReadClient(reader)
+    await expect(reader.query('SELECT 1')).rejects.toThrow('closed')
+    expect(rawQuery).toHaveBeenCalledTimes(2)
+  })
+
+  it('fails closed when recovery fails and never replays the failed read', async () => {
+    const readError = new Error('read failed')
+    const recoveryError = new Error('connection lost')
+    const rawQuery = vi.fn().mockResolvedValueOnce({}).mockRejectedValueOnce(readError).mockRejectedValueOnce(recoveryError).mockResolvedValue({})
+    const client = { query: rawQuery, release: vi.fn() }
+    const pool = { connect: vi.fn().mockResolvedValue(client), end: vi.fn() } as unknown as Pool
+    const reader = await restrictPrimaryReadClient(pool, 'sb_pooler_main', true, false)
+    try {
+      await expect(reader.query('SELECT 1')).rejects.toBe(readError)
+      await expect(reader.query('SELECT 2')).rejects.toMatchObject({ cause: recoveryError })
+      expect(rawQuery.mock.calls.map(([text]) => text)).toEqual(['BEGIN READ ONLY', 'SELECT 1', 'ROLLBACK'])
+    }
+    finally {
+      await closePrimaryReadClient(reader)
+    }
   })
 })
