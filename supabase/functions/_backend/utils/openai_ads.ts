@@ -10,7 +10,9 @@ const DEFAULT_OPENAI_ADS_PIXEL_ID = '5Fiq7Kwp18THe1MThKS7GL'
 const REGISTRATION_SOURCE_URL = 'https://capgo.app/register/'
 // The API rejects events older than 7 days; keep a margin for clock skew.
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000 - 10 * 60 * 1000
-const OPENAI_ADS_TIMEOUT_MS = 10_000
+// Retries stay inside the ~30s background-task budget: 3 x 8s timeout + 2.5s of waits.
+const OPENAI_ADS_TIMEOUT_MS = 8_000
+const DEFAULT_RETRY_DELAYS_MS = [500, 2_000]
 
 type UserRow = Database['public']['Tables']['users']['Row']
 
@@ -44,8 +46,11 @@ export async function buildOpenAIRegistrationEvent(record: Pick<UserRow, 'id' | 
   if (/^[a-z]{2}$/i.test(country))
     user.countries = [country.toUpperCase()]
 
+  // Without a real creation time, a late trigger would report an old signup as new.
   const createdAt = record.created_at ? Date.parse(record.created_at) : Number.NaN
-  const timestampMs = Number.isFinite(createdAt) ? Math.min(createdAt, now) : now
+  if (!Number.isFinite(createdAt))
+    return null
+  const timestampMs = Math.min(createdAt, now)
 
   return {
     // Matches the pixel event_id `registration_<sha256(user id)>` for deduplication.
@@ -59,11 +64,21 @@ export async function buildOpenAIRegistrationEvent(record: Pick<UserRow, 'id' | 
   }
 }
 
+function isRetryableStatus(status: number) {
+  return status === 408 || status === 429 || status >= 500
+}
+
 /**
  * Send the server-side `registration_completed` conversion to OpenAI Ads.
+ * Retries network errors, 408, 429 and 5xx a bounded number of times; the event id stays
+ * the same, so a retry after a lost response does not create a duplicate.
  * No-op when OPENAI_ADS_API_KEY is missing. Never throws.
  */
-export async function trackOpenAIRegistration(c: Context, record: Pick<UserRow, 'id' | 'email' | 'first_name' | 'last_name' | 'country' | 'created_at'>): Promise<boolean> {
+export async function trackOpenAIRegistration(
+  c: Context,
+  record: Pick<UserRow, 'id' | 'email' | 'first_name' | 'last_name' | 'country' | 'created_at'>,
+  { retryDelaysMs = DEFAULT_RETRY_DELAYS_MS }: { retryDelaysMs?: number[] } = {},
+): Promise<boolean> {
   try {
     const apiKey = getEnv(c, 'OPENAI_ADS_API_KEY').trim()
     if (!apiKey)
@@ -72,6 +87,10 @@ export async function trackOpenAIRegistration(c: Context, record: Pick<UserRow, 
 
     const now = Date.now()
     const event = await buildOpenAIRegistrationEvent(record, now)
+    if (!event) {
+      cloudlog({ requestId: c.get('requestId'), message: 'OpenAI Ads registration skipped: unknown creation time', userId: record.id })
+      return false
+    }
     if (now - event.timestamp_ms > MAX_EVENT_AGE_MS) {
       cloudlog({ requestId: c.get('requestId'), message: 'OpenAI Ads registration skipped: event older than 7 days', userId: record.id })
       return false
@@ -79,23 +98,40 @@ export async function trackOpenAIRegistration(c: Context, record: Pick<UserRow, 
 
     const url = new URL(OPENAI_ADS_EVENTS_URL)
     url.searchParams.set('pid', pixelId)
-    const response = await fetch(url.toString(), {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ events: [event] }),
-      signal: AbortSignal.timeout(OPENAI_ADS_TIMEOUT_MS),
-    })
-    if (!response.ok) {
-      const body = await response.text().catch(() => '')
-      cloudlogErr({ requestId: c.get('requestId'), message: 'OpenAI Ads registration event failed', userId: record.id, status: response.status, body: body.slice(0, 500) })
-      return false
+    const body = JSON.stringify({ events: [event] })
+
+    for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+      const isLastAttempt = attempt === retryDelaysMs.length
+      try {
+        const response = await fetch(url.toString(), {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body,
+          signal: AbortSignal.timeout(OPENAI_ADS_TIMEOUT_MS),
+        })
+        if (response.ok) {
+          await response.body?.cancel().catch(() => {})
+          cloudlog({ requestId: c.get('requestId'), message: 'OpenAI Ads registration event sent', userId: record.id, attempt: attempt + 1 })
+          return true
+        }
+        const responseBody = await response.text().catch(() => '')
+        if (isLastAttempt || !isRetryableStatus(response.status)) {
+          cloudlogErr({ requestId: c.get('requestId'), message: 'OpenAI Ads registration event failed', userId: record.id, status: response.status, attempt: attempt + 1, body: responseBody.slice(0, 500) })
+          return false
+        }
+      }
+      catch (error) {
+        if (isLastAttempt) {
+          cloudlogErr({ requestId: c.get('requestId'), message: 'OpenAI Ads registration event error', userId: record.id, attempt: attempt + 1, error: serializeError(error) })
+          return false
+        }
+      }
+      await new Promise(resolve => setTimeout(resolve, retryDelaysMs[attempt]))
     }
-    await response.body?.cancel().catch(() => {})
-    cloudlog({ requestId: c.get('requestId'), message: 'OpenAI Ads registration event sent', userId: record.id })
-    return true
+    return false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'OpenAI Ads registration event error', userId: record.id, error: serializeError(error) })

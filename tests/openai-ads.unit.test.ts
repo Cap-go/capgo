@@ -91,13 +91,53 @@ describe('openai ads conversions api', () => {
     expect(body.events[0].type).toBe('registration_completed')
   })
 
-  it('never throws on network or API errors', async () => {
+  it('skips registrations with an unknown creation time', async () => {
     envValues.OPENAI_ADS_API_KEY = 'test-key'
-    vi.stubGlobal('fetch', vi.fn(async () => {
-      throw new Error('network down')
-    }))
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await buildOpenAIRegistrationEvent({ ...record, created_at: null }, now)).toBeNull()
+    expect(await buildOpenAIRegistrationEvent({ ...record, created_at: 'not a date' }, now)).toBeNull()
     expect(await trackOpenAIRegistration(createContext(), { ...record, created_at: null })).toBe(false)
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('bad', { status: 400 })))
-    expect(await trackOpenAIRegistration(createContext(), { ...record, created_at: null })).toBe(false)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('retries transient failures with the same event id', async () => {
+    envValues.OPENAI_ADS_API_KEY = 'test-key'
+    vi.useFakeTimers({ now, toFake: ['Date'] })
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new Error('network down'))
+      .mockResolvedValueOnce(new Response('busy', { status: 503 }))
+      .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    try {
+      expect(await trackOpenAIRegistration(createContext(), record, { retryDelaysMs: [0, 0] })).toBe(true)
+    }
+    finally {
+      vi.useRealTimers()
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+    const ids = fetchMock.mock.calls.map(call => JSON.parse((call[1] as RequestInit).body as string).events[0].id)
+    expect(new Set(ids).size).toBe(1)
+  })
+
+  it('does not retry client errors and stops after the last attempt', async () => {
+    envValues.OPENAI_ADS_API_KEY = 'test-key'
+    vi.useFakeTimers({ now, toFake: ['Date'] })
+    try {
+      const badRequest = vi.fn(async () => new Response('bad', { status: 400 }))
+      vi.stubGlobal('fetch', badRequest)
+      expect(await trackOpenAIRegistration(createContext(), record, { retryDelaysMs: [0, 0] })).toBe(false)
+      expect(badRequest).toHaveBeenCalledTimes(1)
+
+      const alwaysDown = vi.fn(async () => {
+        throw new Error('network down')
+      })
+      vi.stubGlobal('fetch', alwaysDown)
+      expect(await trackOpenAIRegistration(createContext(), record, { retryDelaysMs: [0, 0] })).toBe(false)
+      expect(alwaysDown).toHaveBeenCalledTimes(3)
+    }
+    finally {
+      vi.useRealTimers()
+    }
   })
 })
