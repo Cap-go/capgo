@@ -759,6 +759,36 @@ describe('mandatory name navigation', () => {
       })
     }
   }
+  for (const path of ['/login-cli', '/oauth/authorize']) {
+    it.concurrent(`lets ${path} finish without the name step`, async () => {
+      await withTestContext(async (context) => {
+        Object.assign(context.userRecord, { first_name: '', last_name: '', onboarding: {} })
+        const noOrganizations = async () => {
+          context.organizationStore.organizations = []
+          context.organizationStore.hasOrganizations = false
+        }
+        context.organizationStore.fetchOrganizations.mockImplementation(noOrganizations)
+        context.organizationStore.dedupFetchOrganizations.mockImplementation(noOrganizations)
+        const guard = await getGuard()
+        const next = vi.fn()
+        await guard({ path, fullPath: path, meta: { middleware: 'auth' }, query: {} }, { path: '/login', meta: {}, query: {} }, next)
+        expect(next).not.toHaveBeenCalledWith(expect.objectContaining({ path: '/onboarding/name' }))
+      })
+    })
+  }
+  it.concurrent('provisions SSO membership before checking names for an already-authenticated user', async () => {
+    await withTestContext(async (context) => {
+      Object.assign(context.userRecord, { first_name: '', last_name: '', onboarding: {} })
+      context.mainStore.auth = { id: 'user-123' }
+      context.mainStore.user = context.userRecord
+      const guard = await getGuard()
+      const next = vi.fn()
+      await guard({ path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} }, { path: '/apps', meta: {}, query: {} }, next)
+      expect(context.mockFetch).toHaveBeenCalledWith('https://api.capgo.test/private/sso/provision-user', expect.anything())
+      expect(next).not.toHaveBeenCalledWith(expect.objectContaining({ path: '/onboarding/name' }))
+      expect(next).toHaveBeenCalledWith()
+    })
+  })
   it.concurrent('keeps the name screen accessible even with pending invitations or app setup', async () => {
     await withTestContext(async (context) => {
       Object.assign(context.userRecord, { first_name: '', last_name: '', onboarding: {} })

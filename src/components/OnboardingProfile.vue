@@ -158,7 +158,8 @@ async function save() {
     draftGeneration++
     main.user = { ...main.user, ...data }
     // A saved profile has no unfinished draft. Use the same queue as wizard writes.
-    await resetDraft()
+    if (!await resetDraft())
+      throw new Error('onboarding_profile_draft_reset_failed')
     try {
       setUser(userId, {
         email: main.user.email,

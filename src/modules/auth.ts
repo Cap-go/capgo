@@ -233,6 +233,9 @@ async function guard(
   }
 
   function requiredNameRedirect(organizationsLoaded: boolean) {
+    // CLI and MCP authorization must finish before any onboarding detour.
+    if (isCliLoginRoute)
+      return null
     // An unknown profile cannot establish whether names are required. Offer a
     // retry without letting the user bypass required names or stranding navigation.
     if (!main.user)
@@ -440,11 +443,6 @@ async function guard(
     await loadPlansIfNeeded()
 
     let organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations(organizationFetchOptions))
-    const nameRedirect = requiredNameRedirect(organizationsLoaded)
-    if (nameRedirect) {
-      await hideLoader()
-      return next(nameRedirect)
-    }
     if (shouldRedirectToPendingInviteOnboarding(organizationsLoaded)) {
       return next({
         path: '/onboarding/invitation',
@@ -465,6 +463,13 @@ async function guard(
       }
 
       organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations(organizationFetchOptions))
+    }
+
+    // Check names after SSO provisioning so enterprise members are not sent to self-signup onboarding.
+    const nameRedirect = requiredNameRedirect(organizationsLoaded)
+    if (nameRedirect) {
+      await hideLoader()
+      return next(nameRedirect)
     }
 
     await resolvePlatformAdminStatus()
