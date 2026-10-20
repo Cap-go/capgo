@@ -1,4 +1,5 @@
 import type { BentoTrackingPayload } from './tracking.ts'
+import { ALERT_UPLOAD_SIZE_BYTES } from '../files/util.ts'
 
 /**
  * CLI `bundle upload` emits this when the zipped bundle is over the alert
@@ -10,6 +11,9 @@ import type { BentoTrackingPayload } from './tracking.ts'
 export const APP_TOO_LARGE_EVENT = 'App Too Large'
 export const APP_TOO_LARGE_BENTO_EVENT = 'app_too_large'
 
+const DEFAULT_THRESHOLD_MB = Math.floor(ALERT_UPLOAD_SIZE_BYTES / 1024 / 1024)
+const DEFAULT_RECOMMENDED_SIZE_MB = DEFAULT_THRESHOLD_MB
+
 export interface AppTooLargeBentoInput {
   event: string
   orgId: string | undefined
@@ -19,8 +23,11 @@ export interface AppTooLargeBentoInput {
   tags?: Record<string, string | number | boolean>
 }
 
-function toSizeMb(tags: Record<string, string | number | boolean> | undefined): number | undefined {
-  const raw = tags?.size_mb
+function parseMbTag(
+  tags: Record<string, string | number | boolean> | undefined,
+  key: string,
+): number | undefined {
+  const raw = tags?.[key]
   if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0)
     return raw
   if (typeof raw === 'string') {
@@ -34,6 +41,10 @@ function toSizeMb(tags: Record<string, string | number | boolean> | undefined): 
   return undefined
 }
 
+function resolveBundleSizeMb(tags: Record<string, string | number | boolean> | undefined): number | undefined {
+  return parseMbTag(tags, 'bundle_size_mb') ?? parseMbTag(tags, 'size_mb')
+}
+
 /**
  * Pure: emit a Bento signal for oversized bundle uploads. Returns undefined
  * when the event name does not match or org/app context is missing.
@@ -44,7 +55,9 @@ export function buildAppTooLargeBentoEvent(input: AppTooLargeBentoInput): BentoT
   if (!input.orgId || !input.appId)
     return undefined
 
-  const sizeMb = toSizeMb(input.tags)
+  const bundleSizeMb = resolveBundleSizeMb(input.tags)
+  const thresholdMb = parseMbTag(input.tags, 'threshold_mb') ?? DEFAULT_THRESHOLD_MB
+  const recommendedSizeMb = parseMbTag(input.tags, 'recommended_size_mb') ?? DEFAULT_RECOMMENDED_SIZE_MB
 
   return {
     cron: '* * * * *',
@@ -56,7 +69,9 @@ export function buildAppTooLargeBentoEvent(input: AppTooLargeBentoInput): BentoT
       org_name: input.orgName ?? '',
       app_id: input.appId,
       app_name: input.appName ?? '',
-      ...(sizeMb === undefined ? {} : { size_mb: sizeMb }),
+      threshold_mb: thresholdMb,
+      recommended_size_mb: recommendedSizeMb,
+      ...(bundleSizeMb === undefined ? {} : { size_mb: bundleSizeMb, bundle_size_mb: bundleSizeMb }),
     },
   }
 }

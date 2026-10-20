@@ -7,7 +7,12 @@ const base = {
   appId: 'com.demo.app',
   orgName: 'Demo Org',
   appName: 'Demo',
-  tags: { size_mb: 42 },
+  tags: {
+    size_mb: 42,
+    bundle_size_mb: 42,
+    threshold_mb: 20,
+    recommended_size_mb: 20,
+  },
 }
 
 describe('buildAppTooLargeBentoEvent', () => {
@@ -23,20 +28,43 @@ describe('buildAppTooLargeBentoEvent', () => {
         app_id: 'com.demo.app',
         app_name: 'Demo',
         size_mb: 42,
+        bundle_size_mb: 42,
+        threshold_mb: 20,
+        recommended_size_mb: 20,
       },
     })
   })
 
-  it.concurrent('parses size_mb from a string tag', () => {
-    const result = buildAppTooLargeBentoEvent({ ...base, tags: { size_mb: '21' } })
+  it.concurrent('parses bundle size from legacy size_mb tag only', () => {
+    const result = buildAppTooLargeBentoEvent({
+      ...base,
+      tags: { size_mb: '21', threshold_mb: 20, recommended_size_mb: 20 },
+    })
     expect(result?.data.size_mb).toBe(21)
+    expect(result?.data.bundle_size_mb).toBe(21)
   })
 
-  it.concurrent('omits size_mb when the tag is missing or invalid', () => {
-    expect(buildAppTooLargeBentoEvent({ ...base, tags: undefined })?.data).not.toHaveProperty('size_mb')
-    expect(buildAppTooLargeBentoEvent({ ...base, tags: { size_mb: 'nope' } })?.data).not.toHaveProperty('size_mb')
-    expect(buildAppTooLargeBentoEvent({ ...base, tags: { size_mb: '   ' } })?.data).not.toHaveProperty('size_mb')
-    expect(buildAppTooLargeBentoEvent({ ...base, tags: { size_mb: -1 } })?.data).not.toHaveProperty('size_mb')
+  it.concurrent('prefers bundle_size_mb over size_mb when both are present', () => {
+    const result = buildAppTooLargeBentoEvent({
+      ...base,
+      tags: { size_mb: 10, bundle_size_mb: 25, threshold_mb: 20, recommended_size_mb: 20 },
+    })
+    expect(result?.data.bundle_size_mb).toBe(25)
+    expect(result?.data.size_mb).toBe(25)
+  })
+
+  it.concurrent('defaults threshold and recommended size when tags are missing', () => {
+    const result = buildAppTooLargeBentoEvent({ ...base, tags: { size_mb: 42 } })
+    expect(result?.data.threshold_mb).toBe(20)
+    expect(result?.data.recommended_size_mb).toBe(20)
+  })
+
+  it.concurrent('omits bundle size fields when the tag is missing or invalid', () => {
+    expect(buildAppTooLargeBentoEvent({ ...base, tags: { threshold_mb: 20, recommended_size_mb: 20 } })?.data).not.toHaveProperty('size_mb')
+    expect(buildAppTooLargeBentoEvent({ ...base, tags: { threshold_mb: 20, recommended_size_mb: 20 } })?.data).not.toHaveProperty('bundle_size_mb')
+    expect(buildAppTooLargeBentoEvent({ ...base, tags: { size_mb: 'nope', threshold_mb: 20 } })?.data).not.toHaveProperty('size_mb')
+    expect(buildAppTooLargeBentoEvent({ ...base, tags: { size_mb: '   ', threshold_mb: 20 } })?.data).not.toHaveProperty('bundle_size_mb')
+    expect(buildAppTooLargeBentoEvent({ ...base, tags: { size_mb: -1, threshold_mb: 20 } })?.data).not.toHaveProperty('size_mb')
   })
 
   it.concurrent('returns undefined for other event names', () => {
@@ -53,8 +81,13 @@ describe('buildAppTooLargeBentoEvent', () => {
       event: APP_TOO_LARGE_EVENT,
       orgId: 'org-1',
       appId: 'com.demo.app',
+      tags: { size_mb: 30 },
     })
     expect(result?.data.org_name).toBe('')
     expect(result?.data.app_name).toBe('')
+    expect(result?.data.org_id).toBe('org-1')
+    expect(result?.data.app_id).toBe('com.demo.app')
+    expect(result?.data.threshold_mb).toBe(20)
+    expect(result?.data.recommended_size_mb).toBe(20)
   })
 })
