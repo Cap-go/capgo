@@ -10,6 +10,11 @@ queue publication does not shift the cadence, and old or duplicate ticks cannot
 start a second execution of an already handled slot. After a delay, the next
 available tick evaluates the current cohort rather than replaying missed slots.
 
+The worker's `HYPERDRIVE_CAPGO_DIRECT_EU` binding uses `capgo-direct-eu-nocache`
+on the primary database, with query caching disabled. Audit relays read immediately
+after writes, so cached results can leave completion audits pending and delay the
+next evaluation. Hyperdrive connection pooling remains enabled.
+
 One evaluation queue delivers one `{ version: 1, evaluationKey, runId }` message
 per invocation. A pending publication retries the same durable UUID. Queue receipt also records
 a missing enqueue timestamp when publication succeeded before the publisher crashed. Publication
