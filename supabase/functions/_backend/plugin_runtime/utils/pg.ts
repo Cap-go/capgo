@@ -472,6 +472,7 @@ export interface LazyPgClient {
 }
 
 const lazyPgQueryCounts = new WeakMap<object, number>()
+const lazyPgClients = new WeakMap<object, () => Promise<PluginPgClient>>()
 const LAZY_PG_CONNECT_ERROR = Symbol('lazy-pg-connect-error')
 
 function markLazyPgConnectError(error: unknown) {
@@ -516,6 +517,7 @@ export function createLazyPgClient(c: Context, readOnly = false): LazyPgClient {
       return ensure().then(db => (db.query as (...queryArgs: unknown[]) => unknown)(...queryArgs))
     },
   } as unknown as PluginPgClient
+  lazyPgClients.set(client, ensure)
   return {
     client,
     isConnected: () => inner !== null,
@@ -532,7 +534,14 @@ export function createLazyPgClient(c: Context, readOnly = false): LazyPgClient {
 export function getDrizzleClient(db: PluginPgClient, options?: { logger?: boolean }) {
   // Keep SQL logging on by default for API/trigger diagnostics.
   // Plugin hot paths pass `{ logger: false }` to avoid per-request log CPU/volume.
-  return configureTransactionAccessMode(drizzle({ client: db, logger: options?.logger ?? true }), db)
+  const database = configureTransactionAccessMode(drizzle({ client: db, logger: options?.logger ?? true }), db)
+  const resolve = lazyPgClients.get(db)
+  if (resolve) {
+    // Resolve only when a transaction is requested, then use the real handle's
+    // access mode and Pool checkout. A lazy proxy has neither of those itself.
+    database.transaction = async (run, config) => getDrizzleClient(await resolve(), options).transaction(run, config)
+  }
+  return database
 }
 
 export interface ReadOnlyPgSession {

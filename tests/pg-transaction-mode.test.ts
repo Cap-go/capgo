@@ -3,7 +3,7 @@ import { env } from 'node:process'
 import { sql } from 'drizzle-orm'
 import { Client, Pool } from 'pg'
 import { describe, expect, it, vi } from 'vitest'
-import { closeClient as closePluginClient, getPgClient as getPluginPgClient } from '../supabase/functions/_backend/plugin_runtime/utils/pg.ts'
+import { closeClient as closePluginClient, createLazyPgClient, getDrizzleClient as getPluginDrizzleClient, getPgClient as getPluginPgClient } from '../supabase/functions/_backend/plugin_runtime/utils/pg.ts'
 import { checkoutPgClient, closeClient, getDrizzleClient, getPgClient, releasePgClient, withPgTransaction } from '../supabase/functions/_backend/utils/pg.ts'
 
 const runtime = vi.hoisted(() => ({ key: 'node' }))
@@ -21,11 +21,12 @@ function context() {
     env: {
       HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString },
       CAPGO_PREVENT_BACKGROUND_FUNCTIONS: 'true',
+      SB_REGION: 'eu-west-3',
     },
     get: (key: string) => variables.get(key),
     set: (key: string, value: unknown) => variables.set(key, value),
     header: vi.fn(),
-    req: { header: () => undefined },
+    req: { header: () => undefined, raw: Object.assign(new Request('https://example.test/updates'), { cf: { continent: 'EU', country: 'FR' } }) },
     res: new Response(null),
   } as unknown as Context
 }
@@ -129,6 +130,52 @@ describe('pooled PostgreSQL transaction access modes', () => {
     }
     finally {
       await client.end()
+    }
+  })
+
+  it('preserves a lazy replica reader mode when starting a Drizzle transaction', async () => {
+    const c = context()
+    c.env.HYPERDRIVE_CAPGO_READ_EU = { connectionString }
+    c.set('requireReadReplica', true)
+    const lazy = createLazyPgClient(c, true)
+    try {
+      expect(lazy.isConnected()).toBe(false)
+      await getPluginDrizzleClient(lazy.client, { logger: false }).transaction(async (tx) => {
+        expect(c.get('databaseSource')).toBe('HYPERDRIVE_CAPGO_READ_EU')
+        expect((await tx.execute(sql`SHOW transaction_read_only`)).rows[0]).toMatchObject({ transaction_read_only: 'on' })
+      })
+    }
+    finally {
+      await lazy.close()
+    }
+  })
+
+  it('rejects a read-write upgrade through a lazy replica reader', async () => {
+    const c = context()
+    c.env.HYPERDRIVE_CAPGO_READ_EU = { connectionString }
+    c.set('requireReadReplica', true)
+    const lazy = createLazyPgClient(c, true)
+    const run = vi.fn(async () => undefined)
+    try {
+      await expect(getPluginDrizzleClient(lazy.client, { logger: false }).transaction(run, { accessMode: 'read write' })).rejects.toThrow('read-only client')
+      expect(run).not.toHaveBeenCalled()
+    }
+    finally {
+      await lazy.close()
+    }
+  })
+
+  it('does not let a lazy root transaction end its primary read restriction', async () => {
+    const c = context()
+    const lazy = createLazyPgClient(c, true)
+    const run = vi.fn(async () => undefined)
+    try {
+      await expect(getPluginDrizzleClient(lazy.client, { logger: false }).transaction(run)).rejects.toThrow('primary read session')
+      expect(run).not.toHaveBeenCalled()
+      expect((await lazy.client.query('SHOW transaction_read_only')).rows[0].transaction_read_only).toBe('on')
+    }
+    finally {
+      await lazy.close()
     }
   })
 })
