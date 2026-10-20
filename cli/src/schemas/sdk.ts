@@ -32,10 +32,6 @@ export const addAppOptionsSchema = z.object({
   apikey: z.string().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
 })
 
 export type AddAppOptions = z.infer<typeof addAppOptionsSchema>
@@ -58,10 +54,6 @@ export const updateAppOptionsSchema = z.object({
   apikey: z.string().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
 }).merge(deviceDataCollectionOptionsSchema)
 
 export type UpdateAppOptions = z.infer<typeof updateAppOptionsSchema>
@@ -109,10 +101,6 @@ export const uploadOptionsSchema = z.object({
   encryptionKey: z.string().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
   timeout: z.number().optional(),
   useTus: z.boolean().optional(),
   comment: z.string().optional(),
@@ -176,10 +164,6 @@ export const cleanupOptionsSchema = z.object({
   apikey: z.string().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
 })
 
 export type CleanupOptions = z.infer<typeof cleanupOptionsSchema>
@@ -225,10 +209,6 @@ export const addChannelOptionsSchema = z.object({
   apikey: z.string().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
 })
 
 export type AddChannelOptions = z.infer<typeof addChannelOptionsSchema>
@@ -274,10 +254,6 @@ export const updateChannelOptionsBaseSchema = z.object({
   apikey: z.string().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
 })
 
 export const updateChannelOptionsSchema = updateChannelOptionsBaseSchema.superRefine((value, ctx) => {
@@ -299,10 +275,6 @@ export const promoteChannelOptionsSchema = z.object({
   apikey: z.string().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
 }).superRefine((value, ctx) => {
   rejectConflictingBooleanGroup(value, ctx, ['acceptIncompatible', 'ignoreMetadataCheck'])
   if (value.fromChannel === value.toChannel)
@@ -319,10 +291,6 @@ export const accountIdOptionsSchema = z.object({
   apikey: z.string().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
 })
 
 export type AccountIdOptions = z.infer<typeof accountIdOptionsSchema>
@@ -418,10 +386,6 @@ export const loginOptionsSchema = z.object({
   local: z.boolean().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
 })
 
 export type LoginOptions = z.infer<typeof loginOptionsSchema>
@@ -445,10 +409,6 @@ export const bundleCompatibilityOptionsSchema = z.object({
   apikey: z.string().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
 })
 
 export type BundleCompatibilityOptions = z.infer<typeof bundleCompatibilityOptionsSchema>
@@ -516,10 +476,6 @@ export const requestBuildOptionsSchema = z.object({
   apikey: z.string().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
   prescan: z.boolean().optional(),
   prescanIgnoreFatal: z.boolean().optional(),
   prescanSkip: z.array(z.string()).optional(),
@@ -570,10 +526,6 @@ export const getStatsOptionsSchema = z.object({
   apikey: z.string().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
 })
 
 export type GetStatsOptions = z.infer<typeof getStatsOptionsSchema>
@@ -605,10 +557,6 @@ export const observeOptionsObjectSchema = z.object({
   apikey: z.string().optional(),
   apiHost: z.string().optional(),
   filesHost: z.string().optional(),
-  /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-  supaHost: z.string().optional(),
-  /** @deprecated ignored */
-  supaAnon: z.string().optional(),
 })
 
 export function refineObserveDeviceId(

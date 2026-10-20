@@ -1,4 +1,4 @@
-import type { Database } from '../types/supabase.types'
+import type { AppVersionInsert, AppVersionRow } from '../types/api'
 import type { CapgoClient } from '../utils'
 import { log } from '@clack/prompts'
 import { Table } from '@sauber/table'
@@ -28,7 +28,7 @@ interface CapgoHttpOptions {
 const BUNDLE_PAGE_SIZE = 50
 
 export type BundleVersionLookupRow = Pick<
-  Database['public']['Tables']['app_versions']['Row'],
+  AppVersionRow,
   'id' | 'name' | 'checksum' | 'deleted' | 'created_at'
 >
 
@@ -123,11 +123,11 @@ async function throwBundleHttpInvokeError(
 
 async function fetchBundlePages(appid: string, options: CapgoHttpOptions & Pick<VersionOptions, 'invoke'>) {
   const invoke = options.invoke ?? invokeCapgoCliApi
-  const all: Database['public']['Tables']['app_versions']['Row'][] = []
+  const all: AppVersionRow[] = []
   let page = 0
   while (true) {
     const params = new URLSearchParams({ app_id: appid, page: String(page) })
-    const { data, error } = await invoke<Database['public']['Tables']['app_versions']['Row'][]>(
+    const { data, error } = await invoke<AppVersionRow[]>(
       `bundle?${params.toString()}`,
       {
         apikey: options.apikey,
@@ -149,15 +149,15 @@ async function fetchBundlePages(appid: string, options: CapgoHttpOptions & Pick<
   return all
 }
 
-export type UpsertAppVersionInput = Pick<Database['public']['Tables']['app_versions']['Insert'], 'app_id' | 'name'>
-  & Partial<Omit<Database['public']['Tables']['app_versions']['Insert'], 'app_id' | 'name'>>
+export type UpsertAppVersionInput = Pick<AppVersionInsert, 'app_id' | 'name'>
+  & Partial<Omit<AppVersionInsert, 'app_id' | 'name'>>
 
 export async function upsertAppVersion(
   apikey: string,
   versionData: UpsertAppVersionInput,
   options: VersionOptions = {},
 ) {
-  const { data, error } = await invokeCapgoCliApi<Database['public']['Tables']['app_versions']['Row']>('bundle/upsert', {
+  const { data, error } = await invokeCapgoCliApi<AppVersionRow>('bundle/upsert', {
     apikey,
     method: 'POST',
     body: {
@@ -246,7 +246,7 @@ export async function deleteSpecificVersion(
 }
 
 export function displayBundles(
-  data: (Database['public']['Tables']['app_versions']['Row'] & { keep?: string })[],
+  data: (AppVersionRow & { keep?: string })[],
   silent = false,
 ) {
   if (silent)

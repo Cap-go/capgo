@@ -262,7 +262,7 @@ async function createAppViaApi(
     apiHost?: string
   },
 ) {
-  // Capgo API host (or self-hosted /functions/v1), authenticated by the API key.
+  // Capgo API host (cloud or self-hosted), authenticated by the API key.
   const apiHost = await resolveCapgoPublicApiHost({
     apiHost: params.apiHost,
   })
@@ -405,8 +405,8 @@ export async function addAppInternal(
 
   let appAlreadyExists = false
   try {
-    // Use the same authorized API path as the web console. Direct PostgREST inserts
-    // hit apps/storage RLS and fail for common API-key + pending-onboarding setups.
+    // Use the same authorized API path as the web console, so API-key and
+    // pending-onboarding setups get the same permission checks.
     await createAppViaApi(options.apikey!, {
       ownerOrg: organizationUid,
       appId,

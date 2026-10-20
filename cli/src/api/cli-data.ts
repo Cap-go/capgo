@@ -1,4 +1,4 @@
-import type { Database } from '../types/supabase.types'
+import type { ChannelRow } from '../types/api'
 import type { CapgoApiTarget } from '../utils'
 import { formatCapgoCliInvokeError, invokeCliHttpFromClient } from '../utils'
 
@@ -16,7 +16,7 @@ export interface CliLinkedVersion {
   deleted: boolean
 }
 
-export type CliChannelRow = Database['public']['Tables']['channels']['Row'] & {
+export type CliChannelRow = ChannelRow & {
   version_info: CliLinkedVersion | null
   rollout_version_info: CliLinkedVersion | null
 }

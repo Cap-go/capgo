@@ -1,5 +1,5 @@
 import type { OptionsSetChannel } from '../schemas/channel'
-import type { Database } from '../types/supabase.types'
+import type { ChannelInsert } from '../types/api'
 import type { Compatibility } from '../utils'
 import { intro, log, outro } from '@clack/prompts'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
@@ -309,7 +309,7 @@ export async function setChannelInternal(channel: string, appId: string, options
 
   const orgId = await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
 
-  const channelPayload: Database['public']['Tables']['channels']['Insert'] = {
+  const channelPayload: ChannelInsert = {
     created_by: userId,
     app_id: appId,
     name: channel,

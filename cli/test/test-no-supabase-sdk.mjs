@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Guard: the CLI talks to Capgo only through Capgo HTTP endpoints. No database SDK,
-// no direct PostgREST queries, so the backend can move off Supabase without a CLI release.
+// no Supabase hosts, URLs, flags or generated database types, so the backend can
+// move off Supabase without a CLI release.
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -13,12 +14,17 @@ for (const field of ['dependencies', 'devDependencies', 'peerDependencies', 'opt
     assert.ok(!name.startsWith('@supabase/'), `${field} must not include ${name}`)
 }
 
-// Static and side-effect imports, re-exports, dynamic import(), require(), and any `.rpc(` call.
+// SDK imports in any form, `.rpc(` calls, Supabase URL layouts, the removed
+// --supa-host / --supa-anon aliases, and any other mention of Supabase.
 const forbidden = [
   /\b(?:from|import)\s*['"]@supabase\//,
   /\bimport\s*\(\s*['"`]@supabase\//,
   /\brequire\s*\(\s*['"`]@supabase\//,
   /\.rpc\s*\(/,
+  /supabase/i,
+  /\bsupa(?:Host|Anon)\b/,
+  /--supa-/,
+  /\/(?:rest|functions|storage|auth)\/v1\b/,
 ]
 
 const offenders = []
@@ -32,11 +38,12 @@ function walk(dir) {
     if (!/\.(?:ts|tsx|mts|cts|js|mjs|cjs)$/.test(entry))
       continue
     const source = readFileSync(path, 'utf8')
-    if (forbidden.some(pattern => pattern.test(source)))
-      offenders.push(relative(root, path))
+    const hit = forbidden.find(pattern => pattern.test(source))
+    if (hit)
+      offenders.push(`${relative(root, path)} (${hit})`)
   }
 }
 walk(join(root, 'src'))
 assert.deepEqual(offenders, [], `CLI sources must use Capgo HTTP endpoints, not Supabase: ${offenders.join(', ')}`)
 
-console.log('✅ CLI has no Supabase SDK usage')
+console.log('✅ CLI sources do not use Supabase')

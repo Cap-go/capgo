@@ -1,5 +1,5 @@
 import type { CapacitorConfig } from '../config'
-import type { Database } from '../types/supabase.types'
+import type { AppRow } from '../types/api'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cwd } from 'node:process'
@@ -77,10 +77,10 @@ export function collectAppIdCandidates(
 }
 
 async function fetchCapgoApps(apikey: string, apiHost?: string) {
-  const all: Database['public']['Tables']['apps']['Row'][] = []
+  const all: AppRow[] = []
   let page = 0
   while (true) {
-    const { data, error } = await invokeCapgoCliApi<Database['public']['Tables']['apps']['Row'][]>(
+    const { data, error } = await invokeCapgoCliApi<AppRow[]>(
       getAppListPath(page),
       { apikey, method: 'GET', body: undefined, apiHost },
     )
@@ -186,7 +186,7 @@ export async function resolveAppIdWithRecovery(options: ResolveAppIdOptions): Pr
 
   while (true) {
     const resolvedApikey = options.apikey || findSavedKeySilent()
-    let remoteApps: Database['public']['Tables']['apps']['Row'][] = []
+    let remoteApps: AppRow[] = []
     if (resolvedApikey) {
       try {
         remoteApps = await fetchCapgoApps(resolvedApikey, options.apiHost)

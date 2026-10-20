@@ -7,7 +7,7 @@ import type { Buffer } from 'node:buffer'
 import type { UploadSpinner } from './bundle/reporter'
 import type { CapacitorConfig, ExtConfigPairs } from './config'
 import type { Compatibility, CompatibilityDetails, IncompatibilityReason, NativePackage } from './schemas/common'
-import type { Database } from './types/supabase.types'
+import type { Organization } from './types/api'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { spawn } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -24,7 +24,7 @@ import prettyjson from 'prettyjson'
 import * as tus from 'tus-js-client'
 import { buildCliRequestHeaders, validateCliRequestHeaderValue } from './analytics/cli-headers'
 import { getGlobalAnalyticsProps } from './analytics/global-props'
-import { createTimedFetch, isSupabaseInstrumentationEnabled } from './analytics/supabase-perf'
+import { createTimedFetch, isApiInstrumentationEnabled } from './analytics/api-perf'
 import { CapgoApiHttpError } from './api/http-error'
 import { assertMinCliVersion } from './api/min-cli-version'
 import { sendCliEvent } from './app/debug'
@@ -116,11 +116,11 @@ export function uploadTimeoutMessage(timeoutMs: number): string {
 
 export const PACKNAME = 'package.json'
 
-/** Stable PostHog fingerprint for incomplete Capgo server config before Supabase client creation. */
+/** Stable PostHog fingerprint for incomplete Capgo server config before the API client is created. */
 
 export type ArrayElement<ArrayType extends readonly unknown[]>
   = ArrayType extends readonly (infer ElementType)[] ? ElementType : never
-export type Organization = ArrayElement<Database['public']['Functions']['get_orgs_v7']['Returns']>
+export type { Organization }
 
 export const regexSemver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-z-][0-9a-z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-z-][0-9a-z-]*))*))?(?:\+([0-9a-z-]+(?:\.[0-9a-z-]+)*))?$/i
 
@@ -811,20 +811,9 @@ export async function getLocalConfig(silent = false) {
     hostApi: localApi ?? defaultApiHost,
   }
 
-  // Legacy self-host config: `localSupa` without `localApi` serves every Capgo function
-  // from <localSupa>/functions/v1. `localSupaAnon` is no longer needed.
-  const legacyApiHost = extConfig?.config?.plugins?.CapacitorUpdater?.localApi
-    ? undefined
-    : legacySupabaseFunctionsHost(extConfig?.config?.plugins?.CapacitorUpdater?.localSupa)
-  if (legacyApiHost) {
-    if (!silent)
-      log.info('Using custom Capgo backend from capacitor.config.json')
-    if (!silent)
-      warnLegacySupabaseHost('`localSupa` in capacitor.config', legacyApiHost)
-    capConfig.hostApi = legacyApiHost
-    if (!localApiFiles)
-      capConfig.hostFilesApi = legacyApiHost
-  }
+  // A stale `localSupa` must not silently fall back to Capgo cloud with a self-hosted key.
+  if (!localApi && extConfig?.config?.plugins?.CapacitorUpdater?.localSupa && !currentHostOverride().apiHost && !envHost('CAPGO_API_HOST'))
+    throw new CliUserError('`localSupa` in capacitor.config is no longer supported. Set `localApi` to your Capgo API URL instead.')
   return applyCapgoHostOverride(capConfig)
 }
 
@@ -1036,24 +1025,6 @@ export async function getRemoteFileConfig(apikey?: string) {
   }
 }
 
-export function normalizeSupabaseHost(host: string): string {
-  const parsed = new URL(host)
-  if (!['http:', 'https:'].includes(parsed.protocol))
-    throw new Error('Invalid Supabase host protocol')
-  const isLoopback = parsed.hostname === 'localhost'
-    || parsed.hostname === '127.0.0.1'
-    || parsed.hostname === '[::1]'
-  if (parsed.protocol === 'http:' && !isLoopback)
-    throw new Error('Supabase host must use HTTPS (HTTP is only allowed for localhost)')
-  if (parsed.username || parsed.password)
-    throw new Error('Supabase host must not include credentials')
-  if (parsed.search || parsed.hash)
-    throw new Error('Supabase host must not include query parameters or fragments')
-
-  const normalizedPath = trimTrailingSlashes(parsed.pathname)
-  return `${parsed.origin}${normalizedPath}`
-}
-
 export function formatCapgoApiErrorBody(body: unknown): string {
   if (!body || typeof body !== 'object')
     return ''
@@ -1080,68 +1051,12 @@ export async function channelUpdatePackageCliError(error: unknown): Promise<stri
   return null
 }
 
-/** Capgo-managed Supabase hosts (cloud). Match hostname exactly. */
-export function isCapgoManagedSupabaseHost(supaHost?: string): boolean {
-  if (!supaHost)
-    return false
-  try {
-    const hostname = new URL(normalizeSupabaseHost(supaHost)).hostname.toLowerCase()
-    return hostname === 'sb.capgo.app'
-      || hostname === 'xvwzpoazmxkqosrdewyv.supabase.co'
-      || hostname === 'ibwjdnhknbkcqfbabwei.supabase.co'
-      || hostname === 'aucsybvnhavogdmzwtcw.supabase.co'
-  }
-  catch {
-    return false
-  }
-}
-
-/**
- * Map a legacy Supabase project URL (`--supa-host`, `localSupa`) to the Capgo API
- * served by its Edge Functions. Capgo-managed projects return undefined: the CLI
- * then talks to the Capgo cloud API.
- */
-export function legacySupabaseFunctionsHost(supaHost?: string): string | undefined {
-  if (!supaHost || isCapgoManagedSupabaseHost(supaHost))
-    return undefined
-  return `${normalizeSupabaseHost(supaHost)}/functions/v1`
-}
-
-let legacySupabaseHostWarned = false
-
-function warnLegacySupabaseHost(source: string, apiHost: string) {
-  if (legacySupabaseHostWarned)
-    return
-  legacySupabaseHostWarned = true
-  log.warn(`${source} is deprecated: the CLI only talks to the Capgo API now. Use --api-host ${apiHost} (or \`localApi\` in capacitor.config) instead.`)
-}
-
-/** Options that select the Capgo API. `supaHost` / `supaAnon` are deprecated aliases. */
+/** Options that select the Capgo API. */
 export interface CapgoHostOptions {
-  /** Capgo API base URL (`--api-host`): any Capgo backend, e.g. `https://<project>.supabase.co/functions/v1` or `http://127.0.0.1:8787`. */
+  /** Capgo API base URL (`--api-host`): any Capgo backend, e.g. `https://api.example.com` or `http://127.0.0.1:8787`. */
   apiHost?: string
   /** Capgo files API base URL (`--files-host`); defaults to apiHost when apiHost is set. */
   filesHost?: string
-  /** @deprecated Supabase project URL; mapped to `<supaHost>/functions/v1`. */
-  supaHost?: string
-  /** @deprecated Ignored: the Capgo API authenticates with the API key only. */
-  supaAnon?: string
-}
-
-/**
- * Fold deprecated `supaHost` / `supaAnon` into `apiHost` and strip them, so the rest
- * of the CLI only ever sees `apiHost`.
- */
-export function normalizeCapgoHostOptions<T extends CapgoHostOptions>(options: T, silent = false): Omit<T, 'supaHost' | 'supaAnon'> {
-  const { supaHost, supaAnon: _supaAnon, ...rest } = options
-  if (rest.apiHost || !supaHost)
-    return rest
-  const apiHost = legacySupabaseFunctionsHost(supaHost)
-  if (!apiHost)
-    return rest
-  if (!silent)
-    warnLegacySupabaseHost('--supa-host', apiHost)
-  return { ...rest, apiHost }
 }
 
 /** Validate a Capgo API base URL: https (http only on loopback), no credentials/query. */
@@ -1239,7 +1154,7 @@ export async function invokeCapgoCliApi<T = any>(
   const hosts = await resolveCapgoApiHosts(options.apiHost)
   const base = options.useFilesHost ? hosts.filesHost : hosts.apiHost
   const url = `${trimTrailingSlashes(base)}/${path.replace(/^\//, '')}`
-  const doFetch = options.instrument !== false && isSupabaseInstrumentationEnabled() ? createTimedFetch() : fetch
+  const doFetch = options.instrument !== false && isApiInstrumentationEnabled() ? createTimedFetch(path.replace(/^\//, '')) : fetch
   try {
     const response = await doFetch(url, {
       method,

@@ -1,5 +1,5 @@
 import type { CapgoClient } from '../utils'
-import type { Database } from '../types/supabase.types'
+import type { AppRow } from '../types/api'
 import { log } from '@clack/prompts'
 import { buildCliRequestHeaders } from '../analytics/cli-headers'
 import { CliUserError } from '../shared/cli-user-error'
@@ -37,12 +37,12 @@ export async function checkAppExists(
 }
 
 export type PendingOnboardingApp = Pick<
-  Database['public']['Tables']['apps']['Row'],
+  AppRow,
   'app_id' | 'name' | 'icon_url' | 'need_onboarding' | 'existing_app' | 'ios_store_url' | 'android_store_url'
 >
 
 export type ExistingOrganizationApp = Pick<
-  Database['public']['Tables']['apps']['Row'],
+  AppRow,
   'app_id' | 'name' | 'owner_org' | 'need_onboarding'
 >
 
@@ -105,13 +105,13 @@ export async function findAppInOrganization(
 }
 
 export async function completePendingOnboardingApp(
-  _supabase: CapgoClient,
+  _client: CapgoClient,
   orgId: string,
   appId: string,
   apikey: string,
   options?: { apiHost?: string },
 ): Promise<void> {
-  // Prefer Capgo API host (or self-hosted /functions/v1) with the API key so
+  // Use the Capgo API host (cloud or self-hosted) with the API key so
   // org.create_app keys can finish pending onboarding without app.update_settings.
   const apiHost = await resolveCapgoPublicApiHost(options)
   const response = await fetch(`${apiHost}/app/${encodeURIComponent(appId)}`, {

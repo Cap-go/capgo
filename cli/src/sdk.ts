@@ -90,7 +90,7 @@ import { organizationMemberRoleOptionsSchema, organizationMemberSdkOptionsSchema
 import { CliUserError } from './shared/cli-user-error'
 import { getUserIdInternal } from './user/account'
 import { getAccountInternal, setAccountInternal } from './user/settings'
-import { createCapgoClient, findSavedKey, getConfig, getLocalConfig, normalizeCapgoHostOptions, withCapgoHosts } from './utils'
+import { createCapgoClient, findSavedKey, getConfig, getLocalConfig, withCapgoHosts } from './utils'
 import { parseSecurityPolicyError } from './utils/security_policy_errors'
 import { normalizeAutoBumpInput } from './versionHelpers'
 
@@ -169,38 +169,32 @@ export class CapgoSDK {
 
   constructor(options?: {
     apikey?: string
-    /** Capgo API base URL for self-hosting or tests, e.g. `https://<project>.supabase.co/functions/v1` or `http://127.0.0.1:8787`. */
+    /** Capgo API base URL for self-hosting or tests, e.g. `http://127.0.0.1:8787`. */
     apiHost?: string
     /** Capgo files API base URL when it differs from apiHost. */
     filesHost?: string
-    /** @deprecated use apiHost (`<supaHost>/functions/v1`) */
-    supaHost?: string
-    /** @deprecated ignored */
-    supaAnon?: string
   }) {
     this.apikey = options?.apikey
-    const hosts = normalizeCapgoHostOptions(options ?? {}, true)
-    this.apiHost = hosts.apiHost
-    this.filesHost = hosts.filesHost
+    this.apiHost = options?.apiHost
+    this.filesHost = options?.filesHost
   }
 
   /**
-   * Hosts for one SDK call: per-call apiHost / filesHost (or deprecated supaHost),
-   * else the constructor's. Each call runs in its own host scope, so SDK instances
+   * Hosts for one SDK call: per-call apiHost / filesHost, else the constructor's. Each call runs in its own host scope, so SDK instances
    * on different backends can run concurrently without sharing hosts or keys.
    */
   callHosts(args: unknown[]): { apiHost?: string, filesHost?: string } {
     const callOptions = args.find((arg): arg is CapgoHostOptions => typeof arg === 'object' && arg !== null
-      && ('apiHost' in arg || 'filesHost' in arg || 'supaHost' in arg))
-    const call = callOptions ? normalizeCapgoHostOptions(callOptions, true) : {}
+      && ('apiHost' in arg || 'filesHost' in arg))
+    const call: CapgoHostOptions = callOptions ?? {}
     if (call.apiHost)
       return { apiHost: call.apiHost, filesHost: call.filesHost }
     return { apiHost: this.apiHost, filesHost: call.filesHost ?? this.filesHost }
   }
 
-  /** Per-call apiHost (or deprecated supaHost) overrides the SDK-wide one. */
+  /** Per-call apiHost overrides the SDK-wide one. */
   private resolveApiHost(options?: CapgoHostOptions): string | undefined {
-    return normalizeCapgoHostOptions(options ?? {}, true).apiHost ?? this.apiHost
+    return options?.apiHost ?? this.apiHost
   }
 
   // ==========================================================================
@@ -1571,7 +1565,6 @@ export async function uploadBundle(options: UploadOptions): Promise<UploadResult
   const sdk = new CapgoSDK({
     apikey: options.apikey,
     apiHost: options.apiHost,
-    supaHost: options.supaHost,
   })
   return sdk.uploadBundle(options)
 }
@@ -1579,7 +1572,6 @@ export async function uploadBundle(options: UploadOptions): Promise<UploadResult
 export async function login(options: LoginOptions): Promise<SDKResult> {
   const sdk = new CapgoSDK({
     apiHost: options.apiHost,
-    supaHost: options.supaHost,
   })
   return sdk.login(options)
 }
@@ -1593,7 +1585,6 @@ export async function checkBundleCompatibility(options: BundleCompatibilityOptio
   const sdk = new CapgoSDK({
     apikey: options.apikey,
     apiHost: options.apiHost,
-    supaHost: options.supaHost,
   })
   return sdk.checkBundleCompatibility(options)
 }
@@ -1650,7 +1641,6 @@ export async function promoteChannel(options: PromoteChannelOptions): Promise<SD
   const sdk = new CapgoSDK({
     apikey: options.apikey,
     apiHost: options.apiHost,
-    supaHost: options.supaHost,
   })
   return sdk.promoteChannel(options)
 }
@@ -1682,7 +1672,6 @@ export async function addOrganization(options: AddOrganizationOptions): Promise<
   const sdk = new CapgoSDK({
     apikey: options.apikey,
     apiHost: options.apiHost,
-    supaHost: options.supaHost,
   })
   return sdk.addOrganization(options)
 }
@@ -1691,7 +1680,6 @@ export async function updateOrganization(options: UpdateOrganizationOptions): Pr
   const sdk = new CapgoSDK({
     apikey: options.apikey,
     apiHost: options.apiHost,
-    supaHost: options.supaHost,
   })
   return sdk.updateOrganization(options)
 }
@@ -1705,27 +1693,27 @@ export async function deleteOrganization(orgId: string, options?: DeleteOrganiza
 }
 
 export async function inviteOrganizationMember(options: InviteOrganizationMemberOptions): Promise<SDKResult> {
-  const sdk = new CapgoSDK({ apikey: options.apikey, supaHost: options.supaHost, supaAnon: options.supaAnon })
+  const sdk = new CapgoSDK({ apikey: options.apikey, apiHost: options.apiHost })
   return sdk.inviteOrganizationMember(options)
 }
 
 export async function updateOrganizationMemberRole(options: UpdateOrganizationMemberRoleOptions): Promise<SDKResult> {
-  const sdk = new CapgoSDK({ apikey: options.apikey, supaHost: options.supaHost, supaAnon: options.supaAnon })
+  const sdk = new CapgoSDK({ apikey: options.apikey, apiHost: options.apiHost })
   return sdk.updateOrganizationMemberRole(options)
 }
 
 export async function removeOrganizationMember(options: RemoveOrganizationMemberOptions): Promise<SDKResult> {
-  const sdk = new CapgoSDK({ apikey: options.apikey, supaHost: options.supaHost, supaAnon: options.supaAnon })
+  const sdk = new CapgoSDK({ apikey: options.apikey, apiHost: options.apiHost })
   return sdk.removeOrganizationMember(options)
 }
 
 export async function getAccount(options?: GetAccountOptions): Promise<SDKResult<AccountProfile>> {
-  const sdk = new CapgoSDK({ apikey: options?.apikey, supaHost: options?.supaHost, supaAnon: options?.supaAnon })
+  const sdk = new CapgoSDK({ apikey: options?.apikey, apiHost: options?.apiHost })
   return sdk.getAccount(options)
 }
 
 export async function updateAccount(options: UpdateAccountOptions): Promise<SDKResult<AccountProfile>> {
-  const sdk = new CapgoSDK({ apikey: options.apikey, supaHost: options.supaHost, supaAnon: options.supaAnon })
+  const sdk = new CapgoSDK({ apikey: options.apikey, apiHost: options.apiHost })
   return sdk.updateAccount(options)
 }
 
@@ -1745,7 +1733,6 @@ export async function addApp(options: AddAppOptions): Promise<SDKResult> {
   const sdk = new CapgoSDK({
     apikey: options.apikey,
     apiHost: options.apiHost,
-    supaHost: options.supaHost,
   })
   return sdk.addApp(options)
 }
@@ -1760,7 +1747,7 @@ export async function addApp(options: AddAppOptions): Promise<SDKResult> {
  */
 export async function listBundles(
   appId: string,
-  options?: { apikey?: string, apiHost?: string, supaHost?: string, supaAnon?: string },
+  options?: { apikey?: string, apiHost?: string },
 ): Promise<SDKResult<BundleInfo[]>> {
   const sdk = new CapgoSDK(options)
   return sdk.listBundles(appId)
@@ -1782,7 +1769,6 @@ export async function addChannel(options: AddChannelOptions): Promise<SDKResult>
   const sdk = new CapgoSDK({
     apikey: options.apikey,
     apiHost: options.apiHost,
-    supaHost: options.supaHost,
   })
   return sdk.addChannel(options)
 }
@@ -1830,7 +1816,6 @@ export async function requestBuild(options: RequestBuildOptions): Promise<SDKRes
   const sdk = new CapgoSDK({
     apikey: options.apikey,
     apiHost: options.apiHost,
-    supaHost: options.supaHost,
   })
   return sdk.requestBuild(options)
 }
@@ -1861,7 +1846,6 @@ export async function getStats(options: GetStatsOptions): Promise<SDKResult<Devi
   const sdk = new CapgoSDK({
     apikey: options.apikey,
     apiHost: options.apiHost,
-    supaHost: options.supaHost,
   })
   return sdk.getStats(options)
 }
@@ -1874,7 +1858,6 @@ export async function getObserve(options: ObserveOptions): Promise<SDKResult<Rec
   const sdk = new CapgoSDK({
     apikey: options.apikey,
     apiHost: options.apiHost,
-    supaHost: options.supaHost,
   })
   return sdk.observe(options)
 }
@@ -1959,7 +1942,7 @@ export type {
   ZipBundleOptions,
 } from './schemas/sdk'
 export type { AccountProfile } from './schemas/account'
-export type { Database } from './types/supabase.types'
+export type { AppRow, AppVersionRow, ChannelRow, Organization } from './types/api'
 export { createCapgoClient, withCapgoHosts } from './utils'
 export {
   formatApiErrorForCli,

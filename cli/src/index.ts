@@ -4,7 +4,7 @@ import { type Command, InvalidArgumentError, Option, program } from 'commander'
 import pack from '../package.json'
 import { categorizeCliError } from './analytics/error-category'
 import { applyCommandAnalyticsOptOut, applyRawCommandAnalyticsOptOut } from './analytics/opt-out'
-import { enableSupabaseInstrumentation } from './analytics/supabase-perf'
+import { enableApiInstrumentation } from './analytics/api-perf'
 import { setCurrentCliCommand } from './analytics/cli-headers'
 import { deferCommandInvocation, extractCommandContext, flushAnalytics, trackCommandFailed, trackCommandInvoked, trackCommandSucceeded } from './analytics/track'
 import { addApp } from './app/add'
@@ -68,14 +68,14 @@ import { ORG_EMAIL_PREFERENCE_KEYS, USER_EMAIL_PREFERENCE_KEYS } from './shared/
 import { TwoFactorComplianceNetworkError } from './shared/two-factor-compliance'
 import { getAccount, setAccount } from './user/settings'
 import { whoami } from './user/whoami'
-import { formatError, normalizeCapgoHostOptions, setCapgoHostOverride } from './utils'
+import { formatError, setCapgoHostOverride } from './utils'
 import { CLI_PROJECT_MODES } from './framework/mode'
 import { normalizeAutoBumpInput } from './versionHelpers'
 
 // Common option descriptions used across multiple commands
 const optionDescriptions = {
   apikey: `API key to link to your account`,
-  apiHost: `Custom Capgo API URL for self-hosting or testing, e.g. https://<project>.supabase.co/functions/v1 or http://127.0.0.1:8787 (env: CAPGO_API_HOST)`,
+  apiHost: `Custom Capgo API URL for self-hosting or testing, e.g. https://api.example.com or http://127.0.0.1:8787 (env: CAPGO_API_HOST)`,
   filesHost: `Custom Capgo files API URL when it differs from --api-host (env: CAPGO_FILES_HOST)`,
   packageJson: `Paths to package.json files for monorepos (comma-separated)`,
   nodeModules: `Paths to node_modules directories for monorepos (comma-separated)`,
@@ -100,30 +100,13 @@ program
 
 // Turn on client-side API perf tracking for the CLI. (Off by default so
 // the SDK bundle, which transitively imports invokeCapgoCliApi, stays clean.)
-enableSupabaseInstrumentation()
-
-// Pre-HTTP-API flags: hidden, folded into --api-host by the preAction hook.
-function deprecatedSupaHostOption() {
-  return new Option('--supa-host <supaHost>', 'Deprecated: use --api-host <supaHost>/functions/v1').hideHelp()
-}
-
-function deprecatedSupaAnonOption() {
-  return new Option('--supa-anon <supaAnon>', 'Deprecated: no longer needed').hideHelp()
-}
+enableApiInstrumentation()
 
 /**
- * Fold deprecated --supa-host / --supa-anon into --api-host, then pin the process to
- * the selected backend so every request (API, files, uploads, remote config) uses it.
+ * Pin the process to the selected backend so every request (API, files, uploads,
+ * remote config) uses it.
  */
 function applyHostOptions(command: Command) {
-  const options = command.opts()
-  if (options.supaHost !== undefined || options.supaAnon !== undefined) {
-    const { apiHost } = normalizeCapgoHostOptions(options)
-    command.setOptionValue('supaHost', undefined)
-    command.setOptionValue('supaAnon', undefined)
-    if (apiHost)
-      command.setOptionValue('apiHost', apiHost)
-  }
   const { apiHost, filesHost } = command.opts()
   if (apiHost || filesHost)
     setCapgoHostOverride({ apiHost, filesHost })
@@ -175,8 +158,6 @@ Example: npx @capgo/cli@latest init YOUR_API_KEY com.example.app`)
   .option('-i, --icon <icon>', `App icon path for display in Capgo Cloud`)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
   .option('--package-json <path>', 'Package JSON for the Capacitor app to onboard (useful in monorepos)')
   .option('--main-file <path>', 'Application entry file to update (useful in monorepos)')
   .option('--capacitor-config <path>', optionDescriptions.capacitorConfig)
@@ -242,8 +223,6 @@ Example: npx @capgo/cli@latest login YOUR_API_KEY`)
   .option('--local', `Only save in local folder, git ignored for security.`)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 program
   .command('get-qr [appId] [target]')
@@ -267,8 +246,6 @@ Examples:
   .addOption(new Option('--preview-env <env>', `Preview web URL environment`).choices(['prod', 'preprod', 'dev']).default('prod'))
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 const bundle = program
   .command('bundle')
@@ -368,8 +345,6 @@ Cordova example: npx @capgo/cli@latest bundle upload com.example.app --mode cord
   .option('--send-update-notification', `Send a native update-check notification to devices after updating linked channel bundles`)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
   .option('--verbose', optionDescriptions.verbose)
 
 bundle
@@ -385,8 +360,6 @@ Example: npx @capgo/cli@latest bundle compatibility com.example.app --channel pr
   .option('--node-modules <nodeModules>', optionDescriptions.nodeModules)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 bundle
   .command('releaseType [appId]')
@@ -400,8 +373,6 @@ Example: npx @capgo/cli@latest bundle releaseType com.example.app --channel prod
   .option('--node-modules <nodeModules>', optionDescriptions.nodeModules)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 bundle
   .command('delete [bundleId] [appId]')
@@ -415,8 +386,6 @@ Example: npx @capgo/cli@latest bundle delete BUNDLE_ID com.example.app`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 bundle
   .command('list [appId]')
@@ -430,8 +399,6 @@ Example: npx @capgo/cli@latest bundle list com.example.app`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 bundle
   .command('cleanup [appId]')
@@ -451,8 +418,6 @@ Example: npx @capgo/cli@latest bundle cleanup com.example.app --bundle=1.0 --kee
   .option('--ignore-channel', `Delete bundles even if linked to channels (WARNING: deletes channels too)`)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 bundle
   .command('encrypt [zipPath] [checksum]')
@@ -515,8 +480,6 @@ Example: npx @capgo/cli@latest app add com.example.app --name "My App" --icon ./
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 app
   .command('delete [appId]')
@@ -529,8 +492,6 @@ Example: npx @capgo/cli@latest app delete com.example.app`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 app
   .command('list')
@@ -548,8 +509,6 @@ Example: npx @capgo/cli@latest app list`)
   .option('--output-text', 'Print plain text with a CSV app table and no interactive formatting')
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 app
   .command('todo [appId]')
@@ -566,8 +525,6 @@ Example: npx @capgo/cli@latest app todo com.example.app`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 app
   .command('debug  [appId]')
@@ -581,8 +538,6 @@ Example: npx @capgo/cli@latest app debug com.example.app --device DEVICE_ID`)
   .option('-d, --device <device>', `The specific device ID to debug`)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 app
   .command('setting [path]')
@@ -642,8 +597,6 @@ Example: npx @capgo/cli@latest app set com.example.app --name "Updated App" --re
   .option('--disable-download-channels', `Disable Capgo download channels for this app (sets all channels public=false)`)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 const channel = program
   .command('channel')
@@ -661,8 +614,6 @@ Example: npx @capgo/cli@latest channel add production com.example.app --default`
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 channel
   .command('delete [channelName] [appId]')
@@ -678,8 +629,6 @@ Example: npx @capgo/cli@latest channel delete production com.example.app`)
   .option('--success-if-not-found', `Success if the channel is not found`)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 channel
   .command('list [appId]')
@@ -693,8 +642,6 @@ Example: npx @capgo/cli@latest channel list com.example.app`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 channel
   .command('currentBundle [channel] [appId]')
@@ -709,8 +656,6 @@ Example: npx @capgo/cli@latest channel currentBundle production com.example.app`
   .option('--quiet', `Only print the bundle version`)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 channel
   .command('promote [fromChannel] [toChannel] [appId]')
@@ -726,8 +671,6 @@ Example: npx @capgo/cli@latest channel promote staging production com.example.ap
   .option('--accept-incompatible', `${optionDescriptions.acceptIncompatibleChannel} Cannot be combined with --ignore-metadata-check.`)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 channel
   .command('set [channelName] [appId]')
@@ -793,8 +736,6 @@ Example: npx @capgo/cli@latest channel set production com.example.app --bundle 1
   .option('--accept-incompatible', `${optionDescriptions.acceptIncompatibleChannel} Cannot be combined with --ignore-metadata-check.`)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 const key = program
   .command('key')
@@ -856,8 +797,6 @@ Example: npx @capgo/cli@latest account get`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 account.command('set')
   .alias('s')
@@ -881,8 +820,6 @@ Example: npx @capgo/cli@latest account set --no-newsletter --email-preference we
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 const organization = program
   .command('organization')
@@ -898,8 +835,6 @@ Example: npx @capgo/cli@latest organization list`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 organization
   .command('add')
@@ -913,8 +848,6 @@ Example: npx @capgo/cli@latest organization add --name "My Company" --email admi
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 organization
   .command('members [orgId]')
@@ -931,8 +864,6 @@ Example: npx @capgo/cli@latest organization members ORG_ID`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 const memberRoleDescription = `Role: org_member, org_billing_admin, org_admin or org_super_admin`
 
@@ -947,8 +878,6 @@ Example: npx @capgo/cli@latest organization members-invite ORG_ID --email teamma
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 organization
   .command('members-role [orgId]')
@@ -961,8 +890,6 @@ Example: npx @capgo/cli@latest organization members-role ORG_ID --email teammate
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 organization
   .command('members-remove [orgId]')
@@ -974,8 +901,6 @@ Example: npx @capgo/cli@latest organization members-remove ORG_ID --email teamma
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 organization
   .command('set [orgId]')
@@ -1028,8 +953,6 @@ Example: npx @capgo/cli@latest organization set ORG_ID --enforce-hashed-api-keys
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 organization
   .command('delete [orgId]')
@@ -1043,8 +966,6 @@ Example: npx @capgo/cli@latest organization delete ORG_ID`)
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 // Deprecated alias for backward compatibility
 function warnDeprecated() {
@@ -1064,8 +985,6 @@ organisation
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 organisation
   .command('add')
@@ -1077,8 +996,6 @@ organisation
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 organisation
   .command('set [orgId]')
@@ -1123,8 +1040,6 @@ organisation
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 organisation
   .command('delete [orgId]')
@@ -1134,8 +1049,6 @@ organisation
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 const build = program
   .command('build')
@@ -1164,8 +1077,6 @@ Example:
   .option('--verbose', optionDescriptions.verbose)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 build
   .command('init')
@@ -1176,8 +1087,6 @@ build
   .option('-p, --platform <platform>', 'Platform to onboard (ios or android). If omitted, uses the saved platform for Builder-only checklists, then auto-detects a single native folder or prompts.')
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
   .option('--no-analytics', 'Disable build onboarding analytics and terminal replay for this run')
   // Self-update and workspace discovery are enabled ONLY here (the genuine
   // `build init` entrypoint), never for wrapper commands that reach onboarding
@@ -1291,8 +1200,6 @@ Examples:
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
 
 build
   .command('sync-ios-version')
@@ -1330,8 +1237,6 @@ Example:
   .option('--verbose', optionDescriptions.verbose)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
-  .addOption(deprecatedSupaHostOption())
-  .addOption(deprecatedSupaAnonOption())
   .action(prescanCommand)
 
 build
@@ -1640,8 +1545,6 @@ function addObserveQueryOptions(command: Command) {
     .option('--json', 'Output as JSON')
     .option('--api-host <apiHost>', optionDescriptions.apiHost)
     .option('--files-host <filesHost>', optionDescriptions.filesHost)
-    .addOption(deprecatedSupaHostOption())
-    .addOption(deprecatedSupaAnonOption())
 }
 
 const observe = program

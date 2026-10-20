@@ -1,7 +1,7 @@
 import type { OnboardingCheckOptions } from './background'
 import type { PreparedOnboardingCheck } from './background-check'
 import { env } from 'node:process'
-import { defaultApiHost, findSavedKeySilent, legacySupabaseFunctionsHost, normalizeCapgoApiHost } from '../utils'
+import { defaultApiHost, findSavedKeySilent, normalizeCapgoApiHost } from '../utils'
 import { isTrustedOnboardingApiHost } from './background-api'
 import { resolveNotifyAppReadyProject } from './notify-app-ready-project'
 
@@ -37,7 +37,7 @@ export async function prepareOnboardingCheck(options: OnboardingCheckOptions): P
     return
   const apiHost = options.apiHost
     ? normalizeCapgoApiHost(options.apiHost)
-    : updater?.localApi || legacySupabaseFunctionsHost(updater?.localSupa) || defaultApiHost
+    : updater?.localApi || defaultApiHost
   if (!isTrustedOnboardingApiHost(apiHost, options, trustedOrigins))
     return
   return {

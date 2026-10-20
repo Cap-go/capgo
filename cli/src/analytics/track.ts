@@ -6,8 +6,8 @@ import { findSavedKeySilent, getAppId, getConfig, sendEvent } from '../utils'
 import { getBuilderAppId } from '../build/app-id'
 import { resolveOwnerOrgId } from './org-resolver'
 import { categorizeCliError, categorizeHttpStatus } from './error-category'
-import { deriveSupabaseOperation, setSupabaseCallRecorder, SLOW_THRESHOLD_MS } from './supabase-perf'
-import type { SupabaseCallInfo } from './supabase-perf'
+import { deriveApiOperation, setApiCallRecorder, SLOW_THRESHOLD_MS } from './api-perf'
+import type { ApiCallInfo } from './api-perf'
 
 // Global analytics props + invocation source live in ./global-props so the
 // shared sendEvent() path (cli/src/utils.ts) can inject them on every event
@@ -303,18 +303,18 @@ export function trackMcpServerStarted(hasApikey: boolean): void {
   })
 }
 
-// --- Supabase performance events ---
+// --- Capgo API performance events ---
 const CLI_PERF_CHANNEL = 'cli-perf'
 
 /**
- * Turns a raw timed-fetch observation into a fire-and-forget `Supabase Call`
- * event. Injected into supabase-perf so that module stays a leaf (no cycle).
+ * Turns a raw timed-fetch observation into a fire-and-forget `API Call`
+ * event. Injected into api-perf so that module stays a leaf (no cycle).
  *
  * Only slow or failed calls are emitted. Successful fast calls were ~50% of
  * PostHog volume (mostly CI `bundle upload`) and added little beyond the
  * existing CLI command lifecycle events.
  */
-function recordSupabaseCall(info: SupabaseCallInfo): void {
+function recordApiCall(info: ApiCallInfo): void {
   const slow = info.durationMs > SLOW_THRESHOLD_MS
   if (info.ok && !slow)
     return
@@ -323,7 +323,7 @@ function recordSupabaseCall(info: SupabaseCallInfo): void {
   // module-level value set in trackCommandInvoked.
   const commandPath = mcpCommandPathStore.getStore() ?? currentCommandPath
   const tags: Record<string, string | number | boolean> = {
-    operation: deriveSupabaseOperation(info.url, info.method),
+    operation: deriveApiOperation(info.route ?? info.url, info.method),
     method: info.method,
     status_code: info.status,
     duration_ms: info.durationMs,
@@ -339,11 +339,11 @@ function recordSupabaseCall(info: SupabaseCallInfo): void {
       ? categorizeCliError(info.error)
       : categorizeHttpStatus(info.status)
   }
-  // Use the key from the Supabase request itself so events fire even when the
+  // Use the key from the request itself so events fire even when the
   // key came from --apikey (not env / a saved file); trackEvent still falls back.
-  void trackEvent({ apikey: info.apikey, channel: CLI_PERF_CHANNEL, event: 'Supabase Call', tags })
+  void trackEvent({ apikey: info.apikey, channel: CLI_PERF_CHANNEL, event: 'API Call', tags })
 }
 
-setSupabaseCallRecorder(recordSupabaseCall)
+setApiCallRecorder(recordApiCall)
 
-export { enableSupabaseInstrumentation } from './supabase-perf'
+export { enableApiInstrumentation } from './api-perf'

@@ -1,5 +1,5 @@
 import type { CapgoClient } from '../utils'
-import type { Database } from '../types/supabase.types'
+import type { AppVersionRow } from '../types/api'
 import process from 'node:process'
 import { confirm as confirmC, intro, log, outro, spinner } from '@clack/prompts'
 import { CliUserError } from '../shared/cli-user-error'
@@ -79,7 +79,7 @@ async function fetchChannelsPage(appid: string, page: number, options: CapgoHttp
 export async function checkVersionNotUsedInChannel(
   client: CapgoClient,
   appid: string,
-  versionData: Database['public']['Tables']['app_versions']['Row'],
+  versionData: AppVersionRow,
   options: CheckVersionOptions = {},
 ) {
   const { silent = false, autoUnlink = false, channelName, requireMatch = false, apikey, apiHost } = options

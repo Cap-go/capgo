@@ -1,5 +1,5 @@
 import type { OptionsBase } from '../schemas/base'
-import type { Database } from '../types/supabase.types'
+import type { AppRow } from '../types/api'
 import { stderr, stdout } from 'node:process'
 import { intro, log, outro } from '@clack/prompts'
 import { Table } from '@sauber/table'
@@ -23,7 +23,6 @@ export function getAppListPath(page: number, orgId?: string) {
   return `app?${query.toString()}`
 }
 
-type AppRow = Database['public']['Tables']['apps']['Row']
 
 function writePlain(message: string) {
   stdout.write(`${message}\n`)
@@ -80,10 +79,10 @@ async function getActiveApps(
   silent: boolean,
   options: { apiHost?: string, filterByOrgId?: string },
 ) {
-  const all: Database['public']['Tables']['apps']['Row'][] = []
+  const all: AppRow[] = []
   let page = 0
   while (true) {
-    const { data, error } = await invokeCapgoCliApi<Database['public']['Tables']['apps']['Row'][]>(
+    const { data, error } = await invokeCapgoCliApi<AppRow[]>(
       getAppListPath(page, options.filterByOrgId),
       {
         apikey,

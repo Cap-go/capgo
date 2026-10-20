@@ -1,32 +1,18 @@
 #!/usr/bin/env node
 import assert from 'node:assert/strict'
 import { resolveOrganizationUpdateApiHost } from '../src/organization/set.ts'
-import { invokeCapgoCliApi, normalizeCapgoApiHost, normalizeCapgoHostOptions, normalizeSupabaseHost } from '../src/utils.ts'
+import { invokeCapgoCliApi, normalizeCapgoApiHost } from '../src/utils.ts'
 
-assert.equal(normalizeSupabaseHost('http://localhost:54321/'), 'http://localhost:54321')
+assert.equal(normalizeCapgoApiHost('http://localhost:54321/'), 'http://localhost:54321')
 assert.throws(
-  () => normalizeSupabaseHost('http://self-hosted.example.com'),
-  /must use HTTPS/,
+  () => normalizeCapgoApiHost('http://self-hosted.example.com'),
+  /HTTPS/,
 )
 assert.throws(() => normalizeCapgoApiHost('https://example.com/api?env=dev'), /query parameters or fragments/)
 
 assert.equal(
   await resolveOrganizationUpdateApiHost({ apiHost: 'https://self-hosted.example.com/functions/v1///' }, true),
   'https://self-hosted.example.com/functions/v1',
-)
-
-// Deprecated --supa-host keeps its path and maps to its Edge Functions.
-assert.equal(
-  await resolveOrganizationUpdateApiHost(normalizeCapgoHostOptions({
-    supaHost: 'https://example.com/custom/supabase/',
-    supaAnon: 'anon-key',
-  }, true), true),
-  'https://example.com/custom/supabase/functions/v1',
-)
-
-assert.throws(
-  () => normalizeCapgoHostOptions({ supaHost: 'https://example.com/supabase?env=dev' }, true),
-  /query parameters or fragments/,
 )
 
 const originalFetch = globalThis.fetch

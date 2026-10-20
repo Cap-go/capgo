@@ -6,7 +6,7 @@ import { z } from 'zod'
 
 export const optionsBaseSchema = z.object({
   apikey: z.string(),
-  /** Capgo API base URL; deprecated --supa-host / --supa-anon are folded into it before commands run. */
+  /** Capgo API base URL (`--api-host`). */
   apiHost: z.string().optional(),
   /** Capgo files API base URL; defaults to apiHost. */
   filesHost: z.string().optional(),

@@ -1,7 +1,7 @@
 import type { SemVer } from '@std/semver'
 import type { CapgoClient } from '../utils'
 import type { BundleCleanupOptions } from '../schemas/bundle'
-import type { Database } from '../types/supabase.types'
+import type { AppVersionRow } from '../types/api'
 import { confirm as confirmC, intro, isCancel, log, outro } from '@clack/prompts'
 import {
   format,
@@ -24,7 +24,7 @@ import {
   } from '../utils'
 
 async function removeVersions(
-  toRemove: Database['public']['Tables']['app_versions']['Row'][],
+  toRemove: AppVersionRow[],
   client: CapgoClient,
   appId: string,
   silent: boolean,
@@ -42,11 +42,11 @@ async function removeVersions(
 }
 
 function getRemovableVersionsInSemverRange(
-  data: Database['public']['Tables']['app_versions']['Row'][],
+  data: AppVersionRow[],
   bundleVersion: SemVer,
   nextMajorVersion: SemVer,
 ) {
-  const toRemove: Database['public']['Tables']['app_versions']['Row'][] = []
+  const toRemove: AppVersionRow[] = []
 
   for (const row of data ?? []) {
     const rowVersion = parse(row.name)
@@ -89,7 +89,7 @@ export async function cleanupBundleInternal(appId: string, options: BundleCleanu
   if (!silent)
     log.info('Querying all available versions in Capgo')
 
-  let allVersions: (Database['public']['Tables']['app_versions']['Row'] & { keep?: string })[] = await getActiveAppVersions(options.apikey!, appId, { silent, apikey: options.apikey!, apiHost: options.apiHost })
+  let allVersions: (AppVersionRow & { keep?: string })[] = await getActiveAppVersions(options.apikey!, appId, { silent, apikey: options.apikey!, apiHost: options.apiHost })
   const versionInUse = await getChannelsVersion({ apikey: options.apikey!, silent, apiHost: options.apiHost }, appId)
 
   if (!silent)
@@ -108,13 +108,13 @@ export async function cleanupBundleInternal(appId: string, options: BundleCleanu
     if (!silent)
       log.info(`Querying available versions in Capgo between ${format(bundleVersion)} and ${format(nextMajorVersion)}`)
 
-    allVersions = getRemovableVersionsInSemverRange(allVersions, bundleVersion, nextMajorVersion) as (Database['public']['Tables']['app_versions']['Row'] & { keep: string })[]
+    allVersions = getRemovableVersionsInSemverRange(allVersions, bundleVersion, nextMajorVersion) as (AppVersionRow & { keep: string })[]
 
     if (!silent)
       log.info(`Active versions in Capgo between ${format(bundleVersion)} and ${format(nextMajorVersion)}: ${allVersions?.length ?? 0}`)
   }
 
-  const toRemove: (Database['public']['Tables']['app_versions']['Row'] & { keep?: string })[] = []
+  const toRemove: (AppVersionRow & { keep?: string })[] = []
   let kept = 0
 
   for (const v of allVersions) {

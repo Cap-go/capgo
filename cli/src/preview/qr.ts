@@ -1,5 +1,5 @@
 import type { OptionsBase } from '../schemas/base'
-import type { Database } from '../types/supabase.types'
+import type { AppRow as ApiAppRow, AppVersionRow, ChannelRow as ApiChannelRow } from '../types/api'
 import { stdout } from 'node:process'
 import { intro, log, outro } from '@clack/prompts'
 import { chmod, mkdir } from 'node:fs/promises'
@@ -10,9 +10,9 @@ import { CliUserError } from '../shared/cli-user-error'
 import { checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { createCapgoClient, findSavedKey, formatCapgoCliInvokeError, formatError, getAppId, getCapgoCliHttpStatus, getConfig, invokeCapgoCliApi } from '../utils'
 
-type AppRow = Pick<Database['public']['Tables']['apps']['Row'], 'allow_preview' | 'app_id'>
-type BundleRow = Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'name'>
-type ChannelRow = Pick<Database['public']['Tables']['channels']['Row'], 'id' | 'name'>
+type AppRow = Pick<ApiAppRow, 'allow_preview' | 'app_id'>
+type BundleRow = Pick<AppVersionRow, 'id' | 'name'>
+type ChannelRow = Pick<ApiChannelRow, 'id' | 'name'>
 
 export interface CapgoPreviewHttpOptions {
   apikey: string

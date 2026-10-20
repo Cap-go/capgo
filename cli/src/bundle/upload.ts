@@ -1,7 +1,7 @@
 import type { Buffer } from 'node:buffer'
 import type { CapacitorConfig } from '../config'
 import type { UploadBundleResult } from '../schemas/bundle'
-import type { Database } from '../types/supabase.types'
+import type { AppVersionInsert, ChannelRow } from '../types/api'
 import type { Compatibility, manifestType } from '../utils'
 import type { AutoBumpLevel } from '../versionHelpers'
 import type { ResolvedManifestUpload } from './manifest-upload'
@@ -48,10 +48,10 @@ import { ManifestUploadAbandonError, resolveManifestUploadAbandonScope } from '.
 import { formatUploadChannels, getChannelsToAssignByChecksum, parseUploadChannels } from './upload-channels'
 import { loadUploadProjectConfig } from './upload-config'
 
-type SupabaseType = Awaited<ReturnType<typeof createCapgoClient>>
+type CapgoClientType = Awaited<ReturnType<typeof createCapgoClient>>
 type pmType = ReturnType<typeof getPMAndCommand>
 type localConfigType = Awaited<ReturnType<typeof getLocalConfig>>
-type UploadTargetChannel = Pick<Database['public']['Tables']['channels']['Row'], 'id' | 'public' | 'version' | 'rollout_version' | 'rollout_enabled' | 'rollout_percentage_bps'>
+type UploadTargetChannel = Pick<ChannelRow, 'id' | 'public' | 'version' | 'rollout_version' | 'rollout_enabled' | 'rollout_percentage_bps'>
 
 export type { UploadBundleResult }
 export type { UploadReporter, UploadSpinner }
@@ -104,7 +104,7 @@ export class IncompatibleBundleError extends CliUserError {}
 
 async function persistVersionData(
   apikey: string,
-  versionData: Database['public']['Tables']['app_versions']['Insert'],
+  versionData: AppVersionInsert,
   action: 'add' | 'update',
   cliHost?: { apikey?: string, apiHost?: string },
 ) {
@@ -702,7 +702,7 @@ async function prepareBundleFile(path: string, options: OptionsUpload, apikey: s
   return { zipped, ivSessionKey, sessionKey, checksum, encryptionMethod, finalKeyData, keyId }
 }
 
-async function uploadBundleToCapgoCloud(apikey: string, client: SupabaseType, appid: string, bundle: string, orgId: string, zipped: Buffer, options: OptionsUpload, tusChunkSize: number) {
+async function uploadBundleToCapgoCloud(apikey: string, client: CapgoClientType, appid: string, bundle: string, orgId: string, zipped: Buffer, options: OptionsUpload, tusChunkSize: number) {
   const spinner = getUploadReporter().spinner()
   spinner.start(`Uploading Bundle`)
   const startTime = performance.now()
@@ -759,12 +759,12 @@ async function uploadBundleToCapgoCloud(apikey: string, client: SupabaseType, ap
       catch (changeError) {
         log.error(`Cannot finish TUS upload ${formatError(changeError)}`)
         if (options.verbose)
-          log.info(`[Verbose] Database update failed: ${formatError(changeError)}`)
+          log.info(`[Verbose] Bundle record update failed: ${formatError(changeError)}`)
         throw new Error('Cannot finish TUS upload')
       }
 
       if (options.verbose)
-        log.info(`[Verbose] Database updated with R2 path: ${filePath}`)
+        log.info(`[Verbose] Bundle record updated with R2 path: ${filePath}`)
     }
     else {
       if (options.verbose)
@@ -1128,7 +1128,7 @@ async function findUploadTargetChannel(
 }
 
 async function preflightRequiredChannelAssignments(
-  client: SupabaseType,
+  client: CapgoClientType,
   apikey: string,
   appid: string,
   channels: string[],
@@ -1237,7 +1237,7 @@ async function promoteExistingChannel(
 }
 
 async function setVersionInChannel(
-  client: SupabaseType,
+  client: CapgoClientType,
   apikey: string,
   displayBundleUrl: boolean,
   bundle: string,
@@ -1366,7 +1366,7 @@ async function setVersionInChannel(
 }
 
 async function setRolloutVersionInChannel(
-  client: SupabaseType,
+  client: CapgoClientType,
   apikey: string,
   displayBundleUrl: boolean,
   bundle: string,
@@ -1555,7 +1555,7 @@ async function uploadBundleInternalWithReporter(preAppid: string, options: Optio
 
   const client = await createCapgoClient(apikey, options.apiHost, false, undefined, options.filesHost)
   if (options.verbose)
-    log.info(`[Verbose] Supabase client created successfully`)
+    log.info(`[Verbose] Capgo API client created successfully`)
 
   // One backend preflight BEFORE sending any bundle bytes: 2FA policy, app existence,
   // app.upload_bundle permission, storage plan and org CLI warnings. Otherwise the whole
@@ -1811,7 +1811,7 @@ async function uploadBundleInternalWithReporter(preAppid: string, options: Optio
     comment: options.comment || null,
     key_id: preparedBundle?.keyId || undefined,
     cli_version: pack.version,
-  } as Database['public']['Tables']['app_versions']['Insert']
+  } as AppVersionInsert
 
   if (options.external) {
     if (options.verbose)

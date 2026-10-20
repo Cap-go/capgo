@@ -16,7 +16,7 @@ import {
 import { DOCS_SEARCH_MAX_RESULTS } from '../shared/docs-search'
 
 // Host fields stay out of MCP inputs so an agent cannot send the saved key to a host it chooses.
-const sdkAuthFields = { apikey: true, apiHost: true, filesHost: true, supaHost: true, supaAnon: true } as const
+const sdkAuthFields = { apikey: true, apiHost: true, filesHost: true } as const
 
 export const mcpAddAppInputSchema = z.object({
   appId: z.string(),

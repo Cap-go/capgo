@@ -9,8 +9,7 @@ import { getAppOnboardingStepIds, parseAppOnboarding } from '../../supabase/func
 import messages from '../../messages/en.json'
 
 const appId = 'com.example.todo'
-// Deprecated --supa-host / --supa-anon must keep working: they map to <supaHost>/functions/v1.
-const options = { apikey: 'test-todo-key', supaHost: 'http://localhost:54321', supaAnon: 'test-anon-key' }
+const options = { apikey: 'test-todo-key' }
 const apiHost = 'http://localhost:54321/functions/v1'
 const progress = {
   onboarding: {
@@ -207,7 +206,7 @@ try {
       const child = spawnSync('node', [
         '--import', preload, builtCli, 'app', alias,
         ...(scenario === 'inferred' ? [] : [appId]),
-        '-a', options.apikey, '--supa-host', options.supaHost, '--supa-anon', options.supaAnon,
+        '-a', options.apikey, '--api-host', apiHost,
       ], {
         cwd: fixture, encoding: 'utf8', timeout: 15000,
         env: { ...process.env, CAPGO_TODO_SCENARIO: scenario, CAPGO_DISABLE_TELEMETRY: '1', CAPGO_DISABLE_POSTHOG: '1', CI: '1' },
@@ -241,7 +240,7 @@ try {
     }
   }
   const trackingFile = join(fixture, 'tracking.json')
-  const tracked = spawnSync('node', ['--import', preload, builtCli, 'app', 'todo', appId, '-a', options.apikey, '--supa-host', options.supaHost, '--supa-anon', options.supaAnon], {
+  const tracked = spawnSync('node', ['--import', preload, builtCli, 'app', 'todo', appId, '-a', options.apikey, '--api-host', apiHost], {
     cwd: fixture, encoding: 'utf8', timeout: 15000,
     env: { ...process.env, CAPGO_TOKEN: 'stale-saved-key', CAPGO_TODO_TRACKING_FILE: trackingFile, CI: '1', CAPGO_DISABLE_TELEMETRY: '', CAPGO_DISABLE_POSTHOG: '' },
   })
@@ -260,7 +259,7 @@ try {
       rmSync(join(fixture, name), { force: true })
     const backgroundUpdate = spawnSync('node', [
       '--import', preload, builtCli, 'app', 'todo', appId,
-      '-a', options.apikey, '--supa-host', options.supaHost, '--supa-anon', options.supaAnon,
+      '-a', options.apikey, '--api-host', apiHost,
     ], {
       cwd: fixture, encoding: 'utf8', timeout: 15_000,
       env: { ...process.env, CAPGO_TODO_SCENARIO: scenario, CAPGO_DISABLE_TELEMETRY: '1', CAPGO_DISABLE_POSTHOG: '1', CI: '1' },

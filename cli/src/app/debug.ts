@@ -1,5 +1,4 @@
 import type { AppDebugOptions } from '../schemas/app'
-import type { Database } from '../types/supabase.types'
 import process from 'node:process'
 import { confirm as confirmC, intro, isCancel, log, outro, spinner } from '@clack/prompts'
 import { Table } from '@sauber/table'
@@ -105,7 +104,7 @@ interface QueryStats {
 interface LogData {
   app_id: string
   device_id: string
-  action: Database['public']['Enums']['stats_action']
+  action: string
   version_id: number
   version?: number
   created_at: string

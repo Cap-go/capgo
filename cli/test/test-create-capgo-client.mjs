@@ -5,7 +5,7 @@ import { chdir, cwd } from 'node:process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createCapgoClient, defaultApiHost, defaultFileHost, getLocalConfig, getRemoteConfig, getRemoteFileConfig, normalizeCapgoHostOptions, setCapgoHostOverride, withCapgoHosts } from '../src/utils.ts'
+import { createCapgoClient, defaultApiHost, defaultFileHost, getLocalConfig, getRemoteConfig, getRemoteFileConfig, setCapgoHostOverride, withCapgoHosts } from '../src/utils.ts'
 import { CapgoSDK } from '../src/sdk.ts'
 import { CliUserError } from '../src/shared/cli-user-error.ts'
 
@@ -112,29 +112,18 @@ try {
   delete process.env.CAPGO_API_HOST
   delete process.env.CAPGO_FILES_HOST
 
-  // Deprecated --supa-host / --supa-anon fold into apiHost; Capgo-managed projects keep the cloud API.
-  assert.deepEqual(normalizeCapgoHostOptions({ apikey: 'k', supaHost: 'https://self.example.com', supaAnon: 'anon' }), {
-    apikey: 'k',
-    apiHost: 'https://self.example.com/functions/v1',
-  })
-  for (const managed of ['https://sb.capgo.app', 'https://xvwzpoazmxkqosrdewyv.supabase.co', 'https://ibwjdnhknbkcqfbabwei.supabase.co', 'https://aucsybvnhavogdmzwtcw.supabase.co'])
-    assert.deepEqual(normalizeCapgoHostOptions({ apikey: 'k', supaHost: managed, supaAnon: 'anon' }), { apikey: 'k' }, managed)
-  assert.deepEqual(normalizeCapgoHostOptions({ apikey: 'k', apiHost: 'https://api.example.com', supaHost: 'https://self.example.com' }), {
-    apikey: 'k',
-    apiHost: 'https://api.example.com',
-  }, 'explicit apiHost wins')
-
   setCapgoHostOverride({})
-  // Legacy capacitor config `localSupa` (without `localApi`) resolves to its Edge Functions.
+  // A legacy `localSupa` config fails loudly instead of sending the key to Capgo cloud.
   writeFileSync(join(isolatedDir, 'capacitor.config.json'), JSON.stringify({
     appId: 'com.example.legacy',
     appName: 'Legacy',
     webDir: 'dist',
     plugins: { CapacitorUpdater: { localSupa: 'https://legacy.example.com', localSupaAnon: 'anon' } },
   }))
-  const legacy = await createCapgoClient('test-api-key', undefined, true)
-  assert.equal(legacy.apiHost, 'https://legacy.example.com/functions/v1')
-  assert.equal(legacy.filesHost, 'https://legacy.example.com/functions/v1')
+  await assert.rejects(() => createCapgoClient('test-api-key', undefined, true), /`localSupa` in capacitor.config is no longer supported/)
+  setCapgoHostOverride({ apiHost: 'https://api.example.com' })
+  assert.equal((await createCapgoClient('test-api-key', undefined, true)).apiHost, 'https://api.example.com', 'an explicit --api-host still works')
+  setCapgoHostOverride({})
 
   // `localApi` alone also serves files; it carries the key, so it must use HTTPS.
   const writeUpdaterConfig = updater => writeFileSync(join(isolatedDir, 'capacitor.config.json'), JSON.stringify({

@@ -193,8 +193,7 @@ try {
     const child = spawnSync('node', [
       '--import', preload, new URL('../dist/index.js', import.meta.url).pathname,
       'channel', 'list', appId, '-a', options.apikey,
-      // Deprecated self-host flags still route to <supa-host>/functions/v1.
-      '--supa-host', 'http://localhost:54321', '--supa-anon', 'test-anon-key',
+      '--api-host', 'http://localhost:54321/functions/v1',
     ], {
       encoding: 'utf8', timeout: 15000,
       env: { ...process.env, CAPGO_CHANNEL_LIST_SCENARIO: scenario },
