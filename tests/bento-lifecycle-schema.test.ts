@@ -139,6 +139,26 @@ describe('lifecycle schema on full PostgreSQL', () => {
     })
   })
 
+  it.concurrent('preserves a pending candidate on equal organization writes and wakes it only when watched values change', async () => {
+    await transaction(async (client) => {
+      const creator = await seedUser(client, assignment)
+      const orgId = await seedOrg(client, creator, 'both')
+      expect((await client.query('SELECT product FROM public.bento_lifecycle_journeys WHERE org_id=$1', [orgId])).rows).toHaveLength(2)
+      await client.query(`UPDATE public.bento_lifecycle_journeys SET candidate='{"branch":"pending"}'::jsonb,
+        state='{"consumed":["last-resort"]}'::jsonb,revision=42,next_evaluation_at='2099-01-01T00:00:00Z',
+        refresh_claim_token=$2,refresh_claim_until='2099-01-01T00:00:00Z' WHERE org_id=$1`, [orgId, randomUUID()])
+      const before = (await client.query('SELECT * FROM public.bento_lifecycle_journeys WHERE org_id=$1 ORDER BY product', [orgId])).rows
+      await client.query(`UPDATE public.orgs SET onboarding=onboarding,email_preferences=email_preferences,
+        management_email=management_email,created_by=created_by,customer_id=customer_id,has_usage_credits=has_usage_credits
+        WHERE id=$1`, [orgId])
+      expect((await client.query('SELECT * FROM public.bento_lifecycle_journeys WHERE org_id=$1 ORDER BY product', [orgId])).rows).toEqual(before)
+      await client.query(`UPDATE public.orgs SET email_preferences='{"onboarding":false}'::jsonb WHERE id=$1`, [orgId])
+      const after = (await client.query(`SELECT candidate,revision,state,next_evaluation_at<=CURRENT_TIMESTAMP AS due,
+        refresh_claim_token FROM public.bento_lifecycle_journeys WHERE org_id=$1 ORDER BY product`, [orgId])).rows
+      expect(after).toEqual(before.map(row => ({ candidate: null, revision: '43', state: row.state, due: true, refresh_claim_token: row.refresh_claim_token })))
+    })
+  })
+
   it.concurrent('preserves completed readiness when deleted before worker reconciliation and isolates recreation by apps.id', async () => {
     await transaction(async (client) => {
       const creator = await seedUser(client)

@@ -98,10 +98,10 @@ export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: An
     // batch budget loading snapshots and deferring every claimed journey.
     if (Date.now() >= deadline - 5_000 || (loaded.length > 0 && Date.now() >= loadDeadline))
       break
-    loaded.push(await loadLifecycleInput(read, item.org_id, item.product))
+    loaded.push({ item, current: await loadLifecycleInput(read, item.org_id, item.product) })
   }
-  const otaApps = loaded.flatMap(item => item?.row.app && item.input.product === 'ota'
-    ? [{ appId: item.row.app.app_id, createdAt: iso(Math.max(ms(item.row.app.created_at), ms(item.capturedAt))) }]
+  const otaApps = loaded.flatMap(({ current }) => current?.row.app && current.input.product === 'ota'
+    ? [{ appId: current.row.app.app_id, createdAt: iso(Math.max(ms(current.row.app.created_at), ms(current.capturedAt))) }]
     : [])
   let healthy = otaApps.length === 0
   let devices: Array<Record<string, string>> = []
@@ -120,10 +120,20 @@ export async function refreshLifecycleJourneys(db: QueryClient, runAnalytics: An
       healthy = false
   }
   let refreshed = 0
-  for (const current of loaded) {
-    if (!current || Date.now() >= deadline - 5_000)
+  for (const { item, current } of loaded) {
+    if (Date.now() >= deadline - 5_000)
       continue
-    const token = due.rows.find(item => item.org_id === current.input.orgId && item.product === current.input.product)!.refresh_claim_token
+    const token = item.refresh_claim_token
+    if (!current) {
+      // Missing provenance must not repeatedly consume the oldest due slots.
+      // A concurrent source wakeup or new owner keeps its current schedule.
+      const rescheduled = await db.query(`UPDATE public.bento_lifecycle_journeys SET candidate = NULL,
+        next_evaluation_at = CURRENT_TIMESTAMP + INTERVAL '7 days', refresh_claim_until = NULL, refresh_claim_token = NULL
+        WHERE org_id = $1::uuid AND product = $2 AND refresh_claim_token = $3::uuid AND revision = $4 RETURNING org_id`, [item.org_id, item.product, token, item.revision])
+      if (rescheduled.rowCount)
+        refreshed++
+      continue
+    }
     const { input, row } = current
     const app = row.app
     if (app && row.captured_at) {
