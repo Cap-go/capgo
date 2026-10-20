@@ -57,6 +57,7 @@ test('shows live Builder progress while keeping platform tasks separate', async 
   await returnButton.evaluate(element => element.style.fontSize = '28px')
   const actionsBox = await page.locator('[data-test="builder-checklist-task-actions"]').boundingBox()
   const returnBox = await returnButton.boundingBox()
+  expect(returnBox!.x).toBeGreaterThanOrEqual(actionsBox!.x)
   expect(returnBox!.x + returnBox!.width).toBeLessThanOrEqual(actionsBox!.x + actionsBox!.width)
   expect(await returnButton.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
   expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites)).toEqual([])
