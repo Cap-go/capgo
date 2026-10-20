@@ -30,14 +30,14 @@ beforeAll(async () => {
   writeFileSync(join(dir, 'slow.mjs'), 'setTimeout(() => {}, 900)')
   writeFileSync(join(dir, 'released.mjs'), "import { parentPort } from 'node:worker_threads'; parentPort.once('message', () => process.exit(0))")
   writeFileSync(join(dir, 'notice.mjs'), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: { kind: 'setup', appId: 'com.example.ready', product: 'live updates', title: 'Create a channel', action: 'Continue your checklist', secondary: [] } })`)
-  for (const app of ['one', 'two']) {
-    writeFileSync(join(dir, `plan-${app}.mjs`), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: { kind: 'plan', appId: 'com.example.${app}', completed: ['Live updates'], secondary: [], billing: { orgId: 'fixture-org', trialEndsAt: null, plansUrl: 'https://console.example.com/plans' } } })`)
+  for (const app of ['one', 'two', 'trial']) {
+    writeFileSync(join(dir, `plan-${app}.mjs`), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: { kind: 'plan', appId: 'com.example.${app}', completed: ['Live updates'], secondary: [], billing: { orgId: 'fixture-org', trialEndsAt: ${JSON.stringify(app === 'trial' ? '2099-01-01T00:00:00Z' : null)}, plansUrl: 'https://console.example.com/plans' } } })`)
   }
 })
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, earlyCompletion = false, immediateCompletion = false, waitForWorkers = false, trialAlreadyShown = false, debug = false, columns = 80 } = {}) {
+function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, earlyCompletion = false, immediateCompletion = false, waitForWorkers = false, trialAlreadyShown = false, debug = false, columns = 80, colorEnv = {} } = {}) {
   const source = `
     import assert from 'node:assert/strict'
     import { performance } from 'node:perf_hooks'
@@ -133,7 +133,7 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
   `
   const runner = join(dir, `run-${++runnerCount}.mjs`)
   writeFileSync(runner, source)
-  const child = spawn('node', [runner], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, CI: ci ? 'true' : 'false', CAPGO_DISABLE_TELEMETRY: disabled ? 'true' : '', CAPGO_DISABLE_POSTHOG: '', CAPGO_SETUP_DEBUG: debug ? '1' : '' } })
+  const child = spawn('node', [runner], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: undefined, ...colorEnv, CI: ci ? 'true' : 'false', CAPGO_DISABLE_TELEMETRY: disabled ? 'true' : '', CAPGO_DISABLE_POSTHOG: '', CAPGO_SETUP_DEBUG: debug ? '1' : '' } })
   let output = ''
   let errors = ''
   let waiting
@@ -302,7 +302,7 @@ test.concurrent('opt-in diagnostics distinguish shutdown timeout from a non-TTY 
 
 
 test.concurrent('standalone boxes have no guide line, diamond or app ID and fit a narrow terminal', async () => {
-  const result = await run({ commandPath: 'bundle list', workers: ['notice.mjs'], waitForWorkers: true, columns: 52 }).completion
+  const result = await run({ commandPath: 'bundle list', workers: ['notice.mjs'], waitForWorkers: true, columns: 52, colorEnv: { FORCE_COLOR: '1' } }).completion
   assert.equal(result.code, 0, result.text)
   const lines = stripVTControlCharacters(result.output).split('\n')
   const start = lines.findIndex(line => line.startsWith('┌'))
@@ -313,5 +313,35 @@ test.concurrent('standalone boxes have no guide line, diamond or app ID and fit 
   for (const line of rendered) {
     assert.ok(stringWidth(line) <= 52, line)
     assert.equal(stringWidth(line), stringWidth(rendered[0]), line)
+  }
+}, 12_000)
+
+
+test.concurrent('interactive setup and plan boxes highlight headings and primary actions', async () => {
+  for (const [worker, heading, color, action] of [
+    ['notice.mjs', 'Finish setting up live updates', 36, 'Continue your checklist'],
+    ['plan-one.mjs', 'Your Capgo setup is complete', 32, 'View plans: https://console.example.com/plans'],
+    ['plan-trial.mjs', 'Your Capgo setup is complete', 32, 'View plans: https://console.example.com/plans'],
+  ]) {
+    const result = await run({ commandPath: 'bundle list', workers: [worker], waitForWorkers: true, colorEnv: { FORCE_COLOR: '1' } }).completion
+    assert.equal(result.code, 0, result.text)
+    assert.ok(result.output.includes(`\x1B[${color}m${heading}\x1B[39m`), 'emphasize the heading')
+    assert.ok(result.output.includes(`\x1B[36m${action}\x1B[39m`), 'highlight the primary action')
+    if (worker === 'plan-trial.mjs') assert.match(result.output, /\x1B\[33mYour trial ends in/)
+    assert.match(stripVTControlCharacters(result.output), /┌─+┐/)
+  }
+}, 12_000)
+
+test.concurrent('notice colors respect NO_COLOR, disabled colors and piped output', async () => {
+  for (const settings of [
+    { colorEnv: { NO_COLOR: '1', FORCE_COLOR: '1' } },
+    { colorEnv: { FORCE_COLOR: '0' } },
+    { tty: false, colorEnv: { FORCE_COLOR: '1' } },
+    { colorEnv: { TERM: 'dumb', FORCE_COLOR: undefined } },
+  ]) {
+    const result = await run({ commandPath: 'bundle list', workers: ['notice.mjs'], waitForWorkers: true, ...settings }).completion
+    assert.equal(result.code, 0, result.text)
+    assert.equal(result.output, stripVTControlCharacters(result.output), `keep plain output free of ANSI sequences: ${JSON.stringify(settings)}`)
+    assert.ok(result.output.includes('Finish setting up live updates'))
   }
 }, 12_000)

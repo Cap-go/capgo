@@ -1,5 +1,6 @@
 import type { Command } from 'commander'
 import process from 'node:process'
+import { styleText } from 'node:util'
 import { box } from '@clack/prompts'
 import { isCI } from 'ci-info'
 import { flushAnalytics, trackEvent } from '../analytics/track'
@@ -9,7 +10,20 @@ import { ONBOARDING_CHECK_GRACE_MS as gracePeriodMs, shouldEvaluateSetupNotice }
 import { formatSetupNotice } from './setup-notices'
 import { markTrialNoticeShown, wasTrialNoticeShown } from './trial-notice-state'
 
-const setupBoxOptions = { withGuide: false, rounded: false, width: 'auto' as const, contentPadding: 1 }
+function setupStyle(format: Parameters<typeof styleText>[0], text: string): string {
+  return process.stdout.isTTY && process.env.NO_COLOR === undefined && process.env.FORCE_COLOR !== '0'
+    && (process.env.TERM !== 'dumb' || process.env.FORCE_COLOR !== undefined)
+    ? styleText(format, text, { stream: process.stdout })
+    : text
+}
+
+const setupBoxOptions = {
+  withGuide: false,
+  rounded: false,
+  width: 'auto' as const,
+  contentPadding: 1,
+  formatBorder: (text: string) => setupStyle('cyan', text),
+}
 
 // Only commands with human-facing output opt into the shutdown message and wait.
 const interactiveCommands = new Set([
@@ -70,7 +84,17 @@ function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPa
     }
     const text = formatSetupNotice(notice)
     if (text) {
-      box(text, '', setupBoxOptions)
+      const action = notice.kind === 'setup' ? notice.action : `View plans: ${notice.billing.plansUrl}`
+      const styledText = text.split('\n').map((line, index) => {
+        if (index === 0)
+          return setupStyle(['bold', notice.kind === 'plan' ? 'green' : 'cyan'], line)
+        if (line === action)
+          return setupStyle(['bold', 'cyan'], line)
+        if (line.startsWith('Your trial'))
+          return setupStyle('yellow', line)
+        return line.startsWith('You can also') ? setupStyle('dim', line) : line
+      }).join('\n')
+      box(styledText, '', setupBoxOptions)
       setupDebug('render shown', { kind: notice.kind })
       shownApps.add(notice.appId)
       if (notice.kind === 'plan')
@@ -96,7 +120,7 @@ export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGl
   process.prependOnceListener('SIGINT', onInterrupt)
   try {
     setupDebug('shutdown wait started', { budget_ms: gracePeriodMs })
-    box('Checking your setup...\n\nPress Ctrl+C to skip.', '', setupBoxOptions)
+    box(`${setupStyle(['bold', 'cyan'], 'Checking your setup...')}\n\n${setupStyle('dim', 'Press Ctrl+C to skip.')}`, '', setupBoxOptions)
     const checks = [...pendingChecks.values()]
     const options = command.optsWithGlobals()
     void trackEvent({
