@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
   profileEmit: undefined as undefined | ((event: string, ...args: unknown[]) => void),
   route: { query: {} as Record<string, string> },
 }))
-const main = shallowReactive({ authGeneration: 1, user: { id: 'name-user', first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } as any }, logout: mocks.logout })
+const main = shallowReactive({ authGeneration: 1, user: { id: 'name-user', first_name: '', last_name: '', onboarding: { version: 6 } as any }, logout: mocks.logout })
 vi.mock('~/stores/dialogv2', () => ({ useDialogV2Store: () => mocks.dialog }))
 vi.mock('~/stores/main', () => ({ useMainStore: () => main }))
 vi.mock('~/stores/organization', () => ({ useOrganizationStore: () => ({ hasOrganizations: false }) }))
@@ -91,7 +91,7 @@ beforeEach(() => {
   mocks.save.mockResolvedValue(true)
   mocks.reset.mockResolvedValue(true)
   mocks.replace.mockResolvedValue(undefined)
-  main.user = { id: 'name-user', first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, version: 6 } }
+  main.user = { id: 'name-user', first_name: '', last_name: '', onboarding: { version: 6 } }
 })
 afterEach(() => {
   app?.unmount()
@@ -153,9 +153,10 @@ describe('welcome followed by required About you', () => {
   })
   it('restarts a saved name draft at Welcome while retaining account identity and AB assignments', async () => {
     const oldAttempt = '36473744-0000-4000-8000-000000000001'
-    const assignments = main.user.onboarding.abtests
+    const assignments = { new_channel: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }
     main.user = { ...main.user, first_name: 'Saved', last_name: 'User', onboarding: {
       ...main.user.onboarding,
+      abtests: assignments,
       onboarding_attempt_id: oldAttempt,
       profile_draft: { first_name: 'Unfinished', last_name: '' },
       status: 'in_progress',

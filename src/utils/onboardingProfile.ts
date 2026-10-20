@@ -1,18 +1,18 @@
 import type { Json } from '~/types/supabase.types'
 import type { OnboardingAnalyticsStep } from '~/utils/onboardingProgressAnalytics'
-import { hasNewChannelTreatment, hasProfileOnboarding, hasWebNativeDevelopmentEnvironmentTreatment } from '~/utils/onboardingABTests'
+import { hasNewChannelTreatment, hasWebNativeDevelopmentEnvironmentTreatment } from '~/utils/onboardingABTests'
 
 interface OnboardingProfileUser {
   first_name?: string | null
   last_name?: string | null
   created_via_invite?: boolean
-  onboarding: Json
+  onboarding?: Json
 }
 
 export const PROFILE_ONBOARDING_HANDOFF_KEY = 'capgoProfileOnboardingHandoff'
 
 export function canEditInitialOnboardingName(user: OnboardingProfileUser | null | undefined, hasOrganizations = false): boolean {
-  return Boolean(user && !hasOrganizations && !user.created_via_invite && hasProfileOnboarding(user.onboarding))
+  return Boolean(user && !hasOrganizations && !user.created_via_invite)
 }
 
 export function needsInitialOnboardingName(user: OnboardingProfileUser | null | undefined, hasOrganizations = false): boolean {

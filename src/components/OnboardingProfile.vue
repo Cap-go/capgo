@@ -7,7 +7,6 @@ import { setUser } from '~/services/posthog'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { replaceUserOnboardingWithRetry, serializeUserOnboardingWrite } from '~/services/userOnboardingWriteQueue'
 import { useMainStore } from '~/stores/main'
-import { hasProfileOnboarding } from '~/utils/onboardingABTests'
 
 const props = defineProps<{ disabled?: boolean, initial?: boolean }>()
 const emit = defineEmits<{
@@ -22,7 +21,7 @@ const { t } = useI18n()
 const inputId = useId()
 const firstName = ref(main.user?.first_name ?? '')
 const lastName = ref(main.user?.last_name ?? '')
-const needsProfileName = computed(() => hasProfileOnboarding(main.user?.onboarding) && (props.initial || !main.user?.first_name?.trim() || !main.user?.last_name?.trim()))
+const needsProfileName = computed(() => props.initial || !main.user?.first_name?.trim() || !main.user?.last_name?.trim())
 const isValid = computed(() => !!main.user?.id && (!needsProfileName.value || (!!firstName.value.trim() && !!lastName.value.trim())))
 let draftGeneration = 0
 let draftTimer: ReturnType<typeof setTimeout> | undefined

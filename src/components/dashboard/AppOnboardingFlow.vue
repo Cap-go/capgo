@@ -68,7 +68,6 @@ import { useBeforeUnloadWarning } from '~/utils/beforeUnloadWarning'
 import { hasDualOnboardingChecklists } from '~/utils/dualOnboardingChecklists'
 import {
   hasNewChannelTreatment,
-  hasProfileOnboarding,
   hasWebNativeDevelopmentEnvironmentTreatment,
   parseOnboardingABTestAssignments,
   reconcileOnboardingABTestAssignments,
@@ -91,6 +90,7 @@ import {
   createOnboardingDetailsFieldDebouncer,
   createOnboardingProgressTracker,
   createOnboardingTelemetryIdentity,
+  PROFILE_ONBOARDING_ANALYTICS_VERSION,
   resolveOnboardingAppIconSource,
 } from '~/utils/onboardingProgressAnalytics'
 import { createOnboardingProgressPersistence, shouldInitializeOnboardingProgressTracking } from '~/utils/onboardingProgressPersistence'
@@ -251,11 +251,14 @@ const selectedDevelopmentEnvironment = ref<OnboardingDevelopmentEnvironment | nu
 const skippedPublishAppQuestion = ref(false)
 const billingAccount = ref<'ee' | 'us' | undefined>()
 const selectedIntent = ref<OnboardingIntent | null>(null)
-const profileOnboarding = computed(() => hasProfileOnboarding(main.user?.onboarding))
-const initialProfileOnboarding = computed(() => props.preOrg && !props.newOrganization && !props.setupAppId && profileOnboarding.value)
+const initialProfileOnboarding = computed(() => props.preOrg && !props.newOrganization && !props.setupAppId)
 const canReturnToProfile = computed(() => initialProfileOnboarding.value && canEditInitialOnboardingName(main.user, organizationStore.hasOrganizations))
 const intentStepLabel = computed(() => t('unified-onboarding-step-intent'))
-const onboardingAnalyticsVersion = () => resolveOnboardingAnalyticsVersion(onboardingForABTests.value, selectedIntent.value)
+function onboardingAnalyticsVersion() {
+  return props.preOrg && !props.newOrganization
+    ? PROFILE_ONBOARDING_ANALYTICS_VERSION
+    : resolveOnboardingAnalyticsVersion(onboardingForABTests.value, selectedIntent.value)
+}
 const setupHandoff = props.setupAppId ? consumeSetupHandoff(props.setupAppId) : null
 const profileHandoff = props.preOrg && !props.newOrganization ? consumeProfileOnboardingHandoff(window.history) : null
 const onboardingTelemetry = createOnboardingTelemetryIdentity({
@@ -338,11 +341,10 @@ function consumeSetupHandoff(appId: string) {
   return handoff
 }
 
-function applyOnboardingABTestAssignments(assignments: Record<string, OnboardingABTestAssignment>, options: { authoritative?: boolean } = {}) {
+function applyOnboardingABTestAssignments(assignments: Record<string, OnboardingABTestAssignment>) {
   onboardingABTestAssignments.value = reconcileOnboardingABTestAssignments(
     onboardingABTestAssignments.value,
     assignments,
-    options,
   )
   if (!main.user)
     return
@@ -353,10 +355,9 @@ function applyOnboardingABTestAssignments(assignments: Record<string, Onboarding
     ...main.user,
     onboarding: {
       ...currentOnboarding,
-      abtests: reconcileOnboardingABTestAssignments(currentABTests, assignments, options),
+      abtests: reconcileOnboardingABTestAssignments(currentABTests, assignments),
     } as unknown as Json,
   }
-  void redirectToRequiredInitialName()
 }
 
 function refreshOnboardingABTests(options: { force?: boolean } = {}): Promise<void> {
@@ -369,7 +370,7 @@ function refreshOnboardingABTests(options: { force?: boolean } = {}): Promise<vo
   }
 
   if (options.force)
-    applyOnboardingABTestAssignments({}, { authoritative: false })
+    applyOnboardingABTestAssignments({})
 
   const request = (async () => {
     const { data, error } = await invokeCapgoApi<OnboardingABTestsResponse>('private/onboarding_ab_tests', {
@@ -722,7 +723,7 @@ function initializeProgressTracking(resumed: boolean) {
   if (initialStep === 'welcome')
     trackedAnalyticsSteps.unshift('welcome')
   ensurePublishAppQuestionStepTracked()
-  if (props.preOrg && !props.newOrganization && profileOnboarding.value)
+  if (props.preOrg && !props.newOrganization)
     trackedAnalyticsSteps = initialProfileOnboardingSteps(onboardingForABTests.value, true)
 
   progressTracker = createOnboardingProgressTracker({
@@ -913,7 +914,7 @@ async function resetOnboardingForm() {
   selectedDevelopmentEnvironment.value = null
   skippedPublishAppQuestion.value = false
   selectedIntent.value = null
-  await waitForOnboardingABTests({ force: true })
+  applyOnboardingABTestAssignments({})
   webNativeRecommendationDismissed.value = false
   existingApp.value = true
   existingAppSetup.value = 'manual'
@@ -2640,7 +2641,7 @@ const nameRedirectFailed = ref(false)
 async function redirectToRequiredInitialName(retry = false): Promise<boolean> {
   if (!props.preOrg || props.newOrganization || !needsInitialOnboardingName(main.user, organizationStore.hasOrganizations)) {
     // This mount yielded progress ownership before navigation failed. Rehydrate
-    // from the server if treatment changed rather than revive its stale writer.
+    // from the server if names were saved elsewhere rather than revive its stale writer.
     if (retry && nameRedirectFailed.value)
       window.location.reload()
     return false
@@ -2690,7 +2691,7 @@ onMounted(async () => {
   isHydratingOnboarding.value = true
   try {
     if (props.preOrg) {
-      await waitForOnboardingABTests()
+      void refreshOnboardingABTests()
       if (await redirectToRequiredInitialName())
         return
       if (resumeAppId.value) {
@@ -2941,7 +2942,7 @@ defineExpose({
             <template v-else>
               <div>
                 <h3 class="text-xl font-semibold text-slate-950 dark:text-white">
-                  {{ t(profileOnboarding ? 'unified-onboarding-profile-goal-question' : 'organization-onboarding-intent-question') }}
+                  {{ t('unified-onboarding-profile-goal-question') }}
                 </h3>
                 <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
                   {{ t('organization-onboarding-intent-hint') }}

@@ -1,12 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { hasProfileOnboarding, reconcileOnboardingABTestAssignments, resolveOnboardingAnalyticsVersion } from '../src/utils/onboardingABTests'
 import { consumeProfileOnboardingHandoff, initialProfileOnboardingSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY, readProfileOnboardingHandoff } from '../src/utils/onboardingProfile'
 
-const abtests = { onboarding_v6: { branch: 'A' as const, assigned_at: '2026-10-19T11:00:00.000Z' } }
-const onboarding = { abtests }
+const onboarding = {}
 
 describe('required initial onboarding name', () => {
-  it.each([['', ''], ['Alice', ''], ['', 'Smith'], [' ', 'Smith']])('requires both saved names for assigned users (%s, %s)', (first_name, last_name) => {
+  it.each([['', ''], ['Alice', ''], ['', 'Smith'], [' ', 'Smith']])('requires both saved names for every new self-signup (%s, %s)', (first_name, last_name) => {
     expect(needsInitialOnboardingName({ first_name, last_name, onboarding })).toBe(true)
   })
   it('requires saved confirmation but excludes invitations and existing organization members', () => {
@@ -16,32 +14,15 @@ describe('required initial onboarding name', () => {
     expect(needsInitialOnboardingName({ onboarding }, true)).toBe(false)
     expect(needsInitialOnboardingName(undefined)).toBe(false)
   })
-  it.each([{}, { version: 6 }, { abtests: { onboarding_v6: { branch: 'B', assigned_at: '2026-10-19' } } }])('keeps V6 disabled without treatment A: %j', (disabled) => {
-    expect(needsInitialOnboardingName({ onboarding: disabled })).toBe(false)
-    expect(hasProfileOnboarding(disabled)).toBe(false)
-    expect(resolveOnboardingAnalyticsVersion(disabled)).not.toBe(6)
+  it.each([{}, { version: 4 }, { abtests: { onboarding_v6: { branch: 'B', assigned_at: '2026-10-19' } } }])('requires names regardless of stored version or experiment data: %j', (stored) => {
+    expect(needsInitialOnboardingName({ onboarding: stored })).toBe(true)
   })
   it('tracks welcome before names and then the goal', () => {
     expect(initialProfileOnboardingSteps(onboarding, true)).toEqual(['welcome', 'name', 'intent', 'app_name', 'app_icon', 'organization', 'setup'])
   })
   it('shares the name, goal and app step order with combined onboarding flags', () => {
-    expect(initialProfileOnboardingSteps({ abtests: { ...abtests, webnativeapp_development_environment: { branch: 'C' }, new_channel: { branch: 'A' } } }, true))
+    expect(initialProfileOnboardingSteps({ abtests: { webnativeapp_development_environment: { branch: 'C' }, new_channel: { branch: 'A' } } }, true))
       .toEqual(['welcome', 'name', 'intent', 'publish_app_question', 'app_name', 'app_icon', 'organization', 'channel', 'setup'])
-  })
-  it('uses treatment A regardless of the legacy stored version', () => {
-    expect(hasProfileOnboarding({ ...onboarding, version: 4 })).toBe(true)
-    expect(resolveOnboardingAnalyticsVersion(onboarding)).toBe(6)
-  })
-  it('removes a stale treatment when the authoritative response omits it', () => {
-    expect(reconcileOnboardingABTestAssignments(abtests, {})).toEqual({})
-  })
-  it('preserves the required name gate and V6 tracking while a forced refresh is pending or fails', () => {
-    const retained = reconcileOnboardingABTestAssignments(abtests, {}, { authoritative: false })
-    expect(retained).toEqual(abtests)
-    const retainedOnboarding = { abtests: { onboarding_v6: { ...retained.onboarding_v6 } } }
-    expect(needsInitialOnboardingName({ onboarding: retainedOnboarding })).toBe(true)
-    expect(resolveOnboardingAnalyticsVersion(retainedOnboarding)).toBe(6)
-    expect(reconcileOnboardingABTestAssignments(retained, {})).toEqual({})
   })
   it('consumes the handoff once so a refresh starts a new telemetry run', () => {
     const identity = { attemptId: 'attempt', runId: 'run' }

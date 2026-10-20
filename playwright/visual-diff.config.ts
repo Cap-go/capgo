@@ -12,7 +12,7 @@ export interface VisualDiffRoute {
 }
 
 async function prepareProfileGoalScreenshot(page: Page, completed = false) {
-  const assignments = { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }
+  const assignments = {}
   let profile: Record<string, unknown> | undefined
   await page.route('**/private/onboarding_ab_tests', route => route.fulfill({ json: { assignments } }))
   await page.route('**/rest/v1/rpc/get_orgs_v7', route => route.fulfill({ json: [] }))
@@ -358,7 +358,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.route('**/rest/v1/users?*', async (route) => {
         const response = await route.fetch()
         const json = await response.json()
-        const profile = (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: { abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }, ...row.onboarding, version: 6 } })
+        const profile = (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: { ...row.onboarding, version: 6 } })
         await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
       })
       await page.reload()

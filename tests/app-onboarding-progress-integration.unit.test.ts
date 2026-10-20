@@ -26,6 +26,8 @@ const writerMocks = vi.hoisted(() => ({
     user: {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: {},
     },
   },
@@ -175,7 +177,10 @@ describe('app onboarding progress analytics integration', () => {
         writerMocks.main.user = {
           id: 'user-bento-retry',
           image_url: 'avatar.png',
+          first_name: 'Example',
+          last_name: 'User',
           onboarding: {
+            profile_completed_at: '2026-10-20T10:00:00.000Z',
             abtests,
             app_id: appId,
             final_step: preOrg ? 'setup' : 'install',
@@ -282,7 +287,10 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: {
+        profile_completed_at: '2026-10-20T10:00:00.000Z',
         app_id: 'com.example.final',
         final_step: 'setup',
         flow: 'pre_org',
@@ -341,7 +349,10 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-missing-app',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: {
+        profile_completed_at: '2026-10-20T10:00:00.000Z',
         app_id: 'com.example.other',
         final_step: 'setup',
         flow: 'pre_org',
@@ -389,7 +400,10 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: {
+        profile_completed_at: '2026-10-20T10:00:00.000Z',
         abtests,
         app_id: appId,
         flow: 'existing_org',
@@ -495,7 +509,10 @@ describe('app onboarding progress analytics integration', () => {
           writerMocks.main.user = {
             id: 'user-bento-retry',
             image_url: 'avatar.png',
+            first_name: 'Example',
+            last_name: 'User',
             onboarding: {
+              profile_completed_at: '2026-10-20T10:00:00.000Z',
               abtests,
               app_id: appId,
               final_step: preOrg ? 'setup' : 'install',
@@ -614,6 +631,7 @@ describe('app onboarding progress analytics integration', () => {
       },
     }
     const initialOnboarding = {
+      profile_completed_at: '2026-10-20T10:00:00.000Z',
       abtests: initialABTests,
       bento_events: initialBentoEvents,
       future_server_state: { revision: 1 },
@@ -628,6 +646,8 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: initialOnboarding,
     }
     writerMocks.refreshUser.mockResolvedValueOnce({
@@ -690,6 +710,7 @@ describe('app onboarding progress analytics integration', () => {
     const matchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
     const assignedAt = '2026-09-11T10:00:00.000Z'
     const currentOnboarding = {
+      profile_completed_at: '2026-10-20T10:00:00.000Z',
       abtests: {
         new_channel: {
           assigned_at: assignedAt,
@@ -712,9 +733,10 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: currentOnboarding,
     }
-    Object.assign(writerMocks.main.user, { first_name: 'Example', last_name: 'User' })
     writerMocks.loadApp.mockReset()
     writerMocks.loadApp.mockResolvedValue({
       data: {
@@ -773,7 +795,7 @@ describe('app onboarding progress analytics integration', () => {
       version: 6,
       profile_completed_at: '2026-10-17T10:00:00.000Z',
       profile_draft: { first_name: 'Draft', last_name: 'User' },
-      abtests: { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' }, new_channel: {
+      abtests: { new_channel: {
         assigned_at: '2026-09-11T10:00:00.000Z',
         branch: 'A',
       } },
@@ -788,9 +810,10 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: currentOnboarding,
     }
-    Object.assign(writerMocks.main.user, { first_name: 'Example', last_name: 'User' })
     writerMocks.replaceUserOnboardingIfUnchanged.mockReset()
     writerMocks.replaceUserOnboardingIfUnchanged.mockImplementation(async (_userId, _expectedOnboarding, onboarding) => ({
       data: { ...writerMocks.main.user, onboarding },
@@ -1086,7 +1109,10 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: {
+        profile_completed_at: '2026-10-20T10:00:00.000Z',
         abtests,
         app_id: pendingApp.app_id,
         flow: 'existing_org',
@@ -1423,7 +1449,7 @@ describe('app onboarding progress analytics integration', () => {
   })
 })
 
-it('requires names when treatment arrives after the bounded startup wait', async () => {
+it('requires names on mount without waiting for onboarding A/B tests', async () => {
   const previousUser = writerMocks.main.user
   const previousResponse = writerMocks.abTestResponse
   const descriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
@@ -1432,20 +1458,14 @@ it('requires names when treatment arrives after the bounded startup wait', async
     resolve = done
   })
   writerMocks.abTestResponse = () => pending
-  writerMocks.main.user = { id: 'late-treatment', image_url: '', onboarding: {} }
+  writerMocks.main.user = { id: 'missing-names', image_url: '', first_name: '', last_name: '', onboarding: {} }
   writerMocks.router.replace.mockClear()
   Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => ({ matches: false }) })
-  vi.useFakeTimers()
   const app = createApp(AppOnboardingFlow, { onboarding: true, preOrg: true })
   app.config.warnHandler = () => undefined
   try {
     app.mount(document.createElement('div'))
-    await vi.advanceTimersByTimeAsync(3100)
-    expect(writerMocks.router.replace).not.toHaveBeenCalledWith(expect.objectContaining({ path: '/onboarding/name' }))
-    resolve({ onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } })
-    await vi.advanceTimersByTimeAsync(0)
-    await nextTick()
-    expect(writerMocks.router.replace).toHaveBeenCalledWith({ path: '/onboarding/name', query: { to: '/onboarding/app' } })
+    await vi.waitFor(() => expect(writerMocks.router.replace).toHaveBeenCalledWith({ path: '/onboarding/name', query: { to: '/onboarding/app' } }))
   }
   finally {
     resolve({})
@@ -1454,7 +1474,6 @@ it('requires names when treatment arrives after the bounded startup wait', async
     writerMocks.abTestResponse = previousResponse
     if (descriptor)
       Object.defineProperty(window, 'matchMedia', descriptor)
-    vi.useRealTimers()
   }
 })
 
@@ -1464,13 +1483,11 @@ it.each([false, true])('returns from the goal to saved names only during initial
   const descriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
   const previousHistoryState = window.history.state
   const identity = { attemptId: 'back-profile-attempt', runId: 'back-profile-run' }
-  const assignments = { onboarding_v6: { branch: 'A', assigned_at: '2026-10-20T10:00:00.000Z' } }
-  writerMocks.abTestAssignments = assignments
+  writerMocks.abTestAssignments = {}
   writerMocks.main.user = Object.assign({
     id: 'back-profile-user',
     image_url: '',
     onboarding: {
-      abtests: assignments,
       profile_completed_at: '2026-10-20T10:00:00.000Z',
       flow: 'pre_org',
       status: 'in_progress',
@@ -1516,14 +1533,13 @@ it.each([false, true])('returns from the goal to saved names only during initial
   }
 })
 
-it.each(['aborted', 'rejected', 'treatment-removed'])('recovers a failed required-name navigation (%s) without saving wizard progress', async (failure) => {
+it.each(['aborted', 'rejected', 'names-saved-elsewhere'])('recovers a failed required-name navigation (%s) without saving wizard progress', async (failure) => {
   const previousUser = writerMocks.main.user
   const previousAssignments = writerMocks.abTestAssignments
   const descriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
   const reload = vi.spyOn(window.location, 'reload').mockImplementation(() => undefined)
-  const assignments = { onboarding_v6: { branch: 'A', assigned_at: '2026-10-20T10:00:00.000Z' } }
-  writerMocks.abTestAssignments = assignments
-  writerMocks.main.user = { id: 'name-redirect-retry', image_url: '', onboarding: { abtests: assignments } }
+  writerMocks.abTestAssignments = {}
+  writerMocks.main.user = { id: 'name-redirect-retry', image_url: '', first_name: '', last_name: '', onboarding: {} }
   writerMocks.router.replace.mockReset()
   if (failure !== 'rejected')
     writerMocks.router.replace.mockResolvedValueOnce({ type: 4 })
@@ -1546,14 +1562,14 @@ it.each(['aborted', 'rejected', 'treatment-removed'])('recovers a failed require
     expect(root.querySelector('.onboarding-intent-card')).toBeNull()
     expect(writerMocks.replaceUserOnboardingIfUnchanged).not.toHaveBeenCalled()
     expect(retry!.disabled).toBe(false)
-    if (failure === 'treatment-removed')
-      writerMocks.main.user.onboarding = { abtests: {} }
+    if (failure === 'names-saved-elsewhere')
+      Object.assign(writerMocks.main.user, { first_name: 'Example', last_name: 'User', onboarding: { profile_completed_at: '2026-10-20T10:00:00.000Z' } })
     retry!.click()
     for (let i = 0; i < 20; i++) {
       await Promise.resolve()
       await nextTick()
     }
-    if (failure === 'treatment-removed') {
+    if (failure === 'names-saved-elsewhere') {
       expect(reload).toHaveBeenCalledOnce()
       expect(writerMocks.router.replace).toHaveBeenCalledTimes(1)
     }

@@ -15,10 +15,9 @@ import { mergeUserOnboardingProgress, replaceUserOnboardingWithRetry, serializeU
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
-import { resolveOnboardingAnalyticsVersion } from '~/utils/onboardingABTests'
 import { onboardingPrimaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { canEditInitialOnboardingName, consumeProfileOnboardingHandoff, initialProfileOnboardingProgressSteps, initialProfileOnboardingSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY } from '~/utils/onboardingProfile'
-import { createOnboardingDetailsFieldDebouncer, createOnboardingProgressTracker, createOnboardingTelemetryIdentity } from '~/utils/onboardingProgressAnalytics'
+import { createOnboardingDetailsFieldDebouncer, createOnboardingProgressTracker, createOnboardingTelemetryIdentity, PROFILE_ONBOARDING_ANALYTICS_VERSION } from '~/utils/onboardingProgressAnalytics'
 import { openOnboardingResumeDialog } from '~/utils/onboardingResumeDialog'
 import { validateRedirectPath } from '~/utils/safeRedirect'
 
@@ -45,8 +44,7 @@ const progressSteps = computed(() => initialProfileOnboardingProgressSteps(main.
   .map(step => ({ id: step.id, label: t(step.labelKey) })))
 const profileHandoff = consumeProfileOnboardingHandoff(window.history)
 const resumePending = ref(!showWelcome.value && !profileHandoff)
-const onboardingAnalyticsVersion = () => resolveOnboardingAnalyticsVersion(main.user?.onboarding)
-const identity = createOnboardingTelemetryIdentity({ continueFrom: profileHandoff, flow: 'pre_org', onboardingVersion: onboardingAnalyticsVersion, supaHost: getLocalConfig().supaHost })
+const identity = createOnboardingTelemetryIdentity({ continueFrom: profileHandoff, flow: 'pre_org', onboardingVersion: () => PROFILE_ONBOARDING_ANALYTICS_VERSION, supaHost: getLocalConfig().supaHost })
 const analyticsSteps = targetPath.value.startsWith('/onboarding/organization') ? ['welcome', 'name', 'organization'] as const : initialProfileOnboardingSteps(main.user?.onboarding, true)
 let tracker: ReturnType<typeof createOnboardingProgressTracker> | undefined
 let disposed = false
@@ -209,7 +207,7 @@ onMounted(async () => {
   }
   if (resumePending.value && !await resumeSavedProfile())
     return
-  tracker = createOnboardingProgressTracker({ flow: 'pre_org', onboardingVersion: onboardingAnalyticsVersion, resumed: !showWelcome.value && !profileHandoff, steps: analyticsSteps, supaHost: getLocalConfig().supaHost, onboardingAttemptId: identity.attemptId, onboardingRunId: identity.runId })
+  tracker = createOnboardingProgressTracker({ flow: 'pre_org', onboardingVersion: () => PROFILE_ONBOARDING_ANALYTICS_VERSION, resumed: !showWelcome.value && !profileHandoff, steps: analyticsSteps, supaHost: getLocalConfig().supaHost, onboardingAttemptId: identity.attemptId, onboardingRunId: identity.runId })
   tracker.viewStep(showWelcome.value ? 'welcome' : 'name', isEditingProfile.value ? 'intent' : undefined)
   document.addEventListener('visibilitychange', visibilityChanged)
   try {

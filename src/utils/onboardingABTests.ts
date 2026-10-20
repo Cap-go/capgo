@@ -8,7 +8,6 @@ import {
   NEW_CHANNEL_DEVELOPMENT_ENVIRONMENT_ANALYTICS_VERSION,
   NEW_CHANNEL_PUBLISH_INTENT_ANALYTICS_VERSION,
   ONBOARDING_ANALYTICS_VERSION,
-  PROFILE_ONBOARDING_ANALYTICS_VERSION,
   WEBNATIVE_DEVELOPMENT_ENVIRONMENT_ANALYTICS_VERSION,
   WEBNATIVE_PUBLISH_INTENT_ANALYTICS_VERSION,
 } from '~/utils/onboardingProgressAnalytics'
@@ -16,7 +15,6 @@ import {
 export const WEBNATIVE_PUBLISH_INTENT_AB_TEST = 'webnativeapp_publish_intent'
 export const WEBNATIVE_DEVELOPMENT_ENVIRONMENT_AB_TEST = 'webnativeapp_development_environment'
 export const NEW_CHANNEL_AB_TEST = 'new_channel'
-export const PROFILE_ONBOARDING_AB_TEST = 'onboarding_v6'
 export const OTA_TODO_LIST_V3_AB_TEST = 'ota_todo_list_v3'
 
 export type OnboardingABTestBranch = 'A' | 'B' | 'C' | 'D'
@@ -53,14 +51,9 @@ export function parseOnboardingABTestAssignments(value: unknown): Record<string,
 export function reconcileOnboardingABTestAssignments(
   current: Record<string, OnboardingABTestAssignment>,
   authoritative: Record<string, OnboardingABTestAssignment>,
-  options: { authoritative?: boolean } = {},
 ): Record<string, OnboardingABTestAssignment> {
   const next = { ...current }
   delete next[NEW_CHANNEL_AB_TEST]
-  // A refresh in flight may clear intent-dependent flags, but must retain the
-  // required profile step until a successful server response replaces it.
-  if (options.authoritative !== false)
-    delete next[PROFILE_ONBOARDING_AB_TEST]
   return {
     ...next,
     ...authoritative,
@@ -98,16 +91,10 @@ export function shouldShowWebNativePublishIntent(onboarding: unknown): boolean {
     || hasWebNativeDevelopmentEnvironmentTreatment(onboarding)
 }
 
-export function hasProfileOnboarding(onboarding: unknown): boolean {
-  return getABTestBranch(onboarding, PROFILE_ONBOARDING_AB_TEST) === 'A'
-}
-
 export function resolveOnboardingAnalyticsVersion(
   onboarding: unknown,
   intent: OnboardingIntent | null = null,
 ): OnboardingAnalyticsVersion {
-  if (hasProfileOnboarding(onboarding))
-    return PROFILE_ONBOARDING_ANALYTICS_VERSION
   if (hasNewChannelTreatment(onboarding) && hasWebNativeDevelopmentEnvironmentTreatment(onboarding))
     return NEW_CHANNEL_DEVELOPMENT_ENVIRONMENT_ANALYTICS_VERSION
   if (hasNewChannelTreatment(onboarding) && hasWebNativePublishIntentTreatment(onboarding) && (intent === 'ota' || intent === 'both'))

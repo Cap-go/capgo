@@ -233,16 +233,14 @@ async function guard(
   }
 
   function requiredNameRedirect(organizationsLoaded: boolean) {
-    // An unknown profile cannot establish treatment eligibility. Offer a retry
-    // without letting the user bypass required names or stranding navigation.
+    // An unknown profile cannot establish whether names are required. Offer a
+    // retry without letting the user bypass required names or stranding navigation.
     if (!main.user)
       return { path: '/login', query: { profile_unavailable: '1', to: to.fullPath } }
-    if (!needsInitialOnboardingName(main.user))
+    // Scope is unknown after an org fetch failure. Never force an established
+    // member into initial onboarding; the onboarding wizard re-checks names.
+    if (!organizationsLoaded || !needsInitialOnboardingName(main.user))
       return null
-    // Scope is unknown after an org fetch failure. Retry rather than forcing
-    // an established member into initial onboarding or allowing a bypass.
-    if (!organizationsLoaded)
-      return false
     if (to.path === '/onboarding/name' || organizationStore.hasOrganizations)
       return null
     return { path: '/onboarding/name', query: { to: to.fullPath } }
@@ -386,10 +384,6 @@ async function guard(
 
     const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations(organizationFetchOptions))
     const nameRedirect = requiredNameRedirect(organizationsLoaded)
-    if (nameRedirect === false) {
-      await hideLoader()
-      return next(false)
-    }
     if (nameRedirect) {
       await hideLoader()
       return next(nameRedirect)
@@ -447,10 +441,6 @@ async function guard(
 
     let organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations(organizationFetchOptions))
     const nameRedirect = requiredNameRedirect(organizationsLoaded)
-    if (nameRedirect === false) {
-      await hideLoader()
-      return next(false)
-    }
     if (nameRedirect) {
       await hideLoader()
       return next(nameRedirect)
