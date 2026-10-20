@@ -1514,6 +1514,8 @@ async function handleCustomerProfileStripeEvent(
   if (stripeEvent.type === 'customer.created') {
     // Compatibility with the native Stripe -> Bento trigger: one Stripe customer
     // email, even before provisioning links the org. Never fan out to org members.
+    // This contract includes every customer.created on both accounts; org metadata
+    // provides optional context, not a product/cohort eligibility check for US.
     const email = getStripeCustomerEmailFromEvent(stripeEvent)
     const event = 'org:legacy_stripe_trial_started'
     const context = {

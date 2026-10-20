@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   syncCountry: vi.fn(),
   ensureMetadata: vi.fn(),
   memberEmails: vi.fn(async () => ({ emails: ['owner@example.com', 'admin@example.com'], resolutionFailed: false })),
+  orgUpdates: vi.fn(),
   fetch: vi.fn(),
   log: vi.fn(),
 }))
@@ -88,6 +89,10 @@ function database(account: BillingAccount, linked = true, storedAccount: Billing
         return query
       }),
       eq: vi.fn(() => query),
+      update: vi.fn((patch: unknown) => {
+        mocks.orgUpdates(patch)
+        return query
+      }),
       single: vi.fn(async () => ({ data: { customer_id: org.customer_id, billing_account: storedAccount }, error: null })),
       maybeSingle: vi.fn(async () => ({
         data: table === 'orgs'
@@ -219,11 +224,11 @@ describe.each(['ee', 'us'] as const)('%s Stripe customer creation forwarding', (
   })
 
   it('keeps the original creation email when the live billing email changed before delivery', async () => {
-    database(account, false)
     mocks.retrieve.mockResolvedValue({ email: 'changed@example.com' })
     expect((await deliver(account)).status).toBe(200)
     expect(JSON.parse(mocks.fetch.mock.calls[0][1].body).events[0].email).toBe('billing@example.com')
-    expect(mocks.retrieve).not.toHaveBeenCalled()
+    expect(mocks.retrieve).toHaveBeenCalledExactlyOnceWith(org.customer_id)
+    expect(mocks.orgUpdates).toHaveBeenCalledExactlyOnceWith({ management_email: 'changed@example.com' })
   })
 
   it.each(['network', 'http', 'partial', 'json'])('returns a retryable failure when Bento fails: %s', async (failure) => {

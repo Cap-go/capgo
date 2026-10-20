@@ -6,6 +6,10 @@ The recipient is exactly the Stripe customer's email, trimmed and lowercased.
 Capgo provisions that customer with the organization's management email, which
 can differ from the owner or other members. This event does not fan out.
 `customer.updated` and other event types do not send it.
+This contract deliberately includes every signed `customer.created` on both
+accounts, including US customers without org metadata. Metadata supplies context,
+not product/cohort eligibility; the shared US account's other-product filters on
+separate billing side effects do not apply to this event.
 
 Event details contain `customer_id`, `stripe_event_id`, the verified
 `billing_account` (`ee` or `us`), and `created_at` from the original Stripe event.
