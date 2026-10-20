@@ -17,6 +17,7 @@ import { getAppOnboardingStepIds } from '~/services/appOnboarding'
 import { isAppOnboardingChecklistStep } from '~/utils/appOnboardingChecklist'
 import { APP_ONBOARDING_STEP_GUIDES } from '~/utils/appOnboardingGuides'
 import { hasDualOnboardingChecklists } from '~/utils/dualOnboardingChecklists'
+import AppOnboardingAiAgentCard from './AppOnboardingAiAgentCard.vue'
 import ChannelSetupOnboardingDialog from './ChannelSetupOnboardingDialog.vue'
 import TechnicalTeammateInviteCard from './TechnicalTeammateInviteCard.vue'
 
@@ -33,7 +34,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   copyCommand: []
-  copyAi: []
+  copyAi: [placement?: 'checklist']
   hide: []
   explore: []
   complete: []
@@ -123,6 +124,9 @@ function statusLabel(status: string | undefined) {
       </p>
     </header>
 
+    <!-- The first task already offers the AI prompt next to the CLI command; keep it reachable for every later task too. -->
+    <AppOnboardingAiAgentCard v-if="!completed && !isFirstStep" @copy="emit('copyAi', 'checklist')" />
+
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6" data-test="setup-checklist-progress">
       <p class="shrink-0 text-sm font-medium text-slate-800 dark:text-slate-200" aria-live="polite" aria-atomic="true">
         {{ t('setup-checklist-progress', { done: doneCount, total: steps.length }) }}
@@ -135,28 +139,30 @@ function statusLabel(status: string | undefined) {
       />
     </div>
 
-    <div class="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)] dark:border-white/15 dark:bg-slate-900">
-      <nav class="border-b border-slate-200 p-4 sm:p-6 lg:border-b-0 lg:border-r dark:border-white/15" :aria-label="t('setup-checklist-list-title')">
-        <h2 class="text-lg font-semibold text-slate-950 dark:text-white">
-          {{ t('setup-checklist-list-title') }}
-        </h2>
-        <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+    <div class="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/15 dark:bg-slate-900" :class="{ 'lg:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)]': checklistOpen }">
+      <nav class="border-b border-slate-200 px-4 py-3 sm:px-6 dark:border-white/15" :class="{ 'sm:py-6 lg:border-b-0 lg:border-r': checklistOpen }" :aria-label="t('setup-checklist-list-title')">
+        <!-- New users see one task at a time; the full list stays one click away. -->
+        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <h2 class="text-lg font-semibold text-slate-950 dark:text-white">
+            {{ t('setup-checklist-list-title') }}
+          </h2>
+          <button
+            type="button"
+            class="d-btn d-btn-ghost min-h-11 px-2 text-sky-700 dark:text-azure-300"
+            :aria-expanded="checklistOpen"
+            :aria-controls="`${panelId}-list`"
+            data-test="setup-checklist-toggle"
+            @click="checklistOpen = !checklistOpen"
+          >
+            {{ checklistOpen ? t('setup-checklist-hide-steps') : t('setup-checklist-show-steps', { total: steps.length }) }}
+            <IconChevronDown class="h-4 w-4 shrink-0" :class="{ 'rotate-180': checklistOpen }" aria-hidden="true" />
+          </button>
+        </div>
+        <p v-if="checklistOpen" class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
           {{ t('setup-checklist-list-subtitle') }}
         </p>
 
-        <button
-          type="button"
-          class="d-btn d-btn-ghost mt-3 h-auto min-h-11 w-full justify-between px-0 text-left lg:hidden"
-          :aria-expanded="checklistOpen"
-          :aria-controls="`${panelId}-list`"
-          data-test="setup-checklist-mobile-toggle"
-          @click="checklistOpen = !checklistOpen"
-        >
-          <span class="min-w-0 text-sm">{{ selectedStep.index + 1 }}. {{ selectedStep.title }}</span>
-          <IconChevronDown class="h-4 w-4 shrink-0" :class="{ 'rotate-180': checklistOpen }" aria-hidden="true" />
-        </button>
-
-        <ol :id="`${panelId}-list`" class="mt-4 lg:block" :class="checklistOpen ? 'block' : 'hidden'">
+        <ol :id="`${panelId}-list`" class="mt-4" :class="checklistOpen ? 'block' : 'hidden'">
           <li
             v-for="step in steps"
             :key="step.id"
@@ -202,7 +208,7 @@ function statusLabel(status: string | undefined) {
         </template>
         <template v-else>
           <p class="text-sm font-medium text-sky-700 dark:text-azure-400">
-            {{ isSelectedCurrent ? t('setup-checklist-current-task') : t('setup-checklist-task-number', { number: selectedStep.index + 1, total: steps.length }) }}
+            {{ t(isSelectedCurrent ? 'setup-checklist-current-task-number' : 'setup-checklist-task-number', { number: selectedStep.index + 1, total: steps.length }) }}
           </p>
           <h2 class="mt-3 text-2xl font-semibold leading-tight text-slate-950 sm:text-3xl dark:text-white">
             {{ selectedStep.title }}

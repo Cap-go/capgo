@@ -9,6 +9,8 @@ export interface ReadOnlyContext {
   query: <T extends QueryResultRow = QueryResultRow>(text: string, values?: unknown[]) => Promise<T[]>
 }
 export interface DispatchJob { version: 1, evaluationKey: string, runId: string }
+export interface AuditRecoveryJob { version: 1, operation: 'audit_recovery' }
+export type DispatchQueueJob = DispatchJob | AuditRecoveryJob
 export type TerminalReason = 'accepted' | 'cancelled' | 'expired' | 'removed' | 'superseded' | 'completed'
 export interface EligibleUser {
   flowKey: string
@@ -40,9 +42,22 @@ export interface Evaluation {
   findEligibleUsers: (ctx: ReadOnlyContext) => Promise<EligibleUser[]>
   handleEligibleUsers: (ctx: MutationContext, users: EligibleUser[]) => Promise<Record<string, Json>>
 }
+export interface TaskContext {
+  settings: Readonly<Record<string, string>>
+  run: <T>(operation: (db: QueryClient) => Promise<T>) => Promise<T>
+}
+export interface TaskEvaluation {
+  kind: 'task'
+  key: string
+  everyMinutes: number
+  execute: (ctx: TaskContext) => Promise<Record<string, Json>>
+}
+export type QueuedEvaluation = Evaluation | TaskEvaluation
 export interface RunRecord extends QueryResultRow {
   id: string
   evaluation_key: string
+  scheduled_for: Date | string
+  status: string
   enqueue_claim_token: string | null
   execution_claim_token: string | null
   eligible_users: EligibleUser[] | null

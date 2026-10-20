@@ -7,7 +7,7 @@ import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../supabase/functions/_backend/u
 
 const createdAt = '2026-10-17T15:00:00.000Z'
 const assignedAt = '2026-10-17T15:01:00.000Z'
-const migration = readFileSync('supabase/migrations/20261019102456_organization_lifecycle_v2.sql', 'utf8')
+const migration = readFileSync('supabase/migrations/20261020145512_organization_lifecycle_v2.sql', 'utf8')
 let db: Database
 
 function treatment(branch = 'A') {
@@ -401,9 +401,10 @@ describe('lifecycle private schema and bounded lookup indexes', () => {
 
   it('keeps original-creator, due and per-person/org history lookups indexed', async () => {
     const indexes = (await db.query(`SELECT indexname, indexdef FROM pg_catalog.pg_indexes WHERE schemaname = 'public' AND indexname IN
-      ('org_lifecycle_original_creator','bento_lifecycle_due','bento_lifecycle_dispatch_org','bento_lifecycle_dispatch_person')`)).rows
-    expect(indexes).toHaveLength(4)
+      ('org_lifecycle_original_creator','bento_lifecycle_due','bento_lifecycle_candidates','bento_lifecycle_dispatch_org','bento_lifecycle_dispatch_person')`)).rows
+    expect(indexes).toHaveLength(5)
     expect(indexes.find(row => row.indexname === 'org_lifecycle_original_creator').indexdef).toContain('(original_creator_id, org_id)')
+    expect(indexes.find(row => row.indexname === 'bento_lifecycle_candidates').indexdef).toContain('(product, next_evaluation_at, org_id) WHERE (candidate IS NOT NULL)')
     expect(indexes.find(row => row.indexname === 'bento_lifecycle_dispatch_person').indexdef).toContain('recipientId')
     expect(indexes.find(row => row.indexname === 'bento_lifecycle_dispatch_org').indexdef).toContain('orgId')
   })

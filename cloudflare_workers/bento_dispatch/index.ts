@@ -1,21 +1,21 @@
 import type { Context as HonoContext } from 'hono'
 import type { PostHogQueueEnv } from '../../supabase/functions/_backend/utils/posthog_queue.ts'
-import type { DispatchJob } from './contracts.ts'
+import type { DispatchQueueJob } from './contracts.ts'
 import { Context } from 'hono'
 import { Client } from 'pg'
 import { isBentoConfigured, trackBentoEvent } from '../../supabase/functions/_backend/utils/bento.ts'
 import { bentoFlows } from './bentoFlows.ts'
 import { processDispatchJob } from './consumer.ts'
-import { refreshLifecycleJourneys } from './flows/lifecycle/refresh.ts'
-import { LIFECYCLE_ROLLOUT_KEYS, lifecycleReady, lifecycleSettings } from './flows/lifecycle/rollout.ts'
-import { createMutationContext } from './helpers.ts'
-import { parseDispatchJob } from './operations.ts'
+import { LIFECYCLE_ROLLOUT_KEYS } from './flows/lifecycle/rollout.ts'
+import { createMutationContext, createTaskContext } from './helpers.ts'
+import { parseDispatchQueueJob } from './operations.ts'
 import { publishDispatchJobs } from './scheduler.ts'
 import { DispatchStore } from './store.ts'
 
 export interface DispatchEnv extends PostHogQueueEnv {
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive
-  DISPATCH_QUEUE: Queue<DispatchJob>
+  DISPATCH_QUEUE: Queue<DispatchQueueJob>
+  // Lifecycle-only opt-in; ordinary reminders use Worker configuration.
   BENTO_EVENT_DISPATCH_ENABLED?: string
   BENTO_LIFECYCLE_V2_SENDER_CONTRACT?: string
   BENTO_LIFECYCLE_V2_LEGACY_HANDOFF?: string
@@ -28,37 +28,19 @@ export interface DispatchEnv extends PostHogQueueEnv {
 }
 
 const settings = ['BENTO_PUBLISHABLE_KEY', 'BENTO_SECRET_KEY', 'BENTO_SITE_UUID', 'WEBAPP_URL'] as const
+const lifecycleSettings = [...LIFECYCLE_ROLLOUT_KEYS, 'CF_ACCOUNT_ANALYTICS_ID', 'CF_ANALYTICS_TOKEN'] as const
 
-async function enabled(db: Client, env: DispatchEnv) {
-  // Vault owns runtime activation; an environment value is an explicit
-  // deployment-time override. An absent setting leaves dispatch inactive.
-  if (env.BENTO_EVENT_DISPATCH_ENABLED !== undefined)
-    return env.BENTO_EVENT_DISPATCH_ENABLED.trim() === 'true'
-  const result = await db.query<{ decrypted_secret: string }>(
-    'SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = $1 LIMIT 1',
-    ['BENTO_EVENT_DISPATCH_ENABLED'],
-  )
-  return result.rows[0]?.decrypted_secret?.trim() === 'true'
-}
-
-async function senderContext(db: Client, env: DispatchEnv, runId: string): Promise<HonoContext> {
-  const missing = settings.filter(key => !env[key]?.trim())
+function senderContext(env: DispatchEnv, runId: string): HonoContext {
   const values: Record<string, string> = {}
-  if (missing.length) {
-    const result = await db.query<{ name: string, decrypted_secret: string }>(
-      'SELECT name, decrypted_secret FROM vault.decrypted_secrets WHERE name = ANY($1::text[])',
-      [missing],
-    )
-    for (const row of result.rows)
-      values[row.name] = row.decrypted_secret
-  }
   for (const key of settings) {
-    if (env[key]?.trim())
-      values[key] = env[key]!
+    const value = env[key]?.trim()
+    if (!value)
+      throw new Error('Missing dispatch configuration')
+    values[key] = value
   }
   const c = new Context(new Request('https://bento-dispatch.internal'), { env: values })
   c.set('requestId', runId)
-  if (!isBentoConfigured(c) || !values.WEBAPP_URL)
+  if (!isBentoConfigured(c))
     throw new Error('Missing dispatch configuration')
   // Validate the destination before claiming any events or consuming attempts.
   const url = new URL(values.WEBAPP_URL)
@@ -88,44 +70,22 @@ async function withDatabase<T>(env: DispatchEnv, operation: (db: Client) => Prom
   }
 }
 
-export async function scheduleDispatch(_controller: ScheduledController, env: DispatchEnv) {
+export async function scheduleDispatch(controller: ScheduledController, env: DispatchEnv) {
+  let failed = false
   try {
     await withDatabase(env, async (db) => {
-      const store = new DispatchStore(db)
-      try {
-        await store.relayPendingAudit(env.POSTHOG_QUEUE)
-      }
-      catch { console.error(JSON.stringify({ event: 'bento_dispatch_audit_pending' })) }
-      if (!await enabled(db, env))
-        return
-      try {
-        const read = { query: async <T extends import('pg').QueryResultRow>(sql: string, values?: unknown[]) => (await db.query<T>(sql, values)).rows }
-        if (await lifecycleReady(read, env as unknown as Record<string, string>)) {
-          const analytics = await lifecycleSettings(read, env as unknown as Record<string, string>, ['CF_ACCOUNT_ANALYTICS_ID', 'CF_ANALYTICS_TOKEN'])
-          const reader = /^[a-f\d]{32}$/i.test(analytics.CF_ACCOUNT_ANALYTICS_ID ?? '') && analytics.CF_ANALYTICS_TOKEN
-            ? async (query: string) => {
-              const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${analytics.CF_ACCOUNT_ANALYTICS_ID}/analytics_engine/sql`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${analytics.CF_ANALYTICS_TOKEN}`, 'Content-Type': 'text/plain; charset=utf-8' },
-                body: query,
-                signal: AbortSignal.timeout(5_000),
-              })
-              if (!response.ok)
-                throw new Error('Lifecycle evidence unavailable')
-              const result = await response.json() as { data?: Array<Record<string, string>> }
-              if (!Array.isArray(result.data))
-                throw new Error('Invalid lifecycle evidence')
-              return result.data
-            }
-            : null
-          await refreshLifecycleJourneys(db, reader)
-        }
-      }
-      catch { console.error(JSON.stringify({ event: 'bento_lifecycle_refresh_failed' })) }
-      await publishDispatchJobs(env.DISPATCH_QUEUE, store, bentoFlows)
+      senderContext(env, 'bento-dispatch-scheduler')
+      await publishDispatchJobs(env.DISPATCH_QUEUE, new DispatchStore(db), bentoFlows, controller.scheduledTime)
     })
   }
-  catch {
+  catch { failed = true }
+  try {
+    // This delivery owns no invocation row or audit intent. Recovery must stay
+    // live when completed evaluations cannot roll over their pending telemetry.
+    await env.DISPATCH_QUEUE.send({ version: 1, operation: 'audit_recovery' })
+  }
+  catch { failed = true }
+  if (failed) {
     console.error(JSON.stringify({ event: 'bento_dispatch_schedule_failed' }))
     throw new Error('Bento dispatch scheduling failed')
   }
@@ -143,42 +103,48 @@ export async function consumeDispatch(batch: MessageBatch<unknown>, env: Dispatc
     return
   }
   const [message] = batch.messages
-  let job: DispatchJob
+  let job: DispatchQueueJob
   try {
-    job = parseDispatchJob(message.body, bentoFlows)
+    job = parseDispatchQueueJob(message.body, bentoFlows)
   }
   catch {
     console.error(JSON.stringify({ event: 'bento_dispatch_invalid_job' }))
     message.ack()
     return
   }
+  const logIdentity = 'operation' in job ? { operation: job.operation } : { runId: job.runId, evaluationKey: job.evaluationKey }
   // Keep the global ceiling if a replay or queue reconfiguration exceeds
   // the normal five configured deliveries; never open the database on six.
   if (message.attempts > 5) {
-    console.error(JSON.stringify({ event: 'bento_dispatch_delivery_exhausted', runId: job.runId, evaluationKey: job.evaluationKey }))
+    console.error(JSON.stringify({ event: 'bento_dispatch_delivery_exhausted', ...logIdentity }))
     message.ack()
     return
   }
   try {
     const counts = await withDatabase(env, async (db) => {
-      if (!await enabled(db, env))
-        return { accepted: 0, cancelled: 0, failed: 0 }
-      const c = await senderContext(db, env, job.runId)
       const store = new DispatchStore(db)
+      if ('operation' in job) {
+        await store.relayPendingAudit(env.POSTHOG_QUEUE)
+        return { recovered: true }
+      }
+      const c = senderContext(env, job.runId)
       const result = await processDispatchJob(job, store, run => createMutationContext(store, run, async (event) => {
         return await trackBentoEvent(c, event.email, event.data, event.event, AbortSignal.timeout(10_000)) === true
-      }, { WEBAPP_URL: c.env.WEBAPP_URL, ...Object.fromEntries(LIFECYCLE_ROLLOUT_KEYS.filter(key => env[key] !== undefined).map(key => [key, env[key]!])) }, Date.now, env.POSTHOG_QUEUE), bentoFlows[job.evaluationKey], env.POSTHOG_QUEUE)
+      }, { WEBAPP_URL: c.env.WEBAPP_URL, ...Object.fromEntries(LIFECYCLE_ROLLOUT_KEYS.filter(key => env[key] !== undefined).map(key => [key, env[key]!])) }, Date.now, env.POSTHOG_QUEUE), bentoFlows[job.evaluationKey], env.POSTHOG_QUEUE, run => createTaskContext(store, run, Object.fromEntries(lifecycleSettings.flatMap((key) => {
+        const value = env[key]
+        return value === undefined ? [] : [[key, value]]
+      }))))
       try {
         await store.relayPendingAudit(env.POSTHOG_QUEUE)
       }
       catch { console.error(JSON.stringify({ event: 'bento_dispatch_audit_pending', runId: job.runId })) }
       return result
     })
-    console.log(JSON.stringify({ event: 'bento_dispatch_job', runId: job.runId, evaluationKey: job.evaluationKey, ...counts }))
+    console.log(JSON.stringify({ event: 'bento_dispatch_job', ...logIdentity, ...counts }))
     message.ack()
   }
   catch {
-    console.error(JSON.stringify({ event: 'bento_dispatch_job_failed', runId: job.runId, evaluationKey: job.evaluationKey }))
+    console.error(JSON.stringify({ event: 'bento_dispatch_job_failed', ...logIdentity }))
     if (message.attempts < 5)
       message.retry({ delaySeconds: 60 })
     else

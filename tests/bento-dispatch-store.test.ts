@@ -9,6 +9,8 @@ import { parsePostHogMessage } from '../supabase/functions/_backend/utils/postho
 import { executeSQL, POSTGRES_URL } from './test-utils.ts'
 
 const pool = new Pool({ connectionString: POSTGRES_URL, max: 12 })
+const scheduledTime = Date.UTC(2026, 0, 1, 10)
+const auditQueue = { send: async () => ({ metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } }) }
 afterAll(() => pool.end())
 async function fixture() {
   const key = `test:evaluation:${randomUUID()}`
@@ -21,7 +23,7 @@ async function fixture() {
   } }
 }
 async function running(f: Awaited<ReturnType<typeof fixture>>) {
-  const queued = (await f.store.schedule(f.key, 1))!
+  const queued = (await f.store.schedule(f.key, 1, Date.now()))!
   await f.store.markEnqueued(queued.id, queued.enqueue_claim_token!)
   return (await f.store.claimRun({ version: 1, evaluationKey: f.key, runId: queued.id }))!
 }
@@ -42,36 +44,116 @@ describe('bento evaluation PostgreSQL store', () => {
     }
   })
 
-  it.each([1, 5])('schedules first work once, then observes the durable %i-minute cadence', async (minutes) => {
+  it.each([1, 5])('uses Cloudflare slots for the %i-minute cadence despite late publication', async (minutes) => {
     const f = await fixture()
     try {
-      const run = (await f.store.schedule(f.key, minutes))!
+      const run = (await f.store.schedule(f.key, minutes, scheduledTime))!
       expect(run.id).toBeTruthy()
-      expect(await f.store.schedule(f.key, minutes)).toBeNull()
+      expect(new Date(run.scheduled_for).getTime()).toBe(scheduledTime)
+      expect(await f.store.schedule(f.key, minutes, scheduledTime)).toBeNull()
       await f.store.markEnqueued(run.id, run.enqueue_claim_token!)
       const claimed = (await f.store.claimRun({ version: 1, evaluationKey: f.key, runId: run.id }))!
       await f.store.completeRun(claimed, {})
-      expect(await f.store.schedule(f.key, minutes)).toBeNull()
-      await executeSQL(`UPDATE public.bento_evaluation_runs SET enqueued_at = NOW() - ($2 * INTERVAL '1 minute') - INTERVAL '1 second' WHERE id = $1`, [run.id, minutes])
-      expect((await f.store.schedule(f.key, minutes))!.id).not.toBe(run.id)
+      await f.store.flushRunAudit(run.id, auditQueue)
+      expect(await f.store.schedule(f.key, minutes, scheduledTime + minutes * 60_000 - 1)).toBeNull()
+      const next = (await f.store.schedule(f.key, minutes, scheduledTime + minutes * 60_000))!
+      expect(next.id).not.toBe(run.id)
+      expect(new Date(next.scheduled_for).getTime()).toBe(scheduledTime + minutes * 60_000)
+      const rows = await executeSQL('SELECT id FROM public.bento_evaluation_runs WHERE evaluation_key = $1', [f.key])
+      expect(rows).toEqual([{ id: next.id }])
     }
     finally {
       await f.cleanup()
     }
   })
 
-  it('uses durable queue receipt for cadence after publication succeeds and its marker write is lost', async () => {
+  it('keeps the scheduled slot when queue publication succeeds but its marker write is lost', async () => {
     const f = await fixture()
     try {
-      const pending = (await f.store.schedule(f.key, 5))!
+      const pending = (await f.store.schedule(f.key, 5, scheduledTime))!
       // The queue received this job, but the publisher died before markEnqueued.
       const run = (await f.store.claimRun({ version: 1, evaluationKey: f.key, runId: pending.id }))!
       await f.store.completeRun(run, {})
       const [receipt] = await executeSQL<{ enqueued_at: Date | null }>('SELECT enqueued_at FROM public.bento_evaluation_runs WHERE id = $1', [run.id])
       expect(receipt!.enqueued_at).not.toBeNull()
-      expect(await f.store.schedule(f.key, 5)).toBeNull()
-      await executeSQL(`UPDATE public.bento_evaluation_runs SET enqueued_at = NOW() - INTERVAL '5 minutes 1 second' WHERE id = $1`, [run.id])
-      expect((await f.store.schedule(f.key, 5))!.id).not.toBe(run.id)
+      await f.store.flushRunAudit(run.id, auditQueue)
+      expect(await f.store.schedule(f.key, 5, scheduledTime + 4 * 60_000)).toBeNull()
+      expect((await f.store.schedule(f.key, 5, scheduledTime + 5 * 60_000))!.id).not.toBe(run.id)
+    }
+    finally { await f.cleanup() }
+  })
+
+  it('reuses one row across completed runs and fences delayed messages and owners from previous runs', async () => {
+    const f = await fixture()
+    try {
+      let previous: Awaited<ReturnType<typeof running>> | undefined
+      for (let minute = 0; minute < 4; minute++) {
+        const pending = (await f.store.schedule(f.key, 1, scheduledTime + minute * 60_000))!
+        expect(pending).toBeTruthy()
+        const job = { version: 1 as const, evaluationKey: f.key, runId: pending.id }
+        const run = (await f.store.claimRun(job))!
+        expect(run.eligible_users).toBeNull()
+        if (previous) {
+          expect(run.id).not.toBe(previous.id)
+          expect(await f.store.claimRun({ ...job, runId: previous.id })).toBeNull()
+          expect(await f.store.markEnqueued(previous.id, previous.enqueue_claim_token!)).toBe(false)
+          await f.store.publicationFailed(previous.id, previous.enqueue_claim_token!)
+          await expect(f.store.completeRun(previous, {})).rejects.toThrow('Evaluation claim lost')
+          await expect(f.store.runTask(previous, async () => ({ processed: 1 }))).rejects.toThrow('Evaluation claim lost')
+        }
+        await f.store.saveSelection(run, [selected(f)], [])
+        await f.store.completeRun(run, { selected: 1 })
+        // Unhanded reports must survive and prevent a rollover.
+        expect(await f.store.schedule(f.key, 1, scheduledTime + (minute + 1) * 60_000)).toBeNull()
+        await f.store.flushRunAudit(run.id, auditQueue)
+        expect(await f.store.schedule(f.key, 1, scheduledTime - 60_000)).toBeNull()
+        expect(await executeSQL('SELECT id FROM public.bento_evaluation_runs WHERE evaluation_key = $1', [f.key])).toEqual([{ id: run.id }])
+        previous = run
+      }
+    }
+    finally { await f.cleanup() }
+  })
+
+  it('keeps a running claim for ten minutes, then republishes the same run with its saved selection', async () => {
+    const f = await fixture()
+    try {
+      const run = await running(f)
+      const user = selected(f)
+      await f.store.saveSelection(run, [user], [])
+      const [timing] = await executeSQL<{ seconds: string }>('SELECT EXTRACT(EPOCH FROM execution_claim_until - started_at)::text AS seconds FROM public.bento_evaluation_runs WHERE id = $1', [run.id])
+      expect(Number(timing!.seconds)).toBe(600)
+      await executeSQL(`UPDATE public.bento_evaluation_runs SET execution_claim_until = NOW() + INTERVAL '1 second' WHERE id = $1`, [run.id])
+      expect(await f.store.schedule(f.key, 1, Date.now() + 60_000)).toBeNull()
+      await executeSQL(`UPDATE public.bento_evaluation_runs SET execution_claim_until = NOW() - INTERVAL '1 millisecond' WHERE id = $1`, [run.id])
+      const recovered = (await f.store.schedule(f.key, 1, Date.now() + 60_000))!
+      expect(recovered.id).toBe(run.id)
+      expect(recovered.eligible_users).toEqual([user])
+      const replacement = (await f.store.claimRun({ version: 1, evaluationKey: f.key, runId: run.id }))!
+      expect(replacement.execution_claim_token).not.toBe(run.execution_claim_token)
+      await expect(f.store.completeRun(run, {})).rejects.toThrow('Evaluation claim lost')
+      await f.store.completeRun(replacement, {})
+    }
+    finally { await f.cleanup() }
+  })
+
+  it('allows only one rollover when eight cron invocations contend for the next slot', async () => {
+    const f = await fixture()
+    try {
+      const first = (await f.store.schedule(f.key, 1, scheduledTime))!
+      const run = (await f.store.claimRun({ version: 1, evaluationKey: f.key, runId: first.id }))!
+      await f.store.completeRun(run, {})
+      await f.store.flushRunAudit(run.id, auditQueue)
+      const attempts = await Promise.all(Array.from({ length: 8 }, async () => {
+        const client = await pool.connect()
+        try {
+          return await new DispatchStore(client).schedule(f.key, 1, scheduledTime + 60_000)
+        }
+        finally { client.release() }
+      }))
+      expect(attempts.filter(Boolean)).toHaveLength(1)
+      const next = attempts.find(Boolean)!
+      expect(next.id).not.toBe(first.id)
+      expect(await executeSQL('SELECT id FROM public.bento_evaluation_runs WHERE evaluation_key = $1', [f.key])).toEqual([{ id: next.id }])
     }
     finally { await f.cleanup() }
   })
@@ -82,7 +164,7 @@ describe('bento evaluation PostgreSQL store', () => {
       const scheduled = await Promise.all(Array.from({ length: 8 }, async () => {
         const client = await pool.connect()
         try {
-          return await new DispatchStore(client).schedule(f.key, 1)
+          return await new DispatchStore(client).schedule(f.key, 1, Date.now())
         }
         finally {
           client.release()
@@ -91,7 +173,7 @@ describe('bento evaluation PostgreSQL store', () => {
       expect(scheduled.filter(Boolean)).toHaveLength(1)
       const first = scheduled.find(Boolean)!
       await executeSQL(`UPDATE public.bento_evaluation_runs SET enqueue_claim_until = NOW() - INTERVAL '1 second' WHERE id = $1`, [first.id])
-      const retry = (await f.store.schedule(f.key, 1))!
+      const retry = (await f.store.schedule(f.key, 1, Date.now()))!
       expect(retry.id).toBe(first.id)
       expect(retry.enqueue_claim_token).not.toBe(first.enqueue_claim_token)
       expect(await f.store.markEnqueued(first.id, first.enqueue_claim_token!)).toBe(false)
@@ -108,7 +190,7 @@ describe('bento evaluation PostgreSQL store', () => {
       const first = await running(f)
       const job = { version: 1 as const, evaluationKey: f.key, runId: first.id }
       expect(await f.store.claimRun(job)).toBeNull()
-      expect(await f.store.schedule(f.key, 1)).toBeNull()
+      expect(await f.store.schedule(f.key, 1, Date.now())).toBeNull()
       await executeSQL(`UPDATE public.bento_evaluation_runs SET execution_claim_until = NOW() - INTERVAL '1 second' WHERE id = $1`, [first.id])
       const replacement = (await f.store.claimRun(job))!
       expect(replacement.execution_claim_token).not.toBe(first.execution_claim_token)
@@ -190,7 +272,7 @@ describe('bento evaluation PostgreSQL store', () => {
   it('preserves the original handler selection across retries while sanitizing only analytics', async () => {
     const f = await fixture()
     try {
-      const pending = (await f.store.schedule(f.key, 1))!
+      const pending = (await f.store.schedule(f.key, 1, Date.now()))!
       await f.store.markEnqueued(pending.id, pending.enqueue_claim_token!)
       const user = { ...selected(f), metadata: { event_id: 'safe-domain-history', bento: 'safe-domain-label', nested: { child: { child: { child: { child: { child: { label: 'domain-value' } } } } } } } }
       const seen: EligibleUser[][] = []
@@ -250,15 +332,15 @@ describe('bento evaluation PostgreSQL store', () => {
   it('caps durable publication and execution attempts at five', async () => {
     const f = await fixture()
     try {
-      let pending = (await f.store.schedule(f.key, 1))!
+      let pending = (await f.store.schedule(f.key, 1, Date.now()))!
       const originalId = pending.id
       for (let attempt = 1; attempt <= 5; attempt++) {
         expect(pending.id).toBe(originalId)
         await f.store.publicationFailed(pending.id, pending.enqueue_claim_token!)
         if (attempt < 5)
-          pending = (await f.store.schedule(f.key, 1))!
+          pending = (await f.store.schedule(f.key, 1, Date.now()))!
       }
-      expect(await f.store.schedule(f.key, 1)).toBeNull()
+      expect(await f.store.schedule(f.key, 1, Date.now())).toBeNull()
       const [exhausted] = await executeSQL<{ status: string, enqueue_attempt_count: number }>('SELECT status, enqueue_attempt_count FROM public.bento_evaluation_runs WHERE id = $1', [originalId])
       expect(exhausted).toEqual({ status: 'failed', enqueue_attempt_count: 5 })
       await executeSQL('DELETE FROM public.bento_evaluation_runs WHERE id = $1', [originalId])

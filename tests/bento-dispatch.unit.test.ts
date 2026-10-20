@@ -1,10 +1,11 @@
-import type { EligibleUser, Evaluation } from '../cloudflare_workers/bento_dispatch/contracts.ts'
+import type { EligibleUser, Evaluation, TaskEvaluation } from '../cloudflare_workers/bento_dispatch/contracts.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { buildEligibilityAudit } from '../cloudflare_workers/bento_dispatch/audit.ts'
 import { bentoFlows } from '../cloudflare_workers/bento_dispatch/bentoFlows.ts'
 import { processDispatchJob } from '../cloudflare_workers/bento_dispatch/consumer.ts'
 import { invitationEvaluation, resolveInvitation } from '../cloudflare_workers/bento_dispatch/flows/invitations.ts'
-import { buildInvitationEvent, parseDispatchJob } from '../cloudflare_workers/bento_dispatch/operations.ts'
+import { createTaskContext } from '../cloudflare_workers/bento_dispatch/helpers.ts'
+import { buildInvitationEvent, parseDispatchJob, parseDispatchQueueJob } from '../cloudflare_workers/bento_dispatch/operations.ts'
 import { publishDispatchJobs } from '../cloudflare_workers/bento_dispatch/scheduler.ts'
 import { messageBytes, parsePostHogMessage, POSTHOG_MESSAGE_MAX_BYTES } from '../supabase/functions/_backend/utils/posthog_queue.ts'
 
@@ -35,8 +36,8 @@ function harness() {
 }
 
 describe('bento evaluation contracts', () => {
-  it('uses six independently registered minutely evaluations and identifier-only messages', () => {
-    expect(Object.values(bentoFlows).map(flow => flow.everyMinutes)).toEqual([1, 1, 1, 1, 1, 1])
+  it('keeps the six existing cadences and registers one minutely preparation task and identifier-only messages', () => {
+    expect(Object.values(bentoFlows).map(flow => flow.everyMinutes)).toEqual([1, 1, 1, 1, 1, 1, 1])
     expect(parseDispatchJob(job)).toEqual(job)
     for (const input of [null, [], { ...job, partition: 0 }, { ...job, operation: key }, { ...job, evaluationKey: 'unknown' }, { ...job, runId: 'invalid' }])
       expect(() => parseDispatchJob(input)).toThrow('Invalid dispatch job')
@@ -45,21 +46,57 @@ describe('bento evaluation contracts', () => {
   it('publishes only claimed due evaluations and preserves their durable run UUID on retry', async () => {
     const queue = { send: vi.fn().mockResolvedValue(undefined) }
     const store = { schedule: vi.fn().mockResolvedValueOnce({ id: job.runId, enqueue_claim_token: 'claim' }).mockResolvedValue(null), markEnqueued: vi.fn(), publicationFailed: vi.fn() }
-    await publishDispatchJobs(queue, store, bentoFlows)
+    await publishDispatchJobs(queue, store, bentoFlows, Date.UTC(2026, 0, 1, 10))
     expect(queue.send).toHaveBeenCalledExactlyOnceWith(job)
     expect(store.markEnqueued).toHaveBeenCalledWith(job.runId, 'claim')
+    expect(store.schedule).toHaveBeenCalledWith(expect.any(String), 1, Date.UTC(2026, 0, 1, 10))
   })
 
   it('attempts independent evaluations after a failed publication', async () => {
     const queue = { send: vi.fn().mockRejectedValueOnce(new Error('unavailable')).mockResolvedValue(undefined) }
     const store = { schedule: vi.fn().mockResolvedValue({ id: job.runId, enqueue_claim_token: 'claim' }), markEnqueued: vi.fn(), publicationFailed: vi.fn() }
-    await expect(publishDispatchJobs(queue, store, bentoFlows)).rejects.toThrow('Queue publication failed')
-    expect(queue.send).toHaveBeenCalledTimes(6)
+    await expect(publishDispatchJobs(queue, store, bentoFlows, Date.UTC(2026, 0, 1, 10))).rejects.toThrow('Queue publication failed')
+    expect(queue.send).toHaveBeenCalledTimes(7)
     expect(store.publicationFailed).toHaveBeenCalledOnce()
+  })
+  it('accepts only the exact typed maintenance operation while retaining strict evaluation messages', () => {
+    const recovery = { version: 1, operation: 'audit_recovery' }
+    expect(parseDispatchQueueJob(recovery, bentoFlows)).toEqual(recovery)
+    expect(parseDispatchQueueJob(job, bentoFlows)).toEqual(job)
+    for (const value of [{ ...recovery, email: 'invalid@example.com' }, { ...recovery, runId: job.runId }, { ...recovery, version: 2 }, { ...recovery, operation: 'unknown' }])
+      expect(() => parseDispatchQueueJob(value, bentoFlows)).toThrow()
   })
 })
 
 describe('selection audit ordering and preservation', () => {
+  it('runs a typed preparation task only after claiming and handing off its audit, without a recipient finder', async () => {
+    const h = harness()
+    const runTask = vi.fn(async (_run, operation) => operation({ query: vi.fn() }))
+    Object.assign(h.store, { runTask })
+    const task: TaskEvaluation = { kind: 'task', key: 'lifecycle:v2:prepare', everyMinutes: 1, execute: vi.fn(ctx => ctx.run(async () => {
+      expect(Object.isFrozen(ctx.settings)).toBe(true)
+      h.order.push('task')
+      return { processed: 3, deferred: 2 }
+    })) }
+    await expect(processDispatchJob(job, h.store as never, {} as never, task, undefined, run => createTaskContext(h.store as never, run, { marker: 'value' }))).resolves.toEqual({ processed: 3, deferred: 2 })
+    expect(h.order).toEqual(['analytics', 'task', 'complete', 'analytics'])
+    expect(h.store.readOnly).not.toHaveBeenCalled()
+    expect(h.store.saveSelection).not.toHaveBeenCalled()
+    expect(runTask).toHaveBeenCalledOnce()
+  })
+
+  it('does not execute preparation on a duplicate delivery or before an unavailable audit handoff', async () => {
+    const h = harness()
+    const task: TaskEvaluation = { kind: 'task', key: 'lifecycle:v2:prepare', everyMinutes: 1, execute: vi.fn() }
+    h.store.flushRunAudit.mockRejectedValue(new Error('unavailable'))
+    await expect(processDispatchJob(job, h.store as never, {} as never, task)).rejects.toThrow()
+    expect(task.execute).not.toHaveBeenCalled()
+    expect(h.store.failRun).toHaveBeenCalledWith(expect.anything(), 'task_audit')
+    h.store.claimRun.mockResolvedValueOnce(null)
+    await expect(processDispatchJob(job, h.store as never, {} as never, task)).resolves.toEqual({ duplicate: true })
+    expect(task.execute).not.toHaveBeenCalled()
+  })
+
   it('saves the whole snapshot and completes analytics handoff before invoking the handler', async () => {
     const h = harness()
     await processDispatchJob(job, h.store as never, {} as never, h.evaluation)

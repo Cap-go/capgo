@@ -26,7 +26,13 @@ export function isAuthRateLimitError(error: unknown) {
     || String(err?.message ?? '').toLowerCase().includes('rate limit')
 }
 
-export interface ProfileInput { id: string, email: string, first_name: string, last_name: string }
+export interface ProfileInput {
+  id: string
+  email: string
+  first_name: string
+  last_name: string
+  opt_for_newsletters?: boolean
+}
 
 // All sign-up paths insert the real profile so on_user_create runs exactly once.
 // Optional newsletter consent must never be inferred from social authentication.
@@ -34,6 +40,6 @@ export function provisionUserProfile(c: Context, profile: ProfileInput, preserve
   return supabaseAdmin(c).from('users').upsert({
     ...profile,
     enable_notifications: true,
-    opt_for_newsletters: false,
+    opt_for_newsletters: profile.opt_for_newsletters ?? false,
   }, { onConflict: 'id', ...(preserveExisting ? { ignoreDuplicates: true } : {}) })
 }

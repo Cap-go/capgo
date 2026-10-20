@@ -11,6 +11,7 @@ test('chooses a goal, switches plain tabs, preserves instructions and places dis
   await page.getByRole('button', { name: /Live Updates/ }).click()
   await expect(page.getByRole('tab')).toHaveText(['Live Updates', 'Builder'])
   await expect(page.locator('[data-test="app-onboarding-command-copy"]')).toContainText('@capgo/cli@latest i ')
+  await page.locator('[data-test="setup-checklist-toggle"]').click()
   await page.locator('[data-test="app-onboarding-cli-step-add_updater"] button').click()
   await page.getByRole('tab', { name: 'Builder', exact: true }).click()
   await page.locator('[data-test="builder-platform-android"]').click()

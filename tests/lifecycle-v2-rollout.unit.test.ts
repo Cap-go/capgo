@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { lifecycleReady } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/rollout.ts'
 import { isLegacyLifecycleEvent, isLifecycleV2Treatment, LIFECYCLE_V2_CONTRACT, shouldUseLifecycleV2, withoutLegacyTrialTriggers } from '../supabase/functions/_backend/utils/lifecycle_v2_rollout.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -52,6 +53,20 @@ describe('lifecycle v2 legacy handoff', () => {
     expect(sql).toContain('LIMIT 1')
     expect(sql).not.toContain('orgs.created_by')
     expect(mocks.closeClient).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    ['credentials alone', { BENTO_PUBLISHABLE_KEY: 'configured', BENTO_SECRET_KEY: 'configured', BENTO_SITE_UUID: 'configured', WEBAPP_URL: 'https://console.example.com' }, false],
+    ['explicit lifecycle opt-out', { ...ready, BENTO_EVENT_DISPATCH_ENABLED: 'false' }, false],
+    ['missing sender attestation', { BENTO_EVENT_DISPATCH_ENABLED: 'true', BENTO_LIFECYCLE_V2_LEGACY_HANDOFF: LIFECYCLE_V2_CONTRACT }, false],
+    ['missing legacy handoff', { BENTO_EVENT_DISPATCH_ENABLED: 'true', BENTO_LIFECYCLE_V2_SENDER_CONTRACT: LIFECYCLE_V2_CONTRACT }, false],
+    ['old sender contract', { ...ready, BENTO_LIFECYCLE_V2_SENDER_CONTRACT: 'new-emails-v2-2026-10-17' }, false],
+    ['matching lifecycle attestations', ready, true],
+  ] as const)('keeps Worker readiness and backend legacy suppression aligned for %s', async (_name, env, expected) => {
+    const read = { query: vi.fn(async () => []) }
+    mocks.query.mockImplementation(async (sql: string) => ({ rows: sql.includes('vault.decrypted_secrets') ? [] : [profile()] }))
+    expect(await lifecycleReady(read, env)).toBe(expected)
+    expect(await shouldUseLifecycleV2(context(env), orgId)).toBe(expected)
   })
 
   it.each(Object.keys(ready))('retains legacy when the explicit %s override disables handoff', async (key) => {
