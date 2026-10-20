@@ -3760,8 +3760,8 @@
   "setup-goal-tabs-label": "Used in Capgo web console areas: components/dashboard. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "setup-goal-start-live-updates": "Used in Capgo web console areas: components/dashboard. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "setup-goal-start-builder": "Used in Capgo web console areas: components/dashboard. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
-  "onboarding-name-kicker": "Required initial name step in the Capgo console. Explain that both first and last name must be provided before onboarding can continue. Keep the tone welcoming and concise.",
-  "onboarding-name-description": "Required initial name step in the Capgo console. Explain that both first and last name must be provided before onboarding can continue. Keep the tone welcoming and concise.",
+  "onboarding-name-kicker": "Short welcoming text above the 'About you' heading on the initial name step in the Capgo console. Invites the user to introduce themselves; do not turn it into a validation or requirements message.",
+  "onboarding-name-description": "Helper text on the initial name step in the Capgo console. Asks for the user's name before workspace setup. Keep the tone welcoming and concise.",
   "onboarding-name-required": "Required initial name step in the Capgo console. Explain that both first and last name must be provided before onboarding can continue. Keep the tone welcoming and concise.",
   "unified-onboarding-step-about-you": "Title of onboarding V6 first step, collecting first and last name together before choosing a goal. Translate as a short heading about the user.",
   "unified-onboarding-profile-goal-question": "Goal question displayed below the profile name fields in onboarding V6. Translate as a concise question about what the user wants to do with Capgo."
