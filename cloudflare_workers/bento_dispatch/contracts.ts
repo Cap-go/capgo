@@ -23,7 +23,9 @@ export interface EligibleUser {
   metadata: { [key: string]: Json }
 }
 export interface BentoEvent { email: string, event: string, data: Record<string, unknown> }
-export type ResolvedAction = { action: 'send', buildEvent: (id: string) => BentoEvent } | { action: 'end', reason: TerminalReason } | { action: 'skip', reason: string }
+/** Private producer audit context. Never serialized into a Bento event. */
+export interface LifecycleSendAudit { billingCustomerId: string | null }
+export type ResolvedAction = { action: 'send', buildEvent: (id: string) => BentoEvent, lifecycleEvidence?: LifecycleSendAudit } | { action: 'end', reason: TerminalReason } | { action: 'skip', reason: string }
 export interface SendOutcome { user: EligibleUser, outcome: 'accepted' | 'failed' | 'skipped' | 'ended' | 'deferred' }
 export type ResolveAction = (ctx: ReadOnlyContext) => Promise<ResolvedAction>
 export interface MutationContext {

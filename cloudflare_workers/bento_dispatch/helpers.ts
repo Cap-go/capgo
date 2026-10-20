@@ -1,6 +1,11 @@
 import type { PostHogQueueEnv } from '../../supabase/functions/_backend/utils/posthog_queue.ts'
-import type { BentoEvent, EligibleUser, MutationContext, QueryClient, ReadOnlyContext, ResolveAction, RunRecord, SendOutcome, TaskContext } from './contracts.ts'
+import type { BentoEvent, DispatchRecord, EligibleUser, LifecycleSendAudit, MutationContext, QueryClient, ReadOnlyContext, ResolveAction, RunRecord, SendOutcome, TaskContext } from './contracts.ts'
 import type { DispatchStore } from './store.ts'
+
+async function archiveLifecycleRequest(store: DispatchStore, claim: DispatchRecord, user: EligibleUser, payload: BentoEvent, evidence?: LifecycleSendAudit) {
+  if (user.flowKey.startsWith('lifecycle:v2:'))
+    await store.snapshotEvent(claim, user, payload, evidence)
+}
 
 export function createMutationContext(store: DispatchStore, run: RunRecord, send: (event: BentoEvent) => Promise<boolean>, settings: Readonly<Record<string, string>> = {}, now = Date.now, queue?: PostHogQueueEnv['POSTHOG_QUEUE']): MutationContext {
   const deadline = now() + 40_000
@@ -49,7 +54,9 @@ export function createMutationContext(store: DispatchStore, run: RunRecord, send
           await store.skip(run, user, current.reason)
         return { user, outcome: current.action === 'end' ? 'ended' : 'skipped' }
       }
-      accepted = await send(current.buildEvent(claim.id))
+      const payload = current.buildEvent(claim.id)
+      await archiveLifecycleRequest(store, claim, user, payload, current.lifecycleEvidence)
+      accepted = await send(payload)
       if (!accepted) {
         await store.failEvent(run, claim, user, 'provider_not_confirmed')
         return { user, outcome: 'failed' }
