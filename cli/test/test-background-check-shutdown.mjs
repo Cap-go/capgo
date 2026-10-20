@@ -35,7 +35,7 @@ beforeAll(async () => {
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, waitForWorkers = false, trialAlreadyShown = false, debug = false } = {}) {
+function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, earlyCompletion = false, waitForWorkers = false, trialAlreadyShown = false, debug = false } = {}) {
   const source = `
     import assert from 'node:assert/strict'
     import { performance } from 'node:perf_hooks'
@@ -81,7 +81,21 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
     const started = now()
     let finished = false
     const completion = waitForOnboardingChecks(command, ${JSON.stringify(commandPath)}).then(() => { finished = true })
-    if (${controlledClock}) {
+    if (${earlyCompletion}) {
+      const checks = [...getPendingOnboardingChecks()]
+      for (const [worker] of checks) worker.ref()
+      checks[0][0].postMessage('finish')
+      await checks[0][1].completion
+      await nextTurn()
+      assert.equal(finished, false, 'shutdown must wait for the last worker')
+      for (const [worker] of checks.slice(1)) worker.postMessage('finish')
+      await Promise.all(checks.map(([, check]) => check.completion))
+      await nextTurn()
+      clock.tick(0)
+      await completion
+      assert.equal(finished, true, 'shutdown must finish without advancing the deadline')
+    }
+    else if (${controlledClock}) {
       // Keep real workers and telemetry, but advance the shared deadline without
       // measuring how quickly a busy CI runner schedules this child process.
       if (${JSON.stringify(telemetry)} === 'hang') {
@@ -201,11 +215,10 @@ test.concurrent('channel promote gives its eligible setup notice the same bounde
 }, 12_000)
 
 test.concurrent('exits early as soon as the last worker finishes', async () => {
-  const result = await run({ workers: ['quick.mjs', 'slow.mjs'] }).completion
-  const duration = waitedMs(result)
-  assert.ok(duration >= 800 && duration < 2_000, `early completion was ${duration}ms`)
+  const result = await run({ workers: ['released.mjs', 'released.mjs'], controlledClock: true, earlyCompletion: true }).completion
+  assert.equal(waitedMs(result), 0, 'worker completion must release shutdown before the deadline')
   assert.ok(result.text.includes('Waiting for background checks'))
-})
+}, 12_000)
 
 test.concurrent('completed or absent checks produce no waiting message or delay', async () => {
   for (const settings of [{ workers: [] }, { workers: ['quick.mjs'], foregroundMs: 1_000 }]) {
@@ -278,4 +291,4 @@ test.concurrent('opt-in diagnostics distinguish shutdown timeout from a non-TTY 
   assert.doesNotMatch(piped.output, /\[setup-debug /, 'diagnostics must not pollute stdout')
   const normal = await run({ commandPath: 'bundle list', tty: false }).completion
   assert.doesNotMatch(normal.text, /\[setup-debug /, 'logging is off by default')
-})
+}, 12_000)
