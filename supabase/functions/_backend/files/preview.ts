@@ -11,7 +11,10 @@ import { simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask, getEnv, isValidAppId } from '../utils/utils.ts'
+import { applyPreviewXRobotsTag, PREVIEW_X_ROBOTS_TAG } from './preview-host-headers.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
+
+export { PREVIEW_X_ROBOTS_TAG } from './preview-host-headers.ts'
 // Cache settings
 const PREVIEW_AUTH_CACHE_PATH = '/.preview-auth'
 const PREVIEW_AUTH_CACHE_TTL_SECONDS = 60
@@ -135,6 +138,24 @@ const MIME_TYPES: Record<string, string> = {
 
 const BUNDLE_PREVIEW_CACHE_CONTROL = 'public, max-age=31536000, immutable'
 const CHANNEL_PREVIEW_CACHE_CONTROL = 'no-store, no-cache, must-revalidate, max-age=0'
+const PREVIEW_ROBOTS_TXT_BODY = 'User-agent: *\nDisallow: /\n'
+
+export function isPreviewRobotsTxtPath(pathname: string): boolean {
+  const normalizedPath = pathname.replace(/\/+$/, '') || '/'
+  return normalizedPath === '/robots.txt'
+}
+
+export function buildPreviewRobotsTxtResponse(): Response {
+  const headers = new Headers()
+  headers.set('Content-Type', 'text/plain; charset=utf-8')
+  headers.set('Cache-Control', CHANNEL_PREVIEW_CACHE_CONTROL)
+  headers.set('Pragma', 'no-cache')
+  headers.set('Expires', '0')
+  applyPreviewXRobotsTag(headers)
+  return new Response(PREVIEW_ROBOTS_TXT_BODY, { headers })
+}
+
+export { withPreviewHostHeaders } from './preview-host-headers.ts'
 
 function getContentType(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase() || ''
@@ -145,6 +166,7 @@ export function buildPreviewResponseHeaders(contentType: string, options: { disa
   const headers = new Headers()
   headers.set('Content-Type', contentType)
   headers.set('X-Content-Type-Options', 'nosniff')
+  applyPreviewXRobotsTag(headers)
 
   if (options.disableCache) {
     headers.set('Cache-Control', CHANNEL_PREVIEW_CACHE_CONTROL)
@@ -167,7 +189,15 @@ function buildPreviewPayloadResponseHeaders(): Headers {
   headers.set('Pragma', 'no-cache')
   headers.set('Expires', '0')
   headers.set('Access-Control-Allow-Origin', '*')
+  applyPreviewXRobotsTag(headers)
   return headers
+}
+
+export async function handlePreviewSubdomain(c: Context<MiddlewareKeyVariables>): Promise<Response> {
+  if (isPreviewRobotsTxtPath(c.req.path))
+    return buildPreviewRobotsTxtResponse()
+
+  return handlePreviewRequest(c)
 }
 
 export async function buildPreviewDownloadPayload(c: Context, appId: string, bundle: PreviewDownloadBundle): Promise<PreviewDownloadPayload> {
