@@ -15,9 +15,11 @@ import { mergeUserOnboardingProgress, replaceUserOnboardingWithRetry, serializeU
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { resolveOnboardingAnalyticsVersion } from '~/utils/onboardingABTests'
 import { onboardingPrimaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { canEditInitialOnboardingName, consumeProfileOnboardingHandoff, initialProfileOnboardingProgressSteps, initialProfileOnboardingSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY } from '~/utils/onboardingProfile'
 import { createOnboardingDetailsFieldDebouncer, createOnboardingProgressTracker, createOnboardingTelemetryIdentity } from '~/utils/onboardingProgressAnalytics'
+import { openOnboardingResumeDialog } from '~/utils/onboardingResumeDialog'
 import { validateRedirectPath } from '~/utils/safeRedirect'
 
 const main = useMainStore()
@@ -43,7 +45,8 @@ const progressSteps = computed(() => initialProfileOnboardingProgressSteps(main.
   .map(step => ({ id: step.id, label: t(step.labelKey) })))
 const profileHandoff = consumeProfileOnboardingHandoff(window.history)
 const resumePending = ref(!showWelcome.value && !profileHandoff)
-const identity = createOnboardingTelemetryIdentity({ continueFrom: profileHandoff, flow: 'pre_org', onboardingVersion: () => 6, supaHost: getLocalConfig().supaHost })
+const onboardingAnalyticsVersion = () => resolveOnboardingAnalyticsVersion(main.user?.onboarding)
+const identity = createOnboardingTelemetryIdentity({ continueFrom: profileHandoff, flow: 'pre_org', onboardingVersion: onboardingAnalyticsVersion, supaHost: getLocalConfig().supaHost })
 const analyticsSteps = targetPath.value.startsWith('/onboarding/organization') ? ['welcome', 'name', 'organization'] as const : initialProfileOnboardingSteps(main.user?.onboarding, true)
 let tracker: ReturnType<typeof createOnboardingProgressTracker> | undefined
 let disposed = false
@@ -154,59 +157,59 @@ function visibilityChanged() {
   tracker?.trackVisibilityChange(document.visibilityState)
 }
 
+async function restartProfileOnboarding() {
+  try {
+    if (await persistProfileProgress(current => mergeUserOnboardingProgress({ onboarding_attempt_id: identity.attemptId, last_run_id: identity.runId }, current, { clearIntent: true, clearProfileDraft: true })))
+      return true
+  }
+  catch (error) {
+    console.warn('Cannot restart profile onboarding', error)
+  }
+  toast.error(t('account-error'))
+  return false
+}
+
+async function resumeSavedProfile() {
+  identity.prepareResumeCandidate({
+    onboardingAttemptId: typeof savedOnboarding.onboarding_attempt_id === 'string' ? savedOnboarding.onboarding_attempt_id : undefined,
+    lastRunId: typeof savedOnboarding.last_run_id === 'string' ? savedOnboarding.last_run_id : undefined,
+    savedStep: 'name',
+    steps: analyticsSteps,
+  })
+  const dismissal = openOnboardingResumeDialog(dialogStore, t, {
+    id: 'onboarding-profile-resume',
+    onRestart: restartProfileOnboarding,
+  })
+  identity.recordResumeDialogViewed()
+  await dismissal
+  if (disposed || main.user?.id !== initialUserId || main.authGeneration !== initialAuthGeneration)
+    return false
+  if (dialogStore.lastButtonRole === 'onboarding-resume-restart') {
+    identity.recordResumeRestarted()
+    showWelcome.value = true
+    if (isEditingProfile.value) {
+      const { edit: _edit, ...query } = route.query
+      await router.replace({ path: '/onboarding/name', query })
+    }
+  }
+  else if (dialogStore.lastButtonRole === 'onboarding-resume-continue') {
+    identity.recordResumeContinued()
+  }
+  else {
+    return false
+  }
+  resumePending.value = false
+  return true
+}
+
 onMounted(async () => {
   if (!isEditingProfile.value && !needsInitialOnboardingName(main.user, organizationStore.hasOrganizations)) {
     await router.replace(targetPath.value)
     return
   }
-  if (resumePending.value) {
-    identity.prepareResumeCandidate({
-      onboardingAttemptId: typeof savedOnboarding.onboarding_attempt_id === 'string' ? savedOnboarding.onboarding_attempt_id : undefined,
-      lastRunId: typeof savedOnboarding.last_run_id === 'string' ? savedOnboarding.last_run_id : undefined,
-      savedStep: 'name',
-      steps: analyticsSteps,
-    })
-    dialogStore.openDialog({
-      id: 'onboarding-profile-resume',
-      title: t('onboarding-resume-title'),
-      description: t('onboarding-resume-description'),
-      preventAccidentalClose: true,
-      buttons: [
-        { text: t('onboarding-resume-restart'), id: 'onboarding-resume-restart', role: 'secondary', handler: async () => {
-          try {
-            if (await persistProfileProgress(current => mergeUserOnboardingProgress({ onboarding_attempt_id: identity.attemptId, last_run_id: identity.runId }, current, { clearIntent: true, clearProfileDraft: true })))
-              return true
-          }
-          catch (error) {
-            console.warn('Cannot restart profile onboarding', error)
-          }
-          toast.error(t('account-error'))
-          return false
-        } },
-        { text: t('onboarding-resume-continue'), id: 'onboarding-resume-continue', role: 'primary' },
-      ],
-    })
-    identity.recordResumeDialogViewed()
-    await dialogStore.onDialogDismiss()
-    if (disposed || main.user?.id !== initialUserId || main.authGeneration !== initialAuthGeneration)
-      return
-    if (dialogStore.lastButtonRole === 'onboarding-resume-restart') {
-      identity.recordResumeRestarted()
-      showWelcome.value = true
-      if (isEditingProfile.value) {
-        const { edit: _edit, ...query } = route.query
-        await router.replace({ path: '/onboarding/name', query })
-      }
-    }
-    else if (dialogStore.lastButtonRole === 'onboarding-resume-continue') {
-      identity.recordResumeContinued()
-    }
-    else {
-      return
-    }
-    resumePending.value = false
-  }
-  tracker = createOnboardingProgressTracker({ flow: 'pre_org', onboardingVersion: () => 6, resumed: !showWelcome.value && !profileHandoff, steps: analyticsSteps, supaHost: getLocalConfig().supaHost, onboardingAttemptId: identity.attemptId, onboardingRunId: identity.runId })
+  if (resumePending.value && !await resumeSavedProfile())
+    return
+  tracker = createOnboardingProgressTracker({ flow: 'pre_org', onboardingVersion: onboardingAnalyticsVersion, resumed: !showWelcome.value && !profileHandoff, steps: analyticsSteps, supaHost: getLocalConfig().supaHost, onboardingAttemptId: identity.attemptId, onboardingRunId: identity.runId })
   tracker.viewStep(showWelcome.value ? 'welcome' : 'name', isEditingProfile.value ? 'intent' : undefined)
   document.addEventListener('visibilitychange', visibilityChanged)
   try {

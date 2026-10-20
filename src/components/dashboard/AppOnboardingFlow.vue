@@ -86,7 +86,7 @@ import {
 } from '~/utils/onboardingAppDraft'
 import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { withOnboardingChannelOrigin } from '~/utils/onboardingChannelAnalytics'
-import { canEditInitialOnboardingName, consumeProfileOnboardingHandoff, initialProfileOnboardingProgressSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY } from '~/utils/onboardingProfile'
+import { canEditInitialOnboardingName, consumeProfileOnboardingHandoff, initialProfileOnboardingProgressSteps, initialProfileOnboardingSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY } from '~/utils/onboardingProfile'
 import {
   createOnboardingDetailsFieldDebouncer,
   createOnboardingProgressTracker,
@@ -101,6 +101,7 @@ import {
   ONBOARDING_SETUP_HANDOFF_STATE_KEY,
   readOnboardingSetupHandoff,
 } from '~/utils/onboardingRedirect'
+import { openOnboardingResumeDialog } from '~/utils/onboardingResumeDialog'
 import { slugifyOnboardingSegment } from '~/utils/onboardingSlug'
 import {
   buildUserOnboardingProgress,
@@ -722,7 +723,7 @@ function initializeProgressTracking(resumed: boolean) {
     trackedAnalyticsSteps.unshift('welcome')
   ensurePublishAppQuestionStepTracked()
   if (props.preOrg && !props.newOrganization && profileOnboarding.value)
-    trackedAnalyticsSteps.unshift('welcome', 'name')
+    trackedAnalyticsSteps = initialProfileOnboardingSteps(onboardingForABTests.value, true)
 
   progressTracker = createOnboardingProgressTracker({
     flow: props.preOrg ? 'pre_org' : 'existing_org',
@@ -1090,17 +1091,9 @@ async function maybeResumeSavedOnboarding() {
     savedStep: resumableStep,
     steps: resumeCandidateSteps(resumableStep),
   })
-  dialogStore.openDialog({
-    title: t('onboarding-resume-title'),
-    description: t('onboarding-resume-description'),
-    preventAccidentalClose: true,
-    buttons: [
-      { text: t('onboarding-resume-restart'), id: 'onboarding-resume-restart', role: 'secondary' },
-      { text: t('onboarding-resume-continue'), id: 'onboarding-resume-continue', role: 'primary' },
-    ],
-  })
+  const dismissal = openOnboardingResumeDialog(dialogStore, t)
   onboardingTelemetry.recordResumeDialogViewed()
-  await dialogStore.onDialogDismiss()
+  await dismissal
 
   if (onboardingFlowDisposed)
     return null

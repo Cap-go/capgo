@@ -878,21 +878,21 @@ describe('app onboarding progress analytics integration', () => {
     ])
     expectSourceOrder(resumeDialog, [
       'onboardingTelemetry.prepareResumeCandidate({',
-      'dialogStore.openDialog({',
+      'const dismissal = openOnboardingResumeDialog(dialogStore, t)',
       'onboardingTelemetry.recordResumeDialogViewed()',
-      'await dialogStore.onDialogDismiss()',
+      'await dismissal',
     ])
 
     const restartCheck = `if (dialogStore.lastButtonRole === 'onboarding-resume-restart')`
     expectSourceOrder(resumeDialog, [
-      'await dialogStore.onDialogDismiss()',
+      'await dismissal',
       'if (onboardingFlowDisposed)',
       'return null',
       restartCheck,
     ])
     const restartBranchStart = resumeDialog.indexOf(restartCheck)
     const restartBranchEnd = resumeDialog.indexOf('\n  }\n', restartBranchStart)
-    expect(restartBranchStart).toBeGreaterThan(resumeDialog.indexOf('await dialogStore.onDialogDismiss()'))
+    expect(restartBranchStart).toBeGreaterThan(resumeDialog.indexOf('await dismissal'))
     expect(restartBranchEnd).toBeGreaterThan(restartBranchStart)
     const restartBranch = resumeDialog.slice(restartBranchStart, restartBranchEnd)
     expectSourceOrder(restartBranch, [

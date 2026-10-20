@@ -61,13 +61,13 @@
     }
   },
   "onboarding_v6": {
-    "comment": "Prospective self-signups only. Disabled until rollout is enabled; non-treatment receives no assignment.",
+    "comment": "Required name onboarding for self-signups enrolled at creation after the rollout cutoff. Existing accounts and invitations keep their current flow; non-treatment receives no assignment.",
     "audience": "self_signup",
     "label": "Onboarding V6",
-    "treatment_percentage": 0,
+    "treatment_percentage": 100,
     "allocation": "deterministic",
     "assign_control": false,
-    "enroll_new_users_after": "2026-10-19T10:00:54.000Z",
+    "enroll_new_users_after": "2026-10-20T17:31:40.000Z",
     "treatment_branch": "A",
     "control_branch": "B",
     "branches": {

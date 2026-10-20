@@ -24,6 +24,10 @@ describe('required initial onboarding name', () => {
   it('tracks welcome before names and then the goal', () => {
     expect(initialProfileOnboardingSteps(onboarding, true)).toEqual(['welcome', 'name', 'intent', 'app_name', 'app_icon', 'organization', 'setup'])
   })
+  it('shares the name, goal and app step order with combined onboarding flags', () => {
+    expect(initialProfileOnboardingSteps({ abtests: { ...abtests, webnativeapp_development_environment: { branch: 'C' }, new_channel: { branch: 'A' } } }, true))
+      .toEqual(['welcome', 'name', 'intent', 'publish_app_question', 'app_name', 'app_icon', 'organization', 'channel', 'setup'])
+  })
   it('uses treatment A regardless of the legacy stored version', () => {
     expect(hasProfileOnboarding({ ...onboarding, version: 4 })).toBe(true)
     expect(resolveOnboardingAnalyticsVersion(onboarding)).toBe(6)
