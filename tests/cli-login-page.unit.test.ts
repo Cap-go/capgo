@@ -267,7 +267,7 @@ describe('/login-cli page contract', () => {
 
   it.concurrent('keeps the route out of normal onboarding redirects', () => {
     expect(auth).toContain('const isCliLoginRoute = isCliLoginPath(to.path)')
-    expect(auth.match(/if \(isCliLoginRoute\)/g)).toHaveLength(3)
+    expect(auth.match(/if \(isCliLoginRoute\)/g)).toHaveLength(4)
   })
 
   it.concurrent('defers organization image signing on the CLI login route', () => {
