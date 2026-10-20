@@ -102,6 +102,7 @@ npx @capgo/cli@latest app todo
 
 📋 Show your app's onboarding todo list with done, skipped, and pending tasks.
 Uses the same live progress checks as the Capgo dashboard. The app ID can be inferred from your Capacitor project.
+Apps with both Builder and OTA checklists show interactive tabs. For scripts and AI agents, choose --list builder or --list ota to print one list and exit.
 
 **Example:**
 
@@ -113,6 +114,7 @@ npx @capgo/cli@latest app todo com.example.app
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
+| **--list** | <code>string</code> | Show one todo list and exit; required for dual checklists in non-interactive mode |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--api-host** | <code>string</code> | Custom Capgo API URL for self-hosting or testing, e.g. https://<project>.supabase.co/functions/v1 or http://127.0.0.1:8787 (env: CAPGO_API_HOST) |
 | **--files-host** | <code>string</code> | Custom Capgo files API URL when it differs from --api-host (env: CAPGO_FILES_HOST) |

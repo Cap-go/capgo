@@ -64,10 +64,11 @@ const statusAriaLabel = computed(() => {
   return statusLabel.value
 })
 
+// Trials use the warning style for their whole length: conversion during the
+// trial was highest while the navbar showed a yellow status and Upgrade button.
 const badgeClass = computed(() => {
   switch (status.value.tone) {
     case 'trial':
-      return 'border-none bg-azure-500 text-white'
     case 'warning':
       return 'd-badge-warning text-black'
     case 'success':
@@ -78,7 +79,7 @@ const badgeClass = computed(() => {
 })
 
 const bannerColor = computed(() => {
-  if (status.value.tone === 'warning' || (status.value.kind === 'trial' && status.value.trialDaysLeft <= 7))
+  if (status.value.tone === 'warning' || status.value.kind === 'trial')
     return 'd-btn-warning text-black'
   if (status.value.cta === 'none')
     return ''
@@ -112,8 +113,7 @@ const bannerColor = computed(() => {
       </span>
       <span
         v-if="statusDetail"
-        class="text-xs font-semibold truncate min-w-0 sm:text-sm"
-        :class="status.trialDaysLeft <= 7 ? 'text-amber-700 dark:text-amber-300' : 'text-slate-800 dark:text-slate-200'"
+        class="text-xs font-semibold truncate min-w-0 sm:text-sm text-amber-700 dark:text-amber-300"
         data-test="org-billing-detail"
         :title="statusDetail"
       >
@@ -156,8 +156,7 @@ const bannerColor = computed(() => {
       </span>
       <span
         v-if="statusDetail"
-        class="text-xs font-medium truncate min-w-0 sm:text-base"
-        :class="status.trialDaysLeft <= 7 ? 'text-amber-700 dark:text-amber-300' : 'text-black dark:text-white'"
+        class="text-xs font-medium truncate min-w-0 sm:text-base text-amber-700 dark:text-amber-300"
         data-test="org-billing-detail"
         :title="statusDetail"
       >

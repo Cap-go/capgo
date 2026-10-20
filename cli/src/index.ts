@@ -558,8 +558,11 @@ app
 
 Uses the same live progress checks as the Capgo dashboard. The app ID can be inferred from your Capacitor project.
 
+Apps with both Builder and OTA checklists show interactive tabs. For scripts and AI agents, choose --list builder or --list ota to print one list and exit.
+
 Example: npx @capgo/cli@latest app todo com.example.app`)
   .action(appTodo)
+  .addOption(new Option('--list <list>', 'Show one todo list and exit; required for dual checklists in non-interactive mode').choices(['builder', 'ota']))
   .option('-a, --apikey <apikey>', optionDescriptions.apikey)
   .option('--api-host <apiHost>', optionDescriptions.apiHost)
   .option('--files-host <filesHost>', optionDescriptions.filesHost)
@@ -1263,10 +1266,11 @@ Examples:
   .option('--ios-automatic-release', 'iOS: automatically release the App Store version after Apple approval. Default is manual release.')
   .option('--no-ios-automatic-release', 'iOS: keep the App Store version waiting for manual release after Apple approval.')
   .optionsGroup('Output and version options:')
-  .option('--output-upload', 'Upload the finished IPA/APK/AAB to Capgo storage and print a time-limited download link (and QR). Use with --no-playstore-upload (Android) or --ios-distribution ad_hoc (iOS) when you only need the artifact and are not publishing to the store yet. Precedence: CLI > env > saved credentials')
+  .option('--output-upload', 'Upload the finished IPA/APK/AAB to Capgo storage and print a time-limited download link (and QR), plus a link to the debug symbols (iOS dSYMs, Android mapping.txt) for crash reporters. Use with --no-playstore-upload (Android) or --ios-distribution ad_hoc (iOS) when you only need the artifact and are not publishing to the store yet. Precedence: CLI > env > saved credentials')
   .option('--no-output-upload', 'Do not upload the finished IPA/APK/AAB to Capgo storage (no download link). Store upload still happens when Play/TestFlight credentials are configured. Precedence: CLI > env > saved credentials')
   .option('--output-retention <duration>', 'Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials')
-  .option('--output-record <path>', 'After a successful build, write a JSON record (jobId, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`.')
+  .option('--build-env <KEY|KEY=VALUE>', 'Pass an env var to the cloud build (repeatable). KEY alone takes the value from your environment, so CI secrets stay off the command line. Sent like other build credentials, never logged; Gradle and Xcode build phases see it (e.g. SENTRY_AUTH_TOKEN for the Sentry Gradle plugin). Also read from CAPGO_BUILD_ENV (comma-separated names).', collect, [])
+  .option('--output-record <path>', 'After a successful build, write a JSON record (jobId, status, outputUrl, symbolsUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. symbolsUrl is the iOS dSYMs zip or Android mapping.txt download link (with --output-upload) for crash reporters like Sentry. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`.')
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing. Uses whatever version is already in the project files.')
   .option('--no-skip-build-number-bump', 'Override saved credentials to re-enable automatic build number incrementing for this build only.')
   .option('--skip-marketing-version-bump', 'Skip automatic marketing version (CFBundleShortVersionString / versionName) bump when the app is already released.')
@@ -1342,10 +1346,11 @@ to a PR or issue.
 Examples:
   npx @capgo/cli@latest build last-output --path /tmp/build.json
   npx @capgo/cli@latest build last-output --path /tmp/build.json --field outputUrl
+  npx @capgo/cli@latest build last-output --path /tmp/build.json --field symbolsUrl
   npx @capgo/cli@latest build last-output --path /tmp/build.json --qr`)
   .action(lastOutputCommand)
   .option('--path <path>', 'Path to the JSON record written by --output-record (required)')
-  .option('--field <field>', 'Print a single field (one of: jobId, appId, platform, buildMode, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt, schemaVersion)')
+  .option('--field <field>', 'Print a single field (one of: jobId, appId, platform, buildMode, status, outputUrl, symbolsUrl, qrCodeAscii, qrCodePngPath, finishedAt, schemaVersion)')
   .option('--qr', 'Print the rendered ASCII QR code (shortcut for --field qrCodeAscii)')
 
 const buildCredentials = build

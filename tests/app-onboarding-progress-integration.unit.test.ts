@@ -1276,8 +1276,8 @@ describe('app onboarding progress analytics integration', () => {
     expect(intentTransition).toContain(`intent: selectedIntent.value`)
     expect(intentTransition).toContain(`?? (webNativeDevelopmentEnvironmentTreatment.value ? undefined : 'skipped')`)
 
-    const appNameTransition = sourceBetween('function continueFromAppName()', 'function continueFromAppId()')
-    expect(appNameTransition).toContain(`completeAndViewAppDetailsStep('app_id', { appId: generatedAppId.value, appName: appName.value.trim() })`)
+    const appNameTransition = sourceBetween('function continueFromAppName()', 'function toggleAppIdAdvanced()')
+    expect(appNameTransition).toContain(`completeAndViewAppDetailsStep('icon', { appId: generatedAppId.value, appName: appName.value.trim() })`)
 
     const preOrgDetailsTransition = sourceBetween('function continuePreOrgDetails()', 'async function createOrganizationAndApp()')
     expect(preOrgDetailsTransition).toContain(`completeAndViewStep('organization', {`)

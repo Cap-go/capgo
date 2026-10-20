@@ -69,13 +69,14 @@ import { offerSupportUploadBeforeAi } from '../support/support-upload-prompt.js'
 import { buildCliRequestHeaders } from '../analytics/cli-headers'
 import { assertCliPermission, canPromptInteractively, createCapgoClient, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, trimTrailingSlashes, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { getBuilderAppId } from './app-id'
+import { parseBuildEnv } from './build-env'
 import { syncAndroidVersion } from './android-version'
 import { createBuildCancellationSignalHandler, requestBuildCancellation } from './cancellation'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseAndroidPlayStoreReleaseStatus, parseAndroidPlayStoreTrack, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
 import { withCwd } from './cwd'
 import { syncIosMarketingVersion } from './ios-marketing-version'
-import { writeBuildOutputRecord } from './output-record'
+import { parseDebugSymbolsUrl, writeBuildOutputRecord } from './output-record'
 import { getPlatformDirFromCapacitorConfig, normalizeNativeDependencyPathsInText } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
 import { prepareBuildSupportLogBundle } from './support-log-bundle.js'
@@ -1469,9 +1470,14 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
   // the logger rather than duplicating dispatch logic so the existing print
   // behaviour stays intact.
   let capturedOutputUrl: string | null = null
+  let capturedSymbolsUrl: string | null = null
   const log: BuildLogger = options.outputRecord
     ? {
         ...baseLogger,
+        buildLog: (msg) => {
+          capturedSymbolsUrl = parseDebugSymbolsUrl(msg) ?? capturedSymbolsUrl
+          baseLogger.buildLog(msg)
+        },
         customMsg: async (kind, data) => {
           if (kind === 'qr_download_link' && typeof data.url === 'string')
             capturedOutputUrl = data.url
@@ -1663,6 +1669,13 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         ...existingLocalized,
         ...cliStoreReleaseNotesLocalized,
       })
+    }
+    // --build-env / CAPGO_BUILD_ENV: the user's own env vars (Sentry tokens, ...) for Gradle,
+    // and Xcode build phases. Sent as credentials; names only are logged.
+    const buildEnv = parseBuildEnv(options.buildEnv)
+    if (mergedCredentials && Object.keys(buildEnv).length > 0) {
+      Object.assign(mergedCredentials, buildEnv)
+      log.info(`ℹ️  Build env: ${Object.keys(buildEnv).join(', ')}`)
     }
     // --no-playstore-upload: null out PLAY_CONFIG_JSON so it never reaches the builder
     if (options.playstoreUpload === false && mergedCredentials) {
@@ -2459,6 +2472,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               buildMode: (options.buildMode ?? 'release') as 'debug' | 'release',
               status: finalStatus,
               outputUrl: capturedOutputUrl,
+              symbolsUrl: capturedSymbolsUrl,
             },
             (msg: string) => log.warn(msg),
           )

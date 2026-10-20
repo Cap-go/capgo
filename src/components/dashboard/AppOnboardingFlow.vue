@@ -9,6 +9,7 @@ import type { OnboardingChannelEvent, OnboardingChannelEventProperties, Onboardi
 import type {
   OnboardingAnalyticsStep,
   OnboardingCopyEvent,
+  OnboardingCopyEventProperties,
   OnboardingDetailsEvent,
   OnboardingDetailsEventProperties,
   OnboardingDevelopmentEnvironment,
@@ -133,6 +134,9 @@ const props = defineProps<{
   // Getting started renders the post-creation setup for this app inside the
   // dashboard shell. Creation pages hand off there once the app exists.
   setupAppId?: string
+  // View persisted setup without automatically leaving a finished checklist
+  // or restarting the user's onboarding run.
+  showChecklist?: boolean
   // An existing user creating another organization runs the same first-run
   // flow from the start, ignoring any saved onboarding progress.
   newOrganization?: boolean
@@ -177,13 +181,12 @@ type StandardFlowStep = 'details' | 'channel' | 'setup'
 type PreOrgFlowStep = 'intent' | 'publish_app_question' | 'details' | 'organization' | 'channel' | 'setup'
 type OnboardingFlowStep = StandardFlowStep | PreOrgFlowStep
 type OnboardingProgressStepId = OnboardingFlowStep
-type AppDetailsStep = 'name' | 'app_id' | 'icon'
-type AppDetailsAnalyticsStep = 'app_name' | 'app_id' | 'app_icon'
+type AppDetailsStep = 'name' | 'icon'
+type AppDetailsAnalyticsStep = 'app_name' | 'app_icon'
 type SetupStage = UserOnboardingSetupStage
 
 const APP_DETAILS_ANALYTICS_STEPS: Record<AppDetailsStep, AppDetailsAnalyticsStep> = {
   name: 'app_name',
-  app_id: 'app_id',
   icon: 'app_icon',
 }
 
@@ -259,6 +262,7 @@ const orgNameInput = ref('')
 const hasEditedOrgName = ref(false)
 const estimatedUsersIndex = ref<number | null>(null)
 const isStoreImportOpen = ref(false)
+const isAppIdAdvancedOpen = ref(false)
 const isStoreIconImportOpen = ref(false)
 const isAppDetailsNavigationPending = computed(() => (
   isSubmitting.value || isImportingStore.value || isImportingStoreIcon.value
@@ -432,7 +436,7 @@ async function markOnboardingFeatureStarted(featureKey: 'cli_install' | 'ota' | 
 }
 
 watch([flowStep, createdApp, setupStage, usesBuilderSetupCommand, activeChecklistPath], () => {
-  if (!createdApp.value)
+  if (!createdApp.value || props.showChecklist)
     return
   if (usesDualTodoList.value && !activeChecklistPath.value)
     return
@@ -489,13 +493,9 @@ const suggestedAppId = computed(() => {
   return `com.${orgSlug}.${appSlug}`
 })
 const generatedAppId = computed(() => createdApp.value?.app_id || manualAppId.value.trim() || suggestedAppId.value)
-const hasProvidedAppId = computed(() => Boolean(manualAppId.value.trim() || importedStoreAppId.value.trim()))
 const appDetailsPrimaryActionLabel = computed(() => {
   if (appDetailsStep.value === 'icon')
     return iconPreview.value ? t('app-onboarding-continue') : t('app-onboarding-skip-icon')
-
-  if (appDetailsStep.value === 'app_id' && !hasProvidedAppId.value)
-    return t('app-onboarding-skip-app-id')
 
   return t('app-onboarding-continue')
 })
@@ -542,7 +542,7 @@ function createAiHelpPrompt() {
         }],
       }]
     : []
-  const promptIntent = usesDualTodoList.value ? activeChecklistPath.value ?? 'ota' : selectedIntent.value === 'publish' ? 'builder' : selectedIntent.value
+  const promptIntent = usesDualTodoList.value ? activeChecklistPath.value ?? 'ota' : usesBuilderTodoList.value || selectedIntent.value === 'publish' ? 'builder' : selectedIntent.value
 
   return buildCliAiSetupPrompt({
     apiKey: apiKey.value,
@@ -615,6 +615,7 @@ function emitPendingAppOnboardingReady() {
     || (flowStep.value === 'setup' && setupStage.value === 'cli')
   if (
     !app
+    || props.showChecklist
     || isHandingOff.value
     || app.need_onboarding !== true
     || !orgId
@@ -819,6 +820,8 @@ async function persistOnboardingProgress(
   options: OnboardingPersistOptions = {},
 ) {
   clearScheduledOnboardingProgress()
+  if (props.showChecklist)
+    return 'skipped' as const
   return onboardingProgressPersistence.persist(status, options)
 }
 
@@ -944,6 +947,7 @@ async function resetOnboardingForm() {
   hasEditedOrgName.value = false
   estimatedUsersIndex.value = null
   isStoreImportOpen.value = false
+  isAppIdAdvancedOpen.value = false
   isStoreIconImportOpen.value = false
   createdApp.value = null
   preOrgCreatedOrganizationId.value = null
@@ -983,8 +987,13 @@ function applyOnboardingProgress(progress: ReturnType<typeof parseUserOnboarding
     ? 'setup'
     : resumableStep
   setupStage.value = resolveSetupStage(progress)
-  if (progress.details_step)
+  if (progress.details_step === 'app_id') {
+    appDetailsStep.value = 'icon'
+    isAppIdAdvancedOpen.value = true
+  }
+  else if (progress.details_step) {
     appDetailsStep.value = progress.details_step
+  }
   if (progress.development_environment === 'skipped') {
     skippedPublishAppQuestion.value = true
     selectedDevelopmentEnvironment.value = null
@@ -1337,9 +1346,11 @@ async function loadResumeApp(appId = resumeAppId.value) {
   const iconLoadRun = ++resumeIconLoadRun
   localIconPreview.value = getImmediateImageUrl(data.icon_url) || ''
   void loadResumeIconPreview(data.icon_url, data.app_id, iconLoadRun)
-  const resumeFinalStep = !newChannelTreatment.value
+  const resumeFinalStep = props.showChecklist || !newChannelTreatment.value
     || Boolean(savedProgress && savedProgress.app_id === data.app_id && savedProgress.final_step && savedProgress.setup_stage === 'cli')
   flowStep.value = resumeFinalStep ? 'setup' : 'channel'
+  if (props.showChecklist)
+    setupStage.value = 'cli'
   if (!savedProgress?.intent)
     hydrateIntentFromCurrentOrg()
   return true
@@ -1697,12 +1708,12 @@ function onAppIdInput(event: Event) {
   manualAppId.value = (event.target as HTMLInputElement).value
   appIdFeedback.value = ''
   appIdSuggestions.value = []
-  detailsFieldTracker.schedule('onboarding_app_id_entered', 'app_id', 'app_id', manualAppId.value)
+  detailsFieldTracker.schedule('onboarding_app_id_entered', 'app_id', 'app_icon', manualAppId.value)
 }
 
 function onStoreUrlInput(event: Event) {
   storeAppIdLookupFailed.value = false
-  detailsFieldTracker.schedule('onboarding_store_url_entered', 'store_url', 'app_id', (event.target as HTMLInputElement).value)
+  detailsFieldTracker.schedule('onboarding_store_url_entered', 'store_url', 'app_icon', (event.target as HTMLInputElement).value)
 }
 
 function onIconStoreUrlInput(event: Event) {
@@ -1750,22 +1761,12 @@ function continueFromAppName() {
     return
   }
 
-  completeAndViewAppDetailsStep('app_id', { appId: generatedAppId.value, appName: appName.value.trim() })
+  completeAndViewAppDetailsStep('icon', { appId: generatedAppId.value, appName: appName.value.trim() })
 }
 
-function continueFromAppId() {
-  if (!ensureValidAppId())
-    return
-
-  completeAndViewAppDetailsStep('icon')
-}
-
-function skipAppId() {
-  manualAppId.value = ''
-  hasEditedAppId.value = false
-  appIdFeedback.value = ''
-  appIdSuggestions.value = []
-  continueFromAppId()
+function toggleAppIdAdvanced() {
+  isAppIdAdvancedOpen.value = !isAppIdAdvancedOpen.value
+  trackDetailsEvent(isAppIdAdvancedOpen.value ? 'onboarding_app_id_advanced_shown' : 'onboarding_app_id_advanced_hidden')
 }
 
 function continueFromCurrentAppDetailsStep() {
@@ -1773,20 +1774,12 @@ function continueFromCurrentAppDetailsStep() {
     continueFromAppName()
     return
   }
-  if (appDetailsStep.value === 'app_id') {
-    if (hasProvidedAppId.value)
-      continueFromAppId()
-    else
-      skipAppId()
-    return
-  }
   finishAppDetails()
 }
 
 function viewPreviousAppDetailsStep() {
-  const previousDetailsStep = appDetailsStep.value
   const previousAnalyticsStep = analyticsStepFor('details')
-  appDetailsStep.value = previousDetailsStep === 'icon' ? 'app_id' : 'name'
+  appDetailsStep.value = 'name'
   progressTracker?.viewStep(analyticsStepFor('details'), previousAnalyticsStep)
   schedulePersistOnboardingProgress()
 }
@@ -1806,8 +1799,9 @@ function finishAppDetails() {
 function returnToAppIdAfterConflict() {
   const previousAnalyticsStep = analyticsStepFor(flowStep.value)
   flowStep.value = 'details'
-  appDetailsStep.value = 'app_id'
-  progressTracker?.viewStep('app_id', previousAnalyticsStep)
+  appDetailsStep.value = 'icon'
+  isAppIdAdvancedOpen.value = true
+  progressTracker?.viewStep('app_icon', previousAnalyticsStep)
   schedulePersistOnboardingProgress()
 }
 
@@ -2462,7 +2456,7 @@ async function copyText(text: string) {
   }
 }
 
-function trackSuccessfulCopy(event: OnboardingCopyEvent) {
+function trackSuccessfulCopy(event: OnboardingCopyEvent, placement?: OnboardingCopyEventProperties['placement']) {
   const orgId = currentOrg.value?.gid
   const appId = createdApp.value?.app_id || generatedAppId.value || undefined
   progressTracker?.trackCopyEvent(event, {
@@ -2471,6 +2465,7 @@ function trackSuccessfulCopy(event: OnboardingCopyEvent) {
     ...(selectedIntent.value ? { intent: selectedIntent.value } : {}),
     ...(orgId ? { org_id: orgId } : {}),
     setup_command: usesBuilderSetupCommand.value ? 'builder' : 'ota',
+    ...(placement ? { placement } : {}),
   })
 }
 
@@ -2515,7 +2510,7 @@ async function reportOnboardingPatch(patch: { source?: 'manual' | 'cli' | 'mcp' 
   }
 }
 
-async function copyAiInstructions() {
+async function copyAiInstructions(placement?: unknown) {
   try {
     await loadApiKey()
   }
@@ -2532,7 +2527,7 @@ async function copyAiInstructions() {
 
   const copied = await copyText(createAiHelpPrompt())
   if (copied) {
-    trackSuccessfulCopy('onboarding_ai_instructions_copied')
+    trackSuccessfulCopy('onboarding_ai_instructions_copied', placement === 'checklist' ? 'checklist' : 'start')
     await reportOnboardingPatch({ source: 'ai' })
   }
 }
@@ -2554,7 +2549,7 @@ async function openDashboard() {
     .maybeSingle()
   const current = parseAppOnboarding(data?.onboarding ?? app.onboarding)
   const source = reportedSetupSource.value ?? current.source
-  if (!usesDualTodoList.value && source !== 'manual' && current.outcome === 'in_progress')
+  if (!props.showChecklist && !usesDualTodoList.value && source !== 'manual' && current.outcome === 'in_progress')
     await reportOnboardingPatch({ outcome: 'switched_to_manual' })
   window.dispatchEvent(new Event(ONBOARDING_DASHBOARD_EXPLORED_EVENT))
   allowOnboardingDashboardExploration(onboardingUserId.value, createdApp.value.app_id)
@@ -2592,7 +2587,7 @@ async function skipOnboardingSplash() {
 
 async function leaveSplashIfAlreadySetup() {
   const app = createdApp.value
-  if (!app)
+  if (!app || props.showChecklist)
     return false
   const { data } = await supabase.rpc('verify_getting_started', { p_app_id: app.app_id })
   if (data != null)
@@ -2831,7 +2826,6 @@ defineExpose({
       'onboarding-flow-app-creation': props.preOrg && (flowStep === 'intent' || flowStep === 'publish_app_question' || flowStep === 'details'),
       'onboarding-flow-intent': props.preOrg && (flowStep === 'intent' || flowStep === 'publish_app_question'),
       'onboarding-flow-details-name': flowStep === 'details' && appDetailsStep === 'name',
-      'onboarding-flow-details-app-id': flowStep === 'details' && appDetailsStep === 'app_id',
       'onboarding-flow-details-icon': flowStep === 'details' && appDetailsStep === 'icon',
     }"
   >
@@ -2969,30 +2963,25 @@ defineExpose({
         <div v-if="flowStep === 'details'">
           <div class="onboarding-details-card rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95">
             <div class="onboarding-details-card-content space-y-6">
-              <div class="onboarding-details-heading" :class="{ 'onboarding-details-heading-app-id': appDetailsStep === 'app_id' }">
+              <div class="onboarding-details-heading">
                 <p class="onboarding-details-eyebrow text-sm font-semibold text-primary-500 dark:text-slate-300">
                   {{ t('app-onboarding-step-details') }}
                 </p>
                 <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
                   {{ appDetailsStep === 'name'
                     ? t('app-onboarding-name-step-title')
-                    : appDetailsStep === 'app_id'
-                      ? t('app-onboarding-app-id-step-title')
-                      : t('app-onboarding-icon-step-title') }}
+                    : t('app-onboarding-icon-step-title') }}
                 </h2>
                 <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
                   {{ appDetailsStep === 'name'
                     ? t('app-onboarding-name-step-helper')
-                    : appDetailsStep === 'app_id'
-                      ? t('app-onboarding-app-id-step-helper')
-                      : t('app-onboarding-icon-step-helper') }}
+                    : t('app-onboarding-icon-step-helper') }}
                 </p>
               </div>
 
               <div
                 v-if="appDetailsStep !== 'icon'"
                 class="onboarding-details-preview flex flex-col items-center py-1 text-center"
-                :class="{ 'onboarding-details-preview-app-id': appDetailsStep === 'app_id' }"
               >
                 <div class="onboarding-details-preview-icon relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-[1.4rem] bg-slate-950 text-white shadow-lg shadow-slate-950/15 ring-1 ring-white/10 dark:bg-white dark:text-slate-950 dark:shadow-black/20">
                   <img v-if="iconPreview" :src="iconPreview" :alt="t('app-onboarding-icon-preview-alt')" class="h-full w-full object-cover">
@@ -3005,9 +2994,6 @@ defineExpose({
                 </div>
                 <p class="mt-3 max-w-full truncate text-base font-semibold text-slate-950 dark:text-white">
                   {{ appName.trim() || t('app-onboarding-preview-placeholder') }}
-                </p>
-                <p v-if="appDetailsStep === 'app_id'" class="mt-1 max-w-full truncate font-mono text-xs text-slate-500 dark:text-slate-400">
-                  {{ generatedAppId }}
                 </p>
               </div>
 
@@ -3039,92 +3025,6 @@ defineExpose({
                     maxlength="100"
                     @input="onAppNameInput"
                   >
-                </div>
-
-                <div v-if="appDetailsStep === 'app_id'">
-                  <label for="app-onboarding-app-id" class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ t('app-id') }}</label>
-                  <input
-                    id="app-onboarding-app-id"
-                    :value="manualAppId"
-                    class="onboarding-app-id-input mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 font-mono text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
-                    :placeholder="suggestedAppId"
-                    @input="onAppIdInput"
-                  >
-                  <div class="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                    <i18n-t keypath="app-onboarding-app-id-generated-helper" tag="span">
-                      <template #appId>
-                        <code class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-medium text-slate-700 dark:bg-white/10 dark:text-slate-200">{{ suggestedAppId }}</code>
-                      </template>
-                    </i18n-t>
-                    <button
-                      type="button"
-                      class="text-sm font-medium text-primary-500 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
-                      data-test="app-onboarding-appid-learn-more"
-                      @click="openAppIdHelp()"
-                    >
-                      {{ t('app-onboarding-app-id-learn-more') }}
-                    </button>
-                  </div>
-                  <output v-if="appIdFeedback" class="mt-2 block text-sm font-medium text-amber-700 dark:text-amber-300" for="app-onboarding-app-id">
-                    {{ appIdFeedback }}
-                  </output>
-                  <div v-if="appIdSuggestions.length > 0" class="mt-3 flex flex-wrap gap-2">
-                    <button
-                      v-for="suggestion in appIdSuggestions"
-                      :key="suggestion"
-                      type="button"
-                      class="min-h-9 rounded-full border border-slate-300 bg-white px-3 py-1 font-mono text-xs text-slate-700 transition hover:border-primary-500/40 hover:text-primary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/20 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:border-white/30 dark:hover:text-white"
-                      @click="applyAppIdSuggestion(suggestion)"
-                    >
-                      {{ suggestion }}
-                    </button>
-                  </div>
-                </div>
-
-                <div v-if="appDetailsStep === 'app_id'" class="onboarding-store-import mb-6 mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/15 dark:bg-slate-950/60">
-                  <button
-                    type="button"
-                    class="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-200 dark:hover:bg-slate-900"
-                    data-test="app-onboarding-toggle-store-import"
-                    :aria-expanded="isStoreImportOpen"
-                    aria-controls="app-onboarding-store-import-panel"
-                    @click="toggleStoreImport"
-                  >
-                    <span class="flex items-center gap-2">
-                      <IconStore class="h-4 w-4" />
-                      {{ t('app-onboarding-v2-store-import-toggle') }}
-                    </span>
-                    <IconChevronUp v-if="isStoreImportOpen" class="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
-                    <IconChevronDown v-else class="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
-                  </button>
-
-                  <div v-if="isStoreImportOpen" id="app-onboarding-store-import-panel" class="space-y-3 border-t border-slate-200 p-4 dark:border-white/15">
-                    <label for="app-onboarding-v2-store-url" class="text-sm font-medium text-slate-800 dark:text-slate-200">
-                      {{ t('app-onboarding-store-link-label') }}
-                    </label>
-                    <div class="space-y-3">
-                      <input
-                        id="app-onboarding-v2-store-url"
-                        v-model="storeUrl"
-                        class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
-                        :placeholder="t('app-onboarding-store-link-placeholder')"
-                        type="url"
-                        @input="onStoreUrlInput"
-                      >
-                      <button type="button" class="d-btn min-h-11 w-full sm:w-auto" :class="whiteCardSecondaryButtonClass()" :disabled="isImportingStore || !storeUrl.trim()" @click="importStoreMetadata()">
-                        <IconLoader v-if="isImportingStore" class="h-4 w-4 animate-spin" />
-                        <IconSparkles v-else class="h-4 w-4" />
-                        <span>{{ t('app-onboarding-store-import-button') }}</span>
-                      </button>
-                    </div>
-                    <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400" aria-live="polite">
-                      {{ shouldShowStoreAppIdLookupWarning
-                        ? t('app-onboarding-store-imported-missing-app-id')
-                        : hasImportedStoreMetadata
-                          ? t('app-onboarding-store-imported-help')
-                          : t('app-onboarding-v2-store-import-help') }}
-                    </p>
-                  </div>
                 </div>
 
                 <div v-if="appDetailsStep === 'icon'">
@@ -3225,6 +3125,109 @@ defineExpose({
                   </div>
                 </div>
 
+                <div v-if="appDetailsStep === 'icon'" class="onboarding-app-id-advanced mb-6 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/15 dark:bg-slate-950/60">
+                  <button
+                    type="button"
+                    class="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-200 dark:hover:bg-slate-900"
+                    data-test="app-onboarding-toggle-app-id-advanced"
+                    :aria-expanded="isAppIdAdvancedOpen"
+                    aria-controls="app-onboarding-app-id-advanced-panel"
+                    @click="toggleAppIdAdvanced"
+                  >
+                    <span>{{ t('app-onboarding-app-id-advanced-toggle') }}</span>
+                    <IconChevronUp v-if="isAppIdAdvancedOpen" class="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                    <IconChevronDown v-else class="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                  </button>
+
+                  <div v-if="isAppIdAdvancedOpen" id="app-onboarding-app-id-advanced-panel" class="border-t border-slate-200 p-4 dark:border-white/15">
+                    <div>
+                      <label for="app-onboarding-app-id" class="text-sm font-medium text-slate-800 dark:text-slate-200">{{ t('app-id') }}</label>
+                      <input
+                        id="app-onboarding-app-id"
+                        :value="manualAppId"
+                        class="onboarding-app-id-input mt-2 min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 font-mono text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
+                        :placeholder="suggestedAppId"
+                        @input="onAppIdInput"
+                      >
+                      <div class="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                        <i18n-t keypath="app-onboarding-app-id-generated-helper" tag="span">
+                          <template #appId>
+                            <code class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs font-medium text-slate-700 dark:bg-white/10 dark:text-slate-200">{{ suggestedAppId }}</code>
+                          </template>
+                        </i18n-t>
+                        <button
+                          type="button"
+                          class="text-sm font-medium text-primary-500 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                          data-test="app-onboarding-appid-learn-more"
+                          @click="openAppIdHelp()"
+                        >
+                          {{ t('app-onboarding-app-id-learn-more') }}
+                        </button>
+                      </div>
+                      <output v-if="appIdFeedback" class="mt-2 block text-sm font-medium text-amber-700 dark:text-amber-300" for="app-onboarding-app-id">
+                        {{ appIdFeedback }}
+                      </output>
+                      <div v-if="appIdSuggestions.length > 0" class="mt-3 flex flex-wrap gap-2">
+                        <button
+                          v-for="suggestion in appIdSuggestions"
+                          :key="suggestion"
+                          type="button"
+                          class="min-h-9 rounded-full border border-slate-300 bg-white px-3 py-1 font-mono text-xs text-slate-700 transition hover:border-primary-500/40 hover:text-primary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/20 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:border-white/30 dark:hover:text-white"
+                          @click="applyAppIdSuggestion(suggestion)"
+                        >
+                          {{ suggestion }}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="onboarding-store-import mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-white/15 dark:bg-slate-950/60">
+                      <button
+                        type="button"
+                        class="flex min-h-12 w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:text-slate-200 dark:hover:bg-slate-900"
+                        data-test="app-onboarding-toggle-store-import"
+                        :aria-expanded="isStoreImportOpen"
+                        aria-controls="app-onboarding-store-import-panel"
+                        @click="toggleStoreImport"
+                      >
+                        <span class="flex items-center gap-2">
+                          <IconStore class="h-4 w-4" />
+                          {{ t('app-onboarding-v2-store-import-toggle') }}
+                        </span>
+                        <IconChevronUp v-if="isStoreImportOpen" class="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                        <IconChevronDown v-else class="h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                      </button>
+
+                      <div v-if="isStoreImportOpen" id="app-onboarding-store-import-panel" class="space-y-3 border-t border-slate-200 p-4 dark:border-white/15">
+                        <label for="app-onboarding-v2-store-url" class="text-sm font-medium text-slate-800 dark:text-slate-200">
+                          {{ t('app-onboarding-store-link-label') }}
+                        </label>
+                        <div class="space-y-3">
+                          <input
+                            id="app-onboarding-v2-store-url"
+                            v-model="storeUrl"
+                            class="min-h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/10 dark:border-white/20 dark:bg-slate-950/90 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-primary-500 dark:focus:ring-primary-500/30"
+                            :placeholder="t('app-onboarding-store-link-placeholder')"
+                            type="url"
+                            @input="onStoreUrlInput"
+                          >
+                          <button type="button" class="d-btn min-h-11 w-full sm:w-auto" :class="whiteCardSecondaryButtonClass()" :disabled="isImportingStore || !storeUrl.trim()" @click="importStoreMetadata()">
+                            <IconLoader v-if="isImportingStore" class="h-4 w-4 animate-spin" />
+                            <IconSparkles v-else class="h-4 w-4" />
+                            <span>{{ t('app-onboarding-store-import-button') }}</span>
+                          </button>
+                        </div>
+                        <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400" aria-live="polite">
+                          {{ shouldShowStoreAppIdLookupWarning
+                            ? t('app-onboarding-store-imported-missing-app-id')
+                            : hasImportedStoreMetadata
+                              ? t('app-onboarding-store-imported-help')
+                              : t('app-onboarding-v2-store-import-help') }}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div class="flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:items-center sm:justify-between onboarding-details-actions dark:border-white/15">
                   <button
                     type="button"
@@ -3241,7 +3244,7 @@ defineExpose({
                       class="d-btn min-h-12"
                       :class="whiteCardPrimaryButtonClass()"
                       :disabled="isAppDetailsNavigationPending || (appDetailsStep === 'name' && !appName.trim())"
-                      :data-test="appDetailsStep === 'app_id' && !hasProvidedAppId ? 'app-onboarding-skip-app-id' : 'app-onboarding-continue'"
+                      data-test="app-onboarding-continue"
                       @click="continueFromCurrentAppDetailsStep"
                     >
                       <IconLoader v-if="isSubmitting" class="h-4 w-4 animate-spin" />
@@ -3547,6 +3550,7 @@ defineExpose({
               @snapshot="panel.snapshot"
               @platform-changed="panel.selectPlatform"
               @copy-command="copyBuilderCliCommand"
+              @copy-ai="copyAiInstructions"
               @complete="panel.complete"
             />
           </template>
@@ -3561,6 +3565,7 @@ defineExpose({
           :hiding="isHidingSplash"
           :leaving="isHandingOff"
           @copy-command="copyBuilderCliCommand"
+          @copy-ai="copyAiInstructions"
           @hide="skipOnboardingSplash"
           @explore="openDashboard"
           @complete="openDashboard"

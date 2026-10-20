@@ -4,6 +4,13 @@ import { expect, test } from '@playwright/test'
 const fixture = '/playwright/fixtures/onboarding-setup.html'
 const instructions = '[data-test="setup-checklist-instructions"]'
 
+async function openTask(page: Page, id: string) {
+  const toggle = page.locator('[data-test="setup-checklist-toggle"]')
+  if (await toggle.getAttribute('aria-expanded') === 'false')
+    await toggle.click()
+  await page.locator(`[data-test="app-onboarding-cli-step-${id}"] button`).click()
+}
+
 async function advanceProgressPolls(page: Page, count: number) {
   for (let i = 0; i < count; i++) {
     const requests = await page.evaluate(() => (window as any).onboardingSetupPreview.state.requests)
@@ -19,7 +26,14 @@ test.describe('Actionable onboarding setup checklist', () => {
     await expect(page.getByRole('heading', { name: 'Set up your first live update' })).toBeVisible()
   })
 
-  test('keeps all tasks visible and distinguishes inspecting a task from completing it', async ({ page }) => {
+  test('shows one task at a time, keeps every task one click away and distinguishes inspecting a task from completing it', async ({ page }) => {
+    const toggle = page.locator('[data-test="setup-checklist-toggle"]')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(toggle).toHaveText('Show all 7 steps')
+    await expect(page.locator('[data-test="app-onboarding-cli-step-add_channel"]')).toBeHidden()
+    await expect(page.locator(instructions)).toContainText('Current task · 1 of 7')
+    await toggle.click()
+    await expect(page.locator('[data-test="app-onboarding-cli-step-add_channel"]')).toBeVisible()
     await expect(page.locator('[data-test^="app-onboarding-cli-step-"]')).toHaveCount(7)
     await expect(page.locator('[data-test^="app-onboarding-cli-step-"] button')).toContainText([
       'Start guided setup Current task',
@@ -39,7 +53,7 @@ test.describe('Actionable onboarding setup checklist', () => {
     await expect(page.getByRole('link', { name: 'Manual setup guide', exact: false })).toHaveCount(1)
     await expect(page.locator(instructions).getByRole('button', { name: 'Send setup instructions', exact: true })).toHaveCount(0)
 
-    await page.locator('[data-test="app-onboarding-cli-step-run_device"] button').click()
+    await openTask(page, 'run_device')
     await expect(page.locator(instructions).getByRole('heading', { name: 'Run your app on a device' })).toBeVisible()
     await expect(page.locator(instructions)).toContainText('Choose iOS or Android, build your app with Capgo installed')
     await expect(page.locator('[data-test="setup-checklist-start-actions"]')).toHaveCount(0)
@@ -65,7 +79,7 @@ test.describe('Actionable onboarding setup checklist', () => {
 
   test('follows persisted progress, counts skipped tasks, and stops polling on completion', async ({ page }) => {
     const time = new Date('2026-09-16T12:00:00Z')
-    await page.clock.install({ time })
+    await page.clock.install({ time: new Date(time.getTime() - 60_000) })
     await page.clock.pauseAt(time)
     await page.goto(fixture)
     await page.evaluate(() => {
@@ -90,7 +104,7 @@ test.describe('Actionable onboarding setup checklist', () => {
     expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.steps.build_project)).toEqual({ status: 'done' })
 
     // Browsing a future task should survive background progress updates.
-    await page.locator('[data-test="app-onboarding-cli-step-run_device"] button').click()
+    await openTask(page, 'run_device')
     await page.evaluate(() => {
       (window as any).onboardingSetupPreview.state.steps.add_updater = { status: 'done' }
     })
@@ -127,7 +141,7 @@ test.describe('Actionable onboarding setup checklist', () => {
 
   test('polls one endpoint every two seconds with consecutive N and the app id on every request', async ({ page }) => {
     const time = new Date('2026-09-16T12:00:00Z')
-    await page.clock.install({ time })
+    await page.clock.install({ time: new Date(time.getTime() - 60_000) })
     await page.clock.pauseAt(time)
     await page.goto(fixture)
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.polls.length)).toBe(1)
@@ -168,7 +182,7 @@ test.describe('Actionable onboarding setup checklist', () => {
       for (const [id, href] of Object.entries(guides)) {
         if (id === (version === 1 ? 'login_cli_mcp' : 'add_app'))
           continue
-        await page.locator(`[data-test="app-onboarding-cli-step-${id}"] button`).click()
+        await openTask(page, id)
         const title = await page.locator(instructions).getByRole('heading').textContent()
         const guide = page.locator('[data-test="setup-checklist-manual-guide"]')
         await expect(guide).toHaveAttribute('href', href)
@@ -181,7 +195,7 @@ test.describe('Actionable onboarding setup checklist', () => {
 
     // Verify the link actually navigates without sending a request to production docs.
     await context.route('https://capgo.app/docs/**', route => route.fulfill({ contentType: 'text/html', body: 'Documentation preview' }))
-    await page.locator('[data-test="app-onboarding-cli-step-upload_bundle"] button').click()
+    await openTask(page, 'upload_bundle')
     const popupPromise = page.waitForEvent('popup')
     await page.locator('[data-test="setup-checklist-manual-guide"]').click()
     const popup = await popupPromise
@@ -192,8 +206,7 @@ test.describe('Actionable onboarding setup checklist', () => {
     await page.screenshot({ path: '.context/onboarding-design/task-guides-desktop.png', fullPage: true })
 
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.locator('[data-test="setup-checklist-mobile-toggle"]').click()
-    await page.locator('[data-test="app-onboarding-cli-step-test_update"] button').click()
+    await openTask(page, 'test_update')
     const mobileGuide = page.locator('[data-test="setup-checklist-manual-guide"]')
     await expect(mobileGuide).toHaveAttribute('href', guides.test_update)
     await mobileGuide.scrollIntoViewIfNeeded()
@@ -206,7 +219,7 @@ test.describe('Actionable onboarding setup checklist', () => {
 
   test('creates a channel through the existing animated flow and tags every milestone as todo-list activity', async ({ page }) => {
     await page.setViewportSize({ width: 1190, height: 1322 })
-    await page.locator('[data-test="app-onboarding-cli-step-add_channel"] button').click()
+    await openTask(page, 'add_channel')
     await expect(page.locator(instructions)).toContainText('Waiting for a channel to be created')
     await page.screenshot({ path: '.context/onboarding-design/setup-channel-action.png', fullPage: true })
     await page.locator('[data-test="setup-checklist-create-channel"]').click()
@@ -271,7 +284,7 @@ test.describe('Actionable onboarding setup checklist', () => {
   })
 
   test('returns to the selected task on Escape and preserves origin on animation disposal', async ({ page }) => {
-    await page.locator('[data-test="app-onboarding-cli-step-add_channel"] button').click()
+    await openTask(page, 'add_channel')
     const create = page.locator('[data-test="setup-checklist-create-channel"]')
     await create.click()
     await expect(page.locator('[data-test="setup-checklist-channel-dialog"]')).toBeVisible()
@@ -297,8 +310,7 @@ test.describe('Actionable onboarding setup checklist', () => {
     await page.evaluate(() => {
       (window as any).onboardingSetupPreview.state.channelPermissions = false
     })
-    await page.locator('[data-test="setup-checklist-mobile-toggle"]').click()
-    await page.locator('[data-test="app-onboarding-cli-step-add_channel"] button').click()
+    await openTask(page, 'add_channel')
     await page.locator('[data-test="setup-checklist-create-channel"]').click()
     await page.screenshot({ path: '.context/onboarding-design/setup-channel-flow-mobile.png', fullPage: true })
     const routingBounds = await page.locator('[data-test="channel-default-routing-animation"]').evaluate((stage) => {
@@ -353,7 +365,7 @@ test.describe('Actionable onboarding setup checklist', () => {
   test('reuses a channel created while explanations are open without inserting another one in either checklist version', async ({ page }) => {
     for (const version of [1, 2]) {
       await page.goto(`${fixture}?version=${version}`)
-      await page.locator('[data-test="app-onboarding-cli-step-add_channel"] button').click()
+      await openTask(page, 'add_channel')
       await page.locator('[data-test="setup-checklist-create-channel"]').click()
       await page.evaluate(() => {
         const preview = (window as any).onboardingSetupPreview
@@ -397,7 +409,7 @@ test.describe('Actionable onboarding setup checklist', () => {
       await expect(page.locator(instructions).getByRole('heading', { name: 'Start guided setup' })).toBeVisible()
       expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.steps)).toEqual({})
       expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.channelQueries)).toEqual(['eq.com.example.onboarding-preview'])
-      await page.locator('[data-test="app-onboarding-cli-step-add_channel"] button').click()
+      await openTask(page, 'add_channel')
       await expect(page.locator(instructions).getByRole('heading', { name: 'Create a channel' })).toBeVisible()
       await expect(page.locator(instructions)).not.toContainText('We check on page load and every 10 seconds.')
     }
@@ -418,7 +430,7 @@ test.describe('Actionable onboarding setup checklist', () => {
 
   test('unchecks a deleted channel despite saved completion and rechecks a recreated channel', async ({ page }) => {
     const time = new Date('2026-09-16T12:00:00Z')
-    await page.clock.install({ time })
+    await page.clock.install({ time: new Date(time.getTime() - 60_000) })
     await page.clock.pauseAt(time)
     await page.goto(`${fixture}?channel=1&channelStatus=done`)
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.channelRequests)).toBe(1)
@@ -454,7 +466,7 @@ test.describe('Actionable onboarding setup checklist', () => {
 
   test('detects a new channel at ten seconds and retains it through progress and channel refresh failures', async ({ page }) => {
     const time = new Date('2026-09-16T12:00:00Z')
-    await page.clock.install({ time })
+    await page.clock.install({ time: new Date(time.getTime() - 60_000) })
     await page.clock.pauseAt(time)
     await page.goto(fixture)
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.channelRequests)).toBe(1)
@@ -513,7 +525,7 @@ test.describe('Actionable onboarding setup checklist', () => {
 
   test('ignores delayed channel results from the previous app and polls the new app', async ({ page }) => {
     const time = new Date('2026-09-16T12:00:00Z')
-    await page.clock.install({ time })
+    await page.clock.install({ time: new Date(time.getTime() - 60_000) })
     await page.clock.pauseAt(time)
     await page.goto(`${fixture}?channel=1&channelDelay=4000`)
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.channelRequests)).toBe(1)
@@ -541,7 +553,7 @@ test.describe('Actionable onboarding setup checklist', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await page.goto(`${fixture}?version=1`)
     await expect(page.locator(instructions).getByRole('heading', { name: 'Start guided setup' })).toBeVisible()
-    const toggle = page.locator('[data-test="setup-checklist-mobile-toggle"]')
+    const toggle = page.locator('[data-test="setup-checklist-toggle"]')
     await toggle.click()
     await expect(page.locator('[data-test="app-onboarding-cli-step-test_update"]')).toBeVisible()
     await page.locator('[data-test="app-onboarding-cli-step-run_device"] button').click()
@@ -559,7 +571,8 @@ test.describe('Actionable onboarding setup checklist', () => {
     })
     await page.setViewportSize({ width: 1190, height: 1322 })
     await page.goto(fixture)
-    await expect(page.locator('[data-test="app-onboarding-cli-step-test_update"]')).toBeVisible()
+    await expect(page.locator('[data-test="setup-checklist-toggle"]')).toBeVisible()
+    await expect(page.locator('[data-test="app-onboarding-cli-step-test_update"]')).toBeHidden()
     const commandButton = await page.locator('[data-test="setup-checklist-copy-command"]').boundingBox()
     const aiButton = await page.locator('[data-test="setup-checklist-copy-ai"]').boundingBox()
     expect(commandButton).not.toBeNull()

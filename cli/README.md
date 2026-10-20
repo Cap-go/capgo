@@ -794,6 +794,7 @@ npx @capgo/cli@latest app todo
 
 📋 Show your app's onboarding todo list with done, skipped, and pending tasks.
 Uses the same live progress checks as the Capgo dashboard. The app ID can be inferred from your Capacitor project.
+Apps with both Builder and OTA checklists show interactive tabs. For scripts and AI agents, choose --list builder or --list ota to print one list and exit.
 
 **Example:**
 
@@ -805,6 +806,7 @@ npx @capgo/cli@latest app todo com.example.app
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
+| **--list** | <code>string</code> | Show one todo list and exit; required for dual checklists in non-interactive mode |
 | **-a** | <code>string</code> | API key to link to your account |
 | **--api-host** | <code>string</code> | Custom Capgo API URL for self-hosting or testing, e.g. https://<project>.supabase.co/functions/v1 or http://127.0.0.1:8787 (env: CAPGO_API_HOST) |
 | **--files-host** | <code>string</code> | Custom Capgo files API URL when it differs from --api-host (env: CAPGO_FILES_HOST) |
@@ -1774,10 +1776,11 @@ Examples:
 | **--ios-testflight-groups** | <code>string</code> | iOS: optional comma-separated TestFlight external group names or IDs for external beta distribution. |
 | **--ios-automatic-release** | <code>boolean</code> | iOS: automatically release the App Store version after Apple approval. Default is manual release. |
 | **--no-ios-automatic-release** | <code>boolean</code> | iOS: keep the App Store version waiting for manual release after Apple approval. |
-| **--output-upload** | <code>boolean</code> | Upload the finished IPA/APK/AAB to Capgo storage and print a time-limited download link (and QR). Use with --no-playstore-upload (Android) or --ios-distribution ad_hoc (iOS) when you only need the artifact and are not publishing to the store yet. Precedence: CLI > env > saved credentials |
+| **--output-upload** | <code>boolean</code> | Upload the finished IPA/APK/AAB to Capgo storage and print a time-limited download link (and QR), plus a link to the debug symbols (iOS dSYMs, Android mapping.txt) for crash reporters. Use with --no-playstore-upload (Android) or --ios-distribution ad_hoc (iOS) when you only need the artifact and are not publishing to the store yet. Precedence: CLI > env > saved credentials |
 | **--no-output-upload** | <code>boolean</code> | Do not upload the finished IPA/APK/AAB to Capgo storage (no download link). Store upload still happens when Play/TestFlight credentials are configured. Precedence: CLI > env > saved credentials |
 | **--output-retention** | <code>string</code> | Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials |
-| **--output-record** | <code>string</code> | After a successful build, write a JSON record (jobId, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`. |
+| **--build-env** | <code>string</code> | Pass an env var to the cloud build (repeatable). KEY alone takes the value from your environment, so CI secrets stay off the command line. Sent like other build credentials, never logged; Gradle and Xcode build phases see it (e.g. SENTRY_AUTH_TOKEN for the Sentry Gradle plugin). Also read from CAPGO_BUILD_ENV (comma-separated names). |
+| **--output-record** | <code>string</code> | After a successful build, write a JSON record (jobId, status, outputUrl, symbolsUrl, qrCodeAscii, qrCodePngPath, finishedAt) to <path>. symbolsUrl is the iOS dSYMs zip or Android mapping.txt download link (with --output-upload) for crash reporters like Sentry. A PNG QR code is also written next to it as <path>.qr.png. Read fields back with `build last-output`. |
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing. Uses whatever version is already in the project files. |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Override saved credentials to re-enable automatic build number incrementing for this build only. |
 | **--skip-marketing-version-bump** | <code>boolean</code> | Skip automatic marketing version (CFBundleShortVersionString / versionName) bump when the app is already released. |
@@ -1872,6 +1875,7 @@ to a PR or issue.
 Examples:
   npx @capgo/cli@latest build last-output --path /tmp/build.json
   npx @capgo/cli@latest build last-output --path /tmp/build.json --field outputUrl
+  npx @capgo/cli@latest build last-output --path /tmp/build.json --field symbolsUrl
   npx @capgo/cli@latest build last-output --path /tmp/build.json --qr
 
 **Options:**
@@ -1879,7 +1883,7 @@ Examples:
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
 | **--path** | <code>string</code> | Path to the JSON record written by --output-record (required) |
-| **--field** | <code>string</code> | Print a single field (one of: jobId, appId, platform, buildMode, status, outputUrl, qrCodeAscii, qrCodePngPath, finishedAt, schemaVersion) |
+| **--field** | <code>string</code> | Print a single field (one of: jobId, appId, platform, buildMode, status, outputUrl, symbolsUrl, qrCodeAscii, qrCodePngPath, finishedAt, schemaVersion) |
 | **--qr** | <code>boolean</code> | Print the rendered ASCII QR code (shortcut for --field qrCodeAscii) |
 
 ### <a id="build-credentials"></a> 🔹 **Credentials**
