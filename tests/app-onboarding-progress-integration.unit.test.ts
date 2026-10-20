@@ -1234,7 +1234,8 @@ describe('app onboarding progress analytics integration', () => {
       '<ChannelCreateOnboarding',
     ])
     expect(renderedChannel).toContain('newChannelTreatment')
-    expect(onboardingSource).toContain('const showSetupChecklist = computed(() => flowStep.value === \'setup\' && usesOtaTodoList.value && !showBuilderChecklist.value)')
+    expect(onboardingSource).toContain('const showSetupChecklist = computed(() => flowStep.value === \'setup\' && usesOtaTodoList.value && !usesBuilderSetupCommand.value)')
+    expect(onboardingSource).toContain('const usesBuilderSetupCommand = computed(() => usesBuilderTodoList.value || (!usesDualTodoList.value && (selectedIntent.value === \'builder\' || selectedIntent.value === \'publish\')))')
     expect(onboardingSource).toContain('progressTracker?.trackStepEvent(name, \'channel\', {')
     expect(onboardingSource).toContain('void viewFinalStepWhenRendered(nextStep, previousAnalyticsStep)')
     expect(onboardingSource).toContain('if (!isLoading.value && createdApp.value && flowStep.value === step)')

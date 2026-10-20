@@ -312,7 +312,9 @@ const usesOtaTodoList = computed(() => !!createdApp.value && hasSupportedOtaTodo
 const usesDualTodoList = computed(() => !!createdApp.value && hasDualOnboardingChecklists(createdApp.value.onboarding))
 const activeChecklistPath = ref<ChecklistPath | null>(null)
 const usesBuilderTodoList = computed(() => usesDualTodoList.value ? activeChecklistPath.value === 'builder' : !!createdApp.value && isBuilderTodoListSelected(createdApp.value.onboarding))
-const usesBuilderSetupCommand = computed(() => usesBuilderTodoList.value || (!usesOtaTodoList.value && (selectedIntent.value === 'builder' || selectedIntent.value === 'publish')))
+// Every new app gets the OTA checklist, so the builder intent must win over it
+// outside the dual checklist; otherwise builder users are sent to `capgo i`.
+const usesBuilderSetupCommand = computed(() => usesBuilderTodoList.value || (!usesDualTodoList.value && (selectedIntent.value === 'builder' || selectedIntent.value === 'publish')))
 const markedOnboardingFeatures = new Set<string>()
 let onboardingABTestsRequest: Promise<void> | null = null
 
@@ -605,7 +607,7 @@ const setupTitle = computed(() => usesBuilderSetupCommand.value ? t('unified-onb
 const setupSubtitle = computed(() => usesBuilderSetupCommand.value ? t('unified-onboarding-setup-builder-subtitle') : t('unified-onboarding-setup-ota-subtitle'))
 const showDualChecklist = computed(() => flowStep.value === 'setup' && usesDualTodoList.value)
 const showBuilderChecklist = computed(() => flowStep.value === 'setup' && !!createdApp.value && usesBuilderTodoList.value)
-const showSetupChecklist = computed(() => flowStep.value === 'setup' && usesOtaTodoList.value && !showBuilderChecklist.value)
+const showSetupChecklist = computed(() => flowStep.value === 'setup' && usesOtaTodoList.value && !usesBuilderSetupCommand.value)
 
 function emitPendingAppOnboardingReady() {
   const app = createdApp.value
