@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
   track: vi.fn(),
   row: { onboarding: { setup: { todo_list_version: 3, steps: {} } }, created_at: '2026-09-16T00:00:00Z' } as any,
   channels: [] as any[],
-  billing: { has_usage_credits: false, stripe_info: { status: 'succeeded', trial_at: '2026-11-01T12:34:56Z' } } as any,
+  billing: { created_at: '2026-10-01T09:00:00Z', has_usage_credits: false, stripe_info: { status: 'succeeded', trial_at: '2026-11-01T12:34:56Z' } } as any,
   billingRead: vi.fn(),
   versions: [] as any[],
   archive: [] as any[],
@@ -72,7 +72,7 @@ describe('onboarding progress endpoint', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.row = { onboarding: { setup: { todo_list_version: 3, steps: {} } }, created_at: '2026-09-16T00:00:00Z', owner_org: '11111111-1111-4111-8111-111111111112' }
-    mocks.billing = { has_usage_credits: false, stripe_info: { status: 'succeeded', trial_at: '2026-11-01T12:34:56Z' } }
+    mocks.billing = { created_at: '2026-10-01T09:00:00Z', has_usage_credits: false, stripe_info: { status: 'succeeded', trial_at: '2026-11-01T12:34:56Z' } }
     mocks.billingRead.mockImplementation(async () => ({ data: mocks.billing, error: mocks.errors.orgs ? new Error('Unavailable') : null }))
     mocks.auth = { authType: 'jwt', userId: '11111111-1111-4111-8111-111111111111', jwt: 'fixture', apikey: null }
     mocks.channels = []
@@ -158,12 +158,12 @@ describe('onboarding progress endpoint', () => {
     ['canceled', true, false],
     [null, false, false],
   ])('returns CLI billing fields for status %s', async (status, hasCredits, isPaying) => {
-    mocks.billing = { has_usage_credits: hasCredits, stripe_info: { status, trial_at: '2026-11-01T12:34:56Z' } }
+    mocks.billing = { created_at: '2026-10-01T09:00:00Z', has_usage_credits: hasCredits, stripe_info: { status, trial_at: '2026-11-01T12:34:56Z' } }
     const response = await request(4, false, undefined, true)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
-    expect((await response.json() as any).billing).toEqual({ status: 'available', orgId: mocks.row.owner_org, trialEndsAt: '2026-11-01T12:34:56Z', isPaying, hasCredits })
+    expect((await response.json() as any).billing).toEqual({ status: 'available', orgId: mocks.row.owner_org, orgCreatedAt: '2026-10-01T09:00:00Z', trialEndsAt: '2026-11-01T12:34:56Z', isPaying, hasCredits })
     expect(mocks.permission).toHaveBeenCalledWith(expect.anything(), 'org.read_billing', { orgId: mocks.row.owner_org })
-    expect(mocks.queries.at(-1)).toEqual({ table: 'orgs', calls: [['select', 'has_usage_credits, stripe_info(status, trial_at)'], ['eq', 'id', mocks.row.owner_org]] })
+    expect(mocks.queries.at(-1)).toEqual({ table: 'orgs', calls: [['select', 'created_at, has_usage_credits, stripe_info(status, trial_at)'], ['eq', 'id', mocks.row.owner_org]] })
     expect(mocks.transaction).not.toHaveBeenCalled()
   })
   it('returns no trial explicitly instead of inventing an expiry', async () => {

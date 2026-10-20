@@ -48,7 +48,7 @@ describe('onboarding progress optional billing', () => {
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('no-store')
     const result = await response.json() as any
-    expect(result.billing).toEqual({ status: 'available', orgId, trialEndsAt: expect.any(String), isPaying: true, hasCredits: true })
+    expect(result.billing).toEqual({ status: 'available', orgId, orgCreatedAt: expect.any(String), trialEndsAt: expect.any(String), isPaying: true, hasCredits: true })
     expect(new Date(result.billing.trialEndsAt).toISOString()).toBe(trialEndsAt)
     expect(result.onboarding.setup.steps.ota.login_cli_mcp.status).toBe('done')
     expect(JSON.stringify(result)).not.toContain(customerId)
