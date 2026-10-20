@@ -17,6 +17,7 @@ const route = useRoute('/app/[app].getting-started')
 // Only a single explicit opt-in enables checklist viewing; arrays and values
 // such as "0", "false", or an empty query value keep the normal redirect.
 const showChecklist = computed(() => route.query.showChecklist === '1')
+const initialChecklistPath = computed(() => route.query.path === 'builder' ? 'builder' as const : undefined)
 const { id, app, isLoading } = useAppPage({
   routeName: '/app/[app].getting-started',
   navTitle: t('getting-started'),
@@ -60,6 +61,7 @@ watch(() => app.value?.app_id, (appId) => {
       data-test="getting-started-setup"
       :setup-app-id="setupFlowAppId"
       :show-checklist="showChecklist"
+      :initial-checklist-path="initialChecklistPath"
       :pre-org="setupPreOrg"
       onboarding
     />

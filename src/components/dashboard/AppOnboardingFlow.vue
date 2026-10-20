@@ -137,6 +137,7 @@ const props = defineProps<{
   // View persisted setup without automatically leaving a finished checklist
   // or restarting the user's onboarding run.
   showChecklist?: boolean
+  initialChecklistPath?: ChecklistPath
   // An existing user creating another organization runs the same first-run
   // flow from the start, ignoring any saved onboarding progress.
   newOrganization?: boolean
@@ -3510,6 +3511,7 @@ defineExpose({
           :app-id="createdApp.app_id"
           :user-id="onboardingUserId"
           :initial-onboarding="createdApp.onboarding"
+          :initial-path="props.initialChecklistPath"
           :hiding="isHidingSplash"
           :leaving="isHandingOff"
           @path-changed="activeChecklistPath = $event"

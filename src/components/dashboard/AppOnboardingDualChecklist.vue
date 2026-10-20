@@ -15,6 +15,7 @@ const props = defineProps<{
   appId: string
   userId?: string | null
   initialOnboarding: unknown
+  initialPath?: ChecklistPath
   hiding: boolean
   leaving: boolean
 }>()
@@ -32,7 +33,7 @@ const snapshot = ref(props.initialOnboarding)
 const observedChannel = ref<boolean | null>(null)
 const otaComplete = computed(() => isDualOtaChecklistComplete(snapshot.value, observedChannel.value ?? undefined))
 const resume = computed(() => resolveDualChecklistResume(snapshot.value, preference.value))
-const activePath = ref<ChecklistPath | null>(resume.value.path)
+const activePath = ref<ChecklistPath | null>(props.initialPath ?? resume.value.path)
 const platform = ref<BuilderPlatform | null>(resume.value.platform)
 const visited = ref({ ota: activePath.value === 'ota', builder: activePath.value === 'builder' })
 const paths = ['ota', 'builder'] as const
@@ -52,14 +53,15 @@ watch(() => props.userId, (userId) => {
       ...(next.path ? { path: next.path } : {}),
       ...(next.platform ? { platform: next.platform } : {}),
     }
-    activePath.value = next.path
+    const path = !changedUser && !hasInteracted.value ? props.initialPath ?? next.path : next.path
+    activePath.value = path
     platform.value = next.platform
     if (changedUser) {
       hasInteracted.value = false
       visited.value = { ota: next.path === 'ota', builder: next.path === 'builder' }
     }
-    else if (next.path) {
-      visited.value[next.path] = true
+    else if (path) {
+      visited.value[path] = true
     }
   }
   else {

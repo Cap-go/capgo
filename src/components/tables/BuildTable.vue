@@ -8,6 +8,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconEye from '~icons/heroicons/eye'
+import BuilderIntroduction from '~/components/dashboard/BuilderIntroduction.vue'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -43,6 +44,10 @@ const totalAllBuilds = ref<number | null>(null)
 const platformBuildCounts = ref<Record<Platform, number>>({ ios: 0, android: 0 })
 const showSetupFlow = computed(() => showSteps.value || totalAllBuilds.value === 0)
 const organizationStore = useOrganizationStore()
+const builderEntitlement = computed(() => {
+  const org = organizationStore.getOrgByAppId(props.appId)
+  return org?.paying ? 'plan' as const : (org?.trial_left ?? 0) > 0 ? 'trial' as const : null
+})
 const filters = ref({})
 
 const currentBuildsNumber = computed(() => {
@@ -349,8 +354,14 @@ watch(showSetupFlow, (newValue) => {
 
 <template>
   <div>
+    <BuilderIntroduction
+      v-if="totalAllBuilds === 0"
+      :key="props.appId"
+      :app-id="props.appId"
+      :entitlement="builderEntitlement"
+    />
     <StepsBuild
-      v-if="showSetupFlow"
+      v-else-if="showSteps"
       :onboarding="(totalAllBuilds ?? 0) === 0"
       :app-id="props.appId"
       :platform-build-counts="platformBuildCounts"

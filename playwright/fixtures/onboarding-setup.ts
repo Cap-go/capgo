@@ -6,6 +6,7 @@ import AppOnboardingBuilderChecklist from '../../src/components/dashboard/AppOnb
 import AppOnboardingCliSteps from '../../src/components/dashboard/AppOnboardingCliSteps.vue'
 import AppOnboardingFlow from '../../src/components/dashboard/AppOnboardingFlow.vue'
 import AppOnboardingSetupChecklist from '../../src/components/dashboard/AppOnboardingSetupChecklist.vue'
+import BuilderIntroduction from '../../src/components/dashboard/BuilderIntroduction.vue'
 import GettingStartedNav from '../../src/components/dashboard/GettingStartedNav.vue'
 import OnboardingExploreBanner from '../../src/components/dashboard/OnboardingExploreBanner.vue'
 import OnboardingExploreReminder from '../../src/components/dashboard/OnboardingExploreReminder.vue'
@@ -21,7 +22,10 @@ import { ONBOARDING_SETUP_HANDOFF_STATE_KEY } from '../../src/utils/onboardingRe
 import '../../src/styles/style.css'
 
 const params = new URLSearchParams(location.search)
-const navigationView = params.get('view') === 'navigation' || location.pathname.startsWith('/app/') || location.pathname === '/onboarding/app'
+// The fixture omits the main app's analytics loader, including for prod-config previews.
+Object.defineProperty(window, 'posthog', { configurable: true, value: { capture: () => {} } })
+const builderIntroView = params.get('view') === 'builder-intro'
+const navigationView = builderIntroView || params.get('view') === 'navigation' || location.pathname.startsWith('/app/') || location.pathname === '/onboarding/app'
 const builderComponentView = params.get('view') === 'builder'
 const assignment = params.get('assignment')
 const previewAppId = 'com.example.onboarding-preview'
@@ -52,6 +56,10 @@ const state = {
   appWrites: [] as Array<{ method: string, body: unknown }>,
   setupWrites: [] as Array<{ method: string, body: unknown }>,
   userWrites: [] as unknown[],
+  builderActivationRequests: [] as unknown[],
+  builderActivationError: false,
+  builderActivationDelayMs: 0,
+  builderActivated: false,
 }
 if (params.get('checklistState') === 'completed') {
   for (const id of ['login_cli_mcp', 'add_updater', 'add_code', 'add_channel', 'run_device', 'upload_bundle', 'test_update'])
@@ -119,10 +127,10 @@ function previewOnboarding() {
   const features = params.get('otaInstalled') === '1'
     ? { ota: { succeeded_at: '2026-09-01T00:00:00.000Z' } }
     : {}
-  const dismissal = params.get('checklistState') === 'dismissed' ? { getting_started_dismissed_at: '2026-10-01T00:00:00.000Z' } : {}
+  const dismissal = !state.builderActivated && params.get('checklistState') === 'dismissed' ? { getting_started_dismissed_at: '2026-10-01T00:00:00.000Z' } : {}
   const selectedPath = assignment === 'both-ota' || assignment === 'ota-only' ? 'ota' : 'builder'
-  const hasBuilder = builderComponentView || assignment === 'builder-only' || assignment === 'both-builder' || assignment === 'both-ota'
-  const hasOta = assignment === 'ota-only' || assignment === 'both-builder' || assignment === 'both-ota'
+  const hasBuilder = state.builderActivated || builderComponentView || assignment === 'builder-only' || assignment === 'both-builder' || assignment === 'both-ota'
+  const hasOta = (state.builderActivated && state.version === 3) || assignment === 'ota-only' || assignment === 'both-builder' || assignment === 'both-ota'
   if (hasBuilder || hasOta) {
     return { ...dismissal, features, setup: {
       todo_list_version: 4,
@@ -184,6 +192,16 @@ window.fetch = async (input, init) => {
   }
   if (url.pathname.endsWith('/rpc/verify_getting_started')) {
     events.push('getting-started-verified')
+    return new Response(JSON.stringify(previewOnboarding()), { headers: { 'Content-Type': 'application/json' } })
+  }
+  if (url.pathname.endsWith('/rpc/enable_builder_onboarding')) {
+    state.builderActivationRequests.push(JSON.parse(String(init?.body)))
+    if (state.builderActivationDelayMs)
+      await new Promise(resolve => setTimeout(resolve, state.builderActivationDelayMs))
+    if (state.builderActivationError)
+      return new Response(JSON.stringify({ message: 'Activation unavailable' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+    state.builderActivated = true
+    state.outcome = 'in_progress'
     return new Response(JSON.stringify(previewOnboarding()), { headers: { 'Content-Type': 'application/json' } })
   }
   if (url.pathname.includes('/rpc/')) {
@@ -319,7 +337,7 @@ const router = createRouter({
           },
         }) },
         // A resume id renders the setup UI the way Getting started embeds it.
-        { path: '/:pathMatch(.*)*', component: defineComponent({ setup: () => () => h(AppOnboardingFlow, { onboarding: true, setupAppId: params.get('resume') ?? undefined }) }) },
+        { path: '/:pathMatch(.*)*', component: defineComponent({ setup: () => () => builderIntroView ? h(BuilderIntroduction, { appId: previewAppId, entitlement: 'plan' }) : h(AppOnboardingFlow, { onboarding: true, setupAppId: params.get('resume') ?? undefined }) }) },
       ]
     : [{ path: '/:pathMatch(.*)*', component: { render: () => null } }],
 })

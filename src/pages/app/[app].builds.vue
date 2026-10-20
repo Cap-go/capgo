@@ -72,7 +72,7 @@ watchEffect(async () => {
     <div v-if="app || isLoading">
       <div class="mt-0">
         <div class="w-full h-full px-0 pt-6 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <SectionIntro section="builds">
+          <SectionIntro v-if="!showingBuildSteps" section="builds">
             <template v-if="!showingBuildSteps" #actions>
               <BuildChartControls
                 v-model:use-billing-period="useBillingPeriod"
