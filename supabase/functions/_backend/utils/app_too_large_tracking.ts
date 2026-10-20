@@ -1,5 +1,7 @@
 import type { BentoTrackingPayload } from './tracking.ts'
-import { ALERT_UPLOAD_SIZE_BYTES } from '../files/util.ts'
+
+/** Keep in sync with ALERT_UPLOAD_SIZE_BYTES in supabase/functions/_backend/files/util.ts */
+const DEFAULT_ALERT_UPLOAD_SIZE_MB = 20
 
 /**
  * CLI `bundle upload` emits this when the zipped bundle is over the alert
@@ -11,8 +13,8 @@ import { ALERT_UPLOAD_SIZE_BYTES } from '../files/util.ts'
 export const APP_TOO_LARGE_EVENT = 'App Too Large'
 export const APP_TOO_LARGE_BENTO_EVENT = 'app_too_large'
 
-const DEFAULT_THRESHOLD_MB = Math.floor(ALERT_UPLOAD_SIZE_BYTES / 1024 / 1024)
-const DEFAULT_RECOMMENDED_SIZE_MB = DEFAULT_THRESHOLD_MB
+const DEFAULT_THRESHOLD_MB = DEFAULT_ALERT_UPLOAD_SIZE_MB
+const DEFAULT_RECOMMENDED_SIZE_MB = DEFAULT_ALERT_UPLOAD_SIZE_MB
 
 export interface AppTooLargeBentoInput {
   event: string
