@@ -1458,6 +1458,64 @@ it('requires names when treatment arrives after the bounded startup wait', async
   }
 })
 
+it.each([false, true])('returns from the goal to saved names only during initial onboarding (new organization: %s)', async (newOrganization) => {
+  const previousUser = writerMocks.main.user
+  const previousAssignments = writerMocks.abTestAssignments
+  const descriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
+  const previousHistoryState = window.history.state
+  const identity = { attemptId: 'back-profile-attempt', runId: 'back-profile-run' }
+  const assignments = { onboarding_v6: { branch: 'A', assigned_at: '2026-10-20T10:00:00.000Z' } }
+  writerMocks.abTestAssignments = assignments
+  writerMocks.main.user = Object.assign({
+    id: 'back-profile-user',
+    image_url: '',
+    onboarding: {
+      abtests: assignments,
+      profile_completed_at: '2026-10-20T10:00:00.000Z',
+      flow: 'pre_org',
+      status: 'in_progress',
+      step: 'intent',
+      intent: 'builder',
+    },
+  }, { first_name: 'Example', last_name: 'User' })
+  writerMocks.router.push.mockReset().mockResolvedValue(undefined)
+  writerMocks.dialog.openDialog.mockClear()
+  writerMocks.replaceUserOnboardingIfUnchanged.mockImplementation(async (_id: string, _previous: unknown, onboarding: unknown) => ({ data: { onboarding }, error: null }))
+  window.history.replaceState({ capgoProfileOnboardingHandoff: identity }, '')
+  Object.defineProperty(window, 'matchMedia', { configurable: true, value: () => ({ matches: false }) })
+  const app = createApp(AppOnboardingFlow, { onboarding: true, preOrg: true, newOrganization })
+  app.config.warnHandler = () => undefined
+  const root = document.createElement('div')
+  try {
+    app.mount(root)
+    await vi.waitFor(() => expect(root.querySelector('[data-test="app-onboarding-continue-intent"]')).not.toBeNull())
+    const back = root.querySelector<HTMLButtonElement>('[data-test="app-onboarding-back-profile"]')
+    if (newOrganization) {
+      expect(back).toBeNull()
+      return
+    }
+    expect(writerMocks.dialog.openDialog).not.toHaveBeenCalled()
+    expect(back).not.toBeNull()
+    back!.click()
+    await vi.waitFor(() => expect(writerMocks.router.push).toHaveBeenCalledWith({
+      path: '/onboarding/name',
+      query: { edit: '1', to: '/onboarding/app' },
+      state: { capgoProfileOnboardingHandoff: identity },
+    }))
+    expect(writerMocks.main.user.onboarding).toMatchObject({ intent: 'builder', profile_completed_at: '2026-10-20T10:00:00.000Z' })
+    expect(writerMocks.main.user).toMatchObject({ first_name: 'Example', last_name: 'User' })
+  }
+  finally {
+    app.unmount()
+    await nextTick()
+    writerMocks.main.user = previousUser
+    writerMocks.abTestAssignments = previousAssignments
+    window.history.replaceState(previousHistoryState, '')
+    if (descriptor)
+      Object.defineProperty(window, 'matchMedia', descriptor)
+  }
+})
+
 it.each(['aborted', 'rejected', 'treatment-removed'])('recovers a failed required-name navigation (%s) without saving wizard progress', async (failure) => {
   const previousUser = writerMocks.main.user
   const previousAssignments = writerMocks.abTestAssignments

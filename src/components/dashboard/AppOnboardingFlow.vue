@@ -86,7 +86,7 @@ import {
 } from '~/utils/onboardingAppDraft'
 import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { withOnboardingChannelOrigin } from '~/utils/onboardingChannelAnalytics'
-import { consumeProfileOnboardingHandoff, initialProfileOnboardingProgressSteps, needsInitialOnboardingName } from '~/utils/onboardingProfile'
+import { canEditInitialOnboardingName, consumeProfileOnboardingHandoff, initialProfileOnboardingProgressSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY } from '~/utils/onboardingProfile'
 import {
   createOnboardingDetailsFieldDebouncer,
   createOnboardingProgressTracker,
@@ -252,6 +252,7 @@ const billingAccount = ref<'ee' | 'us' | undefined>()
 const selectedIntent = ref<OnboardingIntent | null>(null)
 const profileOnboarding = computed(() => hasProfileOnboarding(main.user?.onboarding))
 const initialProfileOnboarding = computed(() => props.preOrg && !props.newOrganization && !props.setupAppId && profileOnboarding.value)
+const canReturnToProfile = computed(() => initialProfileOnboarding.value && canEditInitialOnboardingName(main.user, organizationStore.hasOrganizations))
 const intentStepLabel = computed(() => t('unified-onboarding-step-intent'))
 const onboardingAnalyticsVersion = () => resolveOnboardingAnalyticsVersion(onboardingForABTests.value, selectedIntent.value)
 const setupHandoff = props.setupAppId ? consumeSetupHandoff(props.setupAppId) : null
@@ -1059,7 +1060,7 @@ async function maybeResumeSavedOnboarding() {
   const flow = props.preOrg ? 'pre_org' : 'existing_org'
   const saved = parseUserOnboardingProgress(main.user?.onboarding)
 
-  if (!shouldPromptOnboardingResume(saved, flow) || !saved) {
+  if (!shouldPromptOnboardingResume(saved, flow) || !saved || profileHandoff) {
     if (saved?.status === 'in_progress' && saved.flow === flow) {
       applyOnboardingProgress(saved)
     }
@@ -1925,6 +1926,32 @@ function continueFromIntent() {
     developmentEnvironment: selectedDevelopmentEnvironment.value ?? (webNativeDevelopmentEnvironmentTreatment.value ? undefined : 'skipped'),
     intent: selectedIntent.value,
   })
+}
+
+async function backToProfile() {
+  if (!canReturnToProfile.value || flowStep.value !== 'intent' || isSubmitting.value)
+    return
+  isSubmitting.value = true
+  try {
+    if (await persistOnboardingProgress() !== 'persisted') {
+      toast.error(t('account-error'))
+      return
+    }
+    const failure = await router.push({
+      path: '/onboarding/name',
+      query: { edit: '1', to: '/onboarding/app' },
+      state: { [PROFILE_ONBOARDING_HANDOFF_KEY]: { attemptId: onboardingTelemetry.attemptId, runId: onboardingTelemetry.runId } },
+    })
+    if (failure)
+      throw failure
+  }
+  catch (error) {
+    console.warn('Cannot return to onboarding names', error)
+    toast.error(t('account-error'))
+  }
+  finally {
+    isSubmitting.value = false
+  }
 }
 
 async function continueFromGoal() {
@@ -2942,7 +2969,10 @@ defineExpose({
                   </span>
                 </button>
               </div>
-              <div class="onboarding-intent-actions flex justify-end border-t border-slate-200 pt-6 dark:border-white/15">
+              <div class="onboarding-intent-actions flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-end dark:border-white/15">
+                <button v-if="canReturnToProfile" type="button" class="d-btn min-h-12 sm:mr-auto" :class="whiteCardSecondaryButtonClass()" data-test="app-onboarding-back-profile" :disabled="isSubmitting" @click="backToProfile">
+                  {{ t('button-back') }}
+                </button>
                 <button type="button" class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" data-test="app-onboarding-continue-intent" :disabled="!selectedIntent || isSubmitting" @click="continueFromGoal()">
                   {{ t('unified-onboarding-continue-intent') }}<IconArrowRight class="h-4 w-4" />
                 </button>

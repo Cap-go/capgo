@@ -262,6 +262,32 @@ test.describe('Registration', () => {
     expect(profile?.onboarding).not.toHaveProperty('version', 6)
   })
 
+  test('returns from Your goal to saved names and retains the selected goal', async ({ page }) => {
+    await page.fill('[data-test="email"]', `profile-back-${Date.now()}@example.com`)
+    await page.fill('[data-test="password"]', 'Password123!')
+    await page.fill('[data-test="confirm-password"]', 'Password123!')
+    await page.click('[data-test="submit"]')
+    await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
+    await completeName(page)
+    await expectOnboardingGoal(page)
+    await page.click('[data-test="onboarding-intent-builder"]')
+    await page.click('[data-test="app-onboarding-back-profile"]')
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveValue('Example')
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('User')
+    await expect(page.locator('[data-test="onboarding-welcome"]')).toHaveCount(0)
+    await page.fill('[data-test="onboarding-first-name"]', '')
+    await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeDisabled()
+    await page.fill('[data-test="onboarding-first-name"]', 'Updated')
+    await page.click('[data-test="onboarding-name-continue"]')
+    await expectOnboardingGoal(page)
+    await expect(page.locator('[data-test="onboarding-intent-builder"]')).toHaveClass(/(?:^|\s)border-primary-500(?:\s|$)/)
+    await expect(page.locator('[data-test="onboarding-resume-continue"]')).toHaveCount(0)
+    await page.click('[data-test="app-onboarding-back-profile"]')
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveValue('Updated')
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('User')
+  })
+
   test('should redirect new users through app-first onboarding until the org is created', async ({ page }) => {
     const uniqueSuffix = Date.now()
     const email = `no-org-e2e-${uniqueSuffix}@example.com`

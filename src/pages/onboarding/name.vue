@@ -15,7 +15,7 @@ import { replaceUserOnboardingWithRetry, serializeUserOnboardingWrite } from '~/
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { onboardingPrimaryButtonClass } from '~/utils/onboardingButtonClasses'
-import { initialProfileOnboardingProgressSteps, initialProfileOnboardingSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY } from '~/utils/onboardingProfile'
+import { canEditInitialOnboardingName, consumeProfileOnboardingHandoff, initialProfileOnboardingProgressSteps, initialProfileOnboardingSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY } from '~/utils/onboardingProfile'
 import { createOnboardingDetailsFieldDebouncer, createOnboardingProgressTracker, createOnboardingTelemetryIdentity } from '~/utils/onboardingProgressAnalytics'
 import { validateRedirectPath } from '~/utils/safeRedirect'
 
@@ -30,13 +30,15 @@ const isLoggingOut = ref(false)
 const onboarding = main.user?.onboarding
 const savedOnboarding = onboarding && typeof onboarding === 'object' && !Array.isArray(onboarding) ? onboarding : {}
 const savedDraft = savedOnboarding.profile_draft
-const showWelcome = ref(!savedDraft || typeof savedDraft !== 'object' || Array.isArray(savedDraft))
+const isEditingProfile = computed(() => route.query.edit === '1' && canEditInitialOnboardingName(main.user, organizationStore.hasOrganizations))
+const showWelcome = ref(!isEditingProfile.value && (!savedDraft || typeof savedDraft !== 'object' || Array.isArray(savedDraft)))
 const targetPath = computed(() => validateRedirectPath(typeof route.query.to === 'string' ? route.query.to : '', '/onboarding/app', { blockedPrefixes: ['/onboarding/name'] }))
 const progressSteps = computed(() => initialProfileOnboardingProgressSteps(main.user?.onboarding)
   .filter(step => !targetPath.value.startsWith('/onboarding/organization') || step.id === 'name' || step.id === 'organization')
   .map(step => ({ id: step.id, label: t(step.labelKey) })))
-const identity = createOnboardingTelemetryIdentity({ continueFrom: !showWelcome.value && typeof savedOnboarding.onboarding_attempt_id === 'string' ? { attemptId: savedOnboarding.onboarding_attempt_id } : null, flow: 'pre_org', onboardingVersion: () => 6, supaHost: getLocalConfig().supaHost })
-const tracker = createOnboardingProgressTracker({ flow: 'pre_org', onboardingVersion: () => 6, resumed: !showWelcome.value, steps: targetPath.value.startsWith('/onboarding/organization') ? ['welcome', 'name', 'organization'] : initialProfileOnboardingSteps(main.user?.onboarding, true), supaHost: getLocalConfig().supaHost, onboardingAttemptId: identity.attemptId, onboardingRunId: identity.runId })
+const profileHandoff = consumeProfileOnboardingHandoff(window.history)
+const identity = createOnboardingTelemetryIdentity({ continueFrom: profileHandoff ?? (!showWelcome.value && typeof savedOnboarding.onboarding_attempt_id === 'string' ? { attemptId: savedOnboarding.onboarding_attempt_id } : null), flow: 'pre_org', onboardingVersion: () => 6, supaHost: getLocalConfig().supaHost })
+const tracker = createOnboardingProgressTracker({ flow: 'pre_org', onboardingVersion: () => 6, resumed: !showWelcome.value && !profileHandoff, steps: targetPath.value.startsWith('/onboarding/organization') ? ['welcome', 'name', 'organization'] : initialProfileOnboardingSteps(main.user?.onboarding, true), supaHost: getLocalConfig().supaHost, onboardingAttemptId: identity.attemptId, onboardingRunId: identity.runId })
 const fields = createOnboardingDetailsFieldDebouncer((event, step, properties) => tracker.trackDetailsEvent(event, step, properties), 500)
 
 function trackField(field: 'first_name' | 'last_name', value: string) {
@@ -143,11 +145,11 @@ function visibilityChanged() {
 }
 
 onMounted(async () => {
-  if (!needsInitialOnboardingName(main.user, organizationStore.hasOrganizations)) {
+  if (!isEditingProfile.value && !needsInitialOnboardingName(main.user, organizationStore.hasOrganizations)) {
     await router.replace(targetPath.value)
     return
   }
-  tracker.viewStep(showWelcome.value ? 'welcome' : 'name')
+  tracker.viewStep(showWelcome.value ? 'welcome' : 'name', isEditingProfile.value ? 'intent' : undefined)
   document.addEventListener('visibilitychange', visibilityChanged)
   try {
     await persistProfileProgress({ onboarding_attempt_id: identity.attemptId, last_run_id: identity.runId })

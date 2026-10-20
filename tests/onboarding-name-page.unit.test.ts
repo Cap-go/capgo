@@ -150,6 +150,39 @@ describe('welcome followed by required About you', () => {
     expect(mocks.capture).toHaveBeenCalledWith('onboarding_step_completed', expect.objectContaining({ step: 'name', next_step: 'intent' }))
   })
 
+  it('reopens confirmed names from Your goal without replaying welcome or starting a new run', async () => {
+    const identity = { attemptId: 'return-attempt', runId: 'return-run' }
+    const previousState = window.history.state
+    window.history.replaceState({ capgoProfileOnboardingHandoff: identity }, '')
+    mocks.route.query = { edit: '1', to: '/onboarding/app' }
+    mocks.valid = true
+    main.user = { ...main.user, first_name: 'Example', last_name: 'User', onboarding: {
+      ...main.user.onboarding,
+      profile_completed_at: '2026-10-20T10:00:00Z',
+    } }
+    try {
+      const container = await mount(false)
+      expect(container.querySelector('form')).not.toBeNull()
+      expect(container.querySelector('[data-test="onboarding-welcome"]')).toBeNull()
+      expect(mocks.replace).not.toHaveBeenCalled()
+      expect(mocks.capture).toHaveBeenCalledWith('onboarding_step_viewed', expect.objectContaining({
+        step: 'name',
+        previous_step: 'intent',
+        resumed: false,
+        onboarding_attempt_id: identity.attemptId,
+        onboarding_run_id: identity.runId,
+      }))
+      await submit(container)
+      await vi.waitFor(() => expect(mocks.replace).toHaveBeenCalledWith(expect.objectContaining({
+        path: '/onboarding/app',
+        state: { capgoProfileOnboardingHandoff: identity },
+      })))
+    }
+    finally {
+      window.history.replaceState(previousState, '')
+    }
+  })
+
   it('blocks continuing and programmatic form submission while names are invalid', async () => {
     const container = await mount()
     expect(container.querySelector<HTMLButtonElement>('[data-test="onboarding-name-continue"]')?.disabled).toBe(true)

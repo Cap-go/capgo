@@ -11,8 +11,12 @@ interface OnboardingProfileUser {
 
 export const PROFILE_ONBOARDING_HANDOFF_KEY = 'capgoProfileOnboardingHandoff'
 
+export function canEditInitialOnboardingName(user: OnboardingProfileUser | null | undefined, hasOrganizations = false): boolean {
+  return Boolean(user && !hasOrganizations && !user.created_via_invite && hasProfileOnboarding(user.onboarding))
+}
+
 export function needsInitialOnboardingName(user: OnboardingProfileUser | null | undefined, hasOrganizations = false): boolean {
-  if (hasOrganizations || !user || user.created_via_invite || !hasProfileOnboarding(user.onboarding))
+  if (!user || !canEditInitialOnboardingName(user, hasOrganizations))
     return false
   const onboarding = user.onboarding && typeof user.onboarding === 'object' && !Array.isArray(user.onboarding) ? user.onboarding : {}
   const confirmedAt = onboarding.profile_completed_at

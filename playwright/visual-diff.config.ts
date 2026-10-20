@@ -11,7 +11,7 @@ export interface VisualDiffRoute {
   prepare?: (page: Page) => Promise<void>
 }
 
-async function prepareProfileGoalScreenshot(page: Page) {
+async function prepareProfileGoalScreenshot(page: Page, completed = false) {
   const assignments = { onboarding_v6: { branch: 'A', assigned_at: '2026-10-19T11:00:00.000Z' } }
   let profile: Record<string, unknown> | undefined
   await page.route('**/private/onboarding_ab_tests', route => route.fulfill({ json: { assignments } }))
@@ -32,7 +32,16 @@ async function prepareProfileGoalScreenshot(page: Page) {
     const row = Array.isArray(json) ? json[0] : json
     if (!row)
       throw new Error('The visual profile fixture requires an existing test user')
-    profile = { ...row, first_name: '', last_name: '', onboarding: { abtests: assignments, version: 6 } }
+    profile = {
+      ...row,
+      first_name: completed ? 'Example' : '',
+      last_name: completed ? 'User' : '',
+      onboarding: {
+        abtests: assignments,
+        version: 6,
+        ...(completed ? { profile_completed_at: '2026-10-20T11:00:00.000Z' } : {}),
+      },
+    }
     await route.fulfill({ response, json: [profile] })
   })
   await page.reload()
@@ -285,7 +294,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     slug: 'onboarding-profile-goal',
     path: '/onboarding/app',
     auth: true,
-    prepare: prepareProfileGoalScreenshot,
+    prepare: page => prepareProfileGoalScreenshot(page),
   },
   {
     slug: 'onboarding-profile-goal-mobile',
@@ -294,6 +303,21 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     prepare: async (page) => {
       await page.setViewportSize({ width: 390, height: 844 })
       await prepareProfileGoalScreenshot(page)
+    },
+  },
+  {
+    slug: 'onboarding-profile-intent',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: page => prepareProfileGoalScreenshot(page, true),
+  },
+  {
+    slug: 'onboarding-profile-intent-mobile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await prepareProfileGoalScreenshot(page, true)
     },
   },
   {
