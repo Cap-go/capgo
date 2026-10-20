@@ -1,6 +1,6 @@
 import type { Command } from 'commander'
 import process from 'node:process'
-import { log, note } from '@clack/prompts'
+import { box } from '@clack/prompts'
 import { isCI } from 'ci-info'
 import { flushAnalytics, trackEvent } from '../analytics/track'
 import { getPendingOnboardingChecks, takeSetupNotices } from './background-workers'
@@ -8,6 +8,8 @@ import { setupDebug } from './setup-diagnostics'
 import { ONBOARDING_CHECK_GRACE_MS as gracePeriodMs, shouldEvaluateSetupNotice } from './setup-notice-policy'
 import { formatSetupNotice } from './setup-notices'
 import { markTrialNoticeShown, wasTrialNoticeShown } from './trial-notice-state'
+
+const setupBoxOptions = { withGuide: false, rounded: false, width: 'auto' as const, contentPadding: 1 }
 
 // Only commands with human-facing output opt into the shutdown message and wait.
 const interactiveCommands = new Set([
@@ -68,8 +70,7 @@ function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPa
     }
     const text = formatSetupNotice(notice)
     if (text) {
-      const [title, ...body] = text.split('\n')
-      note(body.join('\n'), title, { format: line => line })
+      box(text, '', setupBoxOptions)
       setupDebug('render shown', { kind: notice.kind })
       shownApps.add(notice.appId)
       if (notice.kind === 'plan')
@@ -95,7 +96,7 @@ export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGl
   process.prependOnceListener('SIGINT', onInterrupt)
   try {
     setupDebug('shutdown wait started', { budget_ms: gracePeriodMs })
-    log.info('Waiting for background checks to finish (up to 5 seconds). Press Ctrl-C to exit immediately.')
+    box('Checking your setup...\n\nPress Ctrl+C to skip.', '', setupBoxOptions)
     const checks = [...pendingChecks.values()]
     const options = command.optsWithGlobals()
     void trackEvent({

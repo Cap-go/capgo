@@ -5,6 +5,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { stripVTControlCharacters } from 'node:util'
+import stringWidth from 'string-width'
 import { afterAll, beforeAll, test } from 'bun:test'
 
 const dir = mkdtempSync(join(tmpdir(), 'capgo-background-shutdown-'))
@@ -27,15 +29,15 @@ beforeAll(async () => {
   writeFileSync(join(dir, 'quick.mjs'), 'setTimeout(() => {}, 300)')
   writeFileSync(join(dir, 'slow.mjs'), 'setTimeout(() => {}, 900)')
   writeFileSync(join(dir, 'released.mjs'), "import { parentPort } from 'node:worker_threads'; parentPort.once('message', () => process.exit(0))")
-  writeFileSync(join(dir, 'notice.mjs'), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: { kind: 'setup', appId: 'com.example.ready', product: 'OTA live updates', title: 'Create a channel', action: 'Continue your checklist', secondary: [] } })`)
+  writeFileSync(join(dir, 'notice.mjs'), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: { kind: 'setup', appId: 'com.example.ready', product: 'live updates', title: 'Create a channel', action: 'Continue your checklist', secondary: [] } })`)
   for (const app of ['one', 'two']) {
-    writeFileSync(join(dir, `plan-${app}.mjs`), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: { kind: 'plan', appId: 'com.example.${app}', completed: ['OTA'], secondary: [], billing: { orgId: 'fixture-org', trialEndsAt: null, plansUrl: 'https://console.example.com/plans' } } })`)
+    writeFileSync(join(dir, `plan-${app}.mjs`), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: { kind: 'plan', appId: 'com.example.${app}', completed: ['Live updates'], secondary: [], billing: { orgId: 'fixture-org', trialEndsAt: null, plansUrl: 'https://console.example.com/plans' } } })`)
   }
 })
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, earlyCompletion = false, waitForWorkers = false, trialAlreadyShown = false, debug = false } = {}) {
+function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, earlyCompletion = false, waitForWorkers = false, trialAlreadyShown = false, debug = false, columns = 80 } = {}) {
   const source = `
     import assert from 'node:assert/strict'
     import { performance } from 'node:perf_hooks'
@@ -44,6 +46,7 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
     import { startOnboardingCheck, waitForOnboardingChecks, getPendingOnboardingChecks, markTrialNoticeShown } from ${JSON.stringify(harness)}
     Object.defineProperty(process.stdin, 'isTTY', { value: ${stdinTty} })
     Object.defineProperty(process.stdout, 'isTTY', { value: ${stdoutTty} })
+    Object.defineProperty(process.stdout, 'columns', { value: ${columns} })
     globalThis.fetch = async (url, init) => {
       if (!String(url).endsWith('/private/events'))
         return new Response('', { status: 500 })
@@ -135,7 +138,7 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
     stream.on('data', chunk => {
       if (stderr) errors += chunk
       else output += chunk
-      if ((output + errors).includes('Waiting for background checks')) waiting()
+      if ((output + errors).includes('Checking your setup')) waiting()
     })
   }
   const timeout = setTimeout(() => child.kill('SIGKILL'), 10_000)
@@ -156,10 +159,10 @@ test.concurrent('ready notices render for human-readable output even when no wor
   for (const tty of [true, false]) {
     const result = await run({ commandPath: 'bundle list', workers: ['notice.mjs', 'notice.mjs'], waitForWorkers: true, tty }).completion
     assert.equal(result.code, 0, result.text)
-    assert.equal(result.text.match(/Continue OTA live updates setup/g)?.length, 1, 'deduplicate the app notice')
-    assert.match(result.text, /[─-]+[╮+]/, 'setup notice has a top box border')
-    assert.match(result.text, /[─-]+[╯+]/, 'setup notice has a bottom box border')
-    assert.ok(!result.text.includes('Waiting for background checks'))
+    assert.equal(result.text.match(/Finish setting up live updates/g)?.length, 1, 'deduplicate the app notice')
+    assert.match(result.text, /┌─+┐/, 'setup notice has a closed top box border')
+    assert.match(result.text, /└─+┘/, 'setup notice has a closed bottom box border')
+    assert.ok(!result.text.includes('Checking your setup'))
   }
 })
 
@@ -168,7 +171,7 @@ test.concurrent('machine modes and explicit setup flows discard ready notices', 
   for (const settings of cases) {
     const result = await run({ commandPath: 'bundle list', workers: ['notice.mjs'], waitForWorkers: true, ...settings }).completion
     assert.equal(result.code, 0, result.text)
-    assert.ok(!result.text.includes('Continue OTA live updates setup'))
+    assert.ok(!result.text.includes('Finish setting up live updates'))
   }
 }, 12000)
 
@@ -189,7 +192,7 @@ test.concurrent('both workers share one five-second shutdown budget', async () =
   const result = await completion
   const duration = waitedMs(result)
   assert.equal(duration, 5_000, 'workers must share one five-second deadline')
-  assert.equal(result.text.match(/Waiting for background checks/g)?.length, 1)
+  assert.equal(result.text.match(/Checking your setup/g)?.length, 1)
   const events = waitEvents(result)
   assert.equal(events.length, 1)
   const event = events[0]
@@ -211,20 +214,20 @@ test.concurrent('both workers share one five-second shutdown budget', async () =
 test.concurrent('channel promote gives its eligible setup notice the same bounded grace period', async () => {
   const result = await run({ commandPath: 'channel promote', controlledClock: true }).completion
   assert.equal(waitedMs(result), 5_000)
-  assert.ok(result.text.includes('Waiting for background checks'))
+  assert.ok(result.text.includes('Checking your setup'))
 }, 12_000)
 
 test.concurrent('exits early as soon as the last worker finishes', async () => {
   const result = await run({ workers: ['released.mjs', 'released.mjs'], controlledClock: true, earlyCompletion: true }).completion
   assert.equal(waitedMs(result), 0, 'worker completion must release shutdown before the deadline')
-  assert.ok(result.text.includes('Waiting for background checks'))
+  assert.ok(result.text.includes('Checking your setup'))
 }, 12_000)
 
 test.concurrent('completed or absent checks produce no waiting message or delay', async () => {
   for (const settings of [{ workers: [] }, { workers: ['quick.mjs'], foregroundMs: 1_000 }]) {
     const result = await run(settings).completion
     assert.ok(waitedMs(result) < 100)
-    assert.ok(!result.text.includes('Waiting for background checks'))
+    assert.ok(!result.text.includes('Checking your setup'))
     assert.deepEqual(waitEvents(result), [])
   }
 })
@@ -255,7 +258,7 @@ test.concurrent('machine output, init, MCP, CI and non-interactive commands do n
   const results = await Promise.all(cases.map(settings => run(settings).completion))
   for (const result of results) {
     assert.ok(waitedMs(result) < 100)
-    assert.ok(!result.text.includes('Waiting for background checks'))
+    assert.ok(!result.text.includes('Checking your setup'))
     assert.deepEqual(waitEvents(result), [])
   }
 }, 12_000)
@@ -264,7 +267,7 @@ test.concurrent('telemetry opt-out and delivery errors preserve the wait and ear
   for (const settings of [{ disabled: true }, { telemetry: 'reject' }]) {
     const result = await run({ workers: ['quick.mjs'], ...settings }).completion
     assert.ok(waitedMs(result) < 2_000)
-    assert.ok(result.text.includes('Waiting for background checks'))
+    assert.ok(result.text.includes('Checking your setup'))
     assert.equal(waitEvents(result).length, settings.disabled ? 0 : 1)
   }
 })
@@ -291,4 +294,20 @@ test.concurrent('opt-in diagnostics distinguish shutdown timeout from a non-TTY 
   assert.doesNotMatch(piped.output, /\[setup-debug /, 'diagnostics must not pollute stdout')
   const normal = await run({ commandPath: 'bundle list', tty: false }).completion
   assert.doesNotMatch(normal.text, /\[setup-debug /, 'logging is off by default')
+}, 12_000)
+
+
+test.concurrent('standalone boxes have no guide line, diamond or app ID and fit a narrow terminal', async () => {
+  const result = await run({ commandPath: 'bundle list', workers: ['notice.mjs'], waitForWorkers: true, columns: 52 }).completion
+  assert.equal(result.code, 0, result.text)
+  const lines = stripVTControlCharacters(result.output).split('\n')
+  const start = lines.findIndex(line => line.startsWith('┌'))
+  const end = lines.findIndex((line, index) => index > start && line.startsWith('└'))
+  assert.ok(start >= 0 && end > start, result.text)
+  const rendered = lines.slice(start, end + 1)
+  assert.doesNotMatch(rendered.join('\n'), /[◇◆●├]|App:|com\.example/)
+  for (const line of rendered) {
+    assert.ok(stringWidth(line) <= 52, line)
+    assert.equal(stringWidth(line), stringWidth(rendered[0]), line)
+  }
 }, 12_000)

@@ -47,9 +47,9 @@ test('only commands that can change setup need a post-success refresh', () => {
 
 test('an unfinished OTA-only list focuses on its next task without Builder or billing copy', () => {
   const text = message(fixture(['ota']))
-  assert.match(text, /Continue.*OTA/i)
+  assert.match(text, /Finish setting up live updates/i)
   assert.match(text, /Create a channel/)
-  assert.match(text, /app todo com.example.setup --list ota/)
+  assert.match(text, /app todo --list ota/)
   assert.doesNotMatch(text, /Builder|plan|trial|subscrib/i)
 })
 test('an unfinished Builder-only list offers the right platform and no OTA or billing copy', () => {
@@ -57,15 +57,15 @@ test('an unfinished Builder-only list offers the right platform and no OTA or bi
   progress.onboarding.setup.selected_builder_platform = 'android'
   progress.onboarding.setup.steps.builder.android.start_setup.status = 'done'
   const text = message(progress)
-  assert.match(text, /Continue.*Builder/i)
-  assert.match(text, /Prepare your signing keystore/)
+  assert.match(text, /Finish setting up Android builds/i)
+  assert.match(text, /Add a signing keystore/)
   assert.match(text, /build init --platform android/)
   assert.doesNotMatch(text, /OTA|plan|trial|subscrib/i)
 })
 test('dual assignment focuses on the started OTA list with a brief Builder mention', () => {
   const text = message(fixture())
-  assert.match(text.split('\n')[0], /Continue.*OTA/)
-  assert.match(text, /Also explore.*Builder/)
+  assert.match(text.split('\n')[0], /Finish setting up live updates/)
+  assert.match(text, /You can also explore.*Builder/)
   assert.doesNotMatch(text, /trial|subscrib/i)
 })
 test('one started Builder list wins over an unstarted OTA list', () => {
@@ -73,17 +73,17 @@ test('one started Builder list wins over an unstarted OTA list', () => {
   progress.onboarding.setup.steps.ota.login_cli_mcp.status = 'pending'
   progress.onboarding.setup.steps.builder.android.start_setup.status = 'done'
   const text = message(progress)
-  assert.match(text.split('\n')[0], /Continue.*Builder/)
+  assert.match(text.split('\n')[0], /Finish setting up .*builds/)
   assert.match(text, /--platform android/)
-  assert.match(text, /Also explore.*OTA/)
+  assert.match(text, /You can also explore live updates/)
 })
 test('both started lists use the selected path without equal product pitches', () => {
   const progress = fixture()
   progress.onboarding.setup.selected_path = 'builder'
   progress.onboarding.setup.steps.builder.ios.start_setup.status = 'done'
   const text = message(progress)
-  assert.match(text.split('\n')[0], /Continue.*Builder/)
-  assert.match(text, /Also continue.*OTA/)
+  assert.match(text.split('\n')[0], /Finish setting up .*builds/)
+  assert.match(text, /You can also continue setting up live updates/)
 })
 test('the unreachable dual-unstarted state does not invent a two-product pitch', () => {
   const progress = fixture()
@@ -93,39 +93,39 @@ test('the unreachable dual-unstarted state does not invent a two-product pitch',
 for (const platform of ['ios', 'android']) {
   test(`one finished Builder platform (${platform}) prioritizes plans over unfinished OTA and the other platform`, () => {
     const text = message(finish(fixture(), 'builder', platform))
-    assert.match(text.split('\n')[0], /Builder.*complete/)
+    assert.match(text.split('\n')[0], /cloud builds are set up/)
     assert.match(text, /1 day, 12 hours/)
     assert.match(text, /Choose a Capgo plan/)
-    assert.ok(text.indexOf('Choose a Capgo plan') < text.indexOf('Also'))
-    assert.match(text, new RegExp(`Also.*${platform === 'ios' ? 'Android' : 'iOS'}.*OTA`))
+    assert.ok(text.indexOf('Choose a Capgo plan') < text.indexOf('You can also'))
+    assert.match(text, new RegExp(`You can also.*${platform === 'ios' ? 'Android' : 'iOS'}.*live update`))
     assert.match(text, new RegExp(`plans\\?oid=${orgId}`))
-    assert.doesNotMatch(text, /Continue.*OTA/)
+    assert.doesNotMatch(text, /Finish setting up live updates/)
   })
 }
 test('Builder-only completion suggests the other platform briefly without mentioning an absent OTA list', () => {
   const text = message(finish(fixture(['builder']), 'builder'))
   assert.match(text, /Choose a Capgo plan/)
-  assert.match(text, /Also.*Android/)
+  assert.match(text, /You can also.*Android/)
   assert.doesNotMatch(text, /OTA/)
 })
 test('OTA completion prioritizes trial and plans with brief unfinished Builder guidance', () => {
   const text = message(finish(fixture(), 'ota'))
-  assert.match(text.split('\n')[0], /OTA.*complete/)
+  assert.match(text.split('\n')[0], /Live updates are set up/)
   assert.match(text, /Choose a Capgo plan/)
-  assert.match(text, /Also.*Builder/)
-  assert.ok(text.indexOf('Choose a Capgo plan') < text.indexOf('Also'))
+  assert.match(text, /You can also.*Builder/)
+  assert.ok(text.indexOf('Choose a Capgo plan') < text.indexOf('You can also'))
 })
 test('all completed lists have no unfinished setup prompt', () => {
   const progress = finish(finish(finish(fixture(), 'ota'), 'builder', 'ios'), 'builder', 'android')
   const text = message(progress)
   assert.match(text, /Choose a Capgo plan/)
-  assert.doesNotMatch(text, /Also|Continue|Explore/i)
+  assert.doesNotMatch(text, /You can also|Finish setting up|Explore/i)
 })
 test('warning and skipped cloud-build steps are not successful Builder completion', () => {
   for (const status of ['warning', 'skipped', 'pending']) {
     const progress = finish(fixture(['builder']), 'builder')
     progress.onboarding.setup.steps.builder.ios.successful_cloud_build.status = status
-    assert.match(message(progress), /Continue.*Builder/)
+    assert.match(message(progress), /Finish setting up .*builds/)
     assert.doesNotMatch(message(progress), /Choose a Capgo plan/)
   }
 })
@@ -165,9 +165,9 @@ test('legacy, unsupported and explicitly skipped onboarding stays quiet', () => 
 test('failed OTA checks do not certify OTA completion, while a finished Builder platform remains independent', () => {
   const progress = finish(fixture(), 'ota')
   progress.checkErrors = ['run_device']
-  assert.doesNotMatch(message(progress) ?? '', /OTA.*complete/)
+  assert.doesNotMatch(message(progress) ?? '', /Live updates are set up/)
   finish(progress, 'builder')
-  assert.match(message(progress), /Builder.*complete/)
+  assert.match(message(progress), /cloud builds are set up/)
 })
 test('successful local reports reconcile a stale snapshot without changing unrelated steps, billing or the input', () => {
   const progress = fixture()
@@ -187,18 +187,71 @@ test('setup copy separates the next step and one primary command from a brief se
   progress.onboarding.setup.selected_path = 'builder'
   progress.onboarding.setup.steps.builder.ios.start_setup.status = 'done'
   const text = message(progress)
-  assert.equal(text.split('\n')[0], 'Continue Capgo Builder setup')
-  assert.match(text, /\nApp: com\.example\.setup\n\nNext step: /)
-  assert.match(text, /\n\nResume setup:\nnpx @capgo\/cli@latest build init --platform ios/)
-  assert.match(text, /\n\nAlso continue OTA live updates\.$/)
+  assert.equal(text.split('\n')[0], 'Finish setting up iOS builds')
+  assert.doesNotMatch(text, /App:|com\.example\.setup/)
+  assert.match(text, /\n\nChoose where your iOS build will be installed\./)
+  assert.match(text, /\n\nnpx @capgo\/cli@latest build init --platform ios/)
+  assert.match(text, /\n\nYou can also continue setting up live updates\.$/)
   assert.equal(text.match(/npx @capgo\/cli@latest/g)?.length, 1)
 })
 
 test('completed setup copy gives the trial and plan link their own lines without a raw timestamp', () => {
   const text = message(finish(fixture(), 'ota'))
-  assert.equal(text.split('\n')[0], 'OTA setup is complete')
-  assert.match(text, /\nApp: com\.example\.setup\n\n/)
+  assert.equal(text.split('\n')[0], 'Live updates are set up')
+  assert.doesNotMatch(text, /App:|com\.example\.setup/)
   assert.match(text, /trial ends in 1 day, 12 hours\./)
-  assert.match(text, /\n\nChoose a Capgo plan:\nhttps:\/\//)
+  assert.match(text, /Choose a Capgo plan to continue after your trial\.\n\nView plans: https:\/\//)
   assert.doesNotMatch(text, /2026-01-03|T00:00:00/)
+})
+
+
+test('self-hosted plans links preserve the web path prefix and discard unrelated query and fragment', () => {
+  const notice = getSetupNotice(appId, finish(fixture(['ota']), 'ota'), 'https://console.example.com/console/?unused=yes#old')
+  assert.equal(notice.billing.plansUrl, `https://console.example.com/console/settings/organization/plans?oid=${orgId}`)
+})
+
+test('an unreliable OTA observation cannot redirect an unfinished setup notice to Builder', () => {
+  const progress = fixture()
+  progress.checkErrors = ['run_device']
+  assert.equal(message(progress), undefined)
+  finish(progress, 'builder')
+  assert.match(message(progress), /iOS cloud builds are set up/)
+})
+
+test('approved profile guidance explains the task and omits the app identifier', () => {
+  const progress = fixture()
+  progress.onboarding.setup.selected_path = 'builder'
+  const steps = progress.onboarding.setup.steps.builder.ios
+  for (const key of ['start_setup', 'choose_destination', 'connect_app_store', 'prepare_certificate']) steps[key].status = 'done'
+  const text = message(progress)
+  assert.equal(text, [
+    'Finish setting up iOS builds', '',
+    'Add an iOS provisioning profile to continue setting up cloud builds.', '',
+    'npx @capgo/cli@latest build init --platform ios', '',
+    'You can also continue setting up live updates.',
+  ].join('\n'))
+})
+
+test('expired and unknown trials have the approved plan wording', () => {
+  for (const [trialEndsAt, sentence] of [[null, 'Choose a Capgo plan.'], ['2025-12-01T00:00:00Z', 'Choose a Capgo plan to continue using Capgo.']]) {
+    const progress = finish(fixture(['ota']), 'ota')
+    progress.billing.trialEndsAt = trialEndsAt
+    assert.ok(message(progress).includes(sentence))
+  }
+})
+
+
+test('trial reminders handle the last minute and the exact expiration instant', () => {
+  const progress = finish(fixture(['ota']), 'ota')
+  const notice = getSetupNotice(appId, progress)
+  const expires = Date.parse(progress.billing.trialEndsAt)
+  assert.match(formatSetupNotice(notice, expires - 30_000), /Your trial ends in less than a minute\./)
+  assert.match(formatSetupNotice(notice, expires), /Your trial has ended\./)
+  assert.match(formatSetupNotice(notice, expires), /continue using Capgo\./)
+})
+
+test('completed OTA gives a started Builder checklist a continue mention', () => {
+  const progress = finish(fixture(), 'ota')
+  progress.onboarding.setup.steps.builder.ios.start_setup.status = 'done'
+  assert.match(message(progress), /You can also continue setting up cloud builds\./)
 })
