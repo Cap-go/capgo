@@ -32,6 +32,8 @@ import { getActiveUploadReporter } from './bundle/reporter'
 import { findMonorepoRoot, findNXMonorepoRoot, isMonorepo, isNXMonorepo } from './capacitor-cli'
 import { getChecksum } from './checksum'
 import { loadConfig, loadConfigForWrite, writeConfig } from './config'
+import { setupDebug, setupError } from './onboarding/setup-diagnostics'
+import { markTrialNoticeShown } from './onboarding/trial-notice-state'
 import { IOS_SYNC_VALIDATION_FAILED_MESSAGE, isTruthyEnvValue } from './posthog'
 import { getCliLoginCommand } from './runner-command'
 import { nativePackageSchema } from './schemas/common'
@@ -1354,7 +1356,7 @@ export async function checkRemoteCliMessages(supabase: SupabaseClient<Database>,
 // TODO(cli-http): billing/entitlement RPCs have no Capgo HTTP equivalents yet
 export async function checkPlanValid(supabase: SupabaseClient<Database>, orgId: string, appId?: string, warning = true) {
   const config = await getRemoteConfig()
-  const plansUrl = `${config.hostWeb}/settings/organization/plans`
+  const plansUrl = `${config.hostWeb}/settings/organization/plans?oid=${encodeURIComponent(orgId)}`
 
   if (appId) {
     const planCheck = await resolveMeteredPlanAllowed(
@@ -1377,13 +1379,15 @@ export async function checkPlanValid(supabase: SupabaseClient<Database>, orgId: 
     isPayingOrg(supabase, orgId),
     hasOrgUsageCredits(supabase, orgId, appId),
   ])
-  if (shouldWarnTrialExpiry({ trialDays, isPaying: ispaying, hasCredits, warning }))
+  if (shouldWarnTrialExpiry({ trialDays, isPaying: ispaying, hasCredits, warning })) {
     log.warn(`WARNING !!\nTrial expires in ${trialDays} days, upgrade here: ${plansUrl}\n`)
+    markTrialNoticeShown(orgId)
+  }
 }
 
 export async function checkPlanValidUpload(supabase: SupabaseClient<Database>, orgId: string, appId?: string, warning = true) {
   const config = await getRemoteConfig()
-  const plansUrl = `${config.hostWeb}/settings/organization/plans`
+  const plansUrl = `${config.hostWeb}/settings/organization/plans?oid=${encodeURIComponent(orgId)}`
 
   const planCheck = await resolveMeteredPlanAllowed(supabase, orgId, ['storage'], appId)
   if (planCheck === 'permission_denied')
@@ -1397,8 +1401,10 @@ export async function checkPlanValidUpload(supabase: SupabaseClient<Database>, o
     isPayingOrg(supabase, orgId),
     hasOrgUsageCredits(supabase, orgId, appId),
   ])
-  if (shouldWarnTrialExpiry({ trialDays, isPaying: ispaying, hasCredits, warning }))
-    log.warn(`WARNING !!\nTrial expires in ${trialDays} days, upgrade here: ${config.hostWeb}/settings/organization/plans\n`)
+  if (shouldWarnTrialExpiry({ trialDays, isPaying: ispaying, hasCredits, warning })) {
+    log.warn(`WARNING !!\nTrial expires in ${trialDays} days, upgrade here: ${plansUrl}\n`)
+    markTrialNoticeShown(orgId)
+  }
 }
 
 function tryReadKey(path: string): string | undefined {
@@ -2102,6 +2108,7 @@ type SendEventPayload = TrackOptions & { nonPersonTags?: Record<string, unknown>
 )
 
 export async function sendEvent(capgkey: string, payload: SendEventPayload, verbose?: boolean, signal?: AbortSignal, apiHost?: string, redirect?: RequestInit['redirect']): Promise<void> {
+  const started = Date.now()
   const telemetryDisabled = isTruthyEnvValue(env.CAPGO_DISABLE_TELEMETRY) || isTruthyEnvValue(env.CAPGO_DISABLE_POSTHOG)
   if (telemetryDisabled && !payload.notifyConsole)
     return
@@ -2143,6 +2150,7 @@ export async function sendEvent(capgkey: string, payload: SendEventPayload, verb
       : controller.signal
 
     try {
+      setupDebug('telemetry request started')
       const fetchResponse = await fetch(`${trimTrailingSlashes(hostApi)}/private/events`, {
         method: 'POST',
         body: JSON.stringify(enrichedPayload),
@@ -2154,6 +2162,7 @@ export async function sendEvent(capgkey: string, payload: SendEventPayload, verb
         redirect,
       })
 
+      setupDebug('telemetry response received', { duration_ms: Date.now() - started, status: fetchResponse.status })
       clearTimeout(timeoutId)
 
       if (!fetchResponse.ok) {
@@ -2171,6 +2180,7 @@ export async function sendEvent(capgkey: string, payload: SendEventPayload, verb
     }
   }
   catch (error) {
+    setupDebug('telemetry request failed', { duration_ms: Date.now() - started, error: setupError(error) })
     if (verbose) {
       log.error('Failed to send Stats event details:')
       log.error(formatError(error))
