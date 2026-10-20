@@ -10,6 +10,7 @@ import { checkRegistrationEmail, getCaptchaSecret, isAuthRateLimitError, isCaptc
 import { appleHash, appleQuery, appleRandom, closeAppleQueryClient, openAppleCredential, rememberAppleName, sealAppleCredential } from '../utils/appleAuthStore.ts'
 import { isAppleSignInConfigured, verifyAppleIdentity } from '../utils/appleSignIn.ts'
 import { CacheHelper } from '../utils/cache.ts'
+import { DIRECT_OFFER, isDirectOfferMetadata } from '../utils/direct_offer.ts'
 import { simpleErrorWithStatus, useCors } from '../utils/hono.ts'
 import { getClientIP } from '../utils/rate_limit.ts'
 import { emptySupabaseWithClientIP, supabaseAdmin } from '../utils/supabase.ts'
@@ -38,6 +39,8 @@ const registrationMetadataSchema = z.object({
   first_utm_campaign: z.string().max(512).optional(),
   first_utm_content: z.string().max(512).optional(),
   first_utm_term: z.string().max(512).optional(),
+  // Paid-ads signups send offer=direct (no free trial). Any other value is ignored.
+  offer: z.string().max(64).optional(),
 })
 const credentialSchema = z.object({
   id_token: z.string().min(1).max(16384),
@@ -169,6 +172,8 @@ async function updateRegistrationMetadata(c: Context, client: AuthClient, user: 
     if (key.startsWith('registration_') && value)
       metadata[key] = value
   }
+  if (isDirectOfferMetadata(rawMetadata))
+    metadata.offer = DIRECT_OFFER
   // Hooks read auth metadata when the public profile insert queues on_user_create.
   const updated = await client.auth.updateUser({ data: Object.fromEntries(Object.entries(metadata).filter(([key]) => !user.user_metadata[key])) })
   if (updated.error)

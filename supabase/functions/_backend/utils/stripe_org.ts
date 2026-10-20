@@ -1,7 +1,9 @@
 import type { Context } from 'hono'
+import type { BillingAccount } from './stripe.ts'
 import type { Database } from './supabase.types.ts'
+import { resolveNewOrgTrialEnd } from './direct_offer.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { createCustomer, getPlanProductId, normalizeBillingAccount, planProductIdOrFilter, type BillingAccount } from './stripe.ts'
+import { createCustomer, getPlanProductId, normalizeBillingAccount, planProductIdOrFilter } from './stripe.ts'
 import { getDefaultPlan, getStripeCustomer, supabaseAdmin } from './supabase.ts'
 
 type OrgRow = Database['public']['Tables']['orgs']['Row']
@@ -156,8 +158,8 @@ export async function createStripeCustomer(c: Context, org: OrgRow) {
   }
 
   const customer = await createCustomer(c, current.management_email, current.created_by, current.id, current.name, billingAccount)
-  const trial_at = new Date()
-  trial_at.setDate(trial_at.getDate() + 15)
+  // Direct-offer (paid ads) creators get no trial; everyone else gets the standard trial.
+  const trial_at = await resolveNewOrgTrialEnd(c, current.created_by)
   cloudlog({ requestId: c.get('requestId'), message: 'createInfo', plan: selectedPlan, customer, billingAccount })
 
   const { error: createInfoError } = await supabaseAdmin(c)

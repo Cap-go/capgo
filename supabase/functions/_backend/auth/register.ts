@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { checkRegistrationEmail, getCaptchaSecret, isAuthRateLimitError, isCaptchaFailedError, provisionUserProfile } from '../utils/accountProvisioning.ts'
+import { DIRECT_OFFER, isDirectOfferMetadata } from '../utils/direct_offer.ts'
 import { parseBody, simpleErrorWithStatus, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { getPasswordPolicyValidationErrors } from '../utils/password_policy.ts'
@@ -29,6 +30,8 @@ const registerSchema = z.object({
   utm_source: z.string().trim().min(1).optional(),
   utm_medium: z.string().trim().min(1).optional(),
   utm_campaign: z.string().trim().min(1).optional(),
+  // Paid-ads signups send offer=direct (no free trial). Any other value is ignored.
+  offer: z.string().trim().max(64).optional(),
   opt_for_newsletters: z.boolean().default(false),
   captcha_token: z.string().min(1).optional(),
   registration_device_type: z.string().trim().min(1).optional(),
@@ -134,6 +137,8 @@ app.post('/', async (c) => {
     if (body[key])
       userMetadata[key] = body[key]
   }
+  if (isDirectOfferMetadata({ offer: body.offer }))
+    userMetadata.offer = DIRECT_OFFER
   if (body.registration_device_type)
     userMetadata.registration_device_type = body.registration_device_type
   if (body.registration_os)
