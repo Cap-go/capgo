@@ -233,6 +233,7 @@ async function buildOnboardingBentoEvent(
         org_id: orgResult.data.id,
         org_name: orgResult.data.name,
         app_name: appResult.data.name,
+        app_id: appResult.data.app_id,
       },
     }
   })

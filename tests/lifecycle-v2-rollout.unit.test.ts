@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { lifecycleReady } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/rollout.ts'
-import { isLegacyLifecycleEvent, isLifecycleV2Treatment, LIFECYCLE_V2_CONTRACT, shouldUseLifecycleV2, withoutLegacyTrialTriggers } from '../supabase/functions/_backend/utils/lifecycle_v2_rollout.ts'
+import { isLegacyLifecycleEvent, isLifecycleV2Treatment, legacyLifecycleContext, LIFECYCLE_V2_CONTRACT, shouldUseLifecycleV2, withoutLegacyTrialTriggers } from '../supabase/functions/_backend/utils/lifecycle_v2_rollout.ts'
 
 const mocks = vi.hoisted(() => ({
   closeClient: vi.fn(),
@@ -22,8 +22,9 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
 
 vi.mock('../supabase/functions/_backend/utils/ab_tests.json', () => ({ default: { new_emails_v2: { audience: 'self_signup', enroll_new_users_after: '2026-10-17T14:24:00.000Z' } } }))
 
+const organization = { kind: 'organization' } as const
 const treatment = { branch: 'A', assigned_at: '2026-10-17T15:01:00.000Z' }
-const profile = (assignment: unknown = treatment) => ({ created_at: '2026-10-17T15:00:00.000Z', created_via_invite: false, onboarding: { intent: 'ota', abtests_enrolled: ['new_emails_v2'], abtests: { new_emails_v2: assignment } } })
+const profile = (assignment: unknown = treatment) => ({ org_onboarding: { intent: 'ota' }, app_onboarding: null, active_products: ['ota'], created_at: '2026-10-17T15:00:00.000Z', created_via_invite: false, onboarding: { intent: 'ota', abtests_enrolled: ['new_emails_v2'], abtests: { new_emails_v2: assignment } } })
 const ready = {
   BENTO_EVENT_DISPATCH_ENABLED: 'true',
   BENTO_LIFECYCLE_V2_SENDER_CONTRACT: LIFECYCLE_V2_CONTRACT,
@@ -44,8 +45,8 @@ describe('lifecycle v2 legacy handoff', () => {
   })
 
   it('uses only persisted immutable creator treatment and an existing organization journey', async () => {
-    expect(await shouldUseLifecycleV2(context(), orgId)).toBe(true)
-    expect(mocks.query).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('FROM public.org_lifecycle_creators AS creators'), [orgId])
+    expect(await shouldUseLifecycleV2(context(), orgId, organization)).toBe(true)
+    expect(mocks.query).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('FROM public.org_lifecycle_creators AS creators'), [orgId, null])
     const sql = mocks.query.mock.calls[0][0]
     expect(sql).toContain('users.id = creators.original_creator_id')
     expect(sql).toContain('users.created_via_invite')
@@ -66,17 +67,17 @@ describe('lifecycle v2 legacy handoff', () => {
     const read = { query: vi.fn(async () => []) }
     mocks.query.mockImplementation(async (sql: string) => ({ rows: sql.includes('vault.decrypted_secrets') ? [] : [profile()] }))
     expect(await lifecycleReady(read, env)).toBe(expected)
-    expect(await shouldUseLifecycleV2(context(env), orgId)).toBe(expected)
+    expect(await shouldUseLifecycleV2(context(env), orgId, organization)).toBe(expected)
   })
 
   it.each(Object.keys(ready))('retains legacy when the explicit %s override disables handoff', async (key) => {
-    expect(await shouldUseLifecycleV2(context({ ...ready, [key]: 'false' }), orgId)).toBe(false)
+    expect(await shouldUseLifecycleV2(context({ ...ready, [key]: 'false' }), orgId, organization)).toBe(false)
     expect(mocks.getPgClient).not.toHaveBeenCalled()
   })
 
   it('requires every Vault setting and does not mistake absent readiness for enabled', async () => {
     mocks.query.mockResolvedValueOnce({ rows: [{ name: 'BENTO_EVENT_DISPATCH_ENABLED', decrypted_secret: 'true' }] })
-    expect(await shouldUseLifecycleV2(context({}), orgId)).toBe(false)
+    expect(await shouldUseLifecycleV2(context({}), orgId, organization)).toBe(false)
     expect(mocks.query).toHaveBeenCalledOnce()
   })
 
@@ -85,7 +86,7 @@ describe('lifecycle v2 legacy handoff', () => {
       { name: 'BENTO_LIFECYCLE_V2_SENDER_CONTRACT', decrypted_secret: ` ${LIFECYCLE_V2_CONTRACT} ` },
       { name: 'BENTO_LIFECYCLE_V2_LEGACY_HANDOFF', decrypted_secret: LIFECYCLE_V2_CONTRACT },
     ] })
-    expect(await shouldUseLifecycleV2(context({ BENTO_EVENT_DISPATCH_ENABLED: 'true' }), orgId)).toBe(true)
+    expect(await shouldUseLifecycleV2(context({ BENTO_EVENT_DISPATCH_ENABLED: 'true' }), orgId, organization)).toBe(true)
     expect(mocks.query.mock.calls[0][1]).toEqual([[
       'BENTO_LIFECYCLE_V2_SENDER_CONTRACT',
       'BENTO_LIFECYCLE_V2_LEGACY_HANDOFF',
@@ -100,33 +101,85 @@ describe('lifecycle v2 legacy handoff', () => {
     { branch: 'A', assigned_at: 'yesterday' },
   ])('retains legacy for unresolved or non-treatment creator assignment %j', async (assignment) => {
     mocks.query.mockResolvedValueOnce({ rows: [profile(assignment ?? null)] })
-    expect(await shouldUseLifecycleV2(context(), orgId)).toBe(false)
+    expect(await shouldUseLifecycleV2(context(), orgId, organization)).toBe(false)
   })
 
   it('retains legacy when the original creator was deleted or no immutable provenance/journey exists', async () => {
     mocks.query.mockResolvedValueOnce({ rows: [] })
-    expect(await shouldUseLifecycleV2(context(), orgId)).toBe(false)
+    expect(await shouldUseLifecycleV2(context(), orgId, organization)).toBe(false)
   })
 
   it.each([true, null, undefined])('retains legacy for invited or unknown original signup provenance %j despite stale protected treatment', async (createdViaInvite) => {
     mocks.query.mockResolvedValueOnce({ rows: [{ ...profile(), created_via_invite: createdViaInvite }] })
-    expect(await shouldUseLifecycleV2(context(), orgId)).toBe(false)
+    expect(await shouldUseLifecycleV2(context(), orgId, organization)).toBe(false)
     expect(mocks.closeClient).toHaveBeenCalledOnce()
   })
 
   it('retains legacy when any readiness or creator read fails', async () => {
     mocks.query.mockRejectedValueOnce(new Error('database unavailable'))
-    expect(await shouldUseLifecycleV2(context(), orgId)).toBe(false)
+    expect(await shouldUseLifecycleV2(context(), orgId, organization)).toBe(false)
     expect(mocks.closeClient).toHaveBeenCalledOnce()
   })
 
   it('does not open the database for an absent organization', async () => {
-    expect(await shouldUseLifecycleV2(context(), '')).toBe(false)
+    expect(await shouldUseLifecycleV2(context(), '', organization)).toBe(false)
     expect(mocks.getPgClient).not.toHaveBeenCalled()
+  })
+
+  it('retains legacy without explicit product, app or organization context', async () => {
+    expect(await shouldUseLifecycleV2(context(), orgId)).toBe(false)
+    expect(mocks.getPgClient).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['opposite journey', 'builder', ['ota'], 'builder', false],
+    ['retained journey after intent changes', 'ota', ['ota', 'builder'], 'builder', false],
+    ['matching product', 'builder', ['builder'], 'builder', true],
+    ['matching Builder in dual intent', 'both', ['builder'], 'builder', true],
+  ] as const)('scopes a product handoff for %s', async (_name, intent, activeProducts, product, expected) => {
+    mocks.query.mockResolvedValueOnce({ rows: [{ ...profile(), org_onboarding: { intent }, active_products: activeProducts }] })
+    expect(await shouldUseLifecycleV2(context(), orgId, { kind: 'product', product })).toBe(expected)
+  })
+
+  it.each([
+    ['both', ['ota'], false],
+    ['both', ['builder'], false],
+    ['both', ['ota', 'builder'], true],
+    ['unknown', ['ota', 'builder'], false],
+  ] as const)('requires complete current organization replacement for %s / %j', async (intent, activeProducts, expected) => {
+    mocks.query.mockResolvedValueOnce({ rows: [{ ...profile(), org_onboarding: { intent }, active_products: activeProducts }] })
+    expect(await shouldUseLifecycleV2(context(), orgId, organization)).toBe(expected)
+  })
+
+  it.each([
+    [null, false],
+    [{ setup: { paths: ['ota', 'builder'] } }, false],
+    [{ setup: { todo_list_version: 3, steps: {} } }, true],
+    [{ setup: { paths: ['ota'] } }, false],
+    [{ setup: { todo_list_version: 5, ota_todo_list_version: '1', paths: ['ota'] } }, false],
+    [{ setup: { todo_list_version: 4, ota_todo_list_version: '2', paths: ['ota'] } }, false],
+    [{ setup: { todo_list_version: 4, paths: ['ota'] } }, false],
+    [{ setup: { todo_list_version: 4, ota_todo_list_version: '1', builder_todo_list_version: '1', paths: ['ota', 'builder'] } }, false],
+    [{ setup: { todo_list_version: 4, ota_todo_list_version: '1', paths: ['builder'], selected_path: 'ota' } }, false],
+    [{ setup: { todo_list_version: 4, builder_todo_list_version: '1', paths: ['builder'], selected_path: 'builder' } }, false],
+    [{ setup: { todo_list_version: 4, ota_todo_list_version: '1', builder_todo_list_version: '1', paths: ['ota', 'builder'], selected_path: 'ota' } }, true],
+    [{ setup: { todo_list_version: 4, ota_todo_list_version: '1', paths: ['ota'] } }, true],
+  ])('uses supported persisted app selection %j', async (appOnboarding, expected) => {
+    mocks.query.mockResolvedValueOnce({ rows: [{ ...profile(), app_onboarding: appOnboarding }] })
+    expect(await shouldUseLifecycleV2(context(), orgId, { kind: 'app', appId: 'com.example.handoff' })).toBe(expected)
+    expect(mocks.query.mock.calls[0][0]).toContain('apps.owner_org = creators.org_id')
+    expect(mocks.query.mock.calls[0][1]).toEqual([orgId, 'com.example.handoff'])
   })
 })
 
 describe('legacy overlap boundaries', () => {
+  it('resolves event context without trusting product or intent metadata', () => {
+    expect(legacyLifecycleContext('builder_onboarding_started', { product: 'ota' })).toEqual({ kind: 'product', product: 'builder' })
+    expect(legacyLifecycleContext('org:created', { onboarding_intent: 'ota' })).toEqual({ kind: 'organization' })
+    expect(legacyLifecycleContext('app:updated', { app_id: 'com.example.handoff', product: 'builder', intent: 'builder', setup_command: 'builder' })).toEqual({ kind: 'app', appId: 'com.example.handoff' })
+    expect(legacyLifecycleContext('app:updated', { product: 'ota' })).toBeNull()
+    expect(legacyLifecycleContext('bundle:created', { app_id: 'com.example.handoff' })).toBeNull()
+  })
   it.each([
     'org:created',
     'app:created',

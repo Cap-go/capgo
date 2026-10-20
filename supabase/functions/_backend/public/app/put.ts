@@ -436,7 +436,7 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     if (orgError || !orgData) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot load organization for onboarding completion side effects', error: orgError, app_id: appId })
     }
-    else if (!await shouldUseLifecycleV2(c, data.owner_org)) {
+    else if (!await shouldUseLifecycleV2(c, data.owner_org, { kind: 'app', appId: data.app_id })) {
       const creatorDetails = buildAppCreatorEventDetails(data.onboarding)
       await trackBentoEvent(c, orgData.management_email, {
         ...buildOnboardingIntentBentoEventData(c, parseOrgOnboardingIntent(orgData.onboarding), {
@@ -445,6 +445,7 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
           website: orgData.website,
         }),
         app_name: data.name,
+        app_id: data.app_id,
         ...creatorDetails,
       }, 'app:created')
     }

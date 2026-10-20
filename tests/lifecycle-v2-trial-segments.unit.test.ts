@@ -50,7 +50,7 @@ describe('trial sender handoff at the billing producer', () => {
     Object.assign(mocks.state, { trialDays, allowance })
     const result = await customerToSegmentOrg(c, 'org-control', null, plan)
     expect(result.segments).toEqual(expect.arrayContaining(['trial', expected]))
-    expect(mocks.ready).toHaveBeenCalledExactlyOnceWith(c, 'org-control')
+    expect(mocks.ready).toHaveBeenCalledExactlyOnceWith(c, 'org-control', { kind: 'organization' })
   })
 
   it.each([

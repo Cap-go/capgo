@@ -56,9 +56,48 @@ possible. The heartbeat alone is mutable. These tables contain private recipient
 and organization context and must never be exported into source fixtures, public
 PRs or analytics payloads.
 
-Evidence is retained for the lifetime of its organization. This change adds no
+Organization-scoped evidence is retained for the lifetime of its organization. This change adds no
 automatic purge, retention cron or historical backfill; organization deletion
 cascades through the evidence tables.
+
+## Storage planning before migration
+
+Queue-state capture starts when this migration is applied, including while
+lifecycle sender gates are closed. Its global `bento_evaluation_events` rows have
+no organization foreign key: organization deletion does not remove queue history.
+They are retained indefinitely. The organization erasure rule above applies to
+decisions, coverage, attempts and snapshots. No automatic purge is introduced.
+
+Seven minutely checks with five transitions per successful invocation produce
+50,400 history rows/day, 1,512,000 per 30 days and 18,396,000/year before abnormal
+transitions. Retries, failed publication and execution can add transitions even
+though attempts remain capped at five. Audit-only updates add none.
+
+An isolated native PostgreSQL 17.6 rehearsal applied the actual migration and
+inserted 50,400 synthetic rows with all three production history indexes. After
+VACUUM/ANALYZE, heap/TOAST/FSM/VM plus indexes occupied 25,378,816 bytes for a
+five-transition fixture with a large allowlisted result on each completion,
+and 38,338,560 bytes with that projection on every row. Indexes accounted for
+12,492,800 bytes in each case. These conservative fixture shapes extrapolate to
+approximately 8.63–13.03 GiB/year at nominal transition volume. Generated WAL was
+34,080,680–46,049,536 bytes per fixture; it is additional write volume, not a
+retained-WAL guarantee.
+
+Before merging/applying this migration, the deployment owner must reserve and
+record primary storage for the chosen horizon and abnormal-transition headroom,
+then include WAL retention, backups and each replica separately. For example,
+eight times nominal volume at the larger measured footprint requires about
+104.3 GiB per year for this history relation alone. That is a sizing scenario,
+not a traffic forecast or a production capacity acceptance. Add independent
+decision/attempt growth and up to 64 KiB of serialized snapshot content per
+physical attempt, plus their heap/index overhead, to that reservation.
+
+Use existing database/provider monitoring to compare relation-size deltas and
+remaining provisioned storage against that budget and expand capacity before
+the reserve is exhausted. Recalculate when check cadence, registry size or
+projection changes. If capacity cannot be reserved, defer the migration; any
+shorter retention policy requires an explicit contract revision first. No
+production capacity, provisioning, purge job or deployment is claimed here.
 
 ## Versioned read views
 

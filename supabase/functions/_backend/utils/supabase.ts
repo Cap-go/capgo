@@ -1221,7 +1221,7 @@ export async function customerToSegmentOrg(
     trialPlanNamesToRemove,
   )
 
-  const useLifecycleV2 = await shouldUseLifecycleV2(c, orgId)
+  const useLifecycleV2 = await shouldUseLifecycleV2(c, orgId, { kind: 'organization' })
   const applyLifecycleHandoff = (tags: { segments: string[], deleteSegments: string[] }) => useLifecycleV2 ? withoutLegacyTrialTriggers(tags) : tags
 
   if (!segmentsObj.onboarded) {

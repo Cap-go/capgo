@@ -1,11 +1,22 @@
 import type { PoolClient } from 'pg'
 import { randomUUID } from 'node:crypto'
-import { afterAll, describe, expect, it } from 'vitest'
+import { afterAll, describe, expect, it, vi } from 'vitest'
 import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../supabase/functions/_backend/utils/appOnboarding.ts'
+import { LIFECYCLE_V2_CONTRACT, shouldUseLifecycleV2 } from '../supabase/functions/_backend/utils/lifecycle_v2_rollout.ts'
 import { cleanupPostgresClient, getPostgresClient, USER_PASSWORD_HASH } from './test-utils.ts'
 
 const createdAt = '2026-10-17T15:00:00.000Z'
 const assignedAt = '2026-10-17T15:01:00.000Z'
+const handoffSession = vi.hoisted(() => ({ client: undefined as PoolClient | undefined }))
+vi.mock('../supabase/functions/_backend/utils/pg.ts', async importOriginal => ({
+  ...await importOriginal<typeof import('../supabase/functions/_backend/utils/pg.ts')>(),
+  getPgClient: async () => handoffSession.client!,
+  closeClient: async () => {},
+}))
+vi.mock('hono/adapter', async importOriginal => ({
+  ...await importOriginal<typeof import('hono/adapter')>(),
+  env: (c: { env: unknown }) => c.env,
+}))
 const assignment = {
   intent: 'ota',
   abtests_enrolled: ['new_emails_v2'],
@@ -18,9 +29,11 @@ async function transaction(run: (client: PoolClient) => Promise<void>) {
   const client = await (await getPostgresClient()).connect()
   try {
     await client.query('BEGIN')
+    handoffSession.client = client
     await run(client)
   }
   finally {
+    handoffSession.client = undefined
     await client.query('ROLLBACK')
     client.release()
   }
@@ -58,8 +71,58 @@ function completedChecklist() {
   } }
 }
 
+// The shared max-one pool and transaction-bound handoff client require sequential cases.
 describe('lifecycle schema on full PostgreSQL', () => {
-  it.concurrent('keeps all nine monitoring views private and excludes billing fingerprints from their columns', async () => {
+  it('requires current product intent, complete organization replacement and an owned persisted app selection', async () => {
+    await transaction(async (client) => {
+      const creator = await seedUser(client, assignment)
+      const orgId = await seedOrg(client, creator, 'builder')
+      const c = { env: {
+        BENTO_EVENT_DISPATCH_ENABLED: 'true',
+        BENTO_LIFECYCLE_V2_SENDER_CONTRACT: LIFECYCLE_V2_CONTRACT,
+        BENTO_LIFECYCLE_V2_LEGACY_HANDOFF: LIFECYCLE_V2_CONTRACT,
+      }, get: () => 'handoff-fixture' } as any
+      const builder = { kind: 'product', product: 'builder' } as const
+      const ota = { kind: 'product', product: 'ota' } as const
+      const organization = { kind: 'organization' } as const
+      expect(await shouldUseLifecycleV2(c, orgId, builder)).toBe(true)
+      expect(await shouldUseLifecycleV2(c, orgId, ota)).toBe(false)
+      await client.query(`UPDATE public.orgs SET onboarding='{"intent":"ota"}'::jsonb WHERE id=$1`, [orgId])
+      expect((await client.query('SELECT product FROM public.bento_lifecycle_journeys WHERE org_id=$1', [orgId])).rows).toHaveLength(2)
+      expect(await shouldUseLifecycleV2(c, orgId, builder)).toBe(false)
+      expect(await shouldUseLifecycleV2(c, orgId, ota)).toBe(true)
+
+      const appId = `com.example.handoff.${randomUUID().replaceAll('-', '')}`
+      await client.query(`INSERT INTO public.apps(app_id,icon_url,user_id,owner_org) VALUES($1,'',$2,$3)`, [appId, creator, orgId])
+      await client.query(`UPDATE public.apps SET onboarding='{"setup":{"todo_list_version":4,"ota_todo_list_version":"1","builder_todo_list_version":"1","paths":["ota","builder"],"selected_path":"builder"}}'::jsonb WHERE app_id=$1`, [appId])
+      const app = { kind: 'app', appId } as const
+      expect(await shouldUseLifecycleV2(c, orgId, app)).toBe(false)
+      await client.query(`UPDATE public.orgs SET onboarding='{"intent":"both"}'::jsonb WHERE id=$1`, [orgId])
+      expect(await shouldUseLifecycleV2(c, orgId, app)).toBe(true)
+      expect(await shouldUseLifecycleV2(c, orgId, organization)).toBe(true)
+      await client.query(`UPDATE public.bento_lifecycle_journeys SET support_hold=true WHERE org_id=$1 AND product='builder'`, [orgId])
+      expect(await shouldUseLifecycleV2(c, orgId, app)).toBe(false)
+      expect(await shouldUseLifecycleV2(c, orgId, organization)).toBe(false)
+      expect(await shouldUseLifecycleV2(c, orgId, ota)).toBe(true)
+      await client.query('UPDATE public.bento_lifecycle_journeys SET support_hold=false WHERE org_id=$1', [orgId])
+      await client.query(`UPDATE public.apps SET onboarding='{"setup":{"todo_list_version":4,"ota_todo_list_version":"1","builder_todo_list_version":"1","paths":["ota","builder"]}}'::jsonb WHERE app_id=$1`, [appId])
+      expect(await shouldUseLifecycleV2(c, orgId, app)).toBe(false)
+      await client.query(`UPDATE public.apps SET onboarding='{"setup":{"todo_list_version":3,"steps":{}}}'::jsonb WHERE app_id=$1`, [appId])
+      expect(await shouldUseLifecycleV2(c, orgId, app)).toBe(true)
+      await client.query(`UPDATE public.apps SET onboarding='{"setup":{"paths":["ota"]}}'::jsonb WHERE app_id=$1`, [appId])
+      expect(await shouldUseLifecycleV2(c, orgId, app)).toBe(false)
+      await client.query(`UPDATE public.apps SET onboarding='{"setup":{"todo_list_version":4,"ota_todo_list_version":"2","paths":["ota"]}}'::jsonb WHERE app_id=$1`, [appId])
+      expect(await shouldUseLifecycleV2(c, orgId, app)).toBe(false)
+      const otherCreator = await seedUser(client)
+      const otherOrg = await seedOrg(client, otherCreator)
+      const foreignApp = `${appId}.foreign`
+      await client.query(`INSERT INTO public.apps(app_id,icon_url,user_id,owner_org) VALUES($1,'',$2,$3)`, [foreignApp, otherCreator, otherOrg])
+      await client.query(`UPDATE public.apps SET onboarding='{"setup":{"todo_list_version":4,"ota_todo_list_version":"1","paths":["ota"],"selected_path":"ota"}}'::jsonb WHERE app_id=$1`, [foreignApp])
+      expect(await shouldUseLifecycleV2(c, orgId, { kind: 'app', appId: foreignApp })).toBe(false)
+    })
+  })
+
+  it('keeps all nine monitoring views private and excludes billing fingerprints from their columns', async () => {
     await transaction(async (client) => {
       const views = [
         'bento_lifecycle_monitor_v1',
@@ -91,7 +154,7 @@ describe('lifecycle schema on full PostgreSQL', () => {
     })
   })
 
-  it.concurrent('excludes an invited original creator even with a stale treatment marker', async () => {
+  it('excludes an invited original creator even with a stale treatment marker', async () => {
     await transaction(async (client) => {
       const creator = await seedUser(client, {}, true)
       const orgId = await seedOrg(client, creator, 'both')
@@ -102,7 +165,7 @@ describe('lifecycle schema on full PostgreSQL', () => {
     })
   })
 
-  it.concurrent('keeps prospective creator provenance immutable to users and restricts every lifecycle table', async () => {
+  it('keeps prospective creator provenance immutable to users and restricts every lifecycle table', async () => {
     await transaction(async (client) => {
       const creator = await seedUser(client)
       const orgId = await seedOrg(client, creator)
@@ -123,7 +186,7 @@ describe('lifecycle schema on full PostgreSQL', () => {
     })
   })
 
-  it.concurrent('bootstraps the org created before A/B allocation and preserves operational holds and consumed state', async () => {
+  it('bootstraps the org created before A/B allocation and preserves operational holds and consumed state', async () => {
     await transaction(async (client) => {
       const creator = await seedUser(client)
       const orgId = await seedOrg(client, creator, 'both')
@@ -143,7 +206,7 @@ describe('lifecycle schema on full PostgreSQL', () => {
     })
   })
 
-  it.concurrent('does not enroll an original control through its current owner and retains provenance after creator deletion', async () => {
+  it('does not enroll an original control through its current owner and retains provenance after creator deletion', async () => {
     await transaction(async (client) => {
       const creator = await seedUser(client)
       const currentOwner = await seedUser(client)
@@ -171,7 +234,7 @@ describe('lifecycle schema on full PostgreSQL', () => {
     })
   })
 
-  it.concurrent('preserves a pending candidate on equal organization writes and wakes it only when watched values change', async () => {
+  it('preserves a pending candidate on equal organization writes and wakes it only when watched values change', async () => {
     await transaction(async (client) => {
       const creator = await seedUser(client, assignment)
       const orgId = await seedOrg(client, creator, 'both')
@@ -191,7 +254,7 @@ describe('lifecycle schema on full PostgreSQL', () => {
     })
   })
 
-  it.concurrent('preserves completed readiness when deleted before worker reconciliation and isolates recreation by apps.id', async () => {
+  it('preserves completed readiness when deleted before worker reconciliation and isolates recreation by apps.id', async () => {
     await transaction(async (client) => {
       const creator = await seedUser(client)
       const orgId = await seedOrg(client, creator)
@@ -220,7 +283,7 @@ describe('lifecycle schema on full PostgreSQL', () => {
     })
   })
 
-  it.concurrent('uses indexed creator and org lookups for late allocation without a broad organization scan', async () => {
+  it('uses indexed creator and org lookups for late allocation without a broad organization scan', async () => {
     await transaction(async (client) => {
       const creator = await seedUser(client)
       const orgId = await seedOrg(client, creator)

@@ -3,10 +3,12 @@ import type { QueryClient, ReadOnlyContext } from '../cloudflare_workers/bento_d
 import type { Product } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/evidence.ts'
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
+import { stdout } from 'node:process'
 import { createPgliteEngine, Database } from 'tinbase'
 import { expect, it, vi } from 'vitest'
 import { lifecycleEvaluation } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/index.ts'
 import { claimDueLifecycleJourneys, refreshLifecycleJourneys } from '../cloudflare_workers/bento_dispatch/flows/lifecycle/refresh.ts'
+import { LIFECYCLE_HANDOFF_SOURCE_SQL } from '../supabase/functions/_backend/utils/lifecycle_v2_rollout.ts'
 
 interface PlanNode {
   'Node Type': string
@@ -202,6 +204,22 @@ it('bounds actual recurring selection over 200,000 mostly-idle journeys with spa
     }
     expect((await db.query(`SELECT count(*)::integer AS count FROM public.bento_lifecycle_journeys
       WHERE next_evaluation_at='2099-01-01T00:00:00Z' AND refresh_claim_token IS NULL`)).rows).toEqual([{ count: organizations * 2 - 40 }])
+
+    await db.query(`INSERT INTO public.apps(id,app_id,owner_org,created_at,onboarding)
+      SELECT md5($1 || ':app:' || n)::uuid,'com.example.handoff.' || n,md5($1 || ':org:' || n)::uuid,CURRENT_TIMESTAMP,
+        '{"setup":{"todo_list_version":4,"ota_todo_list_version":"1","paths":["ota"],"selected_path":"ota"}}'::jsonb
+      FROM generate_series(1,$2::integer) n`, [seed, organizations])
+    await db.exec('ANALYZE public.apps; ANALYZE public.org_lifecycle_creators;')
+    const target = (await db.query(`SELECT md5($1 || ':org:1')::uuid AS id`, [seed])).rows[0].id
+    for (const [orgId, appId, expected] of [[target, null, 1], [target, 'com.example.handoff.1', 1], [target, 'com.example.missing', 1], [randomUUID(), 'com.example.handoff.1', 0]]) {
+      const analyzed = (await db.query(`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${LIFECYCLE_HANDOFF_SOURCE_SQL}`, [orgId, appId])).rows[0]['QUERY PLAN'][0]
+      const plan = nodes(analyzed.Plan)
+      expect(plan.filter(node => ['apps', 'orgs', 'users', 'org_lifecycle_creators', 'bento_lifecycle_journeys'].includes(node['Relation Name'] ?? '') && node['Node Type'] === 'Seq Scan')).toEqual([])
+      expect(plan.every(node => node['Actual Rows'] <= 2)).toBe(true)
+      expect(analyzed.Plan['Actual Rows']).toBe(expected)
+      expect(analyzed.Plan['Shared Hit Blocks'] + analyzed.Plan['Shared Read Blocks']).toBeLessThan(100)
+      stdout.write(`Lifecycle handoff plan: ${JSON.stringify({ orgs: organizations, apps: organizations, journeys: organizations * 2, appLookup: appId !== null, returned: expected, executionMs: analyzed['Execution Time'], buffers: analyzed.Plan['Shared Hit Blocks'] + analyzed.Plan['Shared Read Blocks'] })}\n`)
+    }
   }
   finally {
     await db.close()

@@ -99,7 +99,7 @@ describe('pending onboarding Bento event', () => {
     const response = await put(context, 'com.example.pending', { need_onboarding: false }, { key: 'test-key' } as any)
 
     expect(response.status).toBe(200)
-    expect(mocks.shouldUseLifecycleV2).toHaveBeenCalledExactlyOnceWith(context, 'org-id')
+    expect(mocks.shouldUseLifecycleV2).toHaveBeenCalledExactlyOnceWith(context, 'org-id', { kind: 'app', appId: 'com.example.pending' })
     expect(mocks.trackBentoEvent).not.toHaveBeenCalled()
   })
 
@@ -116,6 +116,7 @@ describe('pending onboarding Bento event', () => {
     expect(response.status).toBe(200)
     expect(mocks.trackBentoEvent).toHaveBeenCalledOnce()
     expect(mocks.trackBentoEvent).toHaveBeenCalledWith(context, 'owner@example.com', expect.objectContaining({
+      app_id: 'com.example.pending',
       app_name: 'Example app',
       onboarding_intent: intent,
       org_id: 'org-id',

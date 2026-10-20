@@ -65,6 +65,7 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => {
 
 function createContext() {
   return {
+    req: { header: () => undefined },
     get: (key: string) => key === 'requestId' ? 'request-id' : undefined,
   } as any
 }
@@ -167,7 +168,7 @@ describe('sendNotifToOrgMembersOnce', () => {
     shouldUseLifecycleV2Mock.mockResolvedValue(true)
     const { sendEmailToOrgMembers, sendNotifToOrgMembers, sendNotifToOrgMembersOnceWithResult } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
     const c = createContext()
-    expect(await sendEmailToOrgMembers(c, 'app:created', 'onboarding', {}, 'org-123')).toBe(0)
+    expect(await sendEmailToOrgMembers(c, 'app:created', 'onboarding', { app_id: 'com.example.handoff' }, 'org-123')).toBe(0)
     expect(await sendNotifToOrgMembers(c, 'builder_onboarding_started', 'builder_onboarding', {}, 'org-123', 'once', '* * * * *', {} as any)).toBe(false)
     expect(await sendNotifToOrgMembersOnceWithResult(c, 'user:need_onboarding', 'onboarding', {}, 'org-123', 'once', {} as any)).toBe('suppressed')
     expect(getPgClientMock).not.toHaveBeenCalled()
@@ -175,6 +176,36 @@ describe('sendNotifToOrgMembersOnce', () => {
     expect(claimNotifOrgOnceMock).not.toHaveBeenCalled()
     expect(sendNotifOrgMock).not.toHaveBeenCalled()
     expect(sendNotifOrgOnceMock).not.toHaveBeenCalled()
+    expect(shouldUseLifecycleV2Mock.mock.calls.map(call => call[2])).toEqual([
+      { kind: 'app', appId: 'com.example.handoff' },
+      { kind: 'product', product: 'builder' },
+      { kind: 'organization' },
+    ])
+  })
+
+  it.each(['email', 'throttled', 'once'] as const)('retains an opposite-product Builder event in the %s sender', async (sender) => {
+    shouldUseLifecycleV2Mock.mockImplementation(async (_c, _org, context) => context?.kind === 'product' && context.product === 'ota')
+    const { sendEmailToOrgMembers, sendNotifToOrgMembers, sendNotifToOrgMembersOnceWithResult } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
+    const c = createContext()
+    if (sender === 'email')
+      await sendEmailToOrgMembers(c, 'builder_onboarding_started', 'builder_onboarding', { product: 'ota' }, 'org-123')
+    else if (sender === 'throttled')
+      await sendNotifToOrgMembers(c, 'builder_onboarding_started', 'builder_onboarding', { product: 'ota' }, 'org-123', 'once', '* * * * *', getDrizzleClientMock())
+    else
+      expect(await sendNotifToOrgMembersOnceWithResult(c, 'builder_onboarding_started', 'builder_onboarding', { product: 'ota' }, 'org-123', 'once', {} as any)).not.toBe('suppressed')
+    expect(shouldUseLifecycleV2Mock).toHaveBeenCalledExactlyOnceWith(c, 'org-123', { kind: 'product', product: 'builder' })
+    if (sender === 'throttled')
+      expect(sendNotifOrgMock).toHaveBeenCalled()
+    else
+      expect(getPgClientMock).toHaveBeenCalled()
+  })
+
+  it('retains a generic app event with no verifiable app identity despite product metadata', async () => {
+    shouldUseLifecycleV2Mock.mockResolvedValue(true)
+    const { sendEmailToOrgMembers } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
+    await sendEmailToOrgMembers(createContext(), 'app:created', 'onboarding', { product: 'ota', onboarding_intent: 'ota' }, 'org-123')
+    expect(shouldUseLifecycleV2Mock).not.toHaveBeenCalled()
+    expect(getPgClientMock).toHaveBeenCalled()
   })
 
   it('closes its owned primary reader when recipient lookup returns no organization', async () => {

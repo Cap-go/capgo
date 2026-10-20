@@ -3,7 +3,7 @@ import { parseCronExpression } from 'cron-schedule'
 import { and, eq, inArray } from 'drizzle-orm'
 import { isBentoConfigured, trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
-import { isLegacyLifecycleEvent, shouldUseLifecycleV2 } from './lifecycle_v2_rollout.ts'
+import { legacyLifecycleContext, shouldUseLifecycleV2 } from './lifecycle_v2_rollout.ts'
 import { cloudlog } from './logging.ts'
 import { claimNotifOrgOnceWithResult, hasNotifOrgClaim, sendNotifOrg, sendNotifOrgOnce } from './notifications.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
@@ -498,7 +498,8 @@ export async function sendEmailToOrgMembers(
   if (!isBentoConfigured(c))
     return 0
 
-  if (isLegacyLifecycleEvent(eventName) && await shouldUseLifecycleV2(c, orgId))
+  const lifecycleContext = legacyLifecycleContext(eventName, eventData)
+  if (lifecycleContext && await shouldUseLifecycleV2(c, orgId, lifecycleContext))
     return 0
 
   const ownedPgClient = drizzleClient ? undefined : await getPgClient(c, true)
@@ -583,7 +584,8 @@ export async function sendNotifToOrgMembers(
   if (!isBentoConfigured(c))
     return false
 
-  if (isLegacyLifecycleEvent(eventName) && await shouldUseLifecycleV2(c, orgId))
+  const lifecycleContext = legacyLifecycleContext(eventName, eventData)
+  if (lifecycleContext && await shouldUseLifecycleV2(c, orgId, lifecycleContext))
     return false
 
   // Get all eligible emails (includes org info)
@@ -679,7 +681,8 @@ export async function sendNotifToOrgMembersOnceWithResult(
   if (!isBentoConfigured(c))
     return 'failed'
 
-  if (isLegacyLifecycleEvent(eventName) && await shouldUseLifecycleV2(c, orgId))
+  const lifecycleContext = legacyLifecycleContext(eventName, eventData)
+  if (lifecycleContext && await shouldUseLifecycleV2(c, orgId, lifecycleContext))
     return 'suppressed'
 
   const pgClient = await getPgClient(c)

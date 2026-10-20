@@ -130,6 +130,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
               name: data.name,
               website: data.website,
             }),
+            app_id: record.app_id,
             app_name: record.name,
             ...creatorDetails,
           },
