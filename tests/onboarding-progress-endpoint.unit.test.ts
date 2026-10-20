@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   track: vi.fn(),
   row: { onboarding: { setup: { todo_list_version: 3, steps: {} } }, created_at: '2026-09-16T00:00:00Z' } as any,
   channels: [] as any[],
+  billing: { has_usage_credits: false, stripe_info: { status: 'succeeded', trial_at: '2026-11-01T12:34:56Z' } } as any,
+  billingRead: vi.fn(),
   versions: [] as any[],
   archive: [] as any[],
   errors: {} as Record<string, boolean>,
@@ -45,6 +47,7 @@ function query(table: string) {
     }
   }
   builder.single = async () => ({ data: mocks.row, error: mocks.errors[table] ? new Error('Unavailable') : null })
+  builder.maybeSingle = () => mocks.billingRead()
   builder.then = (resolve: any, reject: any) => Promise.resolve({
     data: table === 'channels' ? mocks.channels : calls.some(call => String(call[1]).includes('!inner')) ? mocks.archive : mocks.versions,
     error: mocks.errors[table] ? new Error('Unavailable') : null,
@@ -63,12 +66,14 @@ function contextFor(auth: unknown, capgkey?: string) {
     env: {},
   }) as any
 }
-const request = (N: number, initial = false, appId = 'com.test.onboarding') => app.request('http://local/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appId, N, initial }) })
+const request = (N: number, initial = false, appId = 'com.test.onboarding', includeBilling?: unknown) => app.request('http://local/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appId, N, initial, includeBilling }) })
 
 describe('onboarding progress endpoint', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.row = { onboarding: { setup: { todo_list_version: 3, steps: {} } }, created_at: '2026-09-16T00:00:00Z' }
+    mocks.row = { onboarding: { setup: { todo_list_version: 3, steps: {} } }, created_at: '2026-09-16T00:00:00Z', owner_org: '11111111-1111-4111-8111-111111111112' }
+    mocks.billing = { has_usage_credits: false, stripe_info: { status: 'succeeded', trial_at: '2026-11-01T12:34:56Z' } }
+    mocks.billingRead.mockImplementation(async () => ({ data: mocks.billing, error: mocks.errors.orgs ? new Error('Unavailable') : null }))
     mocks.auth = { authType: 'jwt', userId: '11111111-1111-4111-8111-111111111111', jwt: 'fixture', apikey: null }
     mocks.channels = []
     mocks.versions = []
@@ -85,7 +90,7 @@ describe('onboarding progress endpoint', () => {
   })
   it.each([0, 1, 2, 3, 4, 5, 9])('always reads the exact app at N=%s and rotates extra checks', async (N) => {
     expect((await request(N)).status).toBe(200)
-    expect(mocks.queries[0]).toMatchObject({ table: 'apps', calls: [['select', 'onboarding, created_at'], ['eq', 'app_id', 'com.test.onboarding']] })
+    expect(mocks.queries[0]).toMatchObject({ table: 'apps', calls: [['select', 'onboarding, created_at, owner_org'], ['eq', 'app_id', 'com.test.onboarding']] })
     expect(mocks.from.mock.calls.filter(call => call[0] === 'channels')).toHaveLength(N % 5 === 0 ? 1 : 0)
     expect(mocks.devices).toHaveBeenCalledTimes(N % 5 === 1 ? 1 : 0)
     expect(mocks.logs).toHaveBeenCalledTimes(N % 5 === 3 ? 1 : 0)
@@ -96,6 +101,126 @@ describe('onboarding progress endpoint', () => {
     expect(mocks.devices).toHaveBeenCalledWith(expect.anything(), { app_id: 'com.test.onboarding', limit: 1 }, false)
     expect(mocks.logs).toHaveBeenCalledWith(expect.anything(), { app_id: 'com.test.onboarding', actions: ['set'], start_date: mocks.row.created_at, limit: 10 }, false)
     expect(mocks.queries.some(q => q.calls.some((call: any[]) => call.includes('add_code')))).toBe(false)
+  })
+  it.each([3, 4])('avoids the write transaction for unchanged v%s CLI progress', async (version) => {
+    mocks.auth.authType = 'apikey'
+    const steps = { login_cli_mcp: { status: 'done' }, add_channel: { status: 'done' }, run_device: { status: 'done' }, upload_bundle: { status: 'done' }, test_update: { status: 'done' } }
+    mocks.row.onboarding = { setup: { todo_list_version: version, source: 'cli', ...(version === 4 ? { ota_todo_list_version: '1' } : {}), steps: version === 4 ? { ota: steps } : steps } }
+    mocks.channels = [{ id: 'channel' }]
+    const result = await (await request(0, true)).json()
+    expect(result).toEqual({ onboarding: mocks.row.onboarding, hasChannel: true, checkErrors: [] })
+    expect(mocks.transaction).not.toHaveBeenCalled()
+    expect(mocks.permissionPg).not.toHaveBeenCalled()
+    expect(mocks.devices).not.toHaveBeenCalled()
+    expect(mocks.logs).not.toHaveBeenCalled()
+  })
+  it('avoids the write transaction when every pending observation is absent', async () => {
+    expect((await request(0, true)).status).toBe(200)
+    expect(mocks.transaction).not.toHaveBeenCalled()
+  })
+  it('persists a source-only promotion when CLI login was already done', async () => {
+    mocks.auth.authType = 'apikey'
+    mocks.row.onboarding = { setup: { todo_list_version: 3, source: 'ai', steps: { login_cli_mcp: { status: 'done', at: 'old' } } } }
+    lockedRow(mocks.row.onboarding)
+    const result = await (await request(4)).json() as any
+    expect(result.onboarding.setup.source).toBe('cli')
+    expect(result.onboarding.setup.steps.login_cli_mcp).toEqual({ status: 'done', at: 'old' })
+    expect(mocks.transaction).toHaveBeenCalledOnce()
+  })
+  it('still persists source promotion and deleted channels after the preflight', async () => {
+    mocks.auth.authType = 'apikey'
+    mocks.row.onboarding = { setup: { todo_list_version: 3, source: 'ai', steps: { login_cli_mcp: { status: 'done', at: 'old' }, add_channel: { status: 'done' } } } }
+    lockedRow(mocks.row.onboarding)
+    const result = await (await request(0)).json() as any
+    expect(result.onboarding.setup.source).toBe('cli')
+    expect(result.onboarding.setup.steps.login_cli_mcp).toEqual({ status: 'done', at: 'old' })
+    expect(result.onboarding.setup.steps.add_channel).toBeUndefined()
+    expect(mocks.transaction).toHaveBeenCalledOnce()
+  })
+  it('rechecks the latest locked row when a local report wins the race', async () => {
+    mocks.channels = [{ id: 'channel' }]
+    const latest = { setup: { todo_list_version: 3, source: 'cli', steps: { add_channel: { status: 'done', at: 'concurrent' }, add_code: { status: 'done' } } } }
+    lockedRow(latest)
+    expect((await request(0)).status).toBe(200)
+    expect(mocks.transaction).toHaveBeenCalledOnce()
+    expect(mocks.execute).toHaveBeenCalledTimes(3) // Locks only; the concurrent report already applied this observation.
+    expect(mocks.track).not.toHaveBeenCalled()
+  })
+  it.each([undefined, false])('omits billing and its reads when includeBilling=%s', async (includeBilling) => {
+    const result = await (await request(4, false, undefined, includeBilling)).json()
+    expect(result).not.toHaveProperty('billing')
+    expect(mocks.from).not.toHaveBeenCalledWith('orgs')
+    expect(mocks.permission.mock.calls.some(call => call[1] === 'org.read_billing')).toBe(false)
+  })
+  it.each([
+    ['succeeded', true, true],
+    ['canceled', false, false],
+    ['canceled', true, false],
+    [null, false, false],
+  ])('returns CLI billing fields for status %s', async (status, hasCredits, isPaying) => {
+    mocks.billing = { has_usage_credits: hasCredits, stripe_info: { status, trial_at: '2026-11-01T12:34:56Z' } }
+    const response = await request(4, false, undefined, true)
+    expect(response.headers.get('Cache-Control')).toBe('no-store')
+    expect((await response.json() as any).billing).toEqual({ status: 'available', orgId: mocks.row.owner_org, trialEndsAt: '2026-11-01T12:34:56Z', isPaying, hasCredits })
+    expect(mocks.permission).toHaveBeenCalledWith(expect.anything(), 'org.read_billing', { orgId: mocks.row.owner_org })
+    expect(mocks.queries.at(-1)).toEqual({ table: 'orgs', calls: [['select', 'has_usage_credits, stripe_info(status, trial_at)'], ['eq', 'id', mocks.row.owner_org]] })
+    expect(mocks.transaction).not.toHaveBeenCalled()
+  })
+  it('returns no trial explicitly instead of inventing an expiry', async () => {
+    mocks.billing.stripe_info.trial_at = null
+    expect((await (await request(4, false, undefined, true)).json() as any).billing.trialEndsAt).toBeNull()
+  })
+  it.each(['denied', 'permission-error', 'query-error', 'throw', 'missing-org', 'missing-stripe'])('keeps progress usable when billing is %s', async (failure) => {
+    if (failure === 'denied')
+      mocks.permission.mockImplementation(async (_c, permission) => permission !== 'org.read_billing')
+    if (failure === 'permission-error') {
+      mocks.permission.mockImplementation(async (_c, permission) => {
+        if (permission === 'org.read_billing')
+          throw new Error('Unavailable')
+        return true
+      })
+    }
+    if (failure === 'query-error')
+      mocks.errors.orgs = true
+    if (failure === 'throw')
+      mocks.billingRead.mockRejectedValue(new Error('Unavailable'))
+    if (failure === 'missing-org')
+      mocks.billing = null
+    if (failure === 'missing-stripe')
+      mocks.billing.stripe_info = null
+    const response = await request(4, false, undefined, true)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ onboarding: mocks.row.onboarding, checkErrors: [], billing: { status: 'unavailable' } })
+    if (failure === 'denied' || failure === 'permission-error')
+      expect(mocks.from).not.toHaveBeenCalledWith('orgs')
+  })
+  it('starts billing while progress is still gathering observations', async () => {
+    let finishDevices!: (value: any) => void
+    mocks.devices.mockImplementation(() => new Promise((resolve) => {
+      finishDevices = resolve
+    }))
+    const response = request(0, true, undefined, true)
+    await vi.waitFor(() => expect(mocks.billingRead).toHaveBeenCalledOnce())
+    expect(mocks.devices).toHaveBeenCalledOnce()
+    finishDevices({ data: [] })
+    expect((await response).status).toBe(200)
+  })
+  it('persists progress without waiting for the optional billing read', async () => {
+    let finishBilling!: (value: any) => void
+    mocks.billingRead.mockImplementation(() => new Promise((resolve) => {
+      finishBilling = resolve
+    }))
+    mocks.devices.mockResolvedValue({ data: [{ device_id: 'device' }] })
+    lockedRow(mocks.row.onboarding)
+    const response = request(1, false, undefined, true)
+    await vi.waitFor(() => expect(mocks.transaction).toHaveBeenCalledOnce())
+    expect(mocks.billingRead).toHaveBeenCalledOnce()
+    finishBilling({ data: mocks.billing, error: null })
+    expect((await (await response).json() as any).onboarding.setup.steps.run_device.status).toBe('done')
+  })
+  it.each(['true', 1, null])('rejects malformed includeBilling=%s before reading data', async (value) => {
+    expect((await request(4, false, undefined, value)).status).toBe(400)
+    expect(mocks.from).not.toHaveBeenCalled()
   })
   it('retains progress and channel state when a check fails', async () => {
     mocks.errors.channels = true

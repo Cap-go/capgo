@@ -122,6 +122,7 @@ export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   builderJourneyId: z.string().optional(),
   cache: buildCacheOptionSchema,
   cacheKey: buildCacheKeyOptionSchema,
+  buildEnv: z.array(z.string().min(1)).optional(),
 })
 
 export type BuildRequestOptions = z.infer<typeof buildRequestOptionsSchema>

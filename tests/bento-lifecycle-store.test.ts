@@ -51,7 +51,7 @@ function fixture() {
     const client = await pool.connect()
     clients.push(client)
     const store = new DispatchStore(client)
-    const queued = await store.schedule(key, 1)
+    const queued = await store.schedule(key, 1, Date.now())
     expect(queued).not.toBeNull()
     expect(await store.markEnqueued(queued!.id, queued!.enqueue_claim_token!)).toBe(true)
     const run = await store.claimRun({ version: 1, evaluationKey: key, runId: queued!.id })

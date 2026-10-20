@@ -34,6 +34,7 @@ vi.mock('../supabase/functions/_backend/utils/bento.ts', async importOriginal =>
 }))
 
 const job = { version: 1, evaluationKey: 'org:invite_existing_user_reminder_1', runId: '11111111-1111-4111-8111-111111111111' }
+const controller = { scheduledTime: Date.UTC(2026, 0, 1, 10) } as ScheduledController
 function environment(): DispatchEnv {
   return { HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'postgres://local' } as Hyperdrive, DISPATCH_QUEUE: { send: vi.fn() } as never, POSTHOG_QUEUE: { send: vi.fn() }, BENTO_PUBLISHABLE_KEY: 'configured', BENTO_SECRET_KEY: 'configured', BENTO_SITE_UUID: 'configured', WEBAPP_URL: 'https://console.example.com' }
 }
@@ -54,13 +55,13 @@ afterEach(() => vi.restoreAllMocks())
 describe('dedicated evaluation Worker', () => {
   it('sweeps audits independently and still schedules evaluations during analytics failure', async () => {
     store.relayPendingAudit.mockRejectedValue(new Error('unavailable'))
-    await scheduleDispatch({} as ScheduledController, environment())
+    await scheduleDispatch(controller, environment())
     expect(publish).toHaveBeenCalledOnce()
     expect(db.end).toHaveBeenCalledOnce()
   })
   it('schedules invitation evaluations from Worker configuration even when lifecycle Vault reads fail', async () => {
     db.query.mockRejectedValue(new Error('Runtime settings are unavailable'))
-    await scheduleDispatch({} as ScheduledController, environment())
+    await scheduleDispatch(controller, environment())
     expect(publish).toHaveBeenCalledOnce()
     expect(db.query).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('vault.decrypted_secrets'), [[
       'BENTO_EVENT_DISPATCH_ENABLED',
@@ -71,7 +72,7 @@ describe('dedicated evaluation Worker', () => {
   })
   it('keeps the old activation flag lifecycle-only while invitations schedule and consume normally', async () => {
     const env = { ...environment(), BENTO_EVENT_DISPATCH_ENABLED: 'false', BENTO_LIFECYCLE_V2_SENDER_CONTRACT: 'new-emails-v2-2026-10-19', BENTO_LIFECYCLE_V2_LEGACY_HANDOFF: 'new-emails-v2-2026-10-19' }
-    await scheduleDispatch({} as ScheduledController, env)
+    await scheduleDispatch(controller, env)
     expect(publish).toHaveBeenCalledOnce()
     expect(refresh).not.toHaveBeenCalled()
     expect(db.query).not.toHaveBeenCalled()
@@ -81,7 +82,7 @@ describe('dedicated evaluation Worker', () => {
     expect(msg.ack).toHaveBeenCalledOnce()
   })
   it('does not treat configured credentials and origin as lifecycle sender or handoff attestations', async () => {
-    await scheduleDispatch({} as ScheduledController, { ...environment(), BENTO_EVENT_DISPATCH_ENABLED: 'true' })
+    await scheduleDispatch(controller, { ...environment(), BENTO_EVENT_DISPATCH_ENABLED: 'true' })
     expect(publish).toHaveBeenCalledOnce()
     expect(refresh).not.toHaveBeenCalled()
     expect(db.query).toHaveBeenCalledWith(expect.stringContaining('vault.decrypted_secrets'), [[
@@ -91,7 +92,7 @@ describe('dedicated evaluation Worker', () => {
   })
   it('retains lifecycle refresh only after all explicit lifecycle gates match', async () => {
     const env = { ...environment(), BENTO_EVENT_DISPATCH_ENABLED: 'true', BENTO_LIFECYCLE_V2_SENDER_CONTRACT: 'new-emails-v2-2026-10-19', BENTO_LIFECYCLE_V2_LEGACY_HANDOFF: 'new-emails-v2-2026-10-19' }
-    await scheduleDispatch({} as ScheduledController, env)
+    await scheduleDispatch(controller, env)
     expect(refresh).toHaveBeenCalledExactlyOnceWith(db, null)
     expect(publish).toHaveBeenCalledOnce()
     expect(db.query).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('vault.decrypted_secrets'), [['CF_ACCOUNT_ANALYTICS_ID', 'CF_ANALYTICS_TOKEN']])
@@ -99,7 +100,7 @@ describe('dedicated evaluation Worker', () => {
   it.each(['BENTO_PUBLISHABLE_KEY', 'BENTO_SECRET_KEY', 'BENTO_SITE_UUID', 'WEBAPP_URL'] as const)('reports missing %s instead of silently pausing or claiming business work', async (key) => {
     const env = environment()
     env[key] = ' '
-    await expect(scheduleDispatch({} as ScheduledController, env)).rejects.toThrow('Bento dispatch scheduling failed')
+    await expect(scheduleDispatch(controller, env)).rejects.toThrow('Bento dispatch scheduling failed')
     expect(publish).not.toHaveBeenCalled()
     const msg = message()
     await consumeDispatch(batch([msg]), env)
@@ -111,7 +112,7 @@ describe('dedicated evaluation Worker', () => {
   it.each(['test', 'TEST', 'placeholder', 'changeme'])('rejects sentinel credential %s before scheduling or consuming dispatch attempts', async (credential) => {
     const env = environment()
     env.BENTO_SECRET_KEY = credential
-    await expect(scheduleDispatch({} as ScheduledController, env)).rejects.toThrow('Bento dispatch scheduling failed')
+    await expect(scheduleDispatch(controller, env)).rejects.toThrow('Bento dispatch scheduling failed')
     expect(publish).not.toHaveBeenCalled()
     const msg = message()
     await consumeDispatch(batch([msg]), env)

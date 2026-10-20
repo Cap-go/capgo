@@ -1,12 +1,12 @@
 import type { DispatchJob, Evaluation } from './contracts.ts'
 import type { DispatchStore } from './store.ts'
 
-export async function publishDispatchJobs(queue: Pick<Queue<DispatchJob>, 'send'>, store: Pick<DispatchStore, 'schedule' | 'markEnqueued' | 'publicationFailed'>, registry: Record<string, Evaluation>) {
+export async function publishDispatchJobs(queue: Pick<Queue<DispatchJob>, 'send'>, store: Pick<DispatchStore, 'schedule' | 'markEnqueued' | 'publicationFailed'>, registry: Record<string, Evaluation>, scheduledTime: number) {
   let failed = false
   // Independent evaluations each take their own short durable scheduling claim.
   for (const evaluation of Object.values(registry)) {
     try {
-      const run = await store.schedule(evaluation.key, evaluation.everyMinutes)
+      const run = await store.schedule(evaluation.key, evaluation.everyMinutes, scheduledTime)
       if (!run)
         continue
       try {

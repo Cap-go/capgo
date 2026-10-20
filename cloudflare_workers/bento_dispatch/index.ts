@@ -70,7 +70,7 @@ async function withDatabase<T>(env: DispatchEnv, operation: (db: Client) => Prom
   }
 }
 
-export async function scheduleDispatch(_controller: ScheduledController, env: DispatchEnv) {
+export async function scheduleDispatch(controller: ScheduledController, env: DispatchEnv) {
   try {
     await withDatabase(env, async (db) => {
       const store = new DispatchStore(db)
@@ -103,7 +103,7 @@ export async function scheduleDispatch(_controller: ScheduledController, env: Di
         }
       }
       catch { console.error(JSON.stringify({ event: 'bento_lifecycle_refresh_failed' })) }
-      await publishDispatchJobs(env.DISPATCH_QUEUE, store, bentoFlows)
+      await publishDispatchJobs(env.DISPATCH_QUEUE, store, bentoFlows, controller.scheduledTime)
     })
   }
   catch {

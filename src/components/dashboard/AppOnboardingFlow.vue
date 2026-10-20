@@ -9,6 +9,7 @@ import type { OnboardingChannelEvent, OnboardingChannelEventProperties, Onboardi
 import type {
   OnboardingAnalyticsStep,
   OnboardingCopyEvent,
+  OnboardingCopyEventProperties,
   OnboardingDetailsEvent,
   OnboardingDetailsEventProperties,
   OnboardingDevelopmentEnvironment,
@@ -541,7 +542,7 @@ function createAiHelpPrompt() {
         }],
       }]
     : []
-  const promptIntent = usesDualTodoList.value ? activeChecklistPath.value ?? 'ota' : selectedIntent.value === 'publish' ? 'builder' : selectedIntent.value
+  const promptIntent = usesDualTodoList.value ? activeChecklistPath.value ?? 'ota' : usesBuilderTodoList.value || selectedIntent.value === 'publish' ? 'builder' : selectedIntent.value
 
   return buildCliAiSetupPrompt({
     apiKey: apiKey.value,
@@ -2455,7 +2456,7 @@ async function copyText(text: string) {
   }
 }
 
-function trackSuccessfulCopy(event: OnboardingCopyEvent) {
+function trackSuccessfulCopy(event: OnboardingCopyEvent, placement?: OnboardingCopyEventProperties['placement']) {
   const orgId = currentOrg.value?.gid
   const appId = createdApp.value?.app_id || generatedAppId.value || undefined
   progressTracker?.trackCopyEvent(event, {
@@ -2464,6 +2465,7 @@ function trackSuccessfulCopy(event: OnboardingCopyEvent) {
     ...(selectedIntent.value ? { intent: selectedIntent.value } : {}),
     ...(orgId ? { org_id: orgId } : {}),
     setup_command: usesBuilderSetupCommand.value ? 'builder' : 'ota',
+    ...(placement ? { placement } : {}),
   })
 }
 
@@ -2508,7 +2510,7 @@ async function reportOnboardingPatch(patch: { source?: 'manual' | 'cli' | 'mcp' 
   }
 }
 
-async function copyAiInstructions() {
+async function copyAiInstructions(placement?: unknown) {
   try {
     await loadApiKey()
   }
@@ -2525,7 +2527,7 @@ async function copyAiInstructions() {
 
   const copied = await copyText(createAiHelpPrompt())
   if (copied) {
-    trackSuccessfulCopy('onboarding_ai_instructions_copied')
+    trackSuccessfulCopy('onboarding_ai_instructions_copied', placement === 'checklist' ? 'checklist' : 'start')
     await reportOnboardingPatch({ source: 'ai' })
   }
 }
@@ -3548,6 +3550,7 @@ defineExpose({
               @snapshot="panel.snapshot"
               @platform-changed="panel.selectPlatform"
               @copy-command="copyBuilderCliCommand"
+              @copy-ai="copyAiInstructions"
               @complete="panel.complete"
             />
           </template>
@@ -3562,6 +3565,7 @@ defineExpose({
           :hiding="isHidingSplash"
           :leaving="isHandingOff"
           @copy-command="copyBuilderCliCommand"
+          @copy-ai="copyAiInstructions"
           @hide="skipOnboardingSplash"
           @explore="openDashboard"
           @complete="openDashboard"
