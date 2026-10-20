@@ -1,5 +1,5 @@
 import type { OptionsBase } from '../schemas/base'
-import type { Database } from '../types/supabase.types'
+import type { AppRow as ApiAppRow, AppVersionRow, ChannelRow as ApiChannelRow } from '../types/api'
 import { stdout } from 'node:process'
 import { intro, log, outro } from '@clack/prompts'
 import { chmod, mkdir } from 'node:fs/promises'
@@ -7,17 +7,16 @@ import { dirname, resolve } from 'node:path'
 import QRCode from 'qrcode'
 import { buildPreviewWebUrl, type PreviewWebEnv } from './web-url'
 import { CliUserError } from '../shared/cli-user-error'
-import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
-import { createSupabaseClient, findSavedKey, formatCapgoCliInvokeError, formatError, getAppId, getCapgoCliHttpStatus, getConfig, invokeCapgoCliApi } from '../utils'
+import { checkAppExistsAndHasPermissionOrgErr } from '../api/app'
+import { createCapgoClient, findSavedKey, formatCapgoCliInvokeError, formatError, getAppId, getCapgoCliHttpStatus, getConfig, invokeCapgoCliApi } from '../utils'
 
-type AppRow = Pick<Database['public']['Tables']['apps']['Row'], 'allow_preview' | 'app_id'>
-type BundleRow = Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'name'>
-type ChannelRow = Pick<Database['public']['Tables']['channels']['Row'], 'id' | 'name'>
+type AppRow = Pick<ApiAppRow, 'allow_preview' | 'app_id'>
+type BundleRow = Pick<AppVersionRow, 'id' | 'name'>
+type ChannelRow = Pick<ApiChannelRow, 'id' | 'name'>
 
 export interface CapgoPreviewHttpOptions {
   apikey: string
-  supaHost?: string
-  supaAnon?: string
+  apiHost?: string
   /** Injectable for unit tests; defaults to invokeCapgoCliApi. */
   invoke?: typeof invokeCapgoCliApi
 }
@@ -28,8 +27,7 @@ function previewInvoke<T>(options: CapgoPreviewHttpOptions, path: string, method
     apikey: options.apikey,
     method,
     body: method === 'GET' || method === 'HEAD' ? undefined : body,
-    supaHost: options.supaHost,
-    supaAnon: options.supaAnon,
+    apiHost: options.apiHost,
   })
 }
 
@@ -330,12 +328,10 @@ export async function getPreviewQr(appId: string, target: string | undefined, op
     throw new CliUserError('Missing appId')
   }
 
-  const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
-  // TODO(cli-http): 2FA + permission checks still use supabase RPCs
-  await check2FAComplianceForApp(supabase, appId)
-  await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, 'app.read', false, true)
+  const client = await createCapgoClient(options.apikey, options.apiHost)
+  await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'app.read', false)
 
-  const http = { apikey: options.apikey!, supaHost: options.supaHost, supaAnon: options.supaAnon }
+  const http = { apikey: options.apikey!, apiHost: options.apiHost }
   const resolvedTarget = await resolvePreviewQrTarget(http, appId, { ...options, target })
   await printPreviewQrForResolvedTarget(http, appId, resolvedTarget, {
     png: options.png,

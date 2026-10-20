@@ -3,7 +3,7 @@ import process from 'node:process'
 import { McpServer } from '@modelcontextprotocol/server'
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio'
 import pack from '../../package.json'
-import { enableSupabaseInstrumentation, setInvocationSource, trackMcpServerStarted, withMcpToolTracking } from '../analytics/track'
+import { enableApiInstrumentation, setInvocationSource, trackMcpServerStarted, withMcpToolTracking } from '../analytics/track'
 import { parseSchema } from '../schemas/schema_validation'
 import { promoteChannelOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateChannelOptionsSchema } from '../schemas/sdk'
 import {
@@ -107,7 +107,7 @@ async function startMcpServerInternal(restoreConfigWriteTarget: () => void): Pro
   )
 
   setInvocationSource('mcp')
-  enableSupabaseInstrumentation()
+  enableApiInstrumentation()
 
   // Auto-track every tool invocation without touching each registration.
   const originalRegisterTool = server.registerTool.bind(server)

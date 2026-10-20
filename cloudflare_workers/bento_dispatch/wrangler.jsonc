@@ -12,6 +12,8 @@
   "env": {
     "prod": {
       "name": "capgo-bento-dispatch-prod",
+      "vars": { "WEBAPP_URL": "https://console.capgo.app" },
+      "secrets": { "required": ["BENTO_PUBLISHABLE_KEY", "BENTO_SECRET_KEY", "BENTO_SITE_UUID"] },
       "triggers": { "crons": ["* * * * *"] },
       "hyperdrive": [{
         "binding": "HYPERDRIVE_CAPGO_DIRECT_EU",

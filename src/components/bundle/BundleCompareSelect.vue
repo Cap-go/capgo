@@ -309,6 +309,8 @@ function liveBadgeTitle(versionId: number): string {
   return t('currently-live-on', { channels: names.join(', ') })
 }
 
+const COMPARE_SEARCH_LIMIT = 20
+
 function escapeIlike(term: string): string {
   return term.replace(/[\\%_]/g, String.raw`\$&`)
 }
@@ -327,63 +329,54 @@ async function searchCompareVersions(term: string) {
   // Each chain must start from its own builder: the Supabase query builder is
   // mutable and returns `this`, so reusing one instance across concurrent
   // chains would leak filters between the requests.
-  const namePattern = `%${escapeIlike(trimmed)}%`
+  // Exact and prefix matches are fetched separately so they are never pushed out
+  // by newer bundles that only contain the term (e.g. "4.0.2" vs "4.0.2-staging+...").
+  const escaped = escapeIlike(trimmed)
   const numericId = /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN
-  let data: VersionRow[] | null = null
-  let error: unknown = null
-
-  if (Number.isNaN(numericId)) {
-    const response = await buildCompareBaseQuery()
+  const [exactResponse, prefixResponse, nameResponse, idResponse] = await Promise.all([
+    buildCompareBaseQuery()
       .neq('id', props.currentVersionId)
-      .ilike('name', namePattern)
+      .eq('name', trimmed)
+      .limit(1),
+    buildCompareBaseQuery()
+      .neq('id', props.currentVersionId)
+      .ilike('name', `${escaped}%`)
       .order('created_at', { ascending: false })
-      .limit(5)
-
-    if (requestId !== compareSearchRequestId.value)
-      return
-
-    data = response.data ?? null
-    error = response.error
-  }
-  else {
-    const [nameResponse, idResponse] = await Promise.all([
-      buildCompareBaseQuery()
-        .neq('id', props.currentVersionId)
-        .ilike('name', namePattern)
-        .order('created_at', { ascending: false })
-        .limit(5),
-      buildCompareBaseQuery()
-        .neq('id', props.currentVersionId)
-        .eq('id', numericId)
-        .order('created_at', { ascending: false })
-        .limit(5),
-    ])
-
-    if (requestId !== compareSearchRequestId.value)
-      return
-
-    if (nameResponse.error || idResponse.error) {
-      error = nameResponse.error ?? idResponse.error
-      data = null
-    }
-    else {
-      const combined = [
-        ...(nameResponse.data ?? []),
-        ...(idResponse.data ?? []),
-      ]
-      const seenIds = new Set<number>()
-      const unique = combined.filter((row) => {
-        if (seenIds.has(row.id))
-          return false
-        seenIds.add(row.id)
-        return true
-      })
-      data = unique.slice(0, 5)
-    }
-  }
+      .limit(COMPARE_SEARCH_LIMIT),
+    buildCompareBaseQuery()
+      .neq('id', props.currentVersionId)
+      .ilike('name', `%${escaped}%`)
+      .order('created_at', { ascending: false })
+      .limit(COMPARE_SEARCH_LIMIT),
+    Number.isNaN(numericId)
+      ? Promise.resolve({ data: [] as VersionRow[], error: null })
+      : buildCompareBaseQuery()
+          .neq('id', props.currentVersionId)
+          .eq('id', numericId)
+          .limit(1),
+  ])
 
   if (requestId !== compareSearchRequestId.value)
     return
+
+  const error = exactResponse.error ?? prefixResponse.error ?? nameResponse.error ?? idResponse.error
+  let data: VersionRow[] | null = null
+  if (!error) {
+    // Rank exact, then ID, then prefix, then substring matches (each newest-first).
+    const combined = [
+      ...(exactResponse.data ?? []),
+      ...(idResponse.data ?? []),
+      ...(prefixResponse.data ?? []),
+      ...(nameResponse.data ?? []),
+    ]
+    const seenIds = new Set<number>()
+    data = combined.filter((row) => {
+      if (seenIds.has(row.id))
+        return false
+      seenIds.add(row.id)
+      return true
+    }).slice(0, COMPARE_SEARCH_LIMIT)
+  }
 
   if (error) {
     console.error('Failed to search compare versions', error)
@@ -452,9 +445,9 @@ watch(
         </button>
         <div
           tabindex="0"
-          class="mt-1 w-full d-dropdown-content d-menu rounded-lg border border-slate-200 bg-white p-2 shadow-lg z-20 dark:border-slate-700 dark:bg-slate-900"
+          class="mt-1 flex w-full min-w-0 flex-col overflow-hidden d-dropdown-content rounded-lg border border-slate-200 bg-white p-2 shadow-lg z-50 dark:border-slate-700 dark:bg-slate-900"
         >
-          <div class="p-2" @mousedown.prevent>
+          <div class="min-w-0 p-2">
             <FormKit
               v-model="compareSearch"
               :prefix-icon="IconSearch"
@@ -462,7 +455,7 @@ watch(
               :classes="{ outer: 'mb-0! w-full' }"
             />
           </div>
-          <div class="max-h-64 overflow-y-auto">
+          <div class="max-h-64 min-w-0 overflow-x-hidden overflow-y-auto">
             <button
               type="button"
               class="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"

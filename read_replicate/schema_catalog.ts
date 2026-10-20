@@ -37,6 +37,8 @@ export const REPLICA_EXCLUDED_INDEXES = [
   // Primary-only reclaim helper for null_migrated_app_version_manifests; not needed on subscribers
   // and Cloud SQL server-side import cannot apply CREATE INDEX before primary migrations.
   'app_versions_manifest_present_idx',
+  // Plugin reads manifest by app_version_id only; this index just adds WAL that every regional replica downloads.
+  'idx_manifest_file_name',
 ] as const
 
 export function replicaConfigPattern(values: readonly string[]): string {

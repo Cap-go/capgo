@@ -1,15 +1,17 @@
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import type { Context } from 'hono'
 import { Hono } from 'hono/tiny'
 import { syncNewUserABTests } from '../utils/ab_tests.ts'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { normalizeBentoEmail, prepareNewUserProvisioning, syncBentoFirstOrgOnUserCreate } from '../utils/bento_first_org.ts'
 import { BRES, middlewareAPISecret, quickError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { trackOpenAIRegistration } from '../utils/openai_ads.ts'
 import { createApiKey, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
+import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 const BENTO_REGISTERED_FROM_MOBILE_EVENT = 'user:registered_from_mobile'
@@ -63,5 +65,9 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'INSERT'), async (c
       error,
     })
   })
+  // Server-side twin of the website pixel signup conversion (deduplicated by event id).
+  // Invited users are not ad-driven self-signups, so they are not reported.
+  if (!record.created_via_invite)
+    await backgroundTask(c, trackOpenAIRegistration(c, record))
   return c.json(BRES)
 })

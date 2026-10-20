@@ -1,5 +1,5 @@
 BEGIN;
-SELECT plan(24);
+SELECT plan(25);
 SELECT has_table(
     'public',
     'bento_event_dispatches',
@@ -8,7 +8,7 @@ SELECT has_table(
 SELECT has_table(
     'public',
     'bento_evaluation_runs',
-    'private evaluation history exists'
+    'private evaluation state exists'
 );
 SELECT has_index(
     'public',
@@ -31,20 +31,8 @@ SELECT has_index(
 SELECT has_index(
     'public',
     'bento_evaluation_runs',
-    'bento_evaluation_runs_latest_idx',
-    'latest evaluation history is indexed'
-);
-SELECT has_index(
-    'public',
-    'bento_evaluation_runs',
-    'bento_evaluation_runs_enqueued_idx',
-    'durable enqueue cadence is indexed'
-);
-SELECT has_index(
-    'public',
-    'bento_evaluation_runs',
-    'bento_evaluation_runs_unfinished_idx',
-    'one unfinished run per evaluation'
+    'bento_evaluation_runs_evaluation_key_key',
+    'evaluation state has an indexed unique key'
 );
 SELECT has_index(
     'public',
@@ -175,6 +163,32 @@ SELECT throws_ok(
     '23514',
     null,
     'publication attempts never exceed five'
+);
+UPDATE public.bento_evaluation_runs
+SET status = 'completed'
+WHERE evaluation_key = 'test:pgtap';
+SELECT throws_ok(
+    $$INSERT INTO public.bento_evaluation_runs
+        (evaluation_key, scheduled_for)
+      VALUES ('test:pgtap', CURRENT_TIMESTAMP)$$,
+    '23505',
+    null,
+    'completed evaluation also remains unique'
+);
+SELECT lives_ok(
+    $$UPDATE public.bento_evaluation_runs
+      SET id = pg_catalog.gen_random_uuid(), status = 'pending_enqueue',
+          scheduled_for = CURRENT_TIMESTAMP + INTERVAL '1 minute'
+      WHERE evaluation_key = 'test:pgtap'$$,
+    'next execution reuses the existing evaluation row'
+);
+SELECT is(
+    (
+        SELECT count(*)::int FROM public.bento_evaluation_runs
+        WHERE evaluation_key = 'test:pgtap'
+    ),
+    1,
+    'row reuse does not accumulate evaluation history'
 );
 SELECT * FROM finish(); -- noqa: AM04
 ROLLBACK;

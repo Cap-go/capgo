@@ -50,6 +50,8 @@ export type OnboardingDetailsEvent
     | 'onboarding_app_icon_picker_opened'
     | 'onboarding_app_icon_upload_failed'
     | 'onboarding_app_icon_uploaded'
+    | 'onboarding_app_id_advanced_hidden'
+    | 'onboarding_app_id_advanced_shown'
     | 'onboarding_app_name_entered'
     | 'onboarding_store_import_failed'
     | 'onboarding_store_import_hidden'
@@ -134,6 +136,8 @@ export interface OnboardingCopyEventProperties {
   intent?: OnboardingIntent
   org_id?: string
   setup_command: 'builder' | 'ota'
+  /** Where the AI prompt was copied: the first-task buttons or the card shown on later tasks. */
+  placement?: 'start' | 'checklist'
 }
 
 export type OnboardingDetailsField = 'app_id' | 'app_name' | 'icon_store_url' | 'store_url'
@@ -429,6 +433,8 @@ export function createOnboardingProgressTracker(options: CreateOnboardingProgres
       eventProperties.intent = details.intent
     if (details.org_id)
       eventProperties.org_id = details.org_id
+    if (details.placement)
+      eventProperties.placement = details.placement
 
     safelyCapture(name, eventProperties)
     return eventProperties

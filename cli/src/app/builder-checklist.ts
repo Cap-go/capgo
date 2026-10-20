@@ -55,6 +55,20 @@ export function getBuilderOnlyChecklist(value: unknown) {
   const setup = getBuilderOnlySetup(value)
   if (!setup)
     return null
+  return parseBuilderChecklist(setup)
+}
+
+export function getBuilderChecklist(value: unknown) {
+  const raw = onboardingRecord(value)
+  const setup = Object.hasOwn(raw, 'setup') ? onboardingRecord(raw.setup) : raw
+  if (setup.todo_list_version !== 4 || setup.builder_todo_list_version !== '1'
+    || !Array.isArray(setup.paths) || !setup.paths.includes('builder')) {
+    return null
+  }
+  return parseBuilderChecklist(setup)
+}
+
+function parseBuilderChecklist(setup: Record<string, unknown>) {
   const selectedPlatform: BuilderChecklistPlatform | undefined = setup.selected_builder_platform === 'ios' || setup.selected_builder_platform === 'android'
     ? setup.selected_builder_platform : undefined
   const builder = onboardingRecord(onboardingRecord(setup.steps).builder)

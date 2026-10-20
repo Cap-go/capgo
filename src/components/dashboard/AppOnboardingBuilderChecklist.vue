@@ -15,6 +15,7 @@ import IconApple from '~icons/mdi/apple'
 import { BUILDER_STEP_IDS, parseBuilderOnboarding } from '~/services/builderOnboardingChecklist'
 import { useConsole } from '~/services/console'
 import { resolveDualChecklistResume } from '~/utils/dualOnboardingChecklists'
+import AppOnboardingAiAgentCard from './AppOnboardingAiAgentCard.vue'
 
 const props = withDefaults(defineProps<{
   appId: string
@@ -31,6 +32,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   copyCommand: [platform: BuilderPlatform]
+  copyAi: [placement: 'checklist']
   hide: []
   explore: []
   complete: []
@@ -178,6 +180,8 @@ function statusLabel(status: BuilderStepStatus) {
         {{ t('builder-checklist-subtitle') }}
       </p>
     </header>
+
+    <AppOnboardingAiAgentCard v-if="!completed" @copy="emit('copyAi', 'checklist')" />
 
     <section aria-labelledby="builder-platform-title" class="space-y-3">
       <div class="flex flex-wrap items-baseline justify-between gap-2">

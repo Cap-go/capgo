@@ -14,8 +14,7 @@
     "CHANGELOG.md",
     "src/services/posthog.ts",
     "cli/dist/**",
-    "cli/test/**",
-    "cli/src/types/supabase.types.ts"
+    "cli/test/**"
   ],
   "rules": {
     "no-debugger": "off"
