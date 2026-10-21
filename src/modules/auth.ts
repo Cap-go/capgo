@@ -370,7 +370,8 @@ async function guard(
     }
     if (provisioningResult === 'abort_navigation') {
       await hideLoader()
-      return next(false)
+      next(false)
+      return
     }
 
     if (!main.user) {
@@ -488,11 +489,11 @@ async function guard(
       return next(onboardingRedirect)
 
     await hideLoader()
-    next()
+    void next()
   }
   else {
     await hideLoader()
-    next()
+    void next()
   }
 }
 

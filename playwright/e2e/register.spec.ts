@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getSupabaseWorktreeConfig } from '../../scripts/supabase-worktree-config'
 import { getSupabaseStatus } from '../../scripts/supabase-worktree-status'
 import { expect, test } from '../support/commands'
+import { CONSOLE_QUERY_ROUTE, consoleQueryError, consoleQueryFromResponse, consoleQueryMethod, consoleQueryPayload, parseConsoleQuery, routeConsoleQuery } from '../support/consoleQuery'
 
 const { ports: supabasePorts } = getSupabaseWorktreeConfig()
 const localSupabaseUrl = `http://127.0.0.1:${supabasePorts.api}`
@@ -231,9 +232,9 @@ test.describe('Registration', () => {
     await page.waitForURL(/\/onboarding\/name/)
     await continuePastProfileWelcome(page)
     await expectProtectedRouteRedirect(page, '/dashboard', /\/onboarding\/name/, '[data-test="onboarding-name-step"]')
-    await page.route('**/rest/v1/users?*', async (route) => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({ status: 503, json: { code: 'unavailable', message: 'Test profile load failure' } })
+    await routeConsoleQuery(page, 'users', async (route, query) => {
+      if (consoleQueryMethod(query) === 'GET') {
+        await route.fulfill(consoleQueryError(503, { code: 'unavailable', message: 'Test profile load failure' }))
         return
       }
       await route.fallback()
@@ -241,7 +242,7 @@ test.describe('Registration', () => {
     await page.reload()
     await expect(page.locator('[data-test="account-load-recovery"]')).toBeVisible()
     await expect(page.locator('[data-test="onboarding-name-step"]')).toHaveCount(0)
-    await page.unroute('**/rest/v1/users?*')
+    await page.unroute(CONSOLE_QUERY_ROUTE)
     await page.locator('[data-test="account-load-retry"]').click()
     await page.waitForURL(/\/onboarding\/name/)
     await continuePastProfileWelcome(page)
@@ -261,9 +262,9 @@ test.describe('Registration', () => {
     await page.fill('[data-test="onboarding-last-name"]', '  User  ')
     await expect(continueGoal).toBeEnabled()
 
-    await page.route('**/rest/v1/users?*', async (route) => {
-      if (route.request().method() === 'PATCH' && route.request().postDataJSON()?.first_name) {
-        await route.fulfill({ status: 500, json: { message: 'Test profile save failure' } })
+    await routeConsoleQuery(page, 'users', async (route, query) => {
+      if (consoleQueryMethod(query) === 'PATCH' && consoleQueryPayload(query)?.first_name) {
+        await route.fulfill(consoleQueryError(500, { message: 'Test profile save failure' }))
         return
       }
       await route.fallback()
@@ -272,7 +273,7 @@ test.describe('Registration', () => {
     await expect(page.getByText('Error while updating your account', { exact: true })).toBeVisible()
     await expect(page).toHaveURL(/\/onboarding\/name/)
     await expect(page.locator('[data-test="app-onboarding-name"]')).toHaveCount(0)
-    await page.unroute('**/rest/v1/users?*')
+    await page.unroute(CONSOLE_QUERY_ROUTE)
     await continueGoal.click()
     await expectOnboardingGoal(page)
     await page.click('[data-test="onboarding-intent-ota"]')
@@ -381,9 +382,10 @@ test.describe('Registration', () => {
       await continuePastProfileWelcome(page)
 
       const draftSaved = page.waitForResponse((response) => {
-        if (!response.url().includes('/rest/v1/users?') || response.request().method() !== 'PATCH' || !response.ok())
+        const query = response.ok() ? consoleQueryFromResponse(response) : null
+        if (!query || query.name !== 'users' || consoleQueryMethod(query) !== 'PATCH')
           return false
-        const draft = response.request().postDataJSON()?.onboarding?.profile_draft
+        const draft = consoleQueryPayload(query)?.onboarding?.profile_draft
         return draft?.first_name === 'Draft' && draft?.last_name === 'User'
       })
       await page.fill('[data-test="onboarding-first-name"]', 'Draft')
@@ -458,7 +460,8 @@ test.describe('Registration', () => {
 
     const writes: string[] = []
     page.on('request', (request) => {
-      if (request.method() === 'PATCH' && request.url().includes('/rest/v1/users?') && request.postDataJSON()?.last_name === 'User')
+      const query = parseConsoleQuery(request)
+      if (query?.name === 'users' && consoleQueryMethod(query) === 'PATCH' && consoleQueryPayload(query)?.last_name === 'User')
         writes.push('profile')
       if (request.method() === 'POST' && /\/organization(?:\?|$)/.test(request.url()))
         writes.push('organization')
@@ -588,10 +591,8 @@ test.describe('Registration', () => {
     await Promise.all([
       page.waitForResponse((response) => {
         // The onboarding step is saved through the console query endpoint (users update).
-        if (!response.url().includes('/private/console/query') || !response.ok())
-          return false
-        const body = response.request().postData() ?? ''
-        return body.includes('"name":"users"') && body.includes('"method":"update"') && body.includes('"step":"organization"')
+        const query = response.ok() ? consoleQueryFromResponse(response) : null
+        return !!query && query.name === 'users' && consoleQueryMethod(query) === 'PATCH' && JSON.stringify(consoleQueryPayload(query) ?? {}).includes('"step":"organization"')
       }),
       page.click('[data-test="app-onboarding-continue"]'),
     ])

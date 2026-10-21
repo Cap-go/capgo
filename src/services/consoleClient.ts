@@ -124,6 +124,69 @@ export function createConsoleClient(authClient: Pick<SupabaseClient<Database>, '
     return builder
   }
 
+  async function readEventStream(body: ReadableStream<Uint8Array>, onEvent: (payload: unknown) => void) {
+    const reader = body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    try {
+      for (;;) {
+        const { value, done } = await reader.read()
+        if (done)
+          break
+        buffer += decoder.decode(value, { stream: true })
+        for (let end = buffer.indexOf('\n\n'); end >= 0; end = buffer.indexOf('\n\n')) {
+          const event = buffer.slice(0, end)
+          buffer = buffer.slice(end + 2)
+          if (event.startsWith('data: '))
+            onEvent(JSON.parse(event.slice(6)))
+        }
+      }
+    }
+    finally {
+      reader.releaseLock()
+    }
+  }
+
+  // One subscription attempt: 'ok' when the server closed a healthy stream,
+  // 'retry' on a transient failure, 'stop' when no events backend exists.
+  async function connectEvents(orgId: string, signal: AbortSignal, callback: (status: string) => void, onEvent: (payload: unknown) => void): Promise<'ok' | 'retry' | 'stop'> {
+    try {
+      const token = await bearer()
+      const response = await fetch(`${baseURL}/private/console/events?org_id=${encodeURIComponent(orgId)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal,
+      })
+      if (response.status === 503) {
+        // No events backend (local Supabase runtime): report once and stop.
+        callback('CHANNEL_ERROR')
+        return 'stop'
+      }
+      if (!response.ok || !response.body)
+        throw new Error('Cannot subscribe to console events')
+      callback('SUBSCRIBED')
+      await readEventStream(response.body, onEvent)
+      return 'ok'
+    }
+    catch {
+      if (!signal.aborted)
+        callback('CHANNEL_ERROR')
+      return 'retry'
+    }
+  }
+
+  async function pumpEvents(orgId: string, controller: AbortController, callback: (status: string) => void, onEvent: (payload: unknown) => void) {
+    let failures = 0
+    while (!controller.signal.aborted) {
+      const outcome = await connectEvents(orgId, controller.signal, callback, onEvent)
+      if (outcome === 'stop')
+        return
+      failures = outcome === 'ok' ? 0 : failures + 1
+      if (!controller.signal.aborted)
+        await sleep(Math.min(EVENTS_MAX_BACKOFF_MS, 1000 * 2 ** failures))
+    }
+    callback('CLOSED')
+  }
+
   // Org-scoped CLI activity as server-sent events, exposing the realtime channel shape the console uses.
   function channel(name: string): RealtimeChannel {
     const orgId = name.replace(/^cli-events:org:/, '')
@@ -135,55 +198,7 @@ export function createConsoleClient(authClient: Pick<SupabaseClient<Database>, '
         return subscription
       },
       subscribe(callback: (status: string) => void) {
-        void (async () => {
-          let failures = 0
-          while (!controller.signal.aborted) {
-            try {
-              const token = await bearer()
-              const response = await fetch(`${baseURL}/private/console/events?org_id=${encodeURIComponent(orgId)}`, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
-                signal: controller.signal,
-              })
-              if (response.status === 503) {
-                // No events backend (local Supabase runtime): report once and stop.
-                callback('CHANNEL_ERROR')
-                return
-              }
-              if (!response.ok || !response.body)
-                throw new Error('Cannot subscribe to console events')
-              failures = 0
-              callback('SUBSCRIBED')
-              const reader = response.body.getReader()
-              const decoder = new TextDecoder()
-              let buffer = ''
-              try {
-                for (;;) {
-                  const { value, done } = await reader.read()
-                  if (done)
-                    break
-                  buffer += decoder.decode(value, { stream: true })
-                  for (let end = buffer.indexOf('\n\n'); end >= 0; end = buffer.indexOf('\n\n')) {
-                    const event = buffer.slice(0, end)
-                    buffer = buffer.slice(end + 2)
-                    if (event.startsWith('data: '))
-                      handler({ payload: JSON.parse(event.slice(6)) })
-                  }
-                }
-              }
-              finally {
-                reader.releaseLock()
-              }
-            }
-            catch {
-              if (!controller.signal.aborted)
-                callback('CHANNEL_ERROR')
-              failures++
-            }
-            if (!controller.signal.aborted)
-              await new Promise(resolve => setTimeout(resolve, Math.min(EVENTS_MAX_BACKOFF_MS, 1000 * 2 ** failures)))
-          }
-          callback('CLOSED')
-        })()
+        void pumpEvents(orgId, controller, callback, payload => handler({ payload }))
         return subscription
       },
       track: async (_presence: unknown) => 'ok',
