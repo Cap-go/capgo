@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import { ALLOWED_STATS_ACTIONS } from '../plugins/stats_actions.ts'
+import { PROVIDER_INFRA_ASNS } from './providerAsns.ts'
 import { updatesAppCacheTag, updatesVersionsCacheTag } from './updatesCacheTag.ts'
 import { hasUpdatesPurgeTarget, parseEdgeShareBps } from './updatesEdgeCache.ts'
 import { getEnv, isListedLimitedApp } from './utils.ts'
@@ -48,12 +49,21 @@ export const SNIPPET_EDGE_ANSWERS_TAG = 'capgo-snippet-edge-answers'
 export const SNIPPET_EDGE_STATS_ACTIONS = ALLOWED_STATS_ACTIONS.filter(action => action !== 'set' && !action.endsWith('_fail'))
 
 interface SnippetFillBase {
-  v: 2
+  /**
+   * 3 when `pa` is set: snippets older than the provider network check
+   * reject it, so they never answer an app that blocks provider IPs.
+   */
+  v: 2 | 3
   /** Share of devices the snippet answers, in basis points. */
   bps: number
   ttl: number
   /** Cache-Tag value of the snippet entry. */
   tags: string
+  /**
+   * The app blocks provider infrastructure: networks (ASNs) the snippet must
+   * send to the worker, which runs the IP lookup the snippet cannot.
+   */
+  pa?: number[]
 }
 
 export interface SnippetUpdatesFill extends SnippetFillBase {
@@ -115,8 +125,8 @@ function fillBase(c: Context, appId: string, blockProviderInfraRequests: boolean
   // A replayed request has no snippet in front of it.
   if (getSnippetEdgeReplay(c))
     return null
-  // The snippet cannot run the provider IP check or the LIMITED_APPS throttle.
-  if (blockProviderInfraRequests || isListedLimitedApp(c, appId))
+  // The snippet cannot run the LIMITED_APPS throttle.
+  if (isListedLimitedApp(c, appId))
     return null
   const bps = getSnippetEdgeAnswerBps(c)
   if (bps <= 0)
@@ -127,7 +137,7 @@ function fillBase(c: Context, appId: string, blockProviderInfraRequests: boolean
     : Math.min(getSnippetEdgeAnswerTtlSeconds(c), Math.floor((planValidUntil - Date.now()) / 1000))
   if (ttl < 1)
     return null
-  return {
+  const base: SnippetFillBase = {
     v: 2,
     bps,
     ttl,
@@ -135,6 +145,13 @@ function fillBase(c: Context, appId: string, blockProviderInfraRequests: boolean
     // served bundle row (versions tag: deleted, key_id).
     tags: `${updatesAppCacheTag(appId)},${updatesVersionsCacheTag(appId)},${SNIPPET_EDGE_ANSWERS_TAG}`,
   }
+  // The snippet cannot look the IP up: it answers only devices outside the
+  // provider networks, the worker checks the rest.
+  if (blockProviderInfraRequests) {
+    base.v = 3
+    base.pa = PROVIDER_INFRA_ASNS
+  }
+  return base
 }
 
 function setFillHeader(c: Context, fill: SnippetUpdatesFill | SnippetStatsFill) {

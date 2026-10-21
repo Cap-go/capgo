@@ -28,7 +28,7 @@ import { getAppOwnerWithEdgeCache } from './pluginEdgeCacheReads.ts'
 import { getClientIP } from './rate_limit.ts'
 import { onPremiseAppResponse } from './rateLimitInfo.ts'
 import { s3 } from './s3.ts'
-import { getSnippetEdgeAnswerBps, setSnippetUpdatesFill } from './snippetEdgeAnswer.ts'
+import { getSnippetEdgeAnswerBps, getSnippetEdgeReplay, setSnippetUpdatesFill } from './snippetEdgeAnswer.ts'
 import { shouldQueuePluginNotifications } from './supabase_write_guard.ts'
 import { getUpdateResponseKind, resToVersion, updateResponseSupportsManifest } from './update_response.ts'
 import { isUpdateEnumerationLimited, recordUpdateEnumerationMiss, updateEnumerationLimitedResponse } from './updateOracleGuard.ts'
@@ -200,6 +200,9 @@ function updateError200(c: Context, errorCode: string, message: string, moreInfo
 }
 
 async function getProviderInfrastructureInfo(c: Context) {
+  // The snippet answered only devices outside the provider networks.
+  if (getSnippetEdgeReplay(c))
+    return null
   const requestIp = getClientIP(c)
   if (requestIp === 'unknown')
     return null

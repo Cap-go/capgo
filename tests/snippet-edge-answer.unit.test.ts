@@ -4,6 +4,7 @@ import { Hono } from 'hono/tiny'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SNIPPET_EDGE_ANSWERS_TAG as SETTER_PURGE_TAG } from '../scripts/set-updates-edge-cache.ts'
 
+import { PROVIDER_INFRA_ASNS } from '../supabase/functions/_backend/plugin_runtime/utils/providerAsns.ts'
 import { isStaleSnippetEdgeReplay, markSnippetEdgeReplay, setSnippetIpLimitHeader, setSnippetStatsFill, setSnippetUpdatesFill, SNIPPET_EDGE_ANSWERS_TAG, SNIPPET_EDGE_FILL_HEADER, SNIPPET_EDGE_IP_LIMIT_HEADER, SNIPPET_EDGE_STATS_ACTIONS } from '../supabase/functions/_backend/plugin_runtime/utils/snippetEdgeAnswer.ts'
 import { buildReplayRequest, chunkSnippetEdgeRecords, decodeSnippetEdgeStat, getR2NotificationObjectKey, groupForSendBatch, handleSnippetEdgeStatsMessage, isSnippetEdgeFileResumeMessage, isSnippetEdgeReplayMessage, parseLogpushLine, readLogpushRecords, recordSize, replaySnippetEdgeRecords } from '../supabase/functions/_backend/plugin_runtime/utils/snippetEdgeReplay.ts'
 
@@ -106,8 +107,18 @@ describe('snippet edge answer fills', () => {
     expect(readFill(await fillFrom({ CF_CACHE_PURGE_TOKEN: 'token', SNIPPET_EDGE_ANSWER: 'off' }, write))).toBeNull()
     expect(readFill(await fillFrom({ SNIPPET_EDGE_ANSWER: 'on' }, write))).toBeNull()
     expect(readFill(await fillFrom({ ...ENABLED_ENV, LIMITED_APPS: JSON.stringify([{ id: 'com.edge.app', ignore: 0.5 }]) }, write))).toBeNull()
-    expect(readFill(await fillFrom(ENABLED_ENV, c => setSnippetUpdatesFill(c, 'com.edge.app', ANSWER, { blockProviderInfraRequests: true, legacyChannelSelfStore: false })))).toBeNull()
-    expect(readFill(await fillFrom(ENABLED_ENV, c => setSnippetStatsFill(c, 'com.edge.app', { ...STATS_FILL, blockProviderInfraRequests: true })))).toBeNull()
+  })
+
+  it('hand the provider networks to the snippet for apps that block provider infrastructure', async () => {
+    const updates = readFill(await fillFrom(ENABLED_ENV, c => setSnippetUpdatesFill(c, 'com.edge.app', ANSWER, { blockProviderInfraRequests: true, legacyChannelSelfStore: false })))
+    const stats = readFill(await fillFrom(ENABLED_ENV, c => setSnippetStatsFill(c, 'com.edge.app', { ...STATS_FILL, blockProviderInfraRequests: true })))
+    for (const fill of [updates, stats]) {
+      expect(fill).toMatchObject({ v: 3, pa: PROVIDER_INFRA_ASNS })
+      expect(fill.pa).toEqual(expect.arrayContaining([15169, 714]))
+    }
+    const open = readFill(await fillFrom(ENABLED_ENV, c => setSnippetStatsFill(c, 'com.edge.app', STATS_FILL)))
+    expect(open.v).toBe(2)
+    expect(open.pa).toBeUndefined()
   })
 
   it('answer 10% of devices while the switch is unset', async () => {
