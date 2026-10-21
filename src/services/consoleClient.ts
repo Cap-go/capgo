@@ -134,8 +134,7 @@ export function createConsoleClient(authClient: Pick<SupabaseClient<Database>, '
                   if (done)
                     break
                   buffer += decoder.decode(value, { stream: true })
-                  let end: number
-                  while ((end = buffer.indexOf('\n\n')) >= 0) {
+                  for (let end = buffer.indexOf('\n\n'); end >= 0; end = buffer.indexOf('\n\n')) {
                     const event = buffer.slice(0, end)
                     buffer = buffer.slice(end + 2)
                     if (event.startsWith('data: '))
