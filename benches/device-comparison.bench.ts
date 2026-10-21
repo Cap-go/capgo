@@ -1,5 +1,5 @@
 import type { DeviceWithoutCreatedAt } from '../supabase/functions/_backend/utils/types.ts'
-import { bench, describe } from 'vitest'
+import { describe, test } from 'vitest'
 import {
   buildNormalizedDeviceForWrite,
   hasComparableDeviceChanged,
@@ -51,50 +51,70 @@ const sparseExisting = {
 } as const
 
 describe('toComparableDevice', () => {
-  bench('full device object', () => {
-    toComparableDevice(fullDevice)
+  test('full device object', async ({ bench }) => {
+    await bench('full device object', () => {
+      toComparableDevice(fullDevice)
+    }).run()
   })
 
-  bench('sparse device with defaults', () => {
-    toComparableDevice(sparseDevice)
+  test('sparse device with defaults', async ({ bench }) => {
+    await bench('sparse device with defaults', () => {
+      toComparableDevice(sparseDevice)
+    }).run()
   })
 })
 
 describe('toComparableExisting', () => {
-  bench('full existing row', () => {
-    toComparableExisting(existingRow)
+  test('full existing row', async ({ bench }) => {
+    await bench('full existing row', () => {
+      toComparableExisting(existingRow)
+    }).run()
   })
 
-  bench('sparse existing row', () => {
-    toComparableExisting(sparseExisting)
+  test('sparse existing row', async ({ bench }) => {
+    await bench('sparse existing row', () => {
+      toComparableExisting(sparseExisting)
+    }).run()
   })
 
-  bench('null/undefined existing', () => {
-    toComparableExisting(null)
-    toComparableExisting(undefined)
+  test('null/undefined existing', async ({ bench }) => {
+    await bench('null/undefined existing', () => {
+      toComparableExisting(null)
+      toComparableExisting(undefined)
+    }).run()
   })
 })
 
 describe('hasComparableDeviceChanged', () => {
-  bench('no changes detected', () => {
-    hasComparableDeviceChanged(existingRow, fullDevice)
+  test('no changes detected', async ({ bench }) => {
+    await bench('no changes detected', () => {
+      hasComparableDeviceChanged(existingRow, fullDevice)
+    }).run()
   })
 
-  bench('changes detected (version_name differs)', () => {
-    hasComparableDeviceChanged(existingRow, { ...fullDevice, version_name: '2.0.0' })
+  test('changes detected (version_name differs)', async ({ bench }) => {
+    await bench('changes detected (version_name differs)', () => {
+      hasComparableDeviceChanged(existingRow, { ...fullDevice, version_name: '2.0.0' })
+    }).run()
   })
 
-  bench('sparse existing vs full device', () => {
-    hasComparableDeviceChanged(sparseExisting, fullDevice)
+  test('sparse existing vs full device', async ({ bench }) => {
+    await bench('sparse existing vs full device', () => {
+      hasComparableDeviceChanged(sparseExisting, fullDevice)
+    }).run()
   })
 })
 
 describe('buildNormalizedDeviceForWrite', () => {
-  bench('full device', () => {
-    buildNormalizedDeviceForWrite(fullDevice)
+  test('full device', async ({ bench }) => {
+    await bench('full device', () => {
+      buildNormalizedDeviceForWrite(fullDevice)
+    }).run()
   })
 
-  bench('sparse device', () => {
-    buildNormalizedDeviceForWrite(sparseDevice)
+  test('sparse device', async ({ bench }) => {
+    await bench('sparse device', () => {
+      buildNormalizedDeviceForWrite(sparseDevice)
+    }).run()
   })
 })

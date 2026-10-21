@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { getSupabaseWorktreeConfig } from './supabase-worktree-config'
 
@@ -82,15 +82,50 @@ function ensureSymlink(linkPath: string, targetPath: string): void {
 }
 
 /**
- * Replace `destPath` with a fresh copy of the `sourcePath` directory.
+ * Return true when `destPath` is a real directory whose files match `sourcePath` byte for byte.
+ */
+function isSameDirCopy(destPath: string, sourcePath: string): boolean {
+  try {
+    if (!lstatSync(destPath).isDirectory())
+      return false
+    const sourceEntries = readdirSync(sourcePath, { withFileTypes: true })
+    if (readdirSync(destPath).length !== sourceEntries.length)
+      return false
+    return sourceEntries.every((entry) => {
+      const src = resolve(sourcePath, entry.name)
+      const dst = resolve(destPath, entry.name)
+      if (entry.isDirectory())
+        return isSameDirCopy(dst, src)
+      return lstatSync(dst).isFile() && readFileSync(dst).equals(readFileSync(src))
+    })
+  }
+  catch {
+    return false
+  }
+}
+
+/**
+ * Make `destPath` a real copy of the `sourcePath` directory.
  *
  * Supabase CLI resolves `content_path` through symlinks and rejects files that end up outside
  * the workdir, so email templates must be real files inside the per-worktree workdir.
+ * Several worktree commands can run at once (e.g. Playwright's db reset and backend start), so
+ * build the copy in a private temp dir and rename it into place instead of copying in place.
  */
 function ensureCopiedDir(destPath: string, sourcePath: string): void {
-  rmSync(destPath, { force: true, recursive: true })
+  if (isSameDirCopy(destPath, sourcePath))
+    return
+  const tmpPath = `${destPath}.tmp-${process.pid}-${Date.now()}`
   mkdirSync(dirname(destPath), { recursive: true })
-  cpSync(sourcePath, destPath, { recursive: true, dereference: true })
+  cpSync(sourcePath, tmpPath, { recursive: true, dereference: true })
+  rmSync(destPath, { force: true, recursive: true })
+  try {
+    renameSync(tmpPath, destPath)
+  }
+  catch {
+    // A concurrent run already placed its copy; keep that one.
+    rmSync(tmpPath, { force: true, recursive: true })
+  }
 }
 
 /**

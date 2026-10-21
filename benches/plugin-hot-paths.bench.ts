@@ -3,7 +3,7 @@ import type { StandardSchema } from '../supabase/functions/_backend/utils/schema
 import type { DeviceLink } from '../supabase/functions/_backend/plugin_runtime/utils/plugin_parser.ts'
 import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'
 import type { AppInfos, AppStats } from '../supabase/functions/_backend/utils/types.ts'
-import { bench, describe } from 'vitest'
+import { describe, test } from 'vitest'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../supabase/functions/_backend/plugin_runtime/utils/plugin_parser.ts'
 import { channelSelfGetRequestSchema, channelSelfRequestSchema, statsRequestSchema, updateRequestSchema } from '../supabase/functions/_backend/plugin_runtime/utils/plugin_validation.ts'
 import { getUpdateResponseKind, resToVersion } from '../supabase/functions/_backend/plugin_runtime/utils/update_response.ts'
@@ -85,34 +85,48 @@ const updateErrorCodes = [
 ]
 
 describe('plugin endpoint request parsing', () => {
-  bench('/updates payload validation', () => {
-    parsePluginBody(postContext, { ...updatePayload }, updateRequestSchema)
+  test('/updates payload validation', async ({ bench }) => {
+    await bench('/updates payload validation', () => {
+      parsePluginBody(postContext, { ...updatePayload }, updateRequestSchema)
+    }).run()
   })
 
-  bench('/stats payload validation', () => {
-    parsePluginBody(postContext, { ...statsPayload }, statsRequestSchema)
+  test('/stats payload validation', async ({ bench }) => {
+    await bench('/stats payload validation', () => {
+      parsePluginBody(postContext, { ...statsPayload }, statsRequestSchema)
+    }).run()
   })
 
-  bench('/channel_self set payload validation', () => {
-    parsePluginBody(postContext, { ...channelSelfPayload }, channelSelfRequestSchema)
+  test('/channel_self set payload validation', async ({ bench }) => {
+    await bench('/channel_self set payload validation', () => {
+      parsePluginBody(postContext, { ...channelSelfPayload }, channelSelfRequestSchema)
+    }).run()
   })
 
-  bench('/channel_self GET query normalization', () => {
-    parsePluginBody(getContext, convertQueryToBody(channelSelfQuery), channelSelfGetSchema, false)
+  test('/channel_self GET query normalization', async ({ bench }) => {
+    await bench('/channel_self GET query normalization', () => {
+      parsePluginBody(getContext, convertQueryToBody(channelSelfQuery), channelSelfGetSchema, false)
+    }).run()
   })
 
-  bench('device row normalization', () => {
-    makeDevice(statsPayload)
+  test('device row normalization', async ({ bench }) => {
+    await bench('device row normalization', () => {
+      makeDevice(statsPayload)
+    }).run()
   })
 })
 
 describe('plugin endpoint response shaping', () => {
-  bench('/updates manifest response with metadata', () => {
-    resToVersion('8.45.0', 'https://files.capgo.app/bundle.zip', appVersion, manifestEntries, true)
+  test('/updates manifest response with metadata', async ({ bench }) => {
+    await bench('/updates manifest response with metadata', () => {
+      resToVersion('8.45.0', 'https://files.capgo.app/bundle.zip', appVersion, manifestEntries, true)
+    }).run()
   })
 
-  bench('/updates error kind classification', () => {
-    for (const code of updateErrorCodes)
-      getUpdateResponseKind(code)
+  test('/updates error kind classification', async ({ bench }) => {
+    await bench('/updates error kind classification', () => {
+      for (const code of updateErrorCodes)
+        getUpdateResponseKind(code)
+    }).run()
   })
 })
