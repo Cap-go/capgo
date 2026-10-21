@@ -436,10 +436,11 @@ BEGIN
     PERFORM set_config('request.jwt.claim.sub', '', true);
     PERFORM set_config('request.jwt.claims', '{}', true);
 
-    INSERT INTO public.apps (app_id, name, owner_org, user_id)
+    INSERT INTO public.apps (app_id, name, icon_url, owner_org, user_id)
     VALUES (
         v_app_id,
         'Audit counter test',
+        '',
         '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
         '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid
     );
