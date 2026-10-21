@@ -10,7 +10,7 @@ import IconX from '~icons/heroicons/x-mark'
 const props = withDefaults(defineProps<{
   title: string
   description?: string
-  size?: 'md' | 'lg' | 'xl'
+  size?: 'md' | 'lg' | 'xl' | 'checkout'
   // Block Escape/backdrop while a payment is being confirmed.
   busy?: boolean
 }>(), {
@@ -33,6 +33,8 @@ const sizeClass = {
   md: 'max-w-lg',
   lg: 'max-w-2xl',
   xl: 'max-w-4xl',
+  // Stripe Embedded Checkout only switches to its two-column layout when its container is ~1000px+.
+  checkout: 'max-w-6xl',
 }
 
 function requestClose() {
