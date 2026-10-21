@@ -14,8 +14,9 @@ import CreditsCta from '~/components/CreditsCta.vue'
 import CreditsOnlyTip from '~/components/CreditsOnlyTip.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { useBillingPaidAt } from '~/composables/useBillingPaidAt'
+import { useDisplayCurrency } from '~/services/displayCurrency'
 import { ENTERPRISE_MAU_STOPS, formatMau, getOrgExtraMau, quoteEnterpriseScale } from '~/services/enterpriseScale'
-import { formatNumber, formatNumberValue } from '~/services/formatLocale'
+import { formatNumberValue } from '~/services/formatLocale'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { shouldShowExpiredTrialPlansState, shouldShowPlanFailureBanner } from '~/services/paymentRequired'
 import { checkPermissions } from '~/services/permissions'
@@ -168,8 +169,11 @@ const enterpriseQuote = computed(() => {
   return quoteEnterpriseScale(pricingSteps.value, plan.mau, plan.price_m, ENTERPRISE_MAU_STOPS[enterpriseMauIndex.value])
 })
 
-function formatUsd(value: number) {
-  return formatNumber(value, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 })
+const { availableCurrencies, currency: displayCurrency, currencyLabel, formatPrice, isEstimate: isPriceEstimate, setCurrency } = useDisplayCurrency()
+
+// Plan prices are whole dollars; converted estimates are rounded the same way.
+function formatPlanPrice(usd: number) {
+  return formatPrice(usd, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
 // Enterprise card lists the MAU picked on the slider, other plans their allowance.
@@ -587,25 +591,44 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           </p>
         </div>
 
-        <!-- Toggle -->
-        <div class="flex items-center p-1 bg-gray-200 rounded-lg dark:bg-base-200">
-          <button
-            type="button"
-            class="py-1.5 px-4 text-sm font-medium rounded-md transition-all duration-200"
-            :class="segmentVal === 'm' ? 'bg-white dark:bg-base-100 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
-            @click="segmentVal = 'm'"
-          >
-            {{ t('monthly-plan') }}
-          </button>
-          <button
-            type="button"
-            class="flex gap-2 items-center py-1.5 px-4 text-sm font-medium rounded-md transition-all duration-200"
-            :class="segmentVal === 'y' ? 'bg-white dark:bg-base-100 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
-            @click="segmentVal = 'y'"
-          >
-            {{ t('yearly') }}
-            <span class="py-0.5 px-1.5 text-xs font-bold text-green-600 bg-green-100 rounded-full dark:text-green-400 dark:bg-green-900/30">{{ t('yearly-two-months-free') }}</span>
-          </button>
+        <div class="flex flex-col items-start gap-2 sm:items-end">
+          <!-- Toggle -->
+          <div class="flex items-center p-1 bg-gray-200 rounded-lg dark:bg-base-200">
+            <button
+              type="button"
+              class="py-1.5 px-4 text-sm font-medium rounded-md transition-all duration-200"
+              :class="segmentVal === 'm' ? 'bg-white dark:bg-base-100 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
+              @click="segmentVal = 'm'"
+            >
+              {{ t('monthly-plan') }}
+            </button>
+            <button
+              type="button"
+              class="flex gap-2 items-center py-1.5 px-4 text-sm font-medium rounded-md transition-all duration-200"
+              :class="segmentVal === 'y' ? 'bg-white dark:bg-base-100 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
+              @click="segmentVal = 'y'"
+            >
+              {{ t('yearly') }}
+              <span class="py-0.5 px-1.5 text-xs font-bold text-green-600 bg-green-100 rounded-full dark:text-green-400 dark:bg-green-900/30">{{ t('yearly-two-months-free') }}</span>
+            </button>
+          </div>
+          <!-- Display currency: estimate only, Stripe bills in USD -->
+          <label v-if="availableCurrencies.length > 1" class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('plans-display-currency') }}
+            <select
+              data-test="plans-currency-select"
+              class="d-select d-select-xs d-select-bordered"
+              :value="displayCurrency"
+              @change="setCurrency(($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="code in availableCurrencies" :key="code" :value="code">
+                {{ currencyLabel(code) }}
+              </option>
+            </select>
+          </label>
+          <p v-if="isPriceEstimate" data-test="plans-currency-estimate" class="text-xs text-gray-500 dark:text-gray-400">
+            {{ t('plans-currency-estimate', { currency: displayCurrency }) }}
+          </p>
         </div>
       </div>
 
@@ -654,21 +677,21 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <div v-if="isEnterprisePlan(p) && enterpriseQuote" class="mb-6 shrink-0" data-test="enterprise-scale">
             <div class="flex items-baseline">
               <span class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                {{ formatUsd(getPrice(p, segmentVal) + enterpriseQuote.extraMauPriceMonthly) }}
+                {{ formatPlanPrice(getPrice(p, segmentVal) + enterpriseQuote.extraMauPriceMonthly) }}
               </span>
               <span class="ml-1 text-sm font-medium text-gray-500 dark:text-gray-400">/{{ t('mo') }}</span>
             </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               <template v-if="enterpriseQuote.extraMau > 0">
                 <template v-if="isYearlyPlan(p, segmentVal) && hasYearlyDiscount(p)">
-                  {{ t('enterprise-scale-breakdown-yearly', { base: formatUsd(p.price_y), extra: formatUsd(enterpriseQuote.extraMauPriceMonthly * 12), mau: formatMau(enterpriseQuote.extraMau) }) }}
+                  {{ t('enterprise-scale-breakdown-yearly', { base: formatPlanPrice(p.price_y), extra: formatPlanPrice(enterpriseQuote.extraMauPriceMonthly * 12), mau: formatMau(enterpriseQuote.extraMau) }) }}
                 </template>
                 <template v-else>
-                  {{ t('enterprise-scale-breakdown', { base: formatUsd(getPrice(p, segmentVal)), extra: formatUsd(enterpriseQuote.extraMauPriceMonthly), mau: formatMau(enterpriseQuote.extraMau) }) }}
+                  {{ t('enterprise-scale-breakdown', { base: formatPlanPrice(getPrice(p, segmentVal)), extra: formatPlanPrice(enterpriseQuote.extraMauPriceMonthly), mau: formatMau(enterpriseQuote.extraMau) }) }}
                 </template>
               </template>
               <template v-else-if="isYearlyPlan(p, segmentVal)">
-                {{ hasYearlyDiscount(p) ? t('billed-annually-at') : t('billed-monthly-at') }} ${{ hasYearlyDiscount(p) ? p.price_y : p.price_m }}
+                {{ hasYearlyDiscount(p) ? t('billed-annually-at') : t('billed-monthly-at') }} {{ formatPlanPrice(hasYearlyDiscount(p) ? p.price_y : p.price_m) }}
               </template>
             </p>
 
@@ -709,12 +732,12 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <div v-else class="mb-6 shrink-0">
             <div class="flex items-baseline">
               <span class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                ${{ getPrice(p, segmentVal) }}
+                {{ formatPlanPrice(getPrice(p, segmentVal)) }}
               </span>
               <span class="ml-1 text-sm font-medium text-gray-500 dark:text-gray-400">/{{ t('mo') }}</span>
             </div>
             <p v-if="isYearlyPlan(p, segmentVal)" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ hasYearlyDiscount(p) ? t('billed-annually-at') : t('billed-monthly-at') }} ${{ hasYearlyDiscount(p) ? p.price_y : p.price_m }}
+              {{ hasYearlyDiscount(p) ? t('billed-annually-at') : t('billed-monthly-at') }} {{ formatPlanPrice(hasYearlyDiscount(p) ? p.price_y : p.price_m) }}
             </p>
           </div>
 
