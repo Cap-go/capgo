@@ -460,9 +460,15 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PluginP
   // pg-pool drops its idle error listener while a client is checked out. Keep a
   // permanent one so a server-side kill (e.g. idle_in_transaction_session_timeout)
   // during a transaction rejects the next query instead of crashing the worker.
+  // Idle-client errors are already logged as 'PG Pool Error', so only log here
+  // while the client is checked out.
+  const checkedOut = new WeakSet<object>()
+  pool.on('acquire', client => checkedOut.add(client))
+  pool.on('release', (_err, client) => checkedOut.delete(client))
   pool.on('connect', (client) => {
     client.on('error', (err: Error) => {
-      cloudlogErr({ requestId, message: 'PG Client Error', databaseSource: dbName, error: serializePostgresError(err) })
+      if (checkedOut.has(client))
+        cloudlogErr({ requestId, message: 'PG Client Error', databaseSource: dbName, error: serializePostgresError(err) })
     })
   })
 
