@@ -11,16 +11,19 @@ interface AppOnboardingStepPosthogInput {
   change: AppOnboardingStepHistoryChange
   orgId: string
   setup: AppOnboardingState
+  /** Free-text reason the user gave when explicitly skipping a step. */
+  skipReason?: string
 }
 
 // Call only after the transaction owning these mutations has committed.
-export async function emitCommittedAppOnboardingHistory(c: Context<MiddlewareKeyVariables>, committed: AppOnboardingMutationResult[]) {
+export async function emitCommittedAppOnboardingHistory(c: Context<MiddlewareKeyVariables>, committed: AppOnboardingMutationResult[], options: { skipReason?: string } = {}) {
   const events = committed.flatMap(result => result.historyChanges.map(change => buildAppOnboardingStepPosthogEvent({
     appId: result.appId,
     orgId: result.orgId,
     auth: c.get('auth')!,
     setup: parseAppOnboarding(result.onboarding),
     change,
+    ...(options.skipReason && change.status === 'skipped' ? { skipReason: options.skipReason } : {}),
   })))
   if (events.length)
     await backgroundTask(c, Promise.all(events.map(event => trackPosthogEvent(c, event))))
@@ -59,6 +62,7 @@ export function buildAppOnboardingStepPosthogEvent(input: AppOnboardingStepPosth
       step_status: input.change.status,
       ...(input.change.completionSource ? { step_completion_source: input.change.completionSource } : {}),
       ...(input.change.inferredFromStepId ? { step_inferred_from: input.change.inferredFromStepId } : {}),
+      ...(input.skipReason ? { skip_reason: input.skipReason } : {}),
     },
   }
 }

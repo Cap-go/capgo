@@ -1522,8 +1522,7 @@ jobs:
         with:
           version: 2.109.1
       - name: Pre-pull Supabase images
-        # Start pulling while the runner sets up; supabase start reuses in-flight layers.
-        background: true
+        # Finish image extraction before dependency installation to limit peak runner memory.
         continue-on-error: true
         run: |
           supabase services --workdir . -o json \
@@ -1535,15 +1534,15 @@ jobs:
         run: ln -sfn supabase/templates templates
       - name: Stop this job's Supabase stack
         run: bun scripts/supabase-worktree.ts stop --no-backup || true
-      - parallel:
-          - name: Install dependencies and build CLI
-            run: |
-              bun install
-              bun run cli:build
-          - name: Run Supabase Start
-            env:
-              SUPABASE_CLI_BIN: supabase
-            run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
+      # Installing the monorepo alongside Docker startup can OOM-kill Bun (exit 137).
+      - name: Install dependencies and build CLI
+        run: |
+          bun install
+          bun run cli:build
+      - name: Run Supabase Start
+        env:
+          SUPABASE_CLI_BIN: supabase
+        run: bun scripts/supabase-worktree.ts start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,logflare,vector
       - name: Export isolated Supabase endpoints
         run: |
           bun scripts/supabase-worktree.ts with-env bun -e 'const apiUrl = new URL(process.env.SUPABASE_URL ?? ""); const dbUrl = process.env.SUPABASE_DB_URL ?? ""; if (!apiUrl.host || !dbUrl) throw new Error("Isolated Supabase status is missing API_URL or DB_URL."); console.log(`SUPABASE_FUNCTIONS_HEALTH_URL=http-get://${apiUrl.host}/functions/v1/ok`); console.log(`MAIN_SUPABASE_DB_URL=${dbUrl}`)' >> "$GITHUB_ENV"

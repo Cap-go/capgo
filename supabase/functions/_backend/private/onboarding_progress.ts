@@ -1,22 +1,30 @@
 import type { Context } from 'hono'
-import type { AppOnboardingPatch, AppOnboardingState } from '../utils/appOnboarding.ts'
+import type { AppOnboardingPatch, AppOnboardingState, AppOnboardingStepId } from '../utils/appOnboarding.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Permission } from '../utils/rbac.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { emitCommittedAppOnboardingHistory } from '../utils/app_onboarding_posthog.ts'
-import { hasSupportedOtaTodoList, parseAppOnboarding, pickAppOnboardingSource } from '../utils/appOnboarding.ts'
+import { getAppOnboardingStepIds, hasSupportedOtaTodoList, parseAppOnboarding, pickAppOnboardingSource } from '../utils/appOnboarding.ts'
 import { tryCompletePendingAppOnboarding } from '../utils/appOnboardingCompletion.ts'
 import { persistAuthorizedOnboardingMutation } from '../utils/appOnboardingMutation.ts'
 import { parseBody, quickError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { cloudlogErr, serializeError } from '../utils/logging.ts'
+import { isActiveBuilderChecklistSetup } from '../utils/builder_onboarding_checklist.ts'
+import { BUILDER_STEP_IDS, isOpenOnboardingStepStatus } from '../utils/onboardingMissedSteps.ts'
 import { appIdSchema } from '../utils/privateAnalyticsValidation.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { readDevices, readStats } from '../utils/stats.ts'
 import { supabaseWithAuth } from '../utils/supabase.ts'
 
 const bodySchema = z.object({ appId: appIdSchema, N: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER), initial: z.boolean().optional(), includeBilling: z.boolean().optional() })
+const skipStepBodySchema = z.object({
+  appId: appIdSchema,
+  step: z.string().regex(/^(?:ota\.[a-z_]+|builder\.(?:ios|android)\.[a-z_]+)$/),
+  // Asked on every explicit skip so the team can review why steps get skipped.
+  reason: z.string().trim().min(3).max(500),
+})
 type Observations = Partial<Record<'login_cli_mcp' | 'add_channel' | 'run_device' | 'upload_bundle' | 'test_update', boolean>>
 type AuthenticatedClient = ReturnType<typeof supabaseWithAuth>
 type BillingSummary = { status: 'available', orgId: string, orgCreatedAt: string | null, trialEndsAt: string | null, isPaying: boolean, hasCredits: boolean } | { status: 'unavailable' }
@@ -103,6 +111,56 @@ export async function persistObservedProgress(c: Context<MiddlewareKeyVariables>
   return result?.onboarding
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function readBuilderStatuses(currentValue: unknown, platform: keyof typeof BUILDER_STEP_IDS) {
+  const setup = isRecord(currentValue) && isRecord(currentValue.setup) ? currentValue.setup : {}
+  if (!isActiveBuilderChecklistSetup(setup))
+    return null
+  const builder = isRecord(setup.steps) && isRecord(setup.steps.builder) ? setup.steps.builder : null
+  const steps = builder && isRecord(builder[platform]) ? builder[platform] : null
+  if (!steps)
+    return null
+  return BUILDER_STEP_IDS[platform].map(id => ({ id: id as string, exists: isRecord(steps[id]), status: isRecord(steps[id]) ? String(steps[id].status) : 'pending' }))
+}
+
+// Any open checklist step can be skipped with a reason. Builder patches only
+// update stored step records, so a step with no record still cannot be skipped.
+function skipStepPatch(currentValue: unknown, current: AppOnboardingState, step: string, at: string): AppOnboardingPatch | null {
+  if (current.outcome === 'skipped')
+    return null
+  const [path, first, second] = step.split('.')
+  if (path === 'ota') {
+    if (!hasSupportedOtaTodoList(current))
+      return null
+    const ids = getAppOnboardingStepIds(current.todo_list_version, current.ota_todo_list_version)
+    if (!ids.includes(first as AppOnboardingStepId))
+      return null
+    if (!isOpenOnboardingStepStatus(current.steps[first as AppOnboardingStepId]?.status))
+      return null
+    return { steps: { [first!]: { status: 'skipped', at } } }
+  }
+  const platform = first as keyof typeof BUILDER_STEP_IDS
+  const statuses = readBuilderStatuses(currentValue, platform)
+  const row = statuses?.find(status => status.id === second)
+  // A step without a stored record cannot be patched, so do not report success.
+  if (!row?.exists || !isOpenOnboardingStepStatus(row.status))
+    return null
+  const builderSteps: NonNullable<AppOnboardingPatch['builderSteps']> = {}
+  builderSteps[`builder.${platform}.${second}`] = { status: 'skipped', at }
+  return { builderSteps }
+}
+
+// Same rule as persistAuthorizedOnboardingMutation: settings update or app creation in the org.
+async function canWriteOnboarding(c: Context<MiddlewareKeyVariables>, appId: string) {
+  if (await checkPermission(c, 'app.update_settings', { appId }))
+    return true
+  const { data } = await supabaseWithAuth(c, c.get('auth')!).from('apps').select('owner_org').eq('app_id', appId).maybeSingle()
+  return !!data && checkPermission(c, 'org.create_app', { orgId: data.owner_org })
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 app.use('*', useCors)
 app.post('/', middlewareAuth({ preferApiKey: true }), async (c) => {
@@ -163,4 +221,28 @@ app.post('/', middlewareAuth({ preferApiKey: true }), async (c) => {
     : row.onboarding
   c.header('Cache-Control', 'no-store')
   return c.json({ onboarding, ...(observations.add_channel !== undefined ? { hasChannel: observations.add_channel } : {}), checkErrors, ...(billing ? { billing: await billing } : {}) })
+})
+
+app.post('/skip_step', middlewareAuth({ preferApiKey: true }), async (c) => {
+  const parsed = skipStepBodySchema.safeParse(await parseBody(c))
+  if (!parsed.success)
+    throw quickError(400, 'invalid_body', 'Invalid body')
+  const { appId, step, reason } = parsed.data
+  if (!(await checkPermission(c, 'app.read', { appId })))
+    throw quickError(403, 'app_access_denied', 'You cannot access this app')
+  // Fail fast with 403 for read-only callers; the locked write rechecks this.
+  if (!(await canWriteOnboarding(c, appId)))
+    throw quickError(403, 'app_access_denied', 'You cannot update this app onboarding')
+  const result = await persistAuthorizedOnboardingMutation(c, appId, {
+    requestedSteps: [step as `${string}.${string}`],
+    buildPatch: ({ current, currentValue, allowedSteps, at }) => allowedSteps.has(step as `${string}.${string}`)
+      ? skipStepPatch(currentValue, current, step, at)
+      : null,
+    afterPersist: tryCompletePendingAppOnboarding,
+  })
+  if (!result)
+    throw quickError(409, 'step_not_skippable', 'This onboarding step cannot be skipped')
+  await emitCommittedAppOnboardingHistory(c, [result], { skipReason: reason })
+  c.header('Cache-Control', 'no-store')
+  return c.json({ onboarding: result.onboarding })
 })

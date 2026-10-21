@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SNIPPET_EDGE_ANSWERS_TAG as SETTER_PURGE_TAG } from '../scripts/set-updates-edge-cache.ts'
 
 import { PROVIDER_INFRA_ASNS } from '../supabase/functions/_backend/plugin_runtime/utils/providerAsns.ts'
+import { resetReplicationLagMemory, setReplicationLagMemoryEntry } from '../supabase/functions/_backend/plugin_runtime/utils/replicaFreshness.ts'
 import { isStaleSnippetEdgeReplay, markSnippetEdgeReplay, setSnippetIpLimitHeader, setSnippetStatsFill, setSnippetUpdatesFill, SNIPPET_EDGE_ANSWERS_TAG, SNIPPET_EDGE_FILL_HEADER, SNIPPET_EDGE_IP_LIMIT_HEADER, SNIPPET_EDGE_STATS_ACTIONS } from '../supabase/functions/_backend/plugin_runtime/utils/snippetEdgeAnswer.ts'
 import { buildReplayRequest, chunkSnippetEdgeRecords, decodeSnippetEdgeStat, getR2NotificationObjectKey, groupForSendBatch, handleSnippetEdgeStatsMessage, isSnippetEdgeFileResumeMessage, isSnippetEdgeReplayMessage, parseLogpushLine, readLogpushRecords, recordSize, replaySnippetEdgeRecords } from '../supabase/functions/_backend/plugin_runtime/utils/snippetEdgeReplay.ts'
 
@@ -47,13 +48,13 @@ function encodeStat(value: unknown) {
 const ENV_KEYS = ['SNIPPET_EDGE_ANSWER', 'SNIPPET_EDGE_ANSWER_TTL_SECONDS', 'CF_CACHE_PURGE_TOKEN', 'CF_ANALYTICS_TOKEN', 'UPDATES_CACHE_LOCAL_PURGE_URL', 'LIMITED_APPS']
 
 // Outside workerd, getEnv reads process.env.
-async function fillFrom(env: Record<string, string>, handler: (c: any) => void) {
+async function fillFrom(env: Record<string, string>, handler: (c: any) => unknown) {
   for (const key of ENV_KEYS)
     vi.stubEnv(key, env[key] ?? '')
   try {
     const app = new Hono()
-    app.get('/', (c) => {
-      handler(c)
+    app.get('/', async (c) => {
+      await handler(c)
       return c.json({ ok: true })
     })
     const response = await app.request('/')
@@ -100,6 +101,21 @@ describe('snippet edge answer fills', () => {
     expect(fill.actions).toContain('ping')
     expect(fill.actions).not.toContain('set')
     expect(fill.actions.some((action: string) => action.endsWith('_fail'))).toBe(false)
+  })
+
+  it('cap the TTL to 30s for an answer from a replica measured behind, including read cache hits', async () => {
+    try {
+      setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_OC', { status: 'lagging', max_lag_seconds: 2400 })
+      // Read cache hit: no query ran, the caller names the replica.
+      const lagging = readFill(await fillFrom(ENABLED_ENV, c => setSnippetUpdatesFill(c, 'com.edge.app', ANSWER, { blockProviderInfraRequests: false, legacyChannelSelfStore: false, replicaSource: 'HYPERDRIVE_CAPGO_READ_OC' })))
+      expect(lagging.ttl).toBe(30)
+      // Same answer from a replica with no lag figure keeps the TTL (fail open).
+      const unmeasured = readFill(await fillFrom(ENABLED_ENV, c => setSnippetUpdatesFill(c, 'com.edge.app', ANSWER, { blockProviderInfraRequests: false, legacyChannelSelfStore: false, replicaSource: 'HYPERDRIVE_CAPGO_READ_HK' })))
+      expect(unmeasured.ttl).toBe(900)
+    }
+    finally {
+      resetReplicationLagMemory()
+    }
   })
 
   it('stay off without the switch, a purge target, or for apps the snippet cannot check', async () => {

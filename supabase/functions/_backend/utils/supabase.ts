@@ -13,7 +13,7 @@ import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableStri
 import { isDirectOfferUser } from './direct_offer.ts'
 import { quickError, simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from './pg.ts'
+import { beginWriteTransaction, checkoutPgClient, closeClient, getPgClient, releasePgClient } from './pg.ts'
 import { getClientIP } from './rate_limit.ts'
 import { emptyStatsInsights, normalizeStatsInsightsResult } from './statsInsights.ts'
 import { Constants } from './supabase.types.ts'
@@ -981,7 +981,7 @@ export async function createApiKey(c: Context, userId: string) {
   let inTransaction = false
   try {
     pgClient = await checkoutPgClient(pgPool)
-    await pgClient.query('BEGIN')
+    await beginWriteTransaction(pgClient)
     inTransaction = true
     await pgClient.query(`SET LOCAL lock_timeout = '5s'`)
 
