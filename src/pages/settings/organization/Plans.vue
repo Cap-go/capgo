@@ -14,12 +14,12 @@ import CreditsCta from '~/components/CreditsCta.vue'
 import CreditsOnlyTip from '~/components/CreditsOnlyTip.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { useBillingPaidAt } from '~/composables/useBillingPaidAt'
-import { useDisplayCurrency } from '~/services/displayCurrency'
 import { ENTERPRISE_MAU_STOPS, formatMau, getOrgExtraMau, quoteEnterpriseScale } from '~/services/enterpriseScale'
-import { formatNumberValue } from '~/services/formatLocale'
+import { formatNumberValue, getFormatLocale } from '~/services/formatLocale'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { shouldShowExpiredTrialPlansState, shouldShowPlanFailureBanner } from '~/services/paymentRequired'
 import { checkPermissions } from '~/services/permissions'
+import { usePlanPrices } from '~/services/planPrices'
 import { createPlansVisitTracker } from '~/services/plansVisitTracking'
 import { getSignupAttributionEventTags } from '~/services/signupAttribution'
 import { startSubscriptionCheckout } from '~/services/stripe'
@@ -169,11 +169,29 @@ const enterpriseQuote = computed(() => {
   return quoteEnterpriseScale(pricingSteps.value, plan.mau, plan.price_m, ENTERPRISE_MAU_STOPS[enterpriseMauIndex.value])
 })
 
-const { availableCurrencies, currency: displayCurrency, currencyLabel, formatPrice, isEstimate: isPriceEstimate, setCurrency } = useDisplayCurrency()
+// Real Stripe amounts per currency (price currency_options); USD from the plans table until they load.
+const { amountsFor, currencies: priceCurrencies, currency: priceCurrency, formatAmount, lockedCurrency, setCurrency } = usePlanPrices(billingOrgId)
 
-// Plan prices are whole dollars; converted estimates are rounded the same way.
-function formatPlanPrice(usd: number) {
-  return formatPrice(usd, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+function planAmounts(plan: Database['public']['Tables']['plans']['Row']) {
+  const stripeAmounts = amountsFor(plan.stripe_id)
+  return stripeAmounts
+    ? { ...stripeAmounts, currency: priceCurrency.value }
+    : { month: plan.price_m, year: plan.price_y, currency: 'usd' }
+}
+
+// Enterprise extra MAU is created in Stripe with the same tier figures in every plan currency.
+function formatPlanPrice(plan: Database['public']['Tables']['plans']['Row'], value: number) {
+  return formatAmount(value, planAmounts(plan).currency, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+}
+
+function currencyLabel(code: string) {
+  try {
+    const name = new Intl.DisplayNames([getFormatLocale()], { type: 'currency' }).of(code.toUpperCase())
+    return name ? `${code.toUpperCase()} - ${name}` : code.toUpperCase()
+  }
+  catch {
+    return code.toUpperCase()
+  }
 }
 
 // Enterprise card lists the MAU picked on the slider, other plans their allowance.
@@ -224,6 +242,8 @@ async function startPlanCheckout(plan: Database['public']['Tables']['plans']['Ro
     orgId: currentOrganization.value?.gid ?? '',
     // Enterprise only: MAU added to the plan quota, billed on the same subscription.
     extraMau: isEnterprisePlan(plan) ? enterpriseQuote.value?.extraMau : undefined,
+    // Only a currency Stripe sells this plan in; otherwise Checkout uses the price default.
+    currency: amountsFor(plan.stripe_id) ? priceCurrency.value : undefined,
   })
 }
 
@@ -313,17 +333,15 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
 }
 
 function hasYearlyDiscount(plan: Database['public']['Tables']['plans']['Row']): boolean {
-  return plan.price_y > 0 && Math.round(plan.price_y / 12) < plan.price_m
+  const { month, year } = planAmounts(plan)
+  return year > 0 && Math.round(year / 12) < month
 }
 
 function getPrice(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): number {
-  if (t === 'm' || !hasYearlyDiscount(plan)) {
-    return plan.price_m
-  }
-  else {
-    const p = plan.price_y
-    return Math.round(p / 12)
-  }
+  const { month, year } = planAmounts(plan)
+  if (t === 'm' || !hasYearlyDiscount(plan))
+    return month
+  return Math.round(year / 12)
 }
 
 function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): boolean {
@@ -612,22 +630,22 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
               <span class="py-0.5 px-1.5 text-xs font-bold text-green-600 bg-green-100 rounded-full dark:text-green-400 dark:bg-green-900/30">{{ t('yearly-two-months-free') }}</span>
             </button>
           </div>
-          <!-- Display currency: estimate only, Stripe bills in USD -->
-          <label v-if="availableCurrencies.length > 1" class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+          <!-- Billing currency: only currencies set on the Stripe prices -->
+          <label v-if="priceCurrencies.length > 1 && !lockedCurrency" class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
             {{ t('plans-display-currency') }}
             <select
               data-test="plans-currency-select"
               class="d-select d-select-xs d-select-bordered"
-              :value="displayCurrency"
+              :value="priceCurrency"
               @change="setCurrency(($event.target as HTMLSelectElement).value)"
             >
-              <option v-for="code in availableCurrencies" :key="code" :value="code">
+              <option v-for="code in priceCurrencies" :key="code" :value="code">
                 {{ currencyLabel(code) }}
               </option>
             </select>
           </label>
-          <p v-if="isPriceEstimate" data-test="plans-currency-estimate" class="text-xs text-gray-500 dark:text-gray-400">
-            {{ t('plans-currency-estimate', { currency: displayCurrency }) }}
+          <p v-if="lockedCurrency" data-test="plans-currency-locked" class="text-xs text-gray-500 dark:text-gray-400">
+            {{ t('plans-currency-locked', { currency: lockedCurrency.toUpperCase() }) }}
           </p>
         </div>
       </div>
@@ -677,21 +695,21 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <div v-if="isEnterprisePlan(p) && enterpriseQuote" class="mb-6 shrink-0" data-test="enterprise-scale">
             <div class="flex items-baseline">
               <span class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                {{ formatPlanPrice(getPrice(p, segmentVal) + enterpriseQuote.extraMauPriceMonthly) }}
+                {{ formatPlanPrice(p, getPrice(p, segmentVal) + enterpriseQuote.extraMauPriceMonthly) }}
               </span>
               <span class="ml-1 text-sm font-medium text-gray-500 dark:text-gray-400">/{{ t('mo') }}</span>
             </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               <template v-if="enterpriseQuote.extraMau > 0">
                 <template v-if="isYearlyPlan(p, segmentVal) && hasYearlyDiscount(p)">
-                  {{ t('enterprise-scale-breakdown-yearly', { base: formatPlanPrice(p.price_y), extra: formatPlanPrice(enterpriseQuote.extraMauPriceMonthly * 12), mau: formatMau(enterpriseQuote.extraMau) }) }}
+                  {{ t('enterprise-scale-breakdown-yearly', { base: formatPlanPrice(p, planAmounts(p).year), extra: formatPlanPrice(p, enterpriseQuote.extraMauPriceMonthly * 12), mau: formatMau(enterpriseQuote.extraMau) }) }}
                 </template>
                 <template v-else>
-                  {{ t('enterprise-scale-breakdown', { base: formatPlanPrice(getPrice(p, segmentVal)), extra: formatPlanPrice(enterpriseQuote.extraMauPriceMonthly), mau: formatMau(enterpriseQuote.extraMau) }) }}
+                  {{ t('enterprise-scale-breakdown', { base: formatPlanPrice(p, getPrice(p, segmentVal)), extra: formatPlanPrice(p, enterpriseQuote.extraMauPriceMonthly), mau: formatMau(enterpriseQuote.extraMau) }) }}
                 </template>
               </template>
               <template v-else-if="isYearlyPlan(p, segmentVal)">
-                {{ hasYearlyDiscount(p) ? t('billed-annually-at') : t('billed-monthly-at') }} {{ formatPlanPrice(hasYearlyDiscount(p) ? p.price_y : p.price_m) }}
+                {{ hasYearlyDiscount(p) ? t('billed-annually-at') : t('billed-monthly-at') }} {{ formatPlanPrice(p, hasYearlyDiscount(p) ? planAmounts(p).year : planAmounts(p).month) }}
               </template>
             </p>
 
@@ -732,12 +750,12 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <div v-else class="mb-6 shrink-0">
             <div class="flex items-baseline">
               <span class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                {{ formatPlanPrice(getPrice(p, segmentVal)) }}
+                {{ formatPlanPrice(p, getPrice(p, segmentVal)) }}
               </span>
               <span class="ml-1 text-sm font-medium text-gray-500 dark:text-gray-400">/{{ t('mo') }}</span>
             </div>
             <p v-if="isYearlyPlan(p, segmentVal)" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ hasYearlyDiscount(p) ? t('billed-annually-at') : t('billed-monthly-at') }} {{ formatPlanPrice(hasYearlyDiscount(p) ? p.price_y : p.price_m) }}
+              {{ hasYearlyDiscount(p) ? t('billed-annually-at') : t('billed-monthly-at') }} {{ formatPlanPrice(p, hasYearlyDiscount(p) ? planAmounts(p).year : planAmounts(p).month) }}
             </p>
           </div>
 

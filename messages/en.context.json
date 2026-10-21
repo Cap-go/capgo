@@ -2766,7 +2766,7 @@
   "plan-upgrade": "Used in Capgo web console areas: pages/settings/organization. Role: short UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "plan-upgrade-v2": "Used in Capgo web console areas: components, components/tables, pages/settings/organization. Role: short UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "plans": "Used in Capgo web console areas: components/dashboard, constants, pages/settings/organization, services, stores. Role: short UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
-  "plans-currency-estimate": "Used in Capgo web console areas: pages/settings/organization. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "plans-currency-locked": "Used in Capgo web console areas: pages/settings/organization. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "plans-display-currency": "Used in Capgo web console areas: pages/settings/organization. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "plans-category-active-trial": "Used in Capgo web console. Role: UI label about \"plans category active trial\". Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "plans-category-canceled": "Used in Capgo web console. Role: short UI label about \"plans category canceled\". Translate for UI; keep Capgo product names, code, and placeholders unchanged.",

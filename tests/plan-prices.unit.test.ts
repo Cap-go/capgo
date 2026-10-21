@@ -1,0 +1,47 @@
+import { describe, expect, it, vi } from 'vitest'
+import { currencyForCountry, getCommonCurrencies, pickCurrency } from '../supabase/functions/_backend/private/plan_prices.ts'
+import { getPriceCurrencyAmounts } from '../supabase/functions/_backend/utils/stripe.ts'
+import { getPlanAmounts } from '../src/services/planPrices'
+
+vi.mock('~/services/capgoApi', () => ({
+  invokeCapgoApi: vi.fn(),
+}))
+
+describe('plan prices', () => {
+  it.concurrent('reads every currency configured on a Stripe price', () => {
+    expect(getPriceCurrencyAmounts({
+      currency: 'usd',
+      unit_amount: 1400,
+      currency_options: {
+        usd: { unit_amount: 1400 },
+        eur: { unit_amount: 1400 },
+        gbp: { unit_amount: null },
+      },
+    } as any)).toEqual({ usd: 1400, eur: 1400 })
+    expect(getPriceCurrencyAmounts({ currency: 'usd', unit_amount: 3900, currency_options: undefined } as any)).toEqual({ usd: 3900 })
+  })
+
+  it.concurrent('keeps only currencies every plan is sold in', () => {
+    expect(getCommonCurrencies({
+      solo: { month: { usd: 1400, eur: 1400, gbp: 1400 }, year: { usd: 14600, eur: 14600, gbp: 14600 } },
+      team: { month: { usd: 9900, eur: 9900 }, year: { usd: 99800, eur: 99800 } },
+    })).toEqual(['eur', 'usd'])
+    expect(getCommonCurrencies({})).toEqual(['usd'])
+  })
+
+  it.concurrent('picks the locked, local, then USD currency', () => {
+    expect(pickCurrency(['eur', 'gbp', 'usd'], 'usd', 'FR')).toBe('usd')
+    expect(pickCurrency(['eur', 'gbp', 'usd'], null, 'FR')).toBe('eur')
+    expect(pickCurrency(['eur', 'gbp', 'usd'], null, 'GB')).toBe('gbp')
+    expect(pickCurrency(['eur', 'usd'], null, 'GB')).toBe('usd')
+    expect(pickCurrency(['eur', 'usd'], null, null)).toBe('usd')
+    expect(currencyForCountry('JP')).toBeNull()
+  })
+
+  it.concurrent('returns Stripe amounts in major units, or null when not sold in that currency', () => {
+    const prices = { prod_solo: { month: { usd: 1400, eur: 1400 }, year: { usd: 14600, eur: 14600 } } }
+    expect(getPlanAmounts(prices, 'prod_solo', 'eur')).toEqual({ month: 14, year: 146 })
+    expect(getPlanAmounts(prices, 'prod_solo', 'gbp')).toBeNull()
+    expect(getPlanAmounts(prices, 'prod_missing', 'usd')).toBeNull()
+  })
+})
