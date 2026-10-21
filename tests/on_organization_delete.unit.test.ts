@@ -27,6 +27,15 @@ vi.mock('../supabase/functions/_backend/utils/hono.ts', async () => {
   }
 })
 
+async function deleteOrg(orgId: string, customerId: string) {
+  const { app } = await import('../supabase/functions/_backend/triggers/on_organization_delete.ts')
+  return app.request('http://localhost/', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ table: 'orgs', type: 'DELETE', old_record: { id: orgId, customer_id: customerId } }),
+  })
+}
+
 describe('on_organization_delete', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -39,22 +48,9 @@ describe('on_organization_delete', () => {
   })
 
   it('cancels Stripe subscriptions and deletes stripe_info rows', async () => {
-    const { app } = await import('../supabase/functions/_backend/triggers/on_organization_delete.ts')
     const orgId = 'org-delete-stripe-info'
     const customerId = 'cus_delete_stripe_info'
-
-    const response = await app.request('http://localhost/', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        table: 'orgs',
-        type: 'DELETE',
-        old_record: {
-          id: orgId,
-          customer_id: customerId,
-        },
-      }),
-    })
+    const response = await deleteOrg(orgId, customerId)
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ status: 'ok' })
@@ -66,22 +62,9 @@ describe('on_organization_delete', () => {
 
   it('still deletes stripe_info when Stripe cancellation fails', async () => {
     cancelSubscription.mockRejectedValueOnce(new Error('stripe unavailable'))
-    const { app } = await import('../supabase/functions/_backend/triggers/on_organization_delete.ts')
     const orgId = 'org-delete-stripe-info-failure'
     const customerId = 'cus_delete_stripe_info_failure'
-
-    const response = await app.request('http://localhost/', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        table: 'orgs',
-        type: 'DELETE',
-        old_record: {
-          id: orgId,
-          customer_id: customerId,
-        },
-      }),
-    })
+    const response = await deleteOrg(orgId, customerId)
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ status: 'ok' })
@@ -92,22 +75,9 @@ describe('on_organization_delete', () => {
   it('keeps stripe_info when the customer Stripe account is not configured', async () => {
     const { BillingAccountUnavailableError } = await import('../supabase/functions/_backend/utils/stripe_billing.ts')
     cancelSubscription.mockRejectedValueOnce(new BillingAccountUnavailableError('us'))
-    const { app } = await import('../supabase/functions/_backend/triggers/on_organization_delete.ts')
     const orgId = 'org-delete-stripe-info-unreachable'
     const customerId = 'cus_delete_stripe_info_unreachable'
-
-    const response = await app.request('http://localhost/', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        table: 'orgs',
-        type: 'DELETE',
-        old_record: {
-          id: orgId,
-          customer_id: customerId,
-        },
-      }),
-    })
+    const response = await deleteOrg(orgId, customerId)
 
     expect(response.status).toBe(200)
     // The row records which Stripe account still bills this customer: never drop it.

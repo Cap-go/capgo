@@ -39,148 +39,22 @@ describe('deploy scope matching', () => {
     })).toBe(true)
   })
 
-  it.concurrent('does not deploy backend targets for frontend-only changes', () => {
-    expect(resolveDeployScopeFromFiles(['src/pages/index.vue'])).toEqual(noBackendDeploys)
-  })
-
-  it.concurrent('does not deploy backend targets for CLI-only lockfile changes', () => {
-    expect(resolveDeployScopeFromFiles(['bun.lock', 'cli/src/index.ts'])).toEqual(noBackendDeploys)
-  })
-
-  it.concurrent('runs the subscriber reconciliation for replica schema code changes', () => {
-    expect(resolveDeployScopeFromFiles([
-      'read_replicate/direct_schema_sync.ts',
-      'scripts/check-read-replica-hyperdrive-schema.sh',
-      'cloudflare_workers/read-replica-schema-check/index.ts',
-    ])).toEqual({
-      api: false,
-      files: false,
-      plugins: false,
-      supabase: true,
-      translation: false,
-      r2_inventory: false,
-      bento_dispatch: false,
-    })
-  })
-
-  it.concurrent('deploys translation plus API surfaces when source messages change', () => {
-    expect(resolveDeployScopeFromFiles(['messages/en.json'])).toEqual({
-      api: true,
-      files: false,
-      plugins: false,
-      supabase: true,
-      translation: true,
-      r2_inventory: false,
-      bento_dispatch: false,
-    })
-  })
-
-  it.concurrent('keeps plugin endpoint changes scoped to Supabase and plugin workers', () => {
-    expect(resolveDeployScopeFromFiles(['supabase/functions/_backend/plugin_runtime/plugins/updates.ts'])).toEqual({
-      api: false,
-      files: false,
-      plugins: true,
-      supabase: true,
-      translation: false,
-      r2_inventory: false,
-      bento_dispatch: false,
-    })
-  })
-
-  it.concurrent('keeps public API changes scoped to Supabase and API workers', () => {
-    expect(resolveDeployScopeFromFiles(['supabase/functions/_backend/public/app/index.ts'])).toEqual({
-      api: true,
-      files: false,
-      plugins: false,
-      supabase: true,
-      translation: false,
-      r2_inventory: false,
-      bento_dispatch: false,
-    })
-  })
-
-  it.concurrent('deploys hosted MCP server changes with the API worker', () => {
-    expect(resolveDeployScopeFromFiles(['supabase/functions/_backend/mcp/tools.ts'])).toEqual({
-      api: true,
-      files: false,
-      plugins: false,
-      supabase: true,
-      translation: false,
-      r2_inventory: false,
-      bento_dispatch: false,
-    })
-  })
-
-  it.concurrent('deploys shared Hono utilities to API/files/inventory workers but not isolated plugins', () => {
-    expect(resolveDeployScopeFromFiles(['supabase/functions/_backend/utils/hono.ts'])).toEqual({
-      api: true,
-      files: true,
-      plugins: false,
-      supabase: true,
-      translation: false,
-      r2_inventory: true,
-      bento_dispatch: true,
-    })
-  })
-
-  it.concurrent('deploys plugin_runtime Hono changes only to plugin workers', () => {
-    expect(resolveDeployScopeFromFiles(['supabase/functions/_backend/plugin_runtime/utils/hono.ts'])).toEqual({
-      api: false,
-      files: false,
-      plugins: true,
-      supabase: true,
-      translation: false,
-      r2_inventory: false,
-      bento_dispatch: false,
-    })
-  })
-
-  it.concurrent('keeps Deno-only plugin stats bridge off the Cloudflare plugin deploy scope', () => {
-    expect(resolveDeployScopeFromFiles(['supabase/functions/shared/plugin_deno_stats_fallbacks.ts'])).toEqual({
-      api: false,
-      files: false,
-      plugins: false,
-      supabase: true,
-      translation: false,
-      r2_inventory: false,
-      bento_dispatch: false,
-    })
-  })
-
-  it.concurrent('deploys files worker when the shared preview subdomain helper changes', () => {
-    expect(resolveDeployScopeFromFiles(['supabase/functions/shared/preview-subdomain.ts'])).toEqual({
-      api: false,
-      files: true,
-      plugins: false,
-      supabase: true,
-      translation: false,
-      r2_inventory: false,
-      bento_dispatch: false,
-    })
-  })
-
-  it.concurrent('deploys API and files workers when the shared TUS file utility changes', () => {
-    expect(resolveDeployScopeFromFiles(['supabase/functions/_backend/files/util.ts'])).toEqual({
-      api: true,
-      files: true,
-      plugins: false,
-      supabase: true,
-      translation: false,
-      r2_inventory: false,
-      bento_dispatch: false,
-    })
-  })
-
-  it.concurrent('deploys package dependency changes to Cloudflare workers without forcing Supabase', () => {
-    expect(resolveDeployScopeFromFiles(['package.json'])).toEqual({
-      api: true,
-      files: true,
-      plugins: true,
-      supabase: false,
-      translation: true,
-      r2_inventory: true,
-      bento_dispatch: true,
-    })
+  it.concurrent.each([
+    ['frontend-only changes deploy no backend target', ['src/pages/index.vue'], {}],
+    ['CLI-only lockfile changes deploy no backend target', ['bun.lock', 'cli/src/index.ts'], {}],
+    ['replica schema code runs the subscriber reconciliation', ['read_replicate/direct_schema_sync.ts', 'scripts/check-read-replica-hyperdrive-schema.sh', 'cloudflare_workers/read-replica-schema-check/index.ts'], { supabase: true }],
+    ['source messages deploy translation plus API surfaces', ['messages/en.json'], { api: true, supabase: true, translation: true }],
+    ['plugin endpoints stay scoped to Supabase and plugin workers', ['supabase/functions/_backend/plugin_runtime/plugins/updates.ts'], { plugins: true, supabase: true }],
+    ['public API changes stay scoped to Supabase and API workers', ['supabase/functions/_backend/public/app/index.ts'], { api: true, supabase: true }],
+    ['hosted MCP server changes deploy with the API worker', ['supabase/functions/_backend/mcp/tools.ts'], { api: true, supabase: true }],
+    ['shared Hono utilities deploy to API/files/inventory workers but not isolated plugins', ['supabase/functions/_backend/utils/hono.ts'], { api: true, files: true, supabase: true, r2_inventory: true, bento_dispatch: true }],
+    ['plugin_runtime Hono changes deploy only to plugin workers', ['supabase/functions/_backend/plugin_runtime/utils/hono.ts'], { plugins: true, supabase: true }],
+    ['the Deno-only plugin stats bridge stays off the Cloudflare plugin deploy', ['supabase/functions/shared/plugin_deno_stats_fallbacks.ts'], { supabase: true }],
+    ['the shared preview subdomain helper deploys the files worker', ['supabase/functions/shared/preview-subdomain.ts'], { files: true, supabase: true }],
+    ['the shared TUS file utility deploys API and files workers', ['supabase/functions/_backend/files/util.ts'], { api: true, files: true, supabase: true }],
+    ['package dependency changes deploy Cloudflare workers without forcing Supabase', ['package.json'], { api: true, files: true, plugins: true, translation: true, r2_inventory: true, bento_dispatch: true }],
+  ] as const)('%s', (_name, files, deploys) => {
+    expect(resolveDeployScopeFromFiles([...files])).toEqual({ ...noBackendDeploys, ...deploys })
   })
 
   it.concurrent.each([

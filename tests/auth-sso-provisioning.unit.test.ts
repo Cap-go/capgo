@@ -223,6 +223,9 @@ vi.mock('~/stores/organization', () => ({
 
 vi.stubGlobal('fetch', vi.fn((...args: unknown[]) => getContext().mockFetch(...args)))
 
+const DASHBOARD_ROUTE = { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} }
+const LOGIN_ROUTE = { path: '/login', fullPath: '/login', meta: {}, query: {} }
+
 async function getGuard() {
   const router = {
     beforeEach: vi.fn(),
@@ -244,11 +247,7 @@ describe('auth guard SSO provisioning', () => {
       const guard = await getGuard()
       const next = vi.fn()
 
-      await guard(
-        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
+      await guard(DASHBOARD_ROUTE, LOGIN_ROUTE, next)
 
       expect(context.mockFetch).toHaveBeenCalledWith('https://api.capgo.test/private/sso/provision-user', expect.objectContaining({
         method: 'POST',
@@ -282,11 +281,7 @@ describe('auth guard SSO provisioning', () => {
       const guard = await getGuard()
       const next = vi.fn()
 
-      await guard(
-        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
+      await guard(DASHBOARD_ROUTE, LOGIN_ROUTE, next)
 
       expect(next).toHaveBeenCalledWith({
         path: '/app/com.test.pending-onboarding/getting-started',
@@ -316,11 +311,7 @@ describe('auth guard SSO provisioning', () => {
       const guard = await getGuard()
       const next = vi.fn()
 
-      await guard(
-        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
+      await guard(DASHBOARD_ROUTE, LOGIN_ROUTE, next)
 
       expect(next).toHaveBeenCalledWith({
         path: '/app/com.test.pending-onboarding/getting-started',
@@ -350,11 +341,7 @@ describe('auth guard SSO provisioning', () => {
       const guard = await getGuard()
       const next = vi.fn()
 
-      await guard(
-        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
+      await guard(DASHBOARD_ROUTE, LOGIN_ROUTE, next)
 
       expect(next).toHaveBeenCalledWith({
         path: '/app/com.test.pending-onboarding/getting-started',
@@ -413,11 +400,7 @@ describe('auth guard SSO provisioning', () => {
       const guard = await getGuard()
       const next = vi.fn()
 
-      await guard(
-        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
+      await guard(DASHBOARD_ROUTE, LOGIN_ROUTE, next)
 
       expect(next).toHaveBeenCalledWith()
     })
@@ -450,11 +433,7 @@ describe('auth guard SSO provisioning', () => {
       const guard = await getGuard()
       const next = vi.fn()
 
-      await guard(
-        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
+      await guard(DASHBOARD_ROUTE, LOGIN_ROUTE, next)
 
       expect(context.mockFetch).not.toHaveBeenCalled()
       expect(next).toHaveBeenCalledWith({
@@ -498,11 +477,7 @@ describe('auth guard SSO provisioning', () => {
 
       const guard = await getGuard()
       const next = vi.fn()
-      await guard(
-        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
+      await guard(DASHBOARD_ROUTE, LOGIN_ROUTE, next)
 
       expect(context.mockIsPlatformAdmin).toHaveBeenCalledOnce()
       expect(context.mainStore.isAdmin).toBe(result === 'admin')
@@ -559,11 +534,7 @@ describe('auth guard SSO provisioning', () => {
       const guard = await getGuard()
       const next = vi.fn()
 
-      await guard(
-        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
+      await guard(DASHBOARD_ROUTE, LOGIN_ROUTE, next)
 
       expect(context.organizationStore.fetchOrganizations).not.toHaveBeenCalled()
       expect(next).toHaveBeenCalledWith({
@@ -611,11 +582,7 @@ describe('auth guard SSO provisioning', () => {
       const guard = await getGuard()
       const next = vi.fn()
 
-      await guard(
-        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
+      await guard(DASHBOARD_ROUTE, LOGIN_ROUTE, next)
 
       expect(context.organizationStore.fetchOrganizations).toHaveBeenCalled()
       expect(next).toHaveBeenCalledWith()
@@ -632,11 +599,7 @@ describe('auth guard SSO provisioning', () => {
       const guard = await getGuard()
       const next = vi.fn()
 
-      await guard(
-        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
+      await guard(DASHBOARD_ROUTE, LOGIN_ROUTE, next)
 
       expect(context.mockSetWebsitePaidUserCookie).toHaveBeenCalledWith(true)
       expect(context.mainStore.isAdmin).toBe(true)
@@ -690,11 +653,7 @@ describe('auth guard SSO provisioning', () => {
       const guard = await getGuard()
       const next = vi.fn()
 
-      await guard(
-        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
+      await guard(DASHBOARD_ROUTE, LOGIN_ROUTE, next)
 
       expect(context.mockFetch).toHaveBeenCalled()
       expect(next).toHaveBeenCalledWith(false)
@@ -720,11 +679,7 @@ describe('auth guard SSO provisioning', () => {
       const guard = await getGuard()
       const next = vi.fn()
 
-      await guard(
-        { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
-        { path: '/login', fullPath: '/login', meta: {}, query: {} },
-        next,
-      )
+      await guard(DASHBOARD_ROUTE, LOGIN_ROUTE, next)
 
       expect(next).toHaveBeenCalledWith(false)
       expect(next).not.toHaveBeenCalledWith('/login?message=sso_account_linked')
