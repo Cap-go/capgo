@@ -4,18 +4,93 @@ import { createClient } from '@supabase/supabase-js'
 import { getSupabaseWorktreeConfig } from '../../scripts/supabase-worktree-config'
 import { getSupabaseStatus } from '../../scripts/supabase-worktree-status'
 import { expect, test } from '../support/commands'
+import { CONSOLE_QUERY_ROUTE, consoleQueryError, consoleQueryFromResponse, consoleQueryMethod, consoleQueryPayload, parseConsoleQuery, routeConsoleQuery } from '../support/consoleQuery'
 
 const { ports: supabasePorts } = getSupabaseWorktreeConfig()
 const localSupabaseUrl = `http://127.0.0.1:${supabasePorts.api}`
+const apiURL = `${localSupabaseUrl}/functions/v1`
 
-async function loginToOnboarding(page: Page, email: string, password: string) {
-  await page.login(email, password, /\/onboarding\/app/)
+function localAdminClient() {
+  const configured = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY
+  const status = configured ? null : getSupabaseStatus()
+  const key = configured || status?.SERVICE_ROLE_KEY || status?.SECRET_KEY
+  if (!key)
+    throw new Error('Local Supabase service key is required for registration fixtures')
+  return createClient(localSupabaseUrl, key, { auth: { persistSession: false } })
 }
 
-async function continuePastWelcome(page: Page) {
-  const continueButton = page.locator('[data-test="onboarding-welcome-continue"]')
-  await expect(continueButton).toBeVisible()
-  await continueButton.click()
+interface ApiSession {
+  userId: string
+  headers: Record<string, string>
+}
+
+// Registration fixtures talk to the Capgo auth API like the console does; the
+// service-role client is only used to read and seed profiles.
+async function apiAuth(path: 'sign-in/email' | 'sign-up/email', body: Record<string, string>): Promise<ApiSession> {
+  const response = await fetch(`${apiURL}/auth/${path}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'origin': 'http://localhost:5173' },
+    body: JSON.stringify(body),
+  })
+  const session = await response.json() as { user?: { id: string }, token?: string, message?: string }
+  if (!response.ok || !session.user || !session.token)
+    throw new Error(session.message ?? `Cannot ${path} ${body.email}`)
+  return { userId: session.user.id, headers: { 'content-type': 'application/json', 'authorization': `Bearer capgo_session_${session.token}` } }
+}
+
+function apiSignIn(email: string, password: string) {
+  return apiAuth('sign-in/email', { email, password })
+}
+
+function apiSignUp(email: string, password: string) {
+  return apiAuth('sign-up/email', { email, password, name: email })
+}
+
+async function apiSignOut(session: ApiSession) {
+  await fetch(`${apiURL}/auth/sign-out`, { method: 'POST', headers: session.headers, body: '{}' })
+}
+
+async function readProfile(email: string, columns: string) {
+  const { data, error } = await localAdminClient().from('users').select(columns).eq('email', email).single()
+  if (error)
+    throw error
+  return data
+}
+
+async function loginToOnboarding(page: Page, email: string, password: string) {
+  await page.login(email, password, /\/onboarding\/(?:name|app)/)
+  if (new URL(page.url()).pathname === '/onboarding/name')
+    await continuePastProfileWelcome(page)
+}
+
+async function continuePastProfileWelcome(page: Page) {
+  const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
+  const name = page.locator('[data-test="onboarding-name-step"]')
+  const resume = page.locator('[data-test="onboarding-resume-continue"]')
+  await expect(welcome.or(name).or(resume)).toBeVisible()
+  if (await resume.isVisible())
+    await resume.click()
+  await expect(welcome.or(name)).toBeVisible()
+  if (await welcome.isVisible()) {
+    await expect(name).toHaveCount(0)
+    await welcome.click()
+  }
+  await expect(name).toBeVisible()
+  await expect(page.locator('[data-test="onboarding-name-restart"]')).toHaveCount(0)
+}
+
+async function completeName(page: Page) {
+  await continuePastProfileWelcome(page)
+  await page.fill('[data-test="onboarding-first-name"]', 'Example')
+  await page.fill('[data-test="onboarding-last-name"]', 'User')
+  await page.click('[data-test="onboarding-name-continue"]')
+  await page.waitForURL(/\/onboarding\/app/)
+}
+
+async function expectOnboardingGoal(page: Page) {
+  await expect(page.locator('[data-test="onboarding-intent-ota"]')).toBeVisible()
+  await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toHaveCount(0)
+  await expect(page.locator('nav[aria-label="Onboarding progress"] [aria-current="step"]')).toContainText('Your goal')
 }
 
 async function continuePastDevelopmentEnvironmentIfShown(page: Page) {
@@ -52,16 +127,7 @@ async function continuePastChannelOnboardingIfShown(page: Page) {
 }
 
 async function forceWebNativeOnboardingTreatments(email: string, password: string) {
-  const apiURL = `${localSupabaseUrl}/functions/v1`
-  const loginResponse = await fetch(`${apiURL}/auth/sign-in/email`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'origin': 'http://localhost:5173' },
-    body: JSON.stringify({ email, password }),
-  })
-  const session = await loginResponse.json()
-  if (!loginResponse.ok || !session.user || !session.token)
-    throw new Error(session.message ?? 'Cannot sign in treatment user')
-  const headers = { 'content-type': 'application/json', 'authorization': `Bearer capgo_session_${session.token}` }
+  const session = await apiSignIn(email, password)
 
   // Experiment fixtures use a separate backend client; user sessions cannot
   // override the server-managed assignment fields.
@@ -74,7 +140,7 @@ async function forceWebNativeOnboardingTreatments(email: string, password: strin
   const { data: profile, error: profileError } = await adminClient
     .from('users')
     .select('onboarding')
-    .eq('id', session.user.id)
+    .eq('id', session.userId)
     .single()
   if (profileError)
     throw profileError
@@ -103,11 +169,12 @@ async function forceWebNativeOnboardingTreatments(email: string, password: strin
         },
       },
     })
-    .eq('id', session.user.id)
+    .eq('id', session.userId)
   if (updateError)
     throw updateError
 
-  await fetch(`${apiURL}/auth/sign-out`, { method: 'POST', headers, body: '{}' })
+  // End only this helper session; the browser must stay signed in.
+  await apiSignOut(session)
 }
 
 async function expectProtectedRouteRedirect(page: Page, targetPath: string, expectedUrl: RegExp, expectedSelector: string) {
@@ -116,6 +183,8 @@ async function expectProtectedRouteRedirect(page: Page, targetPath: string, expe
   try {
     await redirectedPage.goto(targetPath, { waitUntil: 'commit' })
     await redirectedPage.waitForURL(expectedUrl)
+    if (new URL(redirectedPage.url()).pathname === '/onboarding/name')
+      await continuePastProfileWelcome(redirectedPage)
     await expect(redirectedPage.locator(expectedSelector)).toBeVisible()
   }
   finally {
@@ -146,6 +215,36 @@ test.describe('Registration', () => {
     await page.goto('/register/')
   })
 
+  test('returns from Your goal to saved names and retains the selected goal', async ({ page }) => {
+    await page.fill('[data-test="email"]', `profile-back-${Date.now()}@example.com`)
+    await page.fill('[data-test="password"]', 'Password123!')
+    await page.click('[data-test="submit"]')
+    await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
+    await completeName(page)
+    await expectOnboardingGoal(page)
+    await page.click('[data-test="onboarding-intent-builder"]')
+    await page.click('[data-test="app-onboarding-back-profile"]')
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveValue('Example')
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('User')
+    await expect(page.locator('[data-test="onboarding-welcome"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="onboarding-resume-continue"]')).toHaveCount(0)
+    await page.reload()
+    await expect(page.locator('[data-test="onboarding-resume-continue"]')).toBeVisible()
+    await page.click('[data-test="onboarding-resume-continue"]')
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveValue('Example')
+    await page.fill('[data-test="onboarding-first-name"]', '')
+    await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeDisabled()
+    await page.fill('[data-test="onboarding-first-name"]', 'Updated')
+    await page.click('[data-test="onboarding-name-continue"]')
+    await expectOnboardingGoal(page)
+    await expect(page.locator('[data-test="onboarding-intent-builder"]')).toHaveClass(/(?:^|\s)border-primary-500(?:\s|$)/)
+    await expect(page.locator('[data-test="onboarding-resume-continue"]')).toHaveCount(0)
+    await page.click('[data-test="app-onboarding-back-profile"]')
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveValue('Updated')
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('User')
+  })
+
   test('should redirect new users through app-first onboarding until the org is created', async ({ page }) => {
     const uniqueSuffix = Date.now()
     const email = `no-org-e2e-${uniqueSuffix}@example.com`
@@ -154,18 +253,71 @@ test.describe('Registration', () => {
     const finalAppName = `Final App ${uniqueSuffix}`
     const organizationName = `Manual Org ${uniqueSuffix}`
 
+    await expect(page.locator('[data-test="first_name"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="last_name"]')).toHaveCount(0)
     await page.fill('[data-test="email"]', email)
-    await page.fill('[data-test="first_name"]', 'No')
-    await page.fill('[data-test="last_name"]', 'Org')
     await page.fill('[data-test="password"]', 'Password123!')
-    await page.fill('[data-test="confirm-password"]', 'Password123!')
+    const registrationRequest = page.waitForRequest(request => request.url().endsWith('/auth/sign-up/email') && request.method() === 'POST')
     await page.click('[data-test="submit"]')
+    const registrationPayload = (await registrationRequest).postDataJSON()
+    expect(registrationPayload).not.toHaveProperty('first_name')
+    expect(registrationPayload).not.toHaveProperty('last_name')
+    expect(registrationPayload).not.toHaveProperty('firstName')
+    expect(registrationPayload).not.toHaveProperty('lastName')
 
-    await page.waitForURL(/\/onboarding\/app/)
-    await continuePastWelcome(page)
+    await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
+    await expectProtectedRouteRedirect(page, '/dashboard', /\/onboarding\/name/, '[data-test="onboarding-name-step"]')
+    await routeConsoleQuery(page, 'users', async (route, query) => {
+      if (consoleQueryMethod(query) === 'GET') {
+        await route.fulfill(consoleQueryError(503, { code: 'unavailable', message: 'Test profile load failure' }))
+        return
+      }
+      await route.fallback()
+    })
+    await page.reload()
+    await expect(page.locator('[data-test="account-load-recovery"]')).toBeVisible()
+    await expect(page.locator('[data-test="onboarding-name-step"]')).toHaveCount(0)
+    await page.unroute(CONSOLE_QUERY_ROUTE)
+    await page.locator('[data-test="account-load-retry"]').click()
+    await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
+    await expect(page.locator('[data-test="onboarding-name-step"]')).toBeVisible()
+    await expect(page.locator('[data-test="onboarding-intent-ota"]')).toHaveCount(0)
+    const continueGoal = page.locator('[data-test="onboarding-name-continue"]')
+    await expect(continueGoal).toBeDisabled()
+    await expect(page.getByRole('heading', { name: 'About you', exact: true })).toBeVisible()
+    await expect(page.locator('nav[aria-label="Onboarding progress"] [aria-current="step"]')).toContainText('About you')
+    await expect(page.getByText('One command. Live on next launch.', { exact: true })).toHaveCount(0)
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toBeVisible()
+    await page.fill('[data-test="onboarding-first-name"]', '   ')
+    await expect(continueGoal).toBeDisabled()
+    await page.fill('[data-test="onboarding-first-name"]', '  Example  ')
+    await page.fill('[data-test="onboarding-last-name"]', '   ')
+    await expect(continueGoal).toBeDisabled()
+    await page.fill('[data-test="onboarding-last-name"]', '  User  ')
+    await expect(continueGoal).toBeEnabled()
+
+    await routeConsoleQuery(page, 'users', async (route, query) => {
+      if (consoleQueryMethod(query) === 'PATCH' && consoleQueryPayload(query)?.first_name) {
+        await route.fulfill(consoleQueryError(500, { message: 'Test profile save failure' }))
+        return
+      }
+      await route.fallback()
+    })
+    await continueGoal.click()
+    await expect(page.getByText('Error while updating your account', { exact: true })).toBeVisible()
+    await expect(page).toHaveURL(/\/onboarding\/name/)
+    await expect(page.locator('[data-test="app-onboarding-name"]')).toHaveCount(0)
+    await page.unroute(CONSOLE_QUERY_ROUTE)
+    await continueGoal.click()
+    await expectOnboardingGoal(page)
     await page.click('[data-test="onboarding-intent-ota"]')
     await page.click('[data-test="app-onboarding-continue-intent"]')
     await continuePastDevelopmentEnvironmentIfShown(page)
+
+    const profile = await readProfile(email, 'first_name, last_name')
+    expect(profile).toEqual({ first_name: 'Example', last_name: 'User' })
 
     await expect(page.locator('[data-test="app-onboarding-existing-yes"]')).toHaveCount(0)
     await expect(page.locator('[data-test="app-onboarding-existing-no"]')).toHaveCount(0)
@@ -200,16 +352,214 @@ test.describe('Registration', () => {
     await page.fill('[data-test="app-onboarding-name"]', finalAppName)
     await continueFromAppNameToOrganization(page)
     await expect(page.locator('[data-test="onboarding-org-name"]')).toHaveValue(organizationName)
-    await expect(page.locator('[data-test="onboarding-create-org"]')).toBeEnabled()
-    await page.click('[data-test="onboarding-create-org"]')
+    const createOrganization = page.locator('[data-test="onboarding-create-org"]')
+    await expect(createOrganization).toBeEnabled()
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveCount(0)
+    await createOrganization.click()
 
     await expect(page.locator('[data-test="onboarding-invite-users"]')).toBeVisible({ timeout: 60000 })
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveCount(0)
+
     await expect(page.locator('[data-test="app-onboarding-command-copy"]')).toHaveCount(0)
     await page.click('[data-test="onboarding-finish"]')
 
     await continuePastChannelOnboardingIfShown(page)
     await expect(page.locator('[data-test="onboarding-technical-invite"]')).toBeVisible()
     await expect(page).toHaveURL(/\/app\/[^/]+\/getting-started$/)
+  })
+
+  test('should collect first and last names before the goal on the About you step on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.fill('[data-test="email"]', `mobile-profile-e2e-${Date.now()}@example.com`)
+    await page.fill('[data-test="password"]', 'Password123!')
+    await page.click('[data-test="submit"]')
+    await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
+
+    await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toBeVisible()
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'About you', exact: true })).toBeVisible()
+    const nameBox = await page.locator('[data-test="onboarding-first-name"]').boundingBox()
+    const surnameBox = await page.locator('[data-test="onboarding-last-name"]').boundingBox()
+    expect(nameBox).not.toBeNull()
+    expect(surnameBox).not.toBeNull()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+    await page.fill('[data-test="onboarding-first-name"]', 'Example')
+    await page.fill('[data-test="onboarding-last-name"]', 'User')
+    await expect(page.locator('[data-test="onboarding-intent-ota"]')).toHaveCount(0)
+    await page.click('[data-test="onboarding-name-continue"]')
+    await page.click('[data-test="onboarding-intent-ota"]')
+    await page.click('[data-test="app-onboarding-continue-intent"]')
+    await continuePastDevelopmentEnvironmentIfShown(page)
+    await expect(page.locator('[data-test="app-onboarding-name"]')).toBeVisible()
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveCount(0)
+  })
+
+  for (const mobile of [false, true]) {
+    test(`should restore name drafts after refresh before selecting a goal on ${mobile ? 'mobile' : 'desktop'}`, async ({ page }) => {
+      if (mobile)
+        await page.setViewportSize({ width: 390, height: 844 })
+      const email = `draft-profile-e2e-${Date.now()}-${mobile}@example.com`
+      const password = 'Password123!'
+      await page.fill('[data-test="email"]', email)
+      await page.fill('[data-test="password"]', password)
+      await page.click('[data-test="submit"]')
+      await page.waitForURL(/\/onboarding\/name/)
+      await continuePastProfileWelcome(page)
+
+      const draftSaved = page.waitForResponse((response) => {
+        const query = response.ok() ? consoleQueryFromResponse(response) : null
+        if (!query || query.name !== 'users' || consoleQueryMethod(query) !== 'PATCH')
+          return false
+        const draft = consoleQueryPayload(query)?.onboarding?.profile_draft
+        return draft?.first_name === 'Draft' && draft?.last_name === 'User'
+      })
+      await page.fill('[data-test="onboarding-first-name"]', 'Draft')
+      await page.fill('[data-test="onboarding-last-name"]', 'User')
+      await draftSaved
+
+      const profile = await readProfile(email, 'first_name, last_name, onboarding')
+      expect(profile?.first_name || '').toBe('')
+      expect(profile?.last_name || '').toBe('')
+      expect(profile?.onboarding).toMatchObject({ profile_draft: { first_name: 'Draft', last_name: 'User' } })
+
+      await page.reload()
+      const firstName = page.locator('[data-test="onboarding-first-name"]')
+      await expect(page.locator('[data-test="onboarding-resume-continue"]')).toBeVisible()
+      await expect(firstName).toHaveCount(0)
+      await page.click('[data-test="onboarding-resume-continue"]')
+      await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toHaveCount(0)
+      await expect(firstName).toHaveValue('Draft')
+      await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('User')
+      await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeEnabled()
+
+      await page.reload()
+      await expect(page.locator('[data-test="onboarding-resume-restart"]')).toBeVisible()
+      await page.click('[data-test="onboarding-resume-restart"]')
+      await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toBeVisible()
+      await continuePastProfileWelcome(page)
+      await expect(firstName).toHaveValue('')
+      await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('')
+      await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeDisabled()
+      await firstName.fill('Draft')
+      await page.fill('[data-test="onboarding-last-name"]', 'User')
+      await page.click('[data-test="onboarding-name-continue"]')
+      if (!mobile)
+        await expectOnboardingGoal(page)
+      await page.click('[data-test="onboarding-intent-ota"]')
+      await page.click('[data-test="app-onboarding-continue-intent"]')
+      await continuePastDevelopmentEnvironmentIfShown(page)
+      await expect(page.locator('[data-test="app-onboarding-name"]')).toBeVisible()
+    })
+  }
+
+  test('should save an incomplete profile before creating a standalone organization', async ({ page }) => {
+    const email = `standalone-profile-e2e-${Date.now()}@example.com`
+    const password = 'Password123!'
+    const signedUp = await apiSignUp(email, password)
+    const { error: updateError } = await localAdminClient().from('users').upsert({ id: signedUp.userId, email, first_name: 'Example', last_name: '', onboarding: {} }, { onConflict: 'id' })
+    expect(updateError).toBeNull()
+    await apiSignOut(signedUp)
+
+    await loginToOnboarding(page, email, password)
+    await page.goto('/onboarding/organization?source=org-switcher')
+    await continuePastProfileWelcome(page)
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveValue('Example')
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('')
+    await expect(page).toHaveURL(/\/onboarding\/name/)
+    const createOrganization = page.locator('[data-test="onboarding-name-continue"]')
+    await expect(createOrganization).toBeDisabled()
+    await page.fill('[data-test="onboarding-last-name"]', '   ')
+    await expect(createOrganization).toBeDisabled()
+    await page.fill('[data-test="onboarding-last-name"]', '  User  ')
+    await expect(createOrganization).toBeEnabled()
+
+    const writes: string[] = []
+    page.on('request', (request) => {
+      const query = parseConsoleQuery(request)
+      if (query?.name === 'users' && consoleQueryMethod(query) === 'PATCH' && consoleQueryPayload(query)?.last_name === 'User')
+        writes.push('profile')
+      if (request.method() === 'POST' && /\/organization(?:\?|$)/.test(request.url()))
+        writes.push('organization')
+    })
+    await createOrganization.click()
+    await page.click('[data-test="onboarding-intent-ota"]')
+    await page.click('[data-test="onboarding-mode-name"]')
+    await page.fill('[data-test="onboarding-org-name"]', `Standalone Profile Org ${Date.now()}`)
+    await page.locator('[data-test="onboarding-estimated-users-option"]').first().click()
+    await page.click('[data-test="onboarding-create-org"]')
+    await expect(page.locator('[data-test="onboarding-logo-action"]')).toBeVisible({ timeout: 60000 })
+    expect(writes).toEqual(['profile', 'organization'])
+
+    const profile = await readProfile(email, 'first_name, last_name')
+    expect(profile).toEqual({ first_name: 'Example', last_name: 'User' })
+  })
+
+  test('should complete a partial profile and skip both names for subsequent organizations', async ({ page }) => {
+    const email = `partial-profile-e2e-${Date.now()}@example.com`
+    const password = 'Password123!'
+    const signedUp = await apiSignUp(email, password)
+    const { data: seededProfile, error: updateError } = await localAdminClient().from('users').upsert({ id: signedUp.userId, email, first_name: 'Example', last_name: '', onboarding: {} }, { onConflict: 'id' }).select('first_name, last_name').single()
+    expect(updateError).toBeNull()
+    expect(seededProfile).toEqual({ first_name: 'Example', last_name: '' })
+    await apiSignOut(signedUp)
+
+    await loginToOnboarding(page, email, password)
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveValue('Example')
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('')
+    await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeDisabled()
+    await page.fill('[data-test="onboarding-last-name"]', '  User  ')
+    await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeEnabled()
+    await page.click('[data-test="onboarding-name-continue"]')
+    await expectOnboardingGoal(page)
+    await page.click('[data-test="onboarding-intent-ota"]')
+    await page.click('[data-test="app-onboarding-continue-intent"]')
+    await continuePastDevelopmentEnvironmentIfShown(page)
+
+    await page.goto('/onboarding/organization?source=org-switcher')
+    await page.click('[data-test="onboarding-intent-ota"]')
+    await page.click('[data-test="onboarding-mode-name"]')
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveCount(0)
+    await page.fill('[data-test="onboarding-org-name"]', `Profile Org ${Date.now()}`)
+    await page.locator('[data-test="onboarding-estimated-users-option"]').first().click()
+    const createOrganization = page.locator('[data-test="onboarding-create-org"]')
+    await expect(createOrganization).toBeEnabled()
+    await createOrganization.click()
+    await expect(page.locator('[data-test="onboarding-logo-action"]')).toBeVisible({ timeout: 60000 })
+
+    const profile = await readProfile(email, 'first_name, last_name')
+    expect(profile).toEqual({ first_name: 'Example', last_name: 'User' })
+
+    await page.goto('/onboarding/organization?source=org-switcher')
+    await page.click('[data-test="onboarding-intent-ota"]')
+    await page.click('[data-test="onboarding-mode-name"]')
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveCount(0)
+  })
+
+  test('should preserve an existing surname when saving the first name', async ({ page }) => {
+    const email = `surname-profile-e2e-${Date.now()}@example.com`
+    const password = 'Password123!'
+    const signedUp = await apiSignUp(email, password)
+    const { error: updateError } = await localAdminClient().from('users').upsert({ id: signedUp.userId, email, first_name: '', last_name: 'Existing', onboarding: {} }, { onConflict: 'id' })
+    expect(updateError).toBeNull()
+    await apiSignOut(signedUp)
+
+    await loginToOnboarding(page, email, password)
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('Existing')
+    await page.fill('[data-test="onboarding-first-name"]', '  Example  ')
+    await page.click('[data-test="onboarding-name-continue"]')
+    await expectOnboardingGoal(page)
+    await page.click('[data-test="onboarding-intent-ota"]')
+    await page.click('[data-test="app-onboarding-continue-intent"]')
+    await continuePastDevelopmentEnvironmentIfShown(page)
+    await expect(page.locator('[data-test="app-onboarding-name"]')).toBeVisible()
+
+    const profile = await readProfile(email, 'first_name, last_name')
+    expect(profile).toEqual({ first_name: 'Example', last_name: 'Existing' })
   })
 
   test('should offer to continue or restart onboarding after a dropout', async ({ page }) => {
@@ -219,14 +569,13 @@ test.describe('Registration', () => {
     const password = 'Password123!'
 
     await page.fill('[data-test="email"]', email)
-    await page.fill('[data-test="first_name"]', 'Resume')
-    await page.fill('[data-test="last_name"]', 'User')
     await page.fill('[data-test="password"]', password)
-    await page.fill('[data-test="confirm-password"]', password)
     await page.click('[data-test="submit"]')
 
-    await page.waitForURL(/\/onboarding\/app/)
-    await continuePastWelcome(page)
+    await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
+    await completeName(page)
+    await expectOnboardingGoal(page)
     await page.click('[data-test="onboarding-intent-ota"]')
     await page.click('[data-test="app-onboarding-continue-intent"]')
     await continuePastDevelopmentEnvironmentIfShown(page)
@@ -234,11 +583,9 @@ test.describe('Registration', () => {
     await continueFromAppNameToIcon(page)
     await Promise.all([
       page.waitForResponse((response) => {
-        if (!response.url().includes('/private/console/query') || !response.ok())
-          return false
-        const query = response.request().postDataJSON()
-        return query.kind === 'table' && query.name === 'users'
-          && query.operations.some((op: { method: string, args: any[] }) => op.method === 'update' && op.args[0]?.onboarding?.step === 'organization')
+        // The onboarding step is saved through the console query endpoint (users update).
+        const query = response.ok() ? consoleQueryFromResponse(response) : null
+        return !!query && query.name === 'users' && consoleQueryMethod(query) === 'PATCH' && JSON.stringify(consoleQueryPayload(query) ?? {}).includes('"step":"organization"')
       }),
       page.click('[data-test="app-onboarding-continue"]'),
     ])
@@ -257,8 +604,12 @@ test.describe('Registration', () => {
     await loginToOnboarding(page, email, password)
     await expect(page.locator('[data-test="onboarding-resume-restart"]')).toBeVisible()
     await page.locator('[data-test="onboarding-resume-restart"]').click()
-    await continuePastWelcome(page)
+    await continuePastProfileWelcome(page)
+    await page.locator('[data-test="onboarding-name-continue"]').click()
+    await expectOnboardingGoal(page)
     await expect(page.locator('[data-test="onboarding-intent-ota"]')).toBeVisible()
+    await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveCount(0)
     await expect(page.locator('[data-test="onboarding-org-name"]')).toHaveCount(0)
   })
 
@@ -269,14 +620,13 @@ test.describe('Registration', () => {
     const appName = `WebNative Treatment ${uniqueSuffix}`
 
     await page.fill('[data-test="email"]', email)
-    await page.fill('[data-test="first_name"]', 'WebNative')
-    await page.fill('[data-test="last_name"]', 'Treatment')
     await page.fill('[data-test="password"]', password)
-    await page.fill('[data-test="confirm-password"]', password)
     await page.click('[data-test="submit"]')
 
-    await page.waitForURL(/\/onboarding\/app/)
-    await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toBeVisible()
+    await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
+    await completeName(page)
+    await expectOnboardingGoal(page)
     await forceWebNativeOnboardingTreatments(email, password)
     await page.reload()
     await expect(page.locator('[data-test="onboarding-resume-continue"]')).toBeVisible()
@@ -311,13 +661,12 @@ test.describe('Registration', () => {
     const email = `no-org-logout-e2e-${uniqueSuffix}@example.com`
 
     await page.fill('[data-test="email"]', email)
-    await page.fill('[data-test="first_name"]', 'Wrong')
-    await page.fill('[data-test="last_name"]', 'Account')
     await page.fill('[data-test="password"]', 'Password123!')
-    await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
 
-    await page.waitForURL(/\/onboarding\/app/)
+    await page.waitForURL(/\/onboarding\/name/)
+    await continuePastProfileWelcome(page)
+    await completeName(page)
     await page.click('[data-test="onboarding-logout"]')
 
     await page.waitForURL(/\/login\/?$/)
@@ -326,31 +675,29 @@ test.describe('Registration', () => {
 
   test('should show error for existing email', async ({ page }) => {
     await page.fill('[data-test="email"]', 'test@capgo.app')
-    await page.fill('[data-test="first_name"]', 'Test')
-    await page.fill('[data-test="last_name"]', 'User')
     await page.fill('[data-test="password"]', 'Password123!')
-    await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
     await expect(page.locator('[data-test="form-error"]')).toContainText('User already exists. Use another email.')
   })
 
   test('should show error for deleted account email', async ({ page }) => {
     await page.fill('[data-test="email"]', 'deleted@capgo.app')
-    await page.fill('[data-test="first_name"]', 'Test')
-    await page.fill('[data-test="last_name"]', 'User')
     await page.fill('[data-test="password"]', 'Password123!')
-    await page.fill('[data-test="confirm-password"]', 'Password123!')
     await page.click('[data-test="submit"]')
     await expect(page.locator('[data-test="form-error"]')).toContainText('Account with this email used to exist, cannot recreate')
   })
 
-  test('should show error for password mismatch', async ({ page }) => {
-    await page.fill('[data-test="email"]', 'new@example.com')
-    await page.fill('[data-test="first_name"]', 'Test')
-    await page.fill('[data-test="last_name"]', 'User')
-    await page.fill('[data-test="password"]', 'Password123!')
-    await page.fill('[data-test="confirm-password"]', 'Password456!')
+  test('should require a number before submitting to the registration API', async ({ page }) => {
+    let requests = 0
+    page.on('request', (request) => {
+      if (request.url().endsWith('/auth/sign-up/email') && request.method() === 'POST')
+        requests++
+    })
+    await page.fill('[data-test="email"]', 'password-policy@example.com')
+    await page.fill('[data-test="password"]', 'Password!')
     await page.click('[data-test="submit"]')
-    await expect(page.locator('.formkit-messages [data-message-type="validation"]')).toContainText('Password confirmation does not match')
+    await expect(page.locator('.formkit-messages [data-message-type="validation"]')).toContainText(/number/i)
+    expect(requests).toBe(0)
+    await expect(page).toHaveURL(/\/register\/?$/)
   })
 })

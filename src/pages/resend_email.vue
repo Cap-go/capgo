@@ -268,7 +268,6 @@ async function sendOtpCode() {
     otpSendError.value = t('email-otp-send-failed')
     toast.error(otpSendError.value)
     console.error('Cannot send email OTP', error)
-    return
   }
   finally {
     otpSending.value = false

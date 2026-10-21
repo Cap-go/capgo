@@ -127,8 +127,6 @@ describe('stats Action Types', () => {
     const versions = ALLOWED_STATS_ACTIONS.map(action => getVersionFromAction(action))
     const uniqueVersions = new Set(versions)
     expect(uniqueVersions.size).toBe(ALLOWED_STATS_ACTIONS.length)
-    // Verify all versions match semver pattern
-    expect(versions.every(_v => /^\d+\.\d+\.\d+(-[0-9A-Z-]+)?$/i)).toBe(true)
     type StatsActionEnum = Database['public']['Enums']['stats_action']
     const assertEqual = <T extends readonly StatsActionEnum[]>(value: T) => value
     assertEqual(ALLOWED_STATS_ACTIONS)

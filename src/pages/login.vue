@@ -58,6 +58,7 @@ const passwordPathReady = ref(false)
 const domainCheckTimeoutMs = 5000
 const domainCheckDebounceMs = 350
 const isCheckingSavedSession = ref(true)
+const profileUnavailable = computed(() => route.query.profile_unavailable === '1')
 const captchaStatus = ref<'disabled' | 'loading' | 'ready' | 'unavailable'>(captchaKey.value ? 'loading' : 'disabled')
 let captchaInitTimeout: ReturnType<typeof setTimeout> | null = null
 let domainCheckTimer: ReturnType<typeof setTimeout> | null = null
@@ -229,6 +230,25 @@ async function nextLogin() {
   setTimeout(async () => {
     isLoading.value = false
   }, 500)
+}
+
+async function logoutFromProfileRecovery() {
+  if (isLoading.value)
+    return
+  isLoading.value = true
+  try {
+    const { error } = await supabase.auth.signOut()
+    if (error)
+      throw error
+    await router.replace('/login')
+  }
+  catch (error) {
+    console.error('Failed to sign out from account recovery', error)
+    toast.error(t('cannot-sign-off'))
+  }
+  finally {
+    isLoading.value = false
+  }
 }
 
 async function checkMfa() {
@@ -797,6 +817,10 @@ async function handleAppleOAuthLanding(parsedUrl: URL) {
 
 async function checkLogin() {
   try {
+    if (profileUnavailable.value) {
+      hideLoader()
+      return
+    }
     const parsedUrl = new URL(route.fullPath, globalThis.location.origin)
     if (await handleAppleOAuthLanding(parsedUrl))
       return
@@ -834,13 +858,12 @@ async function checkLogin() {
     }
     else if (!session && route.query.code && typeof route.query.code === 'string') {
       const { data, error } = await supabase.auth.exchangeCodeForSession(route.query.code)
-      if (!error && data.session) {
-        await nextLogin()
-      }
-      else {
+      if (error || !data.session) {
         isLoading.value = false
         hideLoader()
+        return
       }
+      await nextLogin()
     }
     else if (!session && route.hash) {
       await checkMagicLink()
@@ -1015,7 +1038,18 @@ onMounted(checkLogin)
           </div>
 
           <div class="relative mt-5 sm:mt-6">
-            <div v-if="hasQuerySession" :class="authStepCardClass">
+            <div v-if="profileUnavailable" class="space-y-4" data-test="account-load-recovery">
+              <p role="alert" class="text-sm leading-6 text-slate-600 dark:text-slate-300">
+                {{ t('account-load-failed') }}
+              </p>
+              <button type="button" :class="authPrimaryButtonClass" :disabled="isLoading" data-test="account-load-retry" @click="nextLogin">
+                {{ t('retry') }}
+              </button>
+              <button type="button" :class="authSecondaryButtonClass" :disabled="isLoading" data-test="account-load-logout" @click="logoutFromProfileRecovery">
+                {{ t('logout') }}
+              </button>
+            </div>
+            <div v-else-if="hasQuerySession" :class="authStepCardClass">
               <div class="space-y-4 text-slate-500 dark:text-slate-300" :class="authCardBodyClass">
                 <p class="text-sm">
                   {{ t('login-query-session-prompt') }}
@@ -1027,7 +1061,7 @@ onMounted(checkLogin)
                 >
                   <svg
                     v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
-                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading" aria-hidden="true"
                   >
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                     <path
@@ -1082,7 +1116,7 @@ onMounted(checkLogin)
                         >
                           <svg
                             v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading" aria-hidden="true"
                           >
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                             <path
@@ -1166,7 +1200,7 @@ onMounted(checkLogin)
                         >
                           <svg
                             v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading" aria-hidden="true"
                           >
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                             <path
@@ -1203,7 +1237,7 @@ onMounted(checkLogin)
                         >
                           <svg
                             v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
-                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading" aria-hidden="true"
                           >
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
                             <path

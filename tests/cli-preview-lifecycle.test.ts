@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto'
+import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
@@ -473,7 +475,8 @@ describe('cli app preview lifecycle', () => {
       apikey: apiKey.key,
       apiHost: `${SUPABASE_BASE_URL}/functions/v1`,
     }
-    const { log } = await import(new URL('../cli/node_modules/@clack/prompts', import.meta.url).href)
+    // Resolve from the CLI package so the spy targets the module the CLI uses.
+    const { log } = await import(pathToFileURL(createRequire(new URL('../cli/package.json', import.meta.url)).resolve('@clack/prompts')).href)
     const logInfo = vi.spyOn(log, 'info')
     const originalFetch = globalThis.fetch
     let createdChannelId: number | undefined

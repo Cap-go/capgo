@@ -84,7 +84,7 @@ function createContext(options?: {
   } as any
 }
 
-function createOrgRow(overrides: Partial<OrgRow> & Pick<OrgRow, 'id' | 'name' | 'customer_id'>): OrgRow {
+function createOrgRow(overrides: Partial<OrgRow> = {}): OrgRow {
   const baseOrgRow: OrgRow = {
     created_at: null,
     created_by: 'user-123',
@@ -124,6 +124,11 @@ function createOrgRow(overrides: Partial<OrgRow> & Pick<OrgRow, 'id' | 'name' | 
   }
 }
 
+const pendingOrganizationSelects: Array<{
+  data: OrgRow
+  maybeSingle: () => Promise<{ data: OrgRow | null, error: { message: string } | null }>
+}> = []
+
 function createOrgSelectBuilder(data: OrgRow) {
   const builder = {
     data,
@@ -147,10 +152,6 @@ interface OrganizationUpdateBuilder {
   maybeSingle: Mock<() => Promise<{ data: Partial<OrgRow> | null, error: { message: string } | null }>>
 }
 
-const pendingOrganizationSelects: Array<{
-  data: OrgRow
-  maybeSingle: () => Promise<{ data: OrgRow | null, error: { message: string } | null }>
-}> = []
 const pendingOrganizationUpdates: OrganizationUpdateBuilder[] = []
 let organizationUpdateQueryMock: ReturnType<typeof vi.fn>
 
@@ -244,6 +245,17 @@ function createSupabaseClientStub(
   }
 }
 
+function mockJwtClient(...builders: unknown[]) {
+  const from = vi.fn()
+  for (const builder of builders)
+    from.mockReturnValueOnce(builder)
+  supabaseClientMock.mockReturnValue(createSupabaseClientStub(from))
+}
+
+function putRename(body: Record<string, unknown> = {}) {
+  return put(createContext(), { orgId: 'org-123', name: 'New Name', ...body }, undefined)
+}
+
 describe('organization put Stripe sync', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -272,9 +284,6 @@ describe('organization put Stripe sync', () => {
       user_id: 'user-123',
     } satisfies Database['public']['Tables']['apikeys']['Row']
     const updateBuilder = createOrgUpdateBuilder(createOrgRow({
-      id: 'org-123',
-      name: 'Old Name',
-      customer_id: 'cus_123',
       enforce_hashed_api_keys: true,
     }))
     const rlsSupabase = createSupabaseClientStub(
@@ -304,11 +313,7 @@ describe('organization put Stripe sync', () => {
   })
 
   it('updates the org row before syncing Stripe customer name', async () => {
-    const selectBuilder = createOrgSelectBuilder(createOrgRow({
-      id: 'org-123',
-      name: 'Old Name',
-      customer_id: 'cus_123',
-    }))
+    const selectBuilder = createOrgSelectBuilder(createOrgRow())
     const updateBuilder = createOrgUpdateBuilder({
       id: 'org-123',
       name: 'New Name',
@@ -316,11 +321,7 @@ describe('organization put Stripe sync', () => {
       logo: null,
     })
 
-    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
-      vi.fn()
-        .mockReturnValueOnce(selectBuilder)
-        .mockReturnValueOnce(updateBuilder),
-    ))
+    mockJwtClient(selectBuilder, updateBuilder)
 
     const response = await put(createContext(), {
       orgId: 'org-123',
@@ -346,49 +347,27 @@ describe('organization put Stripe sync', () => {
 
   it('syncs Stripe using the committed customer id when it becomes available during the rename', async () => {
     const selectBuilder = createOrgSelectBuilder(createOrgRow({
-      id: 'org-123',
-      name: 'Old Name',
       customer_id: 'pending_org-123',
     }))
     const updateBuilder = createOrgUpdateBuilder(createOrgRow({
-      id: 'org-123',
       name: 'New Name',
-      customer_id: 'cus_123',
     }))
 
-    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
-      vi.fn()
-        .mockReturnValueOnce(selectBuilder)
-        .mockReturnValueOnce(updateBuilder),
-    ))
+    mockJwtClient(selectBuilder, updateBuilder)
 
-    const response = await put(createContext(), {
-      orgId: 'org-123',
-      name: 'New Name',
-    }, undefined)
+    const response = await putRename()
 
     expect(response.status).toBe(200)
     expect(updateCustomerOrganizationNameMock).toHaveBeenCalledWith(expect.anything(), 'cus_123', 'New Name')
   })
 
   it('does not touch Stripe when a competing rename wins the database write', async () => {
-    const selectBuilder = createOrgSelectBuilder(createOrgRow({
-      id: 'org-123',
-      name: 'Old Name',
-      customer_id: 'cus_123',
-    }))
+    const selectBuilder = createOrgSelectBuilder(createOrgRow())
     const updateBuilder = createOrgUpdateBuilder(null)
 
-    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
-      vi.fn()
-        .mockReturnValueOnce(selectBuilder)
-        .mockReturnValueOnce(updateBuilder),
-    ))
+    mockJwtClient(selectBuilder, updateBuilder)
 
-    const error = await put(createContext(), {
-      orgId: 'org-123',
-      name: 'New Name',
-    }, undefined).catch(caught => caught)
+    const error = await putRename().catch(caught => caught)
 
     expect(error).toBeInstanceOf(HTTPException)
     expect(updateCustomerOrganizationNameMock).not.toHaveBeenCalled()
@@ -399,23 +378,12 @@ describe('organization put Stripe sync', () => {
   })
 
   it('does not touch Stripe when the database update fails before commit', async () => {
-    const selectBuilder = createOrgSelectBuilder(createOrgRow({
-      id: 'org-123',
-      name: 'Old Name',
-      customer_id: 'cus_123',
-    }))
+    const selectBuilder = createOrgSelectBuilder(createOrgRow())
     const updateBuilder = createOrgUpdateBuilder(null, { message: 'db write failed' })
 
-    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
-      vi.fn()
-        .mockReturnValueOnce(selectBuilder)
-        .mockReturnValueOnce(updateBuilder),
-    ))
+    mockJwtClient(selectBuilder, updateBuilder)
 
-    const error = await put(createContext(), {
-      orgId: 'org-123',
-      name: 'New Name',
-    }, undefined).catch(caught => caught)
+    const error = await putRename().catch(caught => caught)
 
     expect(error).toBeInstanceOf(HTTPException)
     expect(updateCustomerOrganizationNameMock).not.toHaveBeenCalled()
@@ -426,33 +394,20 @@ describe('organization put Stripe sync', () => {
 
   it('rolls the org row back when syncing Stripe fails', async () => {
     const selectBuilder = createOrgSelectBuilder(createOrgRow({
-      id: 'org-123',
-      name: 'Old Name',
-      customer_id: 'cus_123',
       website: 'https://old.example',
     }))
     const updateBuilder = createOrgUpdateBuilder({
       ...createOrgRow({
-        id: 'org-123',
         name: 'New Name',
-        customer_id: 'cus_123',
         updated_at: '2026-04-15T13:00:00Z',
         website: 'https://new.example',
       }),
     })
     const rollbackBuilder = createOrgUpdateBuilder(createOrgRow({
-      id: 'org-123',
-      name: 'Old Name',
-      customer_id: 'cus_123',
       website: 'https://old.example',
     }))
 
-    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
-      vi.fn()
-        .mockReturnValueOnce(selectBuilder)
-        .mockReturnValueOnce(updateBuilder)
-        .mockReturnValueOnce(rollbackBuilder),
-    ))
+    mockJwtClient(selectBuilder, updateBuilder, rollbackBuilder)
 
     updateCustomerOrganizationNameMock
       .mockRejectedValueOnce(new Error('Stripe update failed'))
@@ -478,32 +433,19 @@ describe('organization put Stripe sync', () => {
   })
 
   it('keeps the org row when Stripe already persisted the renamed customer name', async () => {
-    const selectBuilder = createOrgSelectBuilder(createOrgRow({
-      id: 'org-123',
-      name: 'Old Name',
-      customer_id: 'cus_123',
-    }))
+    const selectBuilder = createOrgSelectBuilder(createOrgRow())
     const updateBuilder = createOrgUpdateBuilder(createOrgRow({
-      id: 'org-123',
       name: 'New Name',
-      customer_id: 'cus_123',
       updated_at: '2026-04-15T13:00:00Z',
     }))
 
-    const from = vi.fn()
-      .mockReturnValueOnce(selectBuilder)
-      .mockReturnValueOnce(updateBuilder)
-
-    supabaseClientMock.mockReturnValue(createSupabaseClientStub(from))
+    mockJwtClient(selectBuilder, updateBuilder)
 
     updateCustomerOrganizationNameMock
       .mockRejectedValueOnce(new Error('connection reset'))
     getStripeCustomerNameMock.mockResolvedValueOnce('New Name')
 
-    const response = await put(createContext(), {
-      orgId: 'org-123',
-      name: 'New Name',
-    }, undefined)
+    const response = await putRename()
 
     expect(response.status).toBe(200)
     expect(getStripeCustomerNameMock).toHaveBeenCalledWith(expect.anything(), 'cus_123')
@@ -511,36 +453,22 @@ describe('organization put Stripe sync', () => {
   })
 
   it('includes both errors when the database rollback fails after Stripe sync error', async () => {
-    const selectBuilder = createOrgSelectBuilder(createOrgRow({
-      id: 'org-123',
-      name: 'Old Name',
-      customer_id: 'cus_123',
-    }))
+    const selectBuilder = createOrgSelectBuilder(createOrgRow())
     const updateBuilder = createOrgUpdateBuilder({
       ...createOrgRow({
-        id: 'org-123',
         name: 'New Name',
-        customer_id: 'cus_123',
         updated_at: '2026-04-15T13:00:00Z',
       }),
     })
     const rollbackBuilder = createOrgUpdateBuilder(null, { message: 'rollback failed' })
 
-    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
-      vi.fn()
-        .mockReturnValueOnce(selectBuilder)
-        .mockReturnValueOnce(updateBuilder)
-        .mockReturnValueOnce(rollbackBuilder),
-    ))
+    mockJwtClient(selectBuilder, updateBuilder, rollbackBuilder)
 
     updateCustomerOrganizationNameMock
       .mockRejectedValueOnce(new Error('Stripe update failed'))
     getStripeCustomerNameMock.mockResolvedValueOnce('Old Name')
 
-    const error = await put(createContext(), {
-      orgId: 'org-123',
-      name: 'New Name',
-    }, undefined).catch(caught => caught)
+    const error = await putRename().catch(caught => caught)
 
     expect(error).toBeInstanceOf(HTTPException)
     expect(error.cause.moreInfo).toMatchObject({
@@ -550,33 +478,20 @@ describe('organization put Stripe sync', () => {
   })
 
   it('does not roll back the org row when Stripe state is unknown after a transport failure', async () => {
-    const selectBuilder = createOrgSelectBuilder(createOrgRow({
-      id: 'org-123',
-      name: 'Old Name',
-      customer_id: 'cus_123',
-    }))
+    const selectBuilder = createOrgSelectBuilder(createOrgRow())
     const updateBuilder = createOrgUpdateBuilder(createOrgRow({
-      id: 'org-123',
       name: 'New Name',
-      customer_id: 'cus_123',
       updated_at: '2026-04-15T13:00:00Z',
     }))
 
-    const from = vi.fn()
-      .mockReturnValueOnce(selectBuilder)
-      .mockReturnValueOnce(updateBuilder)
-
-    supabaseClientMock.mockReturnValue(createSupabaseClientStub(from))
+    mockJwtClient(selectBuilder, updateBuilder)
 
     updateCustomerOrganizationNameMock
       .mockRejectedValueOnce(new Error('connection reset'))
     getStripeCustomerNameMock.mockResolvedValueOnce(undefined)
     isDeterministicStripeCustomerUpdateErrorMock.mockReturnValueOnce(false)
 
-    const error = await put(createContext(), {
-      orgId: 'org-123',
-      name: 'New Name',
-    }, undefined).catch(caught => caught)
+    const error = await putRename().catch(caught => caught)
 
     expect(error).toBeInstanceOf(HTTPException)
     expect(error.cause.moreInfo).toMatchObject({
@@ -588,27 +503,16 @@ describe('organization put Stripe sync', () => {
 
   it('retries Stripe sync when the requested name already matches the committed org row', async () => {
     const selectBuilder = createOrgSelectBuilder(createOrgRow({
-      id: 'org-123',
       name: 'New Name',
-      customer_id: 'cus_123',
     }))
     const updateBuilder = createOrgUpdateBuilder(createOrgRow({
-      id: 'org-123',
       name: 'New Name',
-      customer_id: 'cus_123',
       updated_at: '2026-04-15T13:00:00Z',
     }))
 
-    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
-      vi.fn()
-        .mockReturnValueOnce(selectBuilder)
-        .mockReturnValueOnce(updateBuilder),
-    ))
+    mockJwtClient(selectBuilder, updateBuilder)
 
-    const response = await put(createContext(), {
-      orgId: 'org-123',
-      name: 'New Name',
-    }, undefined)
+    const response = await putRename()
 
     expect(response.status).toBe(200)
     expect(updateCustomerOrganizationNameMock).toHaveBeenCalledTimes(1)
@@ -636,13 +540,10 @@ describe('organization put Stripe sync', () => {
 
   it('skips Stripe sync for pending customer ids', async () => {
     const selectBuilder = createOrgSelectBuilder(createOrgRow({
-      id: 'org-123',
-      name: 'Old Name',
       customer_id: 'pending_org-123',
     }))
     const updateBuilder = createOrgUpdateBuilder({
       ...createOrgRow({
-        id: 'org-123',
         name: 'New Name',
         customer_id: 'pending_org-123',
       }),
@@ -650,16 +551,9 @@ describe('organization put Stripe sync', () => {
       logo: null,
     })
 
-    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
-      vi.fn()
-        .mockReturnValueOnce(selectBuilder)
-        .mockReturnValueOnce(updateBuilder),
-    ))
+    mockJwtClient(selectBuilder, updateBuilder)
 
-    const response = await put(createContext(), {
-      orgId: 'org-123',
-      name: 'New Name',
-    }, undefined)
+    const response = await putRename()
 
     expect(response.status).toBe(200)
     expect(updateCustomerOrganizationNameMock).not.toHaveBeenCalled()

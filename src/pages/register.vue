@@ -7,7 +7,6 @@ import { useRouter } from 'vue-router'
 import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
-import iconName from '~icons/ph/user?raw'
 import { authGhostButtonClass, authInlineLinkClass, authPanelClass, authPrimaryButtonClass } from '~/components/auth/pageStyles'
 import { hashEmail, useConsole } from '~/services/console'
 import { openSupport } from '~/services/support'
@@ -19,38 +18,41 @@ const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const isLoading = ref(false)
 
-async function submit(form: { first_name: string, last_name: string, password: string, email: string }) {
+async function submit(form: { password: string, email: string }) {
   if (isLoading.value)
     return
 
-  const hashedEmail = await hashEmail(form.email)
-  const { data: deleted, error: errorDeleted } = await supabase
-    .rpc('is_not_deleted', { email_check: hashedEmail })
-  if (errorDeleted)
-    console.error(errorDeleted)
-  if (!deleted) {
-    setErrors('register-account', [t('used-to-create')], {})
-    return
-  }
-
   isLoading.value = true
-  const { data: user, error } = await supabase.auth.signUp(
-    {
+  try {
+    const hashedEmail = await hashEmail(form.email)
+    const { data: deleted, error: errorDeleted } = await supabase
+      .rpc('is_not_deleted', { email_check: hashedEmail })
+    if (errorDeleted)
+      console.error(errorDeleted)
+    if (!deleted) {
+      setErrors('register-account', [t('used-to-create')], {})
+      return
+    }
+
+    // Names are collected on the onboarding About you step for every new signup.
+    const { data: user, error } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
       options: {
         captchaToken: turnstileToken.value,
-        data: { first_name: form.first_name, last_name: form.last_name, opt_for_newsletters: true },
+        data: { opt_for_newsletters: true },
       },
-    },
-  )
-  isLoading.value = false
-  if (error || !user) {
-    setErrors('register-account', [error?.message || 'user not found'], {})
-    return
-  }
+    })
+    if (error || !user) {
+      setErrors('register-account', [error?.message || t('account-error')], {})
+      return
+    }
 
-  router.push(user.session ? '/dashboard' : '/login?registered=true')
+    router.push(user.session ? '/dashboard' : '/login?registered=true')
+  }
+  finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -71,6 +73,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
             type="email"
             name="email"
             :prefix-icon="iconEmail"
+            autofocus
             autocomplete="email"
             inputmode="email"
             enterkeyhint="next"
@@ -83,51 +86,21 @@ async function submit(form: { first_name: string, last_name: string, password: s
           />
         </div>
 
-        <FormKit
-          type="text"
-          name="first_name"
-          :disabled="isLoading"
-          :prefix-icon="iconName"
-          :label="t('first-name')"
-          autocomplete="given-name"
-          validation="required:trim"
-          enterkeyhint="next"
-          data-test="first_name"
-          autofocus
-        />
-        <FormKit
-          type="text"
-          name="last_name"
-          :label="t('last-name')"
-          autocomplete="family-name"
-          :prefix-icon="iconName"
-          :disabled="isLoading"
-          validation="required:trim"
-          enterkeyhint="next"
-          data-test="last_name"
-        />
-
-        <FormKit
-          type="password"
-          name="password"
-          :prefix-icon="iconPassword"
-          autocomplete="new-password"
-          :label="t('password')"
-          data-test="password"
-          validation="required|length:6|contains_alpha|contains_uppercase|contains_lowercase|contains_symbol"
-          validation-visibility="dirty"
-        />
-        <FormKit
-          type="password"
-          name="password_confirm"
-          :prefix-icon="iconPassword"
-          :label="t('confirm-password')"
-          autocomplete="new-password"
-          data-test="confirm-password"
-          validation="required|confirm"
-          validation-visibility="dirty"
-          :validation-label="t('password-confirmatio')"
-        />
+        <div class="md:col-span-2">
+          <FormKit
+            type="password"
+            name="password"
+            :prefix-icon="iconPassword"
+            autocomplete="new-password"
+            :label="t('password')"
+            data-test="password"
+            validation="required|length:6|contains_alpha|contains_uppercase|contains_lowercase|contains_numeric|contains_symbol"
+            validation-visibility="dirty"
+            :classes="{
+              outer: 'mb-0!',
+            }"
+          />
+        </div>
 
         <div v-if="captchaKey" class="md:col-span-2 overflow-hidden">
           <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />

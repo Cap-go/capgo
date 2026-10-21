@@ -89,6 +89,7 @@ if (params.get('otaComplete') === '1') {
 const channelEvents: Array<{ event: OnboardingChannelEvent, properties: OnboardingChannelEventProperties }> = []
 const preview = { state, events, channelEvents, appId: ref(previewAppId), command: ref('npx @capgo/cli@latest i [API_KEY]'), hiding: ref(false), selectedOrgId: ref('') }
 const previewUserOnboarding = {
+  profile_completed_at: '2026-09-25T00:00:00.000Z',
   abtests: {
     ...(params.get('channelTreatment') === '1' ? { new_channel: { assigned_at: '2026-09-25T00:00:00.000Z', branch: 'A' } } : {}),
     ...(params.get('todoListTreatment') === '1' ? { ota_todo_list_v3: { assigned_at: '2026-09-25T00:00:00.000Z', branch: 'A' } } : {}),
@@ -220,7 +221,7 @@ const fixtureFetch: typeof fetch = async (input, init) => {
     if (url.pathname.endsWith('/apps') && params.get('unavailable') === '1')
       return new Response(JSON.stringify({ message: 'App unavailable' }), { status: 406, headers: { 'Content-Type': 'application/json' } })
     const app = { id: '00000000-0000-4000-8000-000000000003', app_id: previewAppId, name: 'My Capacitor app', icon_url: '', owner_org: '00000000-0000-4000-8000-000000000002', need_onboarding: true, onboarding: previewOnboarding() }
-    const user = { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', onboarding: previewUserOnboarding }
+    const user = { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', first_name: 'Preview', last_name: 'User', onboarding: previewUserOnboarding }
     const rows = url.pathname.endsWith('/apps') ? (!url.searchParams.get('owner_org') || url.searchParams.get('owner_org') === `eq.${app.owner_org}` ? [app] : []) : url.pathname.endsWith('/users') ? [user] : url.pathname.endsWith('/apikeys') ? [{ key: '00000000-0000-4000-8000-000000000004', rbac_id: '00000000-0000-4000-8000-000000000005', expires_at: null }] : url.pathname.endsWith('/role_bindings') ? [{ principal_id: '00000000-0000-4000-8000-000000000005', scope_type: 'org', roles: { name: 'org_super_admin' } }] : []
     const single = new Headers(init?.headers).get('Accept')?.includes('object')
     return new Response(JSON.stringify(single ? rows[0] ?? {} : rows), { headers: { 'Content-Type': 'application/json' } })
@@ -326,7 +327,7 @@ const app = createApp(defineComponent({
 const pinia = createPinia()
 app.use(pinia)
 // Supply identity to the real channel form without starting dashboard store watchers.
-Object.defineProperty(useMainStore(pinia), 'user', { value: { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', onboarding: previewUserOnboarding } })
+Object.defineProperty(useMainStore(pinia), 'user', { value: { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', first_name: 'Preview', last_name: 'User', onboarding: previewUserOnboarding } })
 Object.defineProperty(useMainStore(pinia), 'auth', { value: { id: '00000000-0000-4000-8000-000000000001' } })
 useMainStore(pinia).awaitInitialLoad = async () => true
 const organization = useOrganizationStore(pinia)

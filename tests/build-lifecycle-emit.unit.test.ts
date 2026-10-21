@@ -150,22 +150,11 @@ describe('emitBuildTransitionEvent', () => {
     })
   })
 
-  it('does NOT call sendEventToTracking when previous status is already terminal', async () => {
-    await emitBuildTransition({
-      previousStatus: 'succeeded',
-      effectiveStatus: 'succeeded',
-      timeoutApplied: false,
-    })
-
-    expect(sendEventToTrackingMock).not.toHaveBeenCalled()
-  })
-
-  it('does NOT call sendEventToTracking when previous === next and no timeout applied', async () => {
-    await emitBuildTransition({
-      previousStatus: 'running',
-      effectiveStatus: 'running',
-      timeoutApplied: false,
-    })
+  it.each([
+    ['previous status is already terminal', 'succeeded', 'succeeded'],
+    ['previous === next and no timeout applied', 'running', 'running'],
+  ] as const)('does NOT call sendEventToTracking when %s', async (_name, previousStatus, effectiveStatus) => {
+    await emitBuildTransition({ previousStatus, effectiveStatus, timeoutApplied: false })
 
     expect(sendEventToTrackingMock).not.toHaveBeenCalled()
   })

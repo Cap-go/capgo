@@ -360,6 +360,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/onboarding/name': RouteRecordInfo<
+      '/onboarding/name',
+      '/onboarding/name',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/onboarding/organization': RouteRecordInfo<
       '/onboarding/organization',
       '/onboarding/organization',
@@ -960,6 +967,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/onboarding/invitation.vue': {
       routes:
         | '/onboarding/invitation'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/onboarding/name.vue': {
+      routes:
+        | '/onboarding/name'
       views:
         | never
       pathParamNames:

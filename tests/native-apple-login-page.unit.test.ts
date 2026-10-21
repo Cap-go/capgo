@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   error: vi.fn(),
   warning: vi.fn(),
   getClaims: vi.fn(),
+  exchangeCodeForSession: vi.fn(),
   rpc: vi.fn(),
   signOut: vi.fn(),
   listFactors: vi.fn(),
@@ -23,11 +24,12 @@ const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
   setSession: vi.fn(),
   fullPath: '/login',
+  query: { to: '/apps' } as Record<string, string>,
   assign: vi.fn(),
 }))
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => mocks.available } }))
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ query: { to: '/apps' }, fullPath: mocks.fullPath, hash: '' }),
+  useRoute: () => ({ query: mocks.query, fullPath: mocks.fullPath, hash: '' }),
   useRouter: () => ({ replace: mocks.replace }),
 }))
 vi.mock('vue-sonner', () => ({ toast: { error: mocks.error, warning: mocks.warning, success: vi.fn() } }))
@@ -40,6 +42,7 @@ vi.mock('~/services/console', () => ({
     rpc: mocks.rpc,
     auth: {
       getClaims: mocks.getClaims,
+      exchangeCodeForSession: mocks.exchangeCodeForSession,
       getSession: async () => ({ data: { session: null } }),
       signOut: mocks.signOut,
       setSession: mocks.setSession,
@@ -76,7 +79,9 @@ beforeEach(() => {
   vi.clearAllMocks()
   mocks.available = true
   mocks.getClaims.mockResolvedValue({ data: { claims: null } })
+  mocks.exchangeCodeForSession.mockResolvedValue({ data: { session: null }, error: null })
   mocks.fullPath = '/login'
+  mocks.query = { to: '/apps' }
   sessionStorage.clear()
   vi.stubEnv('DEV', true)
   vi.stubEnv('VITE_WEB_APPLE_LOGIN_ENABLED', 'false')
@@ -251,5 +256,54 @@ describe('native Apple login page', () => {
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: 'local' })
     expect(mocks.replace).not.toHaveBeenCalled()
     expect(mocks.error).toHaveBeenCalledWith(messages['apple-login-failed'])
+  })
+})
+
+describe('account profile recovery', () => {
+  it('lets the user sign out and clears the recovery query', async () => {
+    mocks.query = { profile_unavailable: '1', to: '/apps' }
+    const root = await mount()
+    const logout = root.querySelector<HTMLButtonElement>('[data-test="account-load-logout"]')
+    expect(logout).not.toBeNull()
+    logout!.click()
+    await settle()
+    expect(mocks.signOut).toHaveBeenCalledOnce()
+    expect(mocks.replace).toHaveBeenCalledWith('/login')
+  })
+
+  it.each(['returned', 'thrown'])('keeps recovery available when logout fails (%s)', async (failure) => {
+    mocks.query = { profile_unavailable: '1', to: '/apps' }
+    if (failure === 'returned')
+      mocks.signOut.mockResolvedValue({ error: new Error('Sign out unavailable') })
+    else
+      mocks.signOut.mockRejectedValue(new Error('Sign out unavailable'))
+    const root = await mount()
+    const logout = root.querySelector<HTMLButtonElement>('[data-test="account-load-logout"]')
+    expect(logout).not.toBeNull()
+    logout!.click()
+    await settle()
+    expect(mocks.error).toHaveBeenCalledWith(messages['cannot-sign-off'])
+    expect(mocks.replace).not.toHaveBeenCalled()
+    expect(logout!.disabled).toBe(false)
+    expect(root.querySelector('[data-test="account-load-retry"]')).not.toBeNull()
+  })
+})
+
+describe('authorization code login bootstrap', () => {
+  it('continues to the validated destination after exchanging the code', async () => {
+    mocks.query = { code: 'one-time-code', to: '/apps' }
+    mocks.exchangeCodeForSession.mockResolvedValue({ data: { session: { user: { id: 'code-user' } } }, error: null })
+    await mount()
+    expect(mocks.exchangeCodeForSession).toHaveBeenCalledWith('one-time-code')
+    expect(mocks.replace).toHaveBeenCalledWith('/apps')
+  })
+
+  it.each(['error', 'missing-session'])('keeps the login available after an unsuccessful code exchange (%s)', async (failure) => {
+    mocks.query = { code: 'one-time-code', to: '/apps' }
+    mocks.exchangeCodeForSession.mockResolvedValue({ data: { session: failure === 'error' ? { user: { id: 'code-user' } } : null }, error: failure === 'error' ? new Error('Code expired') : null })
+    const root = await mount()
+    expect(mocks.exchangeCodeForSession).toHaveBeenCalledWith('one-time-code')
+    expect(mocks.replace).not.toHaveBeenCalled()
+    expect(root.querySelector('input[type="email"]')).not.toBeNull()
   })
 })

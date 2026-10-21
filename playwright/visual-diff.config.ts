@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test'
 import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../src/services/appOnboarding'
 import { BUILDER_STEP_IDS } from '../src/services/builderOnboardingChecklist'
+import { consoleQueryFromResponse, consoleQueryJson, consoleQueryMethod, consoleQueryPayload, consoleQueryRows, forwardConsoleQuery, routeConsoleQuery } from './support/consoleQuery'
+
 
 export interface VisualDiffRoute {
   slug: string
@@ -11,13 +13,70 @@ export interface VisualDiffRoute {
   prepare?: (page: Page) => Promise<void>
 }
 
-async function mockConsoleSecurity(page: Page) {
-  await page.route('**/private/console/query', (route) => {
-    const query = route.request().postDataJSON()
-    if (query.kind !== 'table' || query.name !== 'user_security')
-      return route.fallback()
-    return route.fulfill({ json: { data: { email_otp_verified_at: null }, error: null, status: 200 } })
+async function prepareProfileGoalScreenshot(page: Page, completed = false) {
+  const assignments = {}
+  let profile: Record<string, unknown> | undefined
+  await page.route('**/private/onboarding_ab_tests', route => route.fulfill({ json: { assignments } }))
+  await routeConsoleQuery(page, 'get_orgs_v7', route => route.fulfill(consoleQueryJson([])))
+  await routeConsoleQuery(page, 'users', async (route, query) => {
+    // Welcome persists a draft before opening About you. Keep those writes local
+    // instead of returning an empty conditional-update result or altering seed data.
+    const method = consoleQueryMethod(query)
+    if (method === 'PATCH' && profile) {
+      Object.assign(profile, consoleQueryPayload(query))
+      return route.fulfill(consoleQueryJson(consoleQueryRows(query, [profile])))
+    }
+    if (method !== 'GET')
+      return route.fulfill(consoleQueryJson(consoleQueryRows(query, [])))
+    if (profile)
+      return route.fulfill(consoleQueryJson(consoleQueryRows(query, [profile])))
+    const response = await route.fetch()
+    const json = await response.json() as { data?: unknown }
+    const row = Array.isArray(json.data) ? json.data[0] : json.data
+    if (!row)
+      throw new Error('The visual profile fixture requires an existing test user')
+    profile = {
+      ...row,
+      first_name: completed ? 'Example' : '',
+      last_name: completed ? 'User' : '',
+      onboarding: {
+        abtests: assignments,
+        version: 6,
+        ...(completed ? { profile_completed_at: '2026-10-20T11:00:00.000Z' } : {}),
+      },
+    }
+    await route.fulfill(consoleQueryJson(consoleQueryRows(query, [profile])))
   })
+  await page.reload()
+  const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
+  const goal = page.locator('[data-test="onboarding-intent-ota"]')
+  const name = page.locator('[data-test="onboarding-name-step"]')
+  await welcome.or(goal).or(name).waitFor()
+  if (await name.isVisible())
+    return
+  if (await welcome.isVisible())
+    await welcome.click()
+  await name.or(goal).waitFor()
+  if (await name.isVisible())
+    return
+  await goal.click()
+}
+
+async function prepareProfileResumeScreenshot(page: Page) {
+  await prepareProfileGoalScreenshot(page)
+  const firstName = page.locator('[data-test="onboarding-first-name"]')
+  // The base branch can still show Your goal without a separate name page.
+  if (!await firstName.isVisible())
+    return
+  const saved = page.waitForResponse((response) => {
+    const query = consoleQueryFromResponse(response)
+    return !!query && query.name === 'users' && consoleQueryMethod(query) === 'PATCH'
+      && consoleQueryPayload(query)?.onboarding?.profile_draft?.first_name === 'Example'
+  })
+  await firstName.fill('Example')
+  await saved
+  await page.reload()
+  await page.locator('[data-test="onboarding-name-step"]').or(page.locator('[data-test="onboarding-resume-continue"]')).waitFor()
 }
 
 const nativeObserveDays = ['2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28', '2026-09-29', '2026-09-30']
@@ -226,16 +285,13 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       } }
       // The production preview excludes development-only component fixtures.
       // Override read responses so base and head render the same assigned app.
-      await page.route('**/rest/v1/apps?*', async (route) => {
-        const response = await route.fetch()
-        const json = await response.json().catch(() => null)
-        const matchesApp = new URL(route.request().url()).searchParams.get('app_id') === 'eq.com.demo.app'
-        const override = (row: any) => row?.app_id === 'com.demo.app' || (matchesApp && row?.onboarding !== undefined)
+      await routeConsoleQuery(page, 'apps', async (route, query) => {
+        const matchesApp = query.operations.some(op => op.method === 'eq' && op.args[0] === 'app_id' && op.args[1] === 'com.demo.app')
+        await forwardConsoleQuery(route, (row: any) => row?.app_id === 'com.demo.app' || (matchesApp && row?.onboarding !== undefined)
           ? { ...row, need_onboarding: true, onboarding }
-          : row
-        await route.fulfill({ response, json: Array.isArray(json) ? json.map(override) : override(json) })
+          : row)
       })
-      await page.route('**/rpc/verify_getting_started', route => route.fulfill({ json: onboarding }))
+      await routeConsoleQuery(page, 'verify_getting_started', route => route.fulfill(consoleQueryJson(onboarding)))
       await page.route('**/private/onboarding_progress', route => route.fulfill({ json: { onboarding, hasChannel: false, checkErrors: [] } }))
       await page.goto('/app/com.demo.app/getting-started')
       await page.locator('[data-test="dual-onboarding-checklists"], [data-test="builder-checklist"]').first().waitFor()
@@ -244,6 +300,102 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     },
   })),
   { slug: 'login', path: '/login/', auth: false },
+  { slug: 'register', path: '/register/', auth: false },
+  {
+    slug: 'register-mobile',
+    path: '/register/',
+    auth: false,
+    prepare: page => page.setViewportSize({ width: 390, height: 844 }),
+  },
+  {
+    slug: 'onboarding-profile-goal',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: page => prepareProfileGoalScreenshot(page),
+  },
+  {
+    slug: 'onboarding-profile-goal-mobile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await prepareProfileGoalScreenshot(page)
+    },
+  },
+  {
+    slug: 'onboarding-profile-resume',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: prepareProfileResumeScreenshot,
+  },
+  {
+    slug: 'onboarding-profile-resume-mobile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await prepareProfileResumeScreenshot(page)
+    },
+  },
+  {
+    slug: 'onboarding-profile-intent',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: page => prepareProfileGoalScreenshot(page, true),
+  },
+  {
+    slug: 'onboarding-profile-intent-mobile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await prepareProfileGoalScreenshot(page, true)
+    },
+  },
+  {
+    slug: 'onboarding-organization-profile-legacy',
+    path: '/onboarding/organization?source=org-switcher',
+    auth: true,
+    prepare: async (page) => {
+      await routeConsoleQuery(page, 'users', route => forwardConsoleQuery(route, (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: { ...row.onboarding, version: 6 } })))
+      await page.reload()
+      await page.locator('[data-test="onboarding-intent-ota"]').click()
+      await page.locator('[data-test="onboarding-mode-name"]').click()
+      await page.locator('[data-test="onboarding-org-name"]').scrollIntoViewIfNeeded()
+    },
+  },
+  {
+    slug: 'onboarding-organization-profile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await routeConsoleQuery(page, 'users', async (route, query) => {
+        if (consoleQueryMethod(query) !== 'GET')
+          return route.fulfill(consoleQueryJson(consoleQueryRows(query, [])))
+        await forwardConsoleQuery(route, (row: any) => ({ ...row, first_name: 'Example', last_name: 'User', onboarding: { profile_completed_at: '2026-10-20T10:00:00.000Z' } }))
+      })
+      await page.reload()
+      // Base captures predate the required name step and still open on the legacy welcome canvas.
+      const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
+      const otaIntent = page.locator('[data-test="onboarding-intent-ota"]')
+      await welcome.or(otaIntent).waitFor()
+      if (await welcome.isVisible())
+        await welcome.click()
+      await otaIntent.click()
+      await page.locator('[data-test="app-onboarding-continue-intent"]').click()
+      const assistant = page.locator('[data-test="onboarding-development-environment-ai_assistant"]')
+      const appName = page.locator('[data-test="app-onboarding-name"]')
+      await assistant.or(appName).waitFor()
+      if (await assistant.isVisible()) {
+        await assistant.click()
+        await page.locator('[data-test="app-onboarding-continue-development-environment"]').click()
+      }
+      await appName.fill('Example App')
+      await page.locator('[data-test="app-onboarding-continue"]').click()
+      await page.locator('[data-test="app-onboarding-continue"]').click()
+      await page.locator('[data-test="onboarding-org-name"]').waitFor()
+    },
+  },
   { slug: 'dashboard', path: '/dashboard', auth: true },
   { slug: 'account-settings', path: '/settings/account', auth: true },
   {
@@ -251,8 +403,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     path: '/resend_email',
     auth: true,
     prepare: async (page) => {
-      await mockConsoleSecurity(page)
-      await page.route('**/rest/v1/user_security?*', route => route.fulfill({ json: { email_otp_verified_at: null } }))
+      await routeConsoleQuery(page, 'user_security', route => route.fulfill(consoleQueryJson({ email_otp_verified_at: null })))
       await page.goto('/resend_email?reason=email_not_verified&return_to=/settings/account')
       await page.getByRole('button', { name: 'Send verification code', exact: true }).waitFor()
     },
@@ -263,8 +414,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     auth: true,
     prepare: async (page) => {
       // Keep screenshots deterministic and never send a real verification email.
-      await mockConsoleSecurity(page)
-      await page.route('**/rest/v1/user_security?*', route => route.fulfill({ json: { email_otp_verified_at: null } }))
+      await routeConsoleQuery(page, 'user_security', route => route.fulfill(consoleQueryJson({ email_otp_verified_at: null })))
       await page.route('**/auth/email-otp/send-verification-otp', route => route.fulfill({ json: { success: true } }))
       await page.route('**/auth/v1/otp', route => route.fulfill({ json: { user: null, session: null } }))
       await page.goto('/resend_email?reason=email_not_verified&return_to=/settings/account')
@@ -317,24 +467,8 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       // Read-only response fixtures let both base and head render the same app.
       // The base ignores version 3; the head shows the experiment treatment.
       const onboarding = { setup: { todo_list_version: 3, source: 'manual', outcome: 'in_progress', steps: {} } }
-      await page.route('**/rest/v1/apps?*', async (route) => {
-        const response = await route.fetch()
-        const json = await response.json().catch(() => null)
-        const override = (row: any) => row?.app_id === 'com.demo.app' ? { ...row, need_onboarding: true, onboarding } : row
-        await route.fulfill({ response, json: Array.isArray(json) ? json.map(override) : override(json) })
-      })
-      await page.route('**/private/console/query', async (route) => {
-        const query = route.request().postDataJSON()
-        if (query.kind === 'rpc' && query.name === 'verify_getting_started')
-          return route.fulfill({ json: { data: onboarding, error: null, status: 200 } })
-        if (query.kind !== 'table' || query.name !== 'apps')
-          return route.fallback()
-        const response = await route.fetch()
-        const json = await response.json()
-        const override = (row: any) => row?.app_id === 'com.demo.app' ? { ...row, need_onboarding: true, onboarding } : row
-        await route.fulfill({ response, json: { ...json, data: Array.isArray(json.data) ? json.data.map(override) : override(json.data) } })
-      })
-      await page.route('**/rpc/verify_getting_started', route => route.fulfill({ json: onboarding }))
+      await routeConsoleQuery(page, 'apps', route => forwardConsoleQuery(route, (row: any) => row?.app_id === 'com.demo.app' ? { ...row, need_onboarding: true, onboarding } : row))
+      await routeConsoleQuery(page, 'verify_getting_started', route => route.fulfill(consoleQueryJson(onboarding)))
       await page.route('**/private/onboarding_progress', route => route.fulfill({ json: { onboarding, hasChannel: false, checkErrors: [] } }))
       await page.goto('/app/com.demo.app/getting-started')
       await page.getByRole('heading', { name: /Start guided setup|Finish setup in your app/ }).waitFor()

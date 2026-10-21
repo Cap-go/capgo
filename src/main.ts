@@ -16,6 +16,7 @@ import { getErrorMessage, isComponentResolutionErrorMessage, isKnownCrawlerNoise
 import { getAllowedConfirmationHosts, resolveConfirmationUrl } from '~/utils/safeRedirect'
 import App from './App.vue'
 import { getRemoteConfig } from './services/console'
+import '@fontsource-variable/inter'
 // your custom styles here
 import './styles/style.css'
 
