@@ -149,14 +149,36 @@ async function getWebsiteLiveCache(budget, hostname, appId) {
   return cached ? cached.clone() : null
 }
 
+/**
+ * Seconds the answer may still be stored here, so a snippet entry never
+ * outlives the worker's own: the worker TTL minus Age when the answer is aged.
+ * A worker cache hit without Age has an unknown remaining TTL and is not stored
+ * (storing it for the full TTL could double the staleness window).
+ */
+function getWebsiteLiveCacheTtl(headers) {
+  const cacheTtl = getCacheTtlSeconds(headers, null)
+  if (!cacheTtl)
+    return null
+  const ageHeader = headers.get('Age')
+  if (ageHeader !== null) {
+    const age = Number.parseInt(ageHeader.trim(), 10)
+    if (!Number.isFinite(age) || age < 0)
+      return null
+    return cacheTtl - age > 0 ? cacheTtl - age : null
+  }
+  return headers.get('X-Website-Live-Cache') === 'hit' ? null : cacheTtl
+}
+
 async function setWebsiteLiveCache(budget, hostname, appId, response) {
   try {
     if (response.status !== 200)
       return
-    const cacheTtl = getCacheTtlSeconds(response.headers, null)
+    const cacheTtl = getWebsiteLiveCacheTtl(response.headers)
     if (!cacheTtl)
       return
     const headers = new Headers(response.headers)
+    headers.delete('Age')
+    headers.set('Cache-Control', `public, max-age=${cacheTtl}, s-maxage=${cacheTtl}`)
     // The body is stored decoded: drop transfer headers that no longer match
     // it, and never replay cookies to other devices.
     headers.delete('Content-Encoding')

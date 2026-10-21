@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto'
 import forge from 'node-forge'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
@@ -302,14 +303,20 @@ describe('generateAndroidUploadKeystore', () => {
 })
 
 describe('validatePlayServiceAccountJson', () => {
+  // A real RSA PKCS#8 key, like the ones Google issues for service accounts.
+  const { privateKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+  })
   const valid = {
     type: 'service_account',
     project_id: 'proj-1',
     client_email: 'bot@proj-1.iam.gserviceaccount.com',
-    private_key: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n',
+    private_key: privateKey,
   }
 
-  it('accepts a valid key', () => {
+  it('accepts a service account with a real PKCS#8 key', () => {
     expect(validatePlayServiceAccountJson(JSON.stringify(valid))).toEqual({ clientEmail: valid.client_email, projectId: 'proj-1' })
   })
 

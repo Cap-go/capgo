@@ -262,6 +262,7 @@ describe('onboarding progress analytics', () => {
     const capture = vi.fn()
     const ids = [ATTEMPT_A2, RUN_R2_UUID]
     const onboardingVersion = (): '5.E' => NEW_CHANNEL_ANALYTICS_VERSION
+    const channelSteps = ['app_name', 'channel', 'setup'] as const
     const identity = createOnboardingTelemetryIdentity({
       capture,
       flow: 'pre_org',
@@ -270,8 +271,8 @@ describe('onboarding progress analytics', () => {
       supaHost: 'https://supabase.capgo.test',
     })
     identity.prepareResumeCandidate({
-      savedStep: 'organization',
-      steps,
+      savedStep: 'channel',
+      steps: channelSteps,
     })
     identity.recordResumeDialogViewed()
 
@@ -282,14 +283,11 @@ describe('onboarding progress analytics', () => {
       capture,
       flow: 'pre_org',
       resumed: false,
-      steps,
+      steps: channelSteps,
       supaHost: 'https://supabase.capgo.test',
     })
-    tracker.viewStep('intent')
-    tracker.trackStepEvent('onboarding_organization_invite_viewed', 'organization', {
-      intent: 'publish',
-      starting_out: true,
-    })
+    tracker.viewStep('channel')
+    tracker.trackStepEvent('onboarding_channel_stage_viewed', 'channel', { channel_stage: 'channel-create', channel_flow_origin: 'onboarding' })
 
     expect(capture.mock.calls).toHaveLength(3)
     for (const call of capture.mock.calls)

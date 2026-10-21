@@ -35,7 +35,7 @@
     <main id="loading">
       <div class="spinner" aria-hidden="true"></div>
       <p>Loading…</p>
-      <p class="muted">Preparing the app for first use.</p>
+      <p class="muted" id="loading-hint">Preparing the app for first use.</p>
     </main>
     <main id="offline" hidden>
       <p><strong>You are offline</strong></p>
@@ -46,8 +46,16 @@
       (function () {
         var loading = document.getElementById('loading')
         var offline = document.getElementById('offline')
+        var hint = document.getElementById('loading-hint')
+        var wasOffline = false
         function render() {
           var isOffline = navigator.onLine === false
+          if (isOffline)
+            wasOffline = true
+          // The updater only checks the website on launch and resume, so after a
+          // connection drop tell the user how to start a new check.
+          else if (wasOffline)
+            hint.textContent = 'Back online. If the app does not open in a few seconds, close it and open it again.'
           loading.hidden = isOffline
           offline.hidden = !isOffline
         }
@@ -57,11 +65,7 @@
           var updater = cap && cap.Plugins && cap.Plugins.CapacitorUpdater
           if (updater && updater.notifyAppReady) updater.notifyAppReady().catch(function () {})
         } catch (e) {}
-        document.getElementById('retry').addEventListener('click', function () {
-          loading.hidden = false
-          offline.hidden = true
-          setTimeout(function () { window.location.reload() }, 300)
-        })
+        document.getElementById('retry').addEventListener('click', render)
         window.addEventListener('online', render)
         window.addEventListener('offline', render)
         render()
