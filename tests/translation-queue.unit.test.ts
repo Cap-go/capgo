@@ -67,6 +67,52 @@ describe('translation queue helpers', () => {
     expect(__translationWorkerTestUtils__.translationPrompt('fr')).toContain('Use context to disambiguate')
   })
 
+  it.concurrent('adds the French glossary only to French prompts', () => {
+    const frenchPrompt = __translationWorkerTestUtils__.translationPrompt('fr')
+    expect(frenchPrompt).toContain('channel -> canal')
+    expect(frenchPrompt).toContain('AI -> IA')
+    expect(__translationWorkerTestUtils__.reviewPrompt('fr')).toContain('channel -> canal')
+
+    const germanPrompt = __translationWorkerTestUtils__.translationPrompt('de')
+    expect(germanPrompt).toContain('to German')
+    expect(germanPrompt).toContain('Keep the English developer terms')
+    expect(germanPrompt).not.toContain('channel -> canal')
+  })
+
+  it.concurrent('disables thinking only for hybrid reasoning models', () => {
+    const batch: [string, string, string][] = [['save', 'Save', '']]
+    expect(__translationWorkerTestUtils__.translationRequest('@cf/deepseek-ai/deepseek-v4.1-flash-1017', 'fr', batch))
+      .toMatchObject({ chat_template_kwargs: { enable_thinking: false }, temperature: 0 })
+    expect(__translationWorkerTestUtils__.translationRequest('@cf/meta/llama-3.1-8b-instruct-fast', 'fr', batch))
+      .not.toHaveProperty('chat_template_kwargs')
+  })
+
+  it.concurrent('applies the review pass and keeps drafts when the review fails', async () => {
+    const batch: [string, string, string][] = [['channel', 'Channel', ''], ['save', 'Save', '']]
+    const reviewedAi = {
+      run: vi.fn()
+        .mockResolvedValueOnce({ response: JSON.stringify({ translations: { channel: 'Chaîne', save: 'Enregistrer' } }) })
+        .mockResolvedValueOnce({ response: JSON.stringify({ translations: { channel: 'Canal', save: 'Save' } }) }),
+    }
+    await expect(__translationWorkerTestUtils__.translateBatch(reviewedAi, 'translator', 'fr', batch, 'reviewer'))
+      .resolves
+      .toEqual({ channel: 'Canal', save: 'Enregistrer' })
+    expect(reviewedAi.run).toHaveBeenLastCalledWith('reviewer', expect.objectContaining({
+      messages: expect.arrayContaining([
+        expect.objectContaining({ role: 'user', content: expect.stringContaining('"draft":"Chaîne"') }),
+      ]),
+    }))
+
+    const failingReviewAi = {
+      run: vi.fn()
+        .mockResolvedValueOnce({ response: JSON.stringify({ translations: { channel: 'Canal', save: 'Enregistrer' } }) })
+        .mockRejectedValue(new Error('review unavailable')),
+    }
+    await expect(__translationWorkerTestUtils__.translateBatch(failingReviewAi, 'translator', 'fr', batch, 'reviewer'))
+      .resolves
+      .toEqual({ channel: 'Canal', save: 'Enregistrer' })
+  })
+
   it.concurrent('keeps source text when translation drops a placeholder', () => {
     expect(__translationWorkerTestUtils__.keepTranslation('Used {count} times', 'Utilise plusieurs fois')).toBe('Used {count} times')
   })

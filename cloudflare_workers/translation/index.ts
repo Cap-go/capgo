@@ -1,11 +1,26 @@
 import type { D1Database, ExecutionContext, MessageBatch, Queue } from '@cloudflare/workers-types'
 import sourceMessageContexts from '../../messages/en.context.json' with { type: 'json' }
 import sourceMessages from '../../messages/en.json' with { type: 'json' }
+import { translationStyleGuide } from './style_guides.ts'
 
 const CACHE_TTL_SECONDS = 5 * 60
 const PENDING_TRANSLATION_STORE_TTL_SECONDS = 60 * 60
 const READY_TRANSLATION_STORE_TTL_SECONDS = 7 * 24 * 60 * 60
-const DEFAULT_TRANSLATION_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast'
+// Picked from a French benchmark against Workers AI models: best quality per cost and
+// fast with thinking disabled. See the PR introducing it for the before/after table.
+const DEFAULT_TRANSLATION_MODEL = '@cf/deepseek-ai/deepseek-v4.1-flash-1017'
+// Bump when the prompt, style guides or default models change so every locale is
+// translated again instead of serving catalogs made by the previous pipeline.
+const TRANSLATION_PIPELINE_VERSION = 2
+// Hybrid reasoning models think before answering by default. The first translation
+// pass does not need it (same benchmark score, a fraction of the latency and cost);
+// the optional review pass keeps it, since reviewing without thinking changed nothing.
+const THINKING_MODEL_PREFIXES = [
+  '@cf/deepseek-ai/deepseek-v4',
+  '@cf/google/gemma-4',
+  '@cf/qwen/qwen3',
+  '@cf/zai-org/glm-',
+]
 const MAX_BATCH_CHARACTERS = 6_000
 const MAX_BATCH_ITEMS = 60
 const TRANSLATION_ATTEMPTS = 3
@@ -84,6 +99,7 @@ interface TranslationWorkerBindings {
   ENV_NAME?: string
   TRANSLATION_MESSAGES_QUEUE?: Queue<Required<TranslationQueuePayload>>
   TRANSLATION_MODEL?: string
+  TRANSLATION_REVIEW_MODEL?: string
 }
 
 interface TranslationBody {
@@ -172,6 +188,7 @@ const sourceMessageContextCatalog = catalogWithoutSchema(sourceMessageContexts a
 const sourceCatalogChecksumPromise = sha256Hex(JSON.stringify({
   contexts: sourceMessageContextCatalog,
   messages: sourceMessageCatalog,
+  pipelineVersion: TRANSLATION_PIPELINE_VERSION,
 })) // NOSONAR: top-level await is disallowed by lint config.
 let translationStoreInitialized = false
 let lastTranslationStoreCleanupAt = 0
@@ -237,6 +254,16 @@ function requestIdFrom(request: Request) {
 
 function getTranslationModel(env: TranslationWorkerBindings) {
   return env.TRANSLATION_MODEL || DEFAULT_TRANSLATION_MODEL
+}
+
+function getTranslationReviewModel(env: TranslationWorkerBindings) {
+  return env.TRANSLATION_REVIEW_MODEL?.trim() || null
+}
+
+function modelRequestOptions(model: string) {
+  return THINKING_MODEL_PREFIXES.some(prefix => model.startsWith(prefix))
+    ? { chat_template_kwargs: { enable_thinking: false } }
+    : {}
 }
 
 function targetLanguageLabel(targetLanguage: string) {
@@ -484,16 +511,30 @@ const translationResponseSchema = {
 }
 
 function translationPrompt(targetLanguage: string) {
+  const language = targetLanguageLabel(targetLanguage)
   return [
-    `Translate Capgo application UI messages from English to ${targetLanguageLabel(targetLanguage)}.`,
-    'Return JSON only, with a translations object keyed by the exact input keys.',
+    `You are a senior native ${language} software localizer translating the Capgo web console (a developer-tools SaaS) from English to ${language}.`,
+    'The result must read as if a native developer wrote it in the target language: translate meaning, not words, with correct grammar and agreement.',
     'Each input value is an object with text (translate this) and optional context (where/how the text is used in the Capgo console UI).',
     'Use context to disambiguate meaning, tone, and part of speech (button label vs title vs status vs empty state).',
-    'Translate only the text field. Do not translate or copy context into the output.',
+    'Translate only the text field. Do not translate or copy context into the output. Keep short UI labels short.',
+    'Keep code, URLs, commands, numbers, and placeholders unchanged. Every placeholder like {count}, %name%, or $1 must be copied exactly.',
+    translationStyleGuide(targetLanguage),
+    'Return JSON only, with a translations object keyed by the exact input keys.',
     'Each translations value must be a plain string of the translated text only, never a JSON object or {text, context} wrapper.',
-    'Translate user-facing text naturally. Keep product names, code, URLs, commands, numbers, and placeholders unchanged.',
-    'Every placeholder like {count}, %name%, or $1 must be copied exactly.',
-  ].join(' ')
+  ].join('\n')
+}
+
+function reviewPrompt(targetLanguage: string) {
+  const language = targetLanguageLabel(targetLanguage)
+  return [
+    `You are a senior native ${language} reviewer for the Capgo web console (a developer-tools SaaS).`,
+    `Each input value has the English text, optional UI context, and a draft ${language} translation.`,
+    'Fix mistranslations, wrong terminology, literal or unnatural phrasing, grammar and agreement errors, wrong register, English Title Case, untranslated English, translated product names, and broken placeholders.',
+    'Keep the draft when it is already correct and natural. Keep short UI labels short. Every placeholder like {count}, %name%, or $1 must be copied exactly.',
+    translationStyleGuide(targetLanguage),
+    'Return JSON only, with a translations object keyed by the exact input keys, each value a plain string with the final translation.',
+  ].join('\n')
 }
 
 function translationBatchPayload(batch: MessageEntry[]) {
@@ -506,10 +547,11 @@ function translationBatchPayload(batch: MessageEntry[]) {
   return { messages }
 }
 
-function translationRequest(targetLanguage: string, batch: MessageEntry[]) {
+function translationRequestBody(systemPrompt: string, payload: unknown, options: Record<string, unknown> = {}) {
   return {
     temperature: 0,
     max_tokens: 8192,
+    ...options,
     response_format: {
       type: 'json_schema',
       json_schema: translationResponseSchema,
@@ -517,14 +559,33 @@ function translationRequest(targetLanguage: string, batch: MessageEntry[]) {
     messages: [
       {
         role: 'system',
-        content: translationPrompt(targetLanguage),
+        content: systemPrompt,
       },
       {
         role: 'user',
-        content: JSON.stringify(translationBatchPayload(batch)),
+        content: JSON.stringify(payload),
       },
     ],
   }
+}
+
+function translationRequest(model: string, targetLanguage: string, batch: MessageEntry[]) {
+  return translationRequestBody(translationPrompt(targetLanguage), translationBatchPayload(batch), modelRequestOptions(model))
+}
+
+function reviewBatchPayload(batch: MessageEntry[], drafts: Record<string, string>) {
+  const messages: Record<string, TranslationPromptMessage & { draft: string }> = {}
+  for (const [key, text, context] of batch) {
+    messages[key] = context
+      ? { text, context, draft: drafts[key] ?? text }
+      : { text, draft: drafts[key] ?? text }
+  }
+  return { messages }
+}
+
+function reviewRequest(targetLanguage: string, batch: MessageEntry[], drafts: Record<string, string>) {
+  // Room for the reviewer's reasoning tokens on top of the JSON answer.
+  return translationRequestBody(reviewPrompt(targetLanguage), reviewBatchPayload(batch, drafts), { max_tokens: 16384 })
 }
 
 function translatedBatch(batch: MessageEntry[], translations: Record<string, string>) {
@@ -541,12 +602,12 @@ function normalizeTranslationError(error: unknown) {
   return error instanceof Error ? error : new Error(String(error))
 }
 
-async function translateBatch(ai: AiBinding, model: string, targetLanguage: string, batch: MessageEntry[]) {
+async function runTranslationRequest(ai: AiBinding, model: string, request: unknown, batch: MessageEntry[], logContext: Record<string, unknown>) {
   let lastError: Error | null = null
 
   for (let attempt = 1; attempt <= TRANSLATION_ATTEMPTS; attempt += 1) {
     try {
-      const result = await ai.run(model, translationRequest(targetLanguage, batch))
+      const result = await ai.run(model, request)
       const translations = parseTranslationObject(extractAiText(result) || result)
       if (!translations)
         throw new Error('Workers AI returned invalid JSON')
@@ -555,8 +616,8 @@ async function translateBatch(ai: AiBinding, model: string, targetLanguage: stri
     catch (error) {
       lastError = normalizeTranslationError(error)
       cloudlog({
-        message: 'Message translation batch failed',
-        targetLanguage,
+        ...logContext,
+        model,
         attempt,
         batchSize: batch.length,
         error: lastError.message,
@@ -565,6 +626,34 @@ async function translateBatch(ai: AiBinding, model: string, targetLanguage: stri
   }
 
   throw lastError ?? new Error('Message translation failed')
+}
+
+// Optional second pass (TRANSLATION_REVIEW_MODEL): a reviewer model fixes the draft
+// against the same style guide. A failed review keeps the draft instead of failing the batch.
+async function reviewTranslatedBatch(ai: AiBinding, reviewModel: string, targetLanguage: string, batch: MessageEntry[], drafts: Record<string, string>) {
+  try {
+    const reviewed = await runTranslationRequest(ai, reviewModel, reviewRequest(targetLanguage, batch, drafts), batch, {
+      message: 'Message translation review failed',
+      targetLanguage,
+    })
+    return Object.fromEntries(batch.map(([key, source]) => [
+      key,
+      reviewed[key] !== source ? reviewed[key] : drafts[key],
+    ] as const))
+  }
+  catch {
+    return drafts
+  }
+}
+
+async function translateBatch(ai: AiBinding, model: string, targetLanguage: string, batch: MessageEntry[], reviewModel: string | null = null) {
+  const drafts = await runTranslationRequest(ai, model, translationRequest(model, targetLanguage, batch), batch, {
+    message: 'Message translation batch failed',
+    targetLanguage,
+  })
+  if (!reviewModel)
+    return drafts
+  return reviewTranslatedBatch(ai, reviewModel, targetLanguage, batch, drafts)
 }
 
 function messageCatalogOf(value: unknown): Record<string, string> {
@@ -1249,7 +1338,7 @@ async function translateOwnedBatch(ai: AiBinding, env: TranslationWorkerBindings
   }
 
   try {
-    return await translateBatch(ai, model, targetLanguage, batch)
+    return await translateBatch(ai, model, targetLanguage, batch, getTranslationReviewModel(env))
   }
   catch (error) {
     await releaseTranslationBatchClaim(env, checksum, targetLanguage, batchIndex).catch(() => {})
@@ -1431,12 +1520,16 @@ export const __translationWorkerTestUtils__ = {
   isReadyTranslationFresh,
   isTranslationBatchLeaseExpired,
   keepTranslation,
+  modelRequestOptions,
   normalizeBatchIndex,
   parseTranslationObject,
+  reviewPrompt,
+  translateBatch,
   translationBatchPayload,
   translationBatchClaimMarker,
   translationBatchIndexFromStore,
   translationPrompt,
+  translationRequest,
   translationStoreTtlSeconds,
   unwrapTranslatedMessage,
 }
