@@ -460,6 +460,13 @@ function getStripeErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Payment failed'
 }
 
+function isCapgoError(error: unknown, errorCode: string) {
+  if (!error || typeof error !== 'object' || !('cause' in error))
+    return false
+  const cause = error.cause
+  return !!cause && typeof cause === 'object' && 'error' in cause && cause.error === errorCode
+}
+
 // Only after a real decline, and only while the invoice is still open.
 async function tryBackupAfterDecline(c: Context, ctx: InAppBillingContext, invoiceId: string, attempt: FailedAttempt) {
   try {
@@ -473,6 +480,9 @@ async function tryBackupAfterDecline(c: Context, ctx: InAppBillingContext, invoi
     return await payInvoiceWithBackupCard(c, ctx.stripe, ctx.customerId, invoiceId, { chargeId: attempt.chargeId, paymentMethodId }) === 'paid'
   }
   catch (error) {
+    // Let the caller surface a retryable lookup failure instead of the primary card decline.
+    if (isCapgoError(error, 'subscription_lookup_unknown'))
+      throw error
     cloudlogErr({ requestId: c.get('requestId'), message: 'in-app backup card fallback', customerId: ctx.customerId, invoiceId, error })
     return false
   }

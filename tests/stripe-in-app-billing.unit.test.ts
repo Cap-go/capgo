@@ -494,4 +494,22 @@ describe('payOpenInvoice', () => {
       message: 'Your card was declined.',
     })
   })
+
+  it('surfaces a temporary subscription lookup failure from Pay now backup fallback', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [main, card('pm_back', 'fp_back')])
+    mockActiveSubscription(null, false)
+    mocks.findLatestOpenSubscriptionInvoice.mockResolvedValue({ id: 'in_123' })
+    stripe.invoices.retrieve.mockResolvedValue({ id: 'in_123', status: 'open' })
+    stripe.invoices.pay.mockRejectedValueOnce(Object.assign(new Error('Your card was declined.'), {
+      type: 'StripeCardError',
+      code: 'card_declined',
+      charge: 'ch_1',
+      payment_method: 'pm_main',
+    }))
+
+    await expect(payOpenInvoice(createContext(), createBillingContext(stripe))).rejects.toThrow('Subscription payment method is temporarily unknown')
+    expect(stripe.invoices.pay).toHaveBeenCalledTimes(1)
+  })
 })
