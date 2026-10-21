@@ -103,6 +103,10 @@ Capgo sends the initial invitation itself (Cloudflare Email). After a successful
 
 The flow (kept as JSON in `Cap-go/bento-unofficial-api`, `bento-json-flows/capgo-invitation-reminders.json`) owns the timing and checks the field before each reminder:
 
+Deploy that flow alongside the application change. Until it is deployed, Bento accepts `org:invite_sent` events but sends no invitation reminders. Enable **Repeatable** in Bento so separate invitations for one recipient can each start a flow; JSON format version 1 does not manage this setting. Confirm that the field check reads the subscriber's current field after each delay.
+
+Enrollment uses at-least-once delivery. Confirmed acceptance is recorded per invitation generation, but a lost Bento response or failed database commit can cause a retry to start a duplicate flow. The [Bento Events API](https://bentonow.com/docs/events_api) does not document idempotency for custom flow events; purchase `unique.key` is not a documented flow-enrollment guarantee. Both runs still stop when that invitation leaves `capgo_open_invites`.
+
 ```liquid
 {% assign open_invites = visitor.capgo_open_invites | default: "" | split: " " %}{% if open_invites contains event.details.invite_id %}true{% else %}false{% endif %}
 ```

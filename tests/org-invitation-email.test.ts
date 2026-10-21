@@ -1,7 +1,8 @@
 import type { Context } from 'hono'
 import { randomUUID } from 'node:crypto'
+import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { executeSQL, POSTGRES_URL, USER_ID, USER_ID_NONMEMBER } from './test-utils.ts'
+import { executeSQL, POSTGRES_URL, USER_ID } from './test-utils.ts'
 
 // Use Worker bindings in this Node test; database operations remain real.
 vi.mock('../supabase/functions/_backend/utils/utils.ts', async () => ({
@@ -16,6 +17,7 @@ interface BentoEvent { type: string, email: string, details?: Record<string, str
 
 // Record Bento batch events instead of calling the real API.
 const bentoEvents: BentoEvent[] = []
+const bentoHooks = new Map<string, () => Promise<void>>()
 const realFetch = globalThis.fetch
 beforeAll(() => {
   vi.stubGlobal('EdgeRuntime', undefined)
@@ -25,15 +27,26 @@ beforeAll(() => {
       return realFetch(input, init)
     const { events } = JSON.parse(String(init?.body)) as { events: BentoEvent[] }
     bentoEvents.push(...events)
+    for (const event of events) {
+      const hook = event.details?.invite_id && bentoHooks.get(event.details.invite_id)
+      if (hook)
+        await hook()
+    }
     return Response.json({ results: events.length, failed: 0 })
   })
 })
 afterAll(() => vi.unstubAllGlobals())
 
-async function createFixture(kind: Kind) {
+async function createFixture(kind: Kind, recipientEmail?: string) {
   const orgId = randomUUID()
   const orgName = `Invitation delivery test ${orgId}`
   const generations: string[] = []
+  const recipientUserId = randomUUID()
+  const email = recipientEmail ?? `invitation-${orgId}@example.com`
+  if (kind === 'existing') {
+    await executeSQL('INSERT INTO auth.users (id, email) VALUES ($1, $2)', [recipientUserId, email])
+    await executeSQL('INSERT INTO public.users (id, email) VALUES ($1, $2)', [recipientUserId, email])
+  }
   await executeSQL(`
     INSERT INTO public.orgs (id, created_by, name, management_email)
     VALUES ($1, $2, $3, 'invitation-delivery@example.com')
@@ -42,11 +55,11 @@ async function createFixture(kind: Kind) {
     ? await executeSQL<{ id: number }>(`
       INSERT INTO public.tmp_users (org_id, email, first_name, last_name, invite_magic_string, invited_by_user_id)
       VALUES ($1, $2, 'Alex', '', $3, $4) RETURNING id
-    `, [orgId, `invitation-${orgId}@example.com`, `token-${orgId}`, USER_ID])
+    `, [orgId, email, `token-${orgId}`, USER_ID])
     : await executeSQL<{ id: number }>(`
       INSERT INTO public.org_users (org_id, user_id, is_invite, rbac_role_name)
       VALUES ($1, $2, true, 'org_member') RETURNING id
-    `, [orgId, USER_ID_NONMEMBER])
+    `, [orgId, recipientUserId])
   const inviteId = invitations[0]!.id
   const column = kind === 'new' ? 'tmp_user_id' : 'org_user_id'
   const state = async () => {
@@ -59,10 +72,10 @@ async function createFixture(kind: Kind) {
     return row
   }
   const send = vi.fn(async (_email: unknown) => ({ messageId: `message-${orgId}` }))
-  const post = (id: string) => app.request('http://local/', {
+  const request = (body: unknown) => app.request('http://local/', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'apisecret': 'invitation-test-secret' },
-    body: JSON.stringify({ org_invitation_id: id }),
+    body: JSON.stringify(body),
   }, {
     API_SECRET: 'invitation-test-secret',
     SUPABASE_DB_URL: POSTGRES_URL,
@@ -77,21 +90,77 @@ async function createFixture(kind: Kind) {
   return {
     orgId,
     orgName,
+    email,
+    recipientUserId,
     inviteId,
     column,
     state,
     send,
-    post,
+    post: (id: string) => request({ org_invitation_id: id }),
+    sync: () => request({ org_invitation_bento_sync: { email } }),
     inviteSentEvents,
     cleanup: async () => {
       await executeSQL('DELETE FROM public.orgs WHERE id = $1', [orgId])
+      if (kind === 'existing') {
+        await executeSQL('DELETE FROM public.users WHERE id = $1', [recipientUserId])
+        await executeSQL('DELETE FROM auth.users WHERE id = $1', [recipientUserId])
+      }
       await executeSQL(`DELETE FROM pgmq.q_send_email WHERE message->'payload'->>'org_invitation_id' = ANY($1)`, [generations])
-      await executeSQL(`DELETE FROM pgmq.q_send_email WHERE message->'payload'->'org_invitation_bento_sync'->>'email' = $1`, [`invitation-${orgId}@example.com`])
+      await executeSQL(`DELETE FROM pgmq.q_send_email WHERE message->'payload'->'org_invitation_bento_sync'->>'email' = $1`, [email.trim().toLowerCase()])
+      for (const id of generations)
+        bentoHooks.delete(id)
     },
   }
 }
 
 describe.each(['new', 'existing'] as const)('%s-account invitation delivery with PostgreSQL', (kind) => {
+  it.concurrent('reconciles a close that waits for in-flight Bento enrollment', async () => {
+    const fixture = await createFixture(kind)
+    const applicationName = `invitation-close-${fixture.orgId}`
+    const closePool = new Pool({ connectionString: POSTGRES_URL, application_name: applicationName })
+    let releaseBento!: () => void
+    let enteredBento!: () => void
+    const entered = new Promise<void>((resolve) => { enteredBento = resolve })
+    const released = new Promise<void>((resolve) => { releaseBento = resolve })
+    let sending: Promise<Response> | undefined
+    let closing: Promise<unknown> | undefined
+    try {
+      const queued = await fixture.state()
+      bentoHooks.set(queued.id, async () => {
+        enteredBento()
+        await released
+      })
+      sending = Promise.resolve(fixture.post(queued.id))
+      await entered
+      closing = closePool.query(kind === 'new'
+        ? 'DELETE FROM public.tmp_users WHERE id = $1'
+        : 'UPDATE public.org_users SET is_invite = false WHERE id = $1', [fixture.inviteId])
+      await vi.waitFor(async () => {
+        const activity = await executeSQL<{ wait_event_type: string }>(
+          'SELECT wait_event_type FROM pg_catalog.pg_stat_activity WHERE application_name = $1', [applicationName],
+        )
+        expect(activity.some(row => row.wait_event_type === 'Lock')).toBe(true)
+      })
+      releaseBento()
+      expect((await sending).status).toBe(200)
+      await closing
+      const jobs = await executeSQL<{ count: string }>(`
+        SELECT count(*) FROM pgmq.q_send_email
+        WHERE message->'payload'->'org_invitation_bento_sync'->>'email' = $1
+      `, [fixture.email])
+      expect(jobs[0]!.count).toBe('1')
+      expect((await fixture.sync()).status).toBe(200)
+      expect(bentoEvents.filter(event => event.type === '$update_fields' && event.email === fixture.email).at(-1)?.fields)
+        .toEqual({ capgo_open_invites: '' })
+    }
+    finally {
+      releaseBento()
+      await Promise.allSettled([sending, closing])
+      await closePool.end()
+      await fixture.cleanup()
+    }
+  })
+
   it.concurrent('sends once across eight concurrent deliveries and starts one Bento flow', async () => {
     const fixture = await createFixture(kind)
     try {
@@ -166,6 +235,51 @@ describe.each(['new', 'existing'] as const)('%s-account invitation delivery with
       await fixture.cleanup()
     }
   })
+})
+
+it('clears the original Bento subscriber after an account email changes and the account is deleted', async () => {
+  const fixture = await createFixture('existing')
+  try {
+    const queued = await fixture.state()
+    expect((await fixture.post(queued.id)).status).toBe(200)
+    await executeSQL('UPDATE public.users SET email = $2 WHERE id = $1', [fixture.recipientUserId, `changed-${fixture.orgId}@example.com`])
+    await executeSQL('DELETE FROM public.users WHERE id = $1', [fixture.recipientUserId])
+    const jobs = await executeSQL<{ count: string }>(`
+      SELECT count(*) FROM pgmq.q_send_email
+      WHERE message->'payload'->'org_invitation_bento_sync'->>'email' = $1
+    `, [fixture.email])
+    expect(jobs[0]!.count).toBe('1')
+    expect((await fixture.sync()).status).toBe(200)
+    expect(bentoEvents.filter(event => event.type === '$update_fields' && event.email === fixture.email).at(-1)?.fields)
+      .toEqual({ capgo_open_invites: '' })
+  }
+  finally {
+    await fixture.cleanup()
+  }
+})
+
+it('keeps both invitation kinds in one normalized subscriber field across concurrent enrollment and close syncs', async () => {
+  const email = `mixed-invitation-${randomUUID()}@example.com`
+  const newFixture = await createFixture('new', email.toUpperCase())
+  const existingFixture = await createFixture('existing', email)
+  try {
+    const newState = await newFixture.state()
+    const existingState = await existingFixture.state()
+    const responses = await Promise.all([newFixture.post(newState.id), existingFixture.post(existingState.id)])
+    expect(responses.map(response => response.status)).toEqual([200, 200])
+    const enrollments = bentoEvents.filter(event => event.type === 'org:invite_sent' && event.email === email)
+    expect(enrollments).toHaveLength(2)
+    expect(enrollments.at(-1)!.fields!.capgo_open_invites.split(' ').sort())
+      .toEqual([newState.id, existingState.id].sort())
+    await executeSQL('DELETE FROM public.tmp_users WHERE id = $1', [newFixture.inviteId])
+    expect((await existingFixture.sync()).status).toBe(200)
+    expect(bentoEvents.filter(event => event.type === '$update_fields' && event.email === email).at(-1)?.fields)
+      .toEqual({ capgo_open_invites: existingState.id })
+  }
+  finally {
+    await newFixture.cleanup()
+    await existingFixture.cleanup()
+  }
 })
 
 it('records a delayed provider acceptance after the shared transaction idle cutoff', async () => {

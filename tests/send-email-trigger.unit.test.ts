@@ -104,12 +104,10 @@ function mockInvitation(overrides: Partial<typeof invitation> = {}, openInvites 
       row = { ...row, bento_synced_at: providerAcceptedAt }
       return { rows: [], rowCount: 1 }
     }
-    if (query.includes('FROM public.org_invitation_email_requests r'))
-      return { rows: [row] }
-    if (query.includes('JOIN public.org_invitation_email_requests r'))
+    if (query.includes('r.bento_email = $1'))
       return { rows: openInvites.map(id => ({ id })) }
-    if (query.includes('FROM public.users WHERE id'))
-      return { rows: [{ email: 'member@example.com' }] }
+    if (query.includes('FOR UPDATE OF r'))
+      return { rows: [row] }
     return { rows: [], rowCount: 1 }
   })
 }
@@ -151,7 +149,8 @@ describe('send_email queue handler', () => {
     expect(content.text).toContain('Pat Admin')
     expect(content.text).toContain('valid for seven days')
     expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('SET sent_at'), [orgInvitationId, 'message-id'])
-    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('FROM public.tmp_users t'), ['invitee@example.com'])
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_xact_lock'), ['invitee@example.com'])
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('r.bento_email = $1'), ['invitee@example.com', orgInvitationId])
     expect(trackBentoEventsMock).toHaveBeenCalledOnce()
     expect(trackBentoEventsMock).toHaveBeenCalledWith(expect.anything(), 'invitee@example.com', [{
       event: 'org:invite_sent',
@@ -167,10 +166,13 @@ describe('send_email queue handler', () => {
         invite_link: 'https://console.capgo.app/invitation?invite_magic_string=secret-invite-token',
       },
       fields: { capgo_open_invites: `${otherInvitationId} ${orgInvitationId}` },
-    }])
-    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('SET bento_synced_at'), [orgInvitationId])
+    }], expect.any(AbortSignal))
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('SET bento_synced_at'), [orgInvitationId, 'invitee@example.com'])
     // The email commits before Bento is contacted, so a Bento failure never resends it.
-    expect(sqlIndex('SET sent_at')).toBeLessThan(sqlIndex('SET bento_synced_at'))
+    const emailCommit = sqlIndex('COMMIT')
+    expect(emailCommit).toBeGreaterThan(sqlIndex('SET sent_at'))
+    expect(emailCommit).toBeLessThan(sqlIndex('pg_advisory_xact_lock'))
+    expect(queryMock.mock.invocationCallOrder[emailCommit]).toBeLessThan(trackBentoEventsMock.mock.invocationCallOrder[0]!)
     expect(JSON.stringify(logMock.mock.calls)).toContain('message-id')
     expect(JSON.stringify(logMock.mock.calls)).not.toContain('secret-invite-token')
     expect(JSON.stringify(logMock.mock.calls)).not.toContain('invitee@example.com')
@@ -189,7 +191,7 @@ describe('send_email queue handler', () => {
     expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise))
     expect(queryMock).toHaveBeenCalledWith('SET LOCAL idle_in_transaction_session_timeout = 60000')
     expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('SET sent_at'), [orgInvitationId, 'message-id'])
-    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('SET bento_synced_at'), [orgInvitationId])
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('SET bento_synced_at'), [orgInvitationId, 'invitee@example.com'])
   })
 
   it('sends an existing-account organization invite and starts the existing-user flow', async () => {
@@ -202,7 +204,7 @@ describe('send_email queue handler', () => {
     const content = sendMock.mock.calls[0]![0] as { html: string, text: string }
     expect(content.html).toContain(`/dashboard?invite_org=${orgId}`)
     expect(content.text).toContain('with your existing account')
-    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('FROM public.org_users ou'), [recipientUserId])
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('r.bento_email = $1'), ['invitee@example.com', orgInvitationId])
     const [, email, events] = trackBentoEventsMock.mock.calls[0]!
     expect(email).toBe('invitee@example.com')
     expect(events).toEqual([expect.objectContaining({
@@ -218,7 +220,16 @@ describe('send_email queue handler', () => {
     expect(response.status).toBe(200)
     expect(sendMock).not.toHaveBeenCalled()
     expect(trackBentoEventsMock).toHaveBeenCalledOnce()
-    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('SET bento_synced_at'), [orgInvitationId])
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('SET bento_synced_at'), [orgInvitationId, 'invitee@example.com'])
+  })
+
+  it('uses one normalized Bento subscriber for differently cased invitation addresses', async () => {
+    mockInvitation({ email: 'Invitee@Example.COM', sent_at: providerAcceptedAt })
+    expect((await postSendEmail({ org_invitation_id: orgInvitationId })).status).toBe(200)
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_xact_lock'), ['invitee@example.com'])
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('r.bento_email = $1'), ['invitee@example.com', orgInvitationId])
+    expect(trackBentoEventsMock.mock.calls[0]![1]).toBe('invitee@example.com')
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('SET bento_synced_at'), [orgInvitationId, 'invitee@example.com'])
   })
 
   it.each([
@@ -259,6 +270,15 @@ describe('send_email queue handler', () => {
     expect(sqlIndex('SET bento_synced_at')).toBe(-1)
   })
 
+  it('skips the Bento event when the invitation closed before enrollment', async () => {
+    mockInvitation({}, [otherInvitationId])
+    const response = await postSendEmail({ org_invitation_id: orgInvitationId })
+    expect(response.status).toBe(200)
+    expect(sendMock).toHaveBeenCalledOnce()
+    expect(trackBentoEventsMock).not.toHaveBeenCalled()
+    expect(sqlIndex('SET bento_synced_at')).toBe(-1)
+  })
+
   it('does not mark the flow started when Bento is not configured', async () => {
     trackBentoEventsMock.mockResolvedValueOnce(undefined)
     const response = await postSendEmail({ org_invitation_id: orgInvitationId })
@@ -273,33 +293,36 @@ describe('send_email queue handler', () => {
     expect(sendMock).not.toHaveBeenCalled()
   })
 
-  it('rewrites a new invitee\'s open invites after an invitation closes', async () => {
+  it('rewrites a subscriber\'s open invites after an invitation closes', async () => {
     mockInvitation({}, [otherInvitationId])
-    const response = await postSendEmail({ org_invitation_bento_sync: { kind: 'new', email: 'invitee@example.com' } }, false)
+    const response = await postSendEmail({ org_invitation_bento_sync: { email: 'invitee@example.com' } }, false)
     expect(response.status).toBe(200)
-    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('FROM public.tmp_users t'), ['invitee@example.com'])
-    expect(updateBentoFieldsMock).toHaveBeenCalledWith(expect.anything(), 'invitee@example.com', { capgo_open_invites: otherInvitationId })
+    expect(sqlIndex('pg_advisory_xact_lock')).toBeLessThan(sqlIndex('r.bento_email = $1'))
+    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('r.bento_email = $1'), ['invitee@example.com', null])
+    expect(updateBentoFieldsMock).toHaveBeenCalledWith(expect.anything(), 'invitee@example.com', { capgo_open_invites: otherInvitationId }, expect.any(AbortSignal))
+    expect(queryMock).toHaveBeenCalledWith('COMMIT')
     expect(sendMock).not.toHaveBeenCalled()
   })
 
-  it('clears an existing user\'s open invites after their last invitation closes', async () => {
+  it('clears the field after a subscriber\'s last invitation closes', async () => {
     mockInvitation({}, [])
-    const response = await postSendEmail({ org_invitation_bento_sync: { kind: 'existing', user_id: recipientUserId } }, false)
+    const response = await postSendEmail({ org_invitation_bento_sync: { email: 'member@example.com' } }, false)
     expect(response.status).toBe(200)
-    expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('FROM public.org_users ou'), [recipientUserId])
-    expect(updateBentoFieldsMock).toHaveBeenCalledWith(expect.anything(), 'member@example.com', { capgo_open_invites: '' })
+    expect(updateBentoFieldsMock).toHaveBeenCalledWith(expect.anything(), 'member@example.com', { capgo_open_invites: '' }, expect.any(AbortSignal))
   })
 
-  it('fails the field sync so the queue retries when Bento rejects it', async () => {
-    updateBentoFieldsMock.mockResolvedValueOnce(false)
-    const response = await postSendEmail({ org_invitation_bento_sync: { kind: 'new', email: 'invitee@example.com' } }, false)
+  it.each([false, undefined])('retries a field sync without confirmed Bento acceptance (%s)', async (result) => {
+    updateBentoFieldsMock.mockResolvedValueOnce(result)
+    const response = await postSendEmail({ org_invitation_bento_sync: { email: 'invitee@example.com' } }, false)
     expect(response.status).toBe(500)
+    expect(queryMock).toHaveBeenCalledWith('ROLLBACK')
   })
 
   it.each([
-    { kind: 'existing', user_id: 'not-a-uuid' },
-    { kind: 'new', email: '' },
-    { kind: 'other' },
+    { email: '' },
+    { email: '   ' },
+    { email: 42 },
+    {},
   ])('rejects a malformed Bento sync payload before using the database', async (recipient) => {
     const response = await postSendEmail({ org_invitation_bento_sync: recipient }, false)
     expect(response.status).toBe(400)

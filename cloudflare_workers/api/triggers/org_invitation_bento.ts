@@ -14,45 +14,36 @@ import { orgInvitationLink, selectOrgInvitationForUpdate } from './org_invitatio
 export const INVITE_SENT_EVENT = 'org:invite_sent'
 export const OPEN_INVITES_FIELD = 'capgo_open_invites'
 
-export type OrgInvitationRecipient
-  = | { kind: 'new', email: string }
-    | { kind: 'existing', userId: string }
-
-// Open invitations Bento has been told about (or is being told about now).
-// Bounded by tmp_users_email_idx / finx_org_users_user_id plus unique FKs.
-const OPEN_NEW_INVITES_SQL = `
+// Open invitations Bento tracks for one subscriber address, plus the
+// generation being enrolled now. Bounded by the partial bento_email index
+// and the request primary key; each join is by primary key.
+const OPEN_INVITES_SQL = `
   SELECT r.id::text AS id
-  FROM public.tmp_users t
-  JOIN public.org_invitation_email_requests r ON r.tmp_user_id = t.id
-  WHERE t.email = $1 AND r.sent_at IS NOT NULL AND t.cancelled_at IS NULL
-    AND GREATEST(t.updated_at, t.created_at) > CURRENT_TIMESTAMP - INTERVAL '7 days'
-  ORDER BY r.id
-`
-const OPEN_EXISTING_INVITES_SQL = `
-  SELECT r.id::text AS id
-  FROM public.org_users ou
-  JOIN public.org_invitation_email_requests r ON r.org_user_id = ou.id
-  WHERE ou.user_id = $1 AND r.sent_at IS NOT NULL
-    AND ou.is_invite AND ou.app_id IS NULL AND ou.channel_id IS NULL
+  FROM public.org_invitation_email_requests r
+  LEFT JOIN public.tmp_users t ON t.id = r.tmp_user_id
+  LEFT JOIN public.org_users ou ON ou.id = r.org_user_id
+  WHERE (r.bento_email = $1 OR r.id = $2::uuid) AND r.sent_at IS NOT NULL
+    AND CASE WHEN r.tmp_user_id IS NOT NULL THEN
+      t.id IS NOT NULL AND t.cancelled_at IS NULL
+        AND GREATEST(t.updated_at, t.created_at) > CURRENT_TIMESTAMP - INTERVAL '7 days'
+    ELSE
+      ou.id IS NOT NULL AND ou.is_invite AND ou.app_id IS NULL AND ou.channel_id IS NULL
+    END
   ORDER BY r.id
 `
 
-async function readOpenInvites(client: PgQueryClient, recipient: OrgInvitationRecipient): Promise<{ email: string | null, openInvites: string }> {
-  let email: string | null
-  let rows: { id: string }[]
-  if (recipient.kind === 'new') {
-    email = recipient.email
-    rows = (await client.query<{ id: string }>(OPEN_NEW_INVITES_SQL, [recipient.email])).rows
-  }
-  else {
-    const user = await client.query<{ email: string }>('SELECT email FROM public.users WHERE id = $1', [recipient.userId])
-    email = user.rows[0]?.email ?? null
-    rows = (await client.query<{ id: string }>(OPEN_EXISTING_INVITES_SQL, [recipient.userId])).rows
-  }
-  return { email, openInvites: rows.map(row => row.id).join(' ') }
+// Serializes every Bento field write for one subscriber so a stale list can
+// never land after a newer one. Each caller reads the open list after this.
+async function lockBentoSubscriber(client: PgQueryClient, email: string) {
+  await client.query('SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(pg_catalog.lower($1), 0))', [email])
 }
 
-export function buildInviteSentEvent(invitation: OrgInvitation, inviteLink: string, openInvites: string): BentoBatchEvent {
+async function readOpenInvites(client: PgQueryClient, email: string, enrollingId: string | null): Promise<string[]> {
+  const { rows } = await client.query<{ id: string }>(OPEN_INVITES_SQL, [email, enrollingId])
+  return rows.map(row => row.id)
+}
+
+export function buildInviteSentEvent(invitation: OrgInvitation, inviteLink: string, openInvites: readonly string[]): BentoBatchEvent {
   return {
     event: INVITE_SENT_EVENT,
     data: {
@@ -66,12 +57,16 @@ export function buildInviteSentEvent(invitation: OrgInvitation, inviteLink: stri
       invited_last_name: escapeHtml(invitation.last_name?.trim() || ''),
       invite_link: inviteLink,
     },
-    fields: { [OPEN_INVITES_FIELD]: openInvites },
+    fields: { [OPEN_INVITES_FIELD]: openInvites.join(' ') },
   }
 }
 
-// Starts the Bento reminder flow once per sent generation. The field update
-// rides on the same event so the flow never sees the invite as closed.
+// Starts the Bento reminder flow for a sent generation. The field update
+// rides on the same event so the flow never sees the invite as closed. The
+// request row stays locked until the marker commits, so a concurrent close
+// waits and then queues its own field sync.
+// The marker suppresses confirmed repeats, but Bento and Postgres cannot
+// commit atomically: an ambiguous failure can enroll the generation again.
 export async function startOrgInvitationBentoFlow(c: Context<MiddlewareKeyVariables>, invitationId: string) {
   const pgPool = await getPgClient(c)
   try {
@@ -84,12 +79,16 @@ export async function startOrgInvitationBentoFlow(c: Context<MiddlewareKeyVariab
         return
       }
 
-      const recipient: OrgInvitationRecipient = invitation.tmp_user_id !== null
-        ? { kind: 'new', email: invitation.email }
-        : { kind: 'existing', userId: invitation.recipient_user_id! }
-      const { openInvites } = await readOpenInvites(client, recipient)
+      const email = invitation.email.trim().toLowerCase()
+      await lockBentoSubscriber(client, email)
+      const openInvites = await readOpenInvites(client, email, invitation.id)
+      // A fresh read after the locks; the invite may have closed meanwhile.
+      if (!openInvites.includes(invitation.id)) {
+        cloudlog({ requestId: c.get('requestId'), message: 'organization invitation closed before Bento flow', invitationId })
+        return
+      }
       const event = buildInviteSentEvent(invitation, orgInvitationLink(c, invitation), openInvites)
-      const accepted = await trackBentoEvents(c, invitation.email, [event])
+      const accepted = await trackBentoEvents(c, email, [event], AbortSignal.timeout(10_000))
       if (accepted === false)
         throw new Error('Bento rejected the organization invitation event')
       // Without Bento configured there is no flow to start; leave it unmarked.
@@ -97,9 +96,9 @@ export async function startOrgInvitationBentoFlow(c: Context<MiddlewareKeyVariab
         return
       await client.query(`
         UPDATE public.org_invitation_email_requests
-        SET bento_synced_at = pg_catalog.clock_timestamp()
+        SET bento_synced_at = pg_catalog.clock_timestamp(), bento_email = $2
         WHERE id = $1
-      `, [invitationId])
+      `, [invitationId, email])
     })
   }
   finally {
@@ -107,19 +106,20 @@ export async function startOrgInvitationBentoFlow(c: Context<MiddlewareKeyVariab
   }
 }
 
-// Rewrites the open-invites field after an invitation closes so running
-// reminder flows for it stop at their next check.
-export async function syncOrgInvitationBentoField(c: Context<MiddlewareKeyVariables>, recipient: OrgInvitationRecipient) {
+// Rewrites a subscriber's open-invites field after an invitation closes or
+// is resent, so running reminder flows for it stop at their next check.
+export async function syncOrgInvitationBentoField(c: Context<MiddlewareKeyVariables>, email: string) {
+  email = email.trim().toLowerCase()
   const pgPool = await getPgClient(c)
   try {
-    const { email, openInvites } = await withPgTransaction(pgPool, client => readOpenInvites(client, recipient))
-    if (!email) {
-      cloudlog({ requestId: c.get('requestId'), message: 'organization invitation Bento field sync skipped', kind: recipient.kind })
-      return
-    }
-    const accepted = await updateBentoFields(c, email, { [OPEN_INVITES_FIELD]: openInvites })
-    if (accepted === false)
-      throw new Error('Bento rejected the organization invitation field update')
+    await withPgTransaction(pgPool, async (client) => {
+      await client.query('SET LOCAL idle_in_transaction_session_timeout = 60000')
+      await lockBentoSubscriber(client, email)
+      const openInvites = await readOpenInvites(client, email, null)
+      const accepted = await updateBentoFields(c, email, { [OPEN_INVITES_FIELD]: openInvites.join(' ') }, AbortSignal.timeout(10_000))
+      if (accepted !== true)
+        throw new Error('Bento rejected the organization invitation field update')
+    })
   }
   finally {
     closeClient(c, pgPool)

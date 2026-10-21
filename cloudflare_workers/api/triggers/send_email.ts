@@ -16,10 +16,7 @@ import { sendOrgInvitationEmail } from './org_invitation_email.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-const orgInvitationBentoSyncSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('new'), email: z.string().trim().min(1) }),
-  z.object({ kind: z.literal('existing'), user_id: z.uuid() }),
-])
+const orgInvitationBentoSyncSchema = z.object({ email: z.string().trim().min(1).max(320) })
 
 app.post('/', middlewareAPISecret, async (c) => {
   const body = await parseBody<GoTrueSendEmailEvent & { org_invitation_id?: unknown, org_invitation_bento_sync?: unknown }>(c)
@@ -28,14 +25,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     if (!recipient.success)
       throw simpleError('invalid_payload', 'Invalid organization invitation Bento sync payload')
     try {
-      await syncOrgInvitationBentoField(c, recipient.data.kind === 'new'
-        ? { kind: 'new', email: recipient.data.email }
-        : { kind: 'existing', userId: recipient.data.user_id })
+      await syncOrgInvitationBentoField(c, recipient.data.email)
     }
     catch (error) {
-      quickError(500, 'org_invitation_bento_sync_failed', 'Organization invitation Bento sync failed', {
-        kind: recipient.data.kind,
-      }, error)
+      quickError(500, 'org_invitation_bento_sync_failed', 'Organization invitation Bento sync failed', {}, error)
     }
     return c.json(BRES)
   }
@@ -49,8 +42,9 @@ app.post('/', middlewareAPISecret, async (c) => {
     if (!invitationId.success)
       throw simpleError('invalid_payload', 'Invalid organization invitation email payload')
     try {
-      // Both steps are idempotent per generation, so a queue retry after a
-      // Bento failure skips the already-sent email and retries only Bento.
+      // A queue retry after a Bento failure skips the already-sent email.
+      // Bento enrollment is at least once: acceptance followed by a lost
+      // response or failed marker commit can start a duplicate reminder flow.
       const delivery = sendOrgInvitationEmail(c, invitationId.data)
         .then(() => startOrgInvitationBentoFlow(c, invitationId.data))
       // Finish recording acceptance even if the queue's HTTP client times out.
