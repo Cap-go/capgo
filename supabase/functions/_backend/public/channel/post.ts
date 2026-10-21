@@ -6,7 +6,7 @@ import { HTTPException } from 'hono/http-exception'
 import { throwIfChannelUpdatePackageMismatch } from '../../utils/channel_update_package.ts'
 import { BRES, simpleError } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
-import { checkoutPgClient, closeClient, getDrizzleClient, getPgClient, logPgError, releasePgClient } from '../../utils/pg.ts'
+import { beginWriteTransaction, checkoutPgClient, closeClient, getDrizzleClient, getPgClient, logPgError, releasePgClient } from '../../utils/pg.ts'
 import { checkPermission, checkPermissionPg } from '../../utils/rbac.ts'
 import { supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
 import { isInternalVersionName, isValidAppId } from '../../utils/utils.ts'
@@ -283,7 +283,7 @@ async function createAndPromoteChannelInTransaction(
   let transactionStarted = false
   try {
     dbClient = await checkoutPgClient(pgClient)
-    await dbClient.query('BEGIN')
+    await beginWriteTransaction(dbClient)
     transactionStarted = true
     await dbClient.query(
       'SELECT set_config(\'request.headers\', $1, true)',

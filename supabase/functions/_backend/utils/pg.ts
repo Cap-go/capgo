@@ -7,7 +7,8 @@ import { alias } from 'drizzle-orm/pg-core'
 import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
 import { Client, Pool } from 'pg'
-import { configureTransactionAccessMode, getPgAccessMode, inheritPgAccessMode, readOnlyStartupOptions, setPgAccessMode, TRANSACTION_IDLE_TIMEOUT_MS } from '../plugin_runtime/utils/pg_transaction_mode.ts'
+import { BEGIN_WRITE_TRANSACTION_SQL, configureTransactionAccessMode, getPgAccessMode, inheritPgAccessMode, readOnlyStartupOptions, setPgAccessMode, TRANSACTION_IDLE_TIMEOUT_MS } from '../plugin_runtime/utils/pg_transaction_mode.ts'
+export { BEGIN_WRITE_TRANSACTION_SQL, TRANSACTION_IDLE_TIMEOUT_MS } from '../plugin_runtime/utils/pg_transaction_mode.ts'
 import { serializePostgresError } from '../plugin_runtime/utils/postgres_error.ts'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
@@ -506,13 +507,18 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PgClien
 // Transactions must run on one checked-out connection: BEGIN/COMMIT issued on
 // the Pool itself can land on different connections and leave one idle in
 // transaction, holding row locks until the server kills it.
+export async function beginWriteTransaction(client: Pick<PgQueryClient, 'query'>): Promise<void> {
+  await client.query(BEGIN_WRITE_TRANSACTION_SQL)
+}
+
 export async function withPgTransaction<T>(pgPool: PgClient, run: (client: PgQueryClient) => Promise<T>): Promise<T> {
   const client = await checkoutPgClient(pgPool)
   try {
-    await client.query(getPgAccessMode(pgPool) === 'read only' ? 'BEGIN READ ONLY' : 'BEGIN READ WRITE')
+    // Bound the transaction on the same round trip as BEGIN so an abandoned
+    // request cannot pin the Hyperdrive origin connection with no timeout.
+    const begin = getPgAccessMode(pgPool) === 'read only' ? 'BEGIN READ ONLY' : 'BEGIN READ WRITE'
+    await client.query(`${begin}; SET LOCAL statement_timeout = 10000; SET LOCAL idle_in_transaction_session_timeout = ${TRANSACTION_IDLE_TIMEOUT_MS}`)
     try {
-      await client.query('SET LOCAL statement_timeout = 10000')
-      await client.query(`SET LOCAL idle_in_transaction_session_timeout = ${TRANSACTION_IDLE_TIMEOUT_MS}`)
       const result = await run(client)
       await client.query('COMMIT')
       return result

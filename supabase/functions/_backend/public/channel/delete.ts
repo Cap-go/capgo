@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { HTTPException } from 'hono/http-exception'
 import { BRES, simpleError } from '../../utils/hono.ts'
-import { checkoutPgClient, closeClient, getPgClient, logPgError, releasePgClient } from '../../utils/pg.ts'
+import { beginWriteTransaction, checkoutPgClient, closeClient, getPgClient, logPgError, releasePgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
@@ -174,7 +174,7 @@ async function deletePreviewChannelAndBundle(
 
   try {
     dbClient = await checkoutPgClient(pgClient)
-    await dbClient.query('BEGIN')
+    await beginWriteTransaction(dbClient)
     transactionStarted = true
 
     const expectedChannel = await loadPreviewChannelOwner(dbClient, body)
