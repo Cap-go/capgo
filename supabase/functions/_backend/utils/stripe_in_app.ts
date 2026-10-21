@@ -98,16 +98,40 @@ function toCardSummary(paymentMethod: Stripe.PaymentMethod | null | undefined): 
   }
 }
 
-export async function getDefaultCard(ctx: InAppBillingContext): Promise<CardSummary | null> {
-  const customer = await ctx.stripe.customers.retrieve(ctx.customerId, { expand: ['invoice_settings.default_payment_method'] })
+export interface SavedCards {
+  card: CardSummary | null
+  backupCard: CardSummary | null
+}
+
+export type PaymentMethodRole = 'default' | 'backup'
+
+function isExpired(paymentMethod: Stripe.PaymentMethod, now = new Date()) {
+  const card = paymentMethod.card
+  if (!card)
+    return true
+  const year = now.getUTCFullYear()
+  return card.exp_year < year || (card.exp_year === year && card.exp_month < now.getUTCMonth() + 1)
+}
+
+// The backup is the newest other valid card: Stripe only ever charges the default on its own.
+async function findSavedPaymentMethods(stripe: Stripe, customerId: string) {
+  const customer = await stripe.customers.retrieve(customerId, { expand: ['invoice_settings.default_payment_method'] })
   if (customer.deleted)
-    return null
-  const defaultPaymentMethod = customer.invoice_settings?.default_payment_method
-  if (defaultPaymentMethod && typeof defaultPaymentMethod === 'object')
-    return toCardSummary(defaultPaymentMethod)
+    return { defaultPaymentMethod: null, backupPaymentMethod: null }
+  const cards = await stripe.paymentMethods.list({ customer: customerId, type: 'card', limit: 10 })
+  const expandedDefault = customer.invoice_settings?.default_payment_method
   // Older customers only have the card Checkout saved, without a default.
-  const cards = await ctx.stripe.paymentMethods.list({ customer: ctx.customerId, type: 'card', limit: 1 })
-  return toCardSummary(cards.data[0])
+  const defaultPaymentMethod = expandedDefault && typeof expandedDefault === 'object' ? expandedDefault : cards.data[0] ?? null
+  const defaultFingerprint = defaultPaymentMethod?.card?.fingerprint
+  const backupPaymentMethod = cards.data.find(paymentMethod => paymentMethod.id !== defaultPaymentMethod?.id
+    && !isExpired(paymentMethod)
+    && (!defaultFingerprint || paymentMethod.card?.fingerprint !== defaultFingerprint)) ?? null
+  return { defaultPaymentMethod, backupPaymentMethod }
+}
+
+export async function getSavedCards(ctx: InAppBillingContext): Promise<SavedCards> {
+  const { defaultPaymentMethod, backupPaymentMethod } = await findSavedPaymentMethods(ctx.stripe, ctx.customerId)
+  return { card: toCardSummary(defaultPaymentMethod), backupCard: toCardSummary(backupPaymentMethod) }
 }
 
 export async function getSubscriptionSummary(c: Context, ctx: InAppBillingContext): Promise<SubscriptionSummary | null> {
@@ -180,14 +204,18 @@ async function resolveConfirmedPaymentMethodId(ctx: InAppBillingContext, intentI
   throw simpleError('invalid_intent_id', 'Invalid intent id')
 }
 
-// Make the card the customer's default so renewals, retries and auto top-up use it.
-export async function setDefaultPaymentMethodFromIntent(c: Context, ctx: InAppBillingContext, intentId: string) {
+// default: renewals, retries and auto top-up use it. backup: charged only when the default fails.
+export async function savePaymentMethodFromIntent(c: Context, ctx: InAppBillingContext, intentId: string, role: PaymentMethodRole = 'default') {
   const paymentMethodId = await resolveConfirmedPaymentMethodId(ctx, intentId)
   if (!paymentMethodId)
     throw simpleError('missing_payment_method', 'No card was saved')
   const paymentMethod = await ctx.stripe.paymentMethods.retrieve(paymentMethodId)
   if (paymentMethod.customer !== ctx.customerId)
     await ctx.stripe.paymentMethods.attach(paymentMethodId, { customer: ctx.customerId })
+  if (role === 'backup') {
+    cloudlog({ requestId: c.get('requestId'), message: 'in-app backup card saved', customerId: ctx.customerId, paymentMethodId })
+    return toCardSummary(paymentMethod)
+  }
   await ctx.stripe.customers.update(ctx.customerId, { invoice_settings: { default_payment_method: paymentMethodId } })
   const subscriptionId = await getActiveSubscriptionId(c, ctx.customerId)
   if (subscriptionId) {
@@ -200,6 +228,41 @@ export async function setDefaultPaymentMethodFromIntent(c: Context, ctx: InAppBi
     }
   }
   return toCardSummary(paymentMethod)
+}
+
+export function parsePaymentMethodRole(value: unknown): PaymentMethodRole {
+  if (value === undefined || value === null || value === 'default')
+    return 'default'
+  if (value === 'backup')
+    return 'backup'
+  throw simpleError('invalid_payment_method_role', 'Role must be default or backup')
+}
+
+// Only the backup can be removed: the default keeps renewals working.
+export async function removeBackupCard(c: Context, ctx: InAppBillingContext, paymentMethodId: string) {
+  const { backupPaymentMethod } = await findSavedPaymentMethods(ctx.stripe, ctx.customerId)
+  if (!backupPaymentMethod || backupPaymentMethod.id !== paymentMethodId)
+    throw simpleError('invalid_payment_method', 'This card is not the backup card')
+  await ctx.stripe.paymentMethods.detach(paymentMethodId)
+  cloudlog({ requestId: c.get('requestId'), message: 'in-app backup card removed', customerId: ctx.customerId, paymentMethodId })
+  return await getSavedCards(ctx)
+}
+
+// Charges the open renewal with the backup card after the default failed. Returns true once paid.
+export async function payInvoiceWithBackupCard(c: Context, stripe: Stripe, customerId: string, invoiceId: string, failedPaymentMethodId?: string | null) {
+  try {
+    const { backupPaymentMethod } = await findSavedPaymentMethods(stripe, customerId)
+    // A failed backup charge fires charge.failed again: never retry the card that just failed.
+    if (!backupPaymentMethod || backupPaymentMethod.id === failedPaymentMethodId)
+      return false
+    const paid = await stripe.invoices.pay(invoiceId, { payment_method: backupPaymentMethod.id, off_session: true })
+    cloudlog({ requestId: c.get('requestId'), message: 'backup card charged', customerId, invoiceId, status: paid.status })
+    return paid.status === 'paid'
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'backup card charge failed', customerId, invoiceId, code: getStripeErrorCode(error), error: getStripeErrorMessage(error) })
+    return false
+  }
 }
 
 export function parseCancelFeedback(value: unknown): CancelFeedback {
@@ -280,8 +343,11 @@ export async function payOpenInvoice(c: Context, ctx: InAppBillingContext): Prom
   catch (error) {
     const code = getStripeErrorCode(error)
     cloudlog({ requestId: c.get('requestId'), message: 'in-app invoice pay failed', customerId: ctx.customerId, invoiceId: invoice.id, code })
-    if (code !== 'invoice_payment_intent_requires_action')
+    if (code !== 'invoice_payment_intent_requires_action') {
+      if (await payInvoiceWithBackupCard(c, ctx.stripe, ctx.customerId, invoice.id))
+        return { status: 'paid' }
       return { status: 'requires_payment_method', message: getStripeErrorMessage(error) }
+    }
   }
   const paymentIntent = await getInvoicePaymentIntent(ctx, invoice.id)
   // Without Stripe.js there is no way to run 3DS here; ask for another card instead.

@@ -7,12 +7,12 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconLock from '~icons/heroicons/lock-closed'
 import BillingModal from '~/components/billing/BillingModal.vue'
-import { createCardSetupIntent, getInvoicePaymentIntent, getStripeJs, saveDefaultPaymentMethod } from '~/services/stripe'
+import { createCardSetupIntent, getInvoicePaymentIntent, getStripeJs, savePaymentMethod } from '~/services/stripe'
 
 const props = defineProps<{
   orgId: string
-  // setup: save a new default card. invoice: pay the open invoice with a new card (saved as default).
-  mode: 'setup' | 'invoice'
+  // setup: save a new default card. backup: save a fallback card. invoice: pay the open invoice with a new card (saved as default).
+  mode: 'setup' | 'backup' | 'invoice'
   amountLabel?: string
 }>()
 
@@ -32,10 +32,21 @@ let elements: StripeElements | null = null
 let publishableKey = ''
 let disposed = false
 
-const title = computed(() => props.mode === 'invoice' ? t('billing-pay-invoice-title') : t('billing-card-title'))
-const description = computed(() => props.mode === 'invoice'
-  ? t('billing-pay-invoice-desc', { amount: props.amountLabel ?? '' })
-  : t('billing-card-desc'))
+const title = computed(() => {
+  if (props.mode === 'invoice')
+    return t('billing-pay-invoice-title')
+  return props.mode === 'backup' ? t('billing-backup-card-title') : t('billing-card-title')
+})
+const description = computed(() => {
+  if (props.mode === 'invoice')
+    return t('billing-pay-invoice-desc', { amount: props.amountLabel ?? '' })
+  return props.mode === 'backup' ? t('billing-backup-card-desc') : t('billing-card-desc')
+})
+const successMessage = computed(() => {
+  if (props.mode === 'invoice')
+    return t('billing-invoice-paid')
+  return props.mode === 'backup' ? t('billing-backup-card-saved') : t('billing-card-saved')
+})
 const submitLabel = computed(() => props.mode === 'invoice'
   ? t('billing-pay-amount', { amount: props.amountLabel ?? '' })
   : t('billing-save-card'))
@@ -110,7 +121,7 @@ async function submit() {
     }
     let card: BillingCard | null = null
     try {
-      card = (await saveDefaultPaymentMethod(props.orgId, intentId)).card
+      card = (await savePaymentMethod(props.orgId, intentId, props.mode === 'backup' ? 'backup' : 'default')).card
     }
     catch (error) {
       // The invoice is already paid; only making the card the default failed.
@@ -118,7 +129,7 @@ async function submit() {
         throw error
       console.error('Cannot set default card after invoice payment', error)
     }
-    toast.success(props.mode === 'invoice' ? t('billing-invoice-paid') : t('billing-card-saved'))
+    toast.success(successMessage.value)
     emit('saved', card)
   }
   catch (error) {

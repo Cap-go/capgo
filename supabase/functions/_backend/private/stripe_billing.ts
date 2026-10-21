@@ -7,18 +7,20 @@ import { middlewareAuth } from '../utils/hono_jwt.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import {
   createCardSetupIntent,
-  getDefaultCard,
   getInAppBillingContext,
   getOpenInvoicePaymentSecret,
   getOpenInvoiceSummary,
+  getSavedCards,
   getSubscriptionSummary,
   listInvoices,
   parseCancelComment,
   parseCancelFeedback,
+  parsePaymentMethodRole,
   payOpenInvoice,
+  removeBackupCard,
   resumeSubscription,
+  savePaymentMethodFromIntent,
   scheduleSubscriptionCancel,
-  setDefaultPaymentMethodFromIntent,
 } from '../utils/stripe_in_app.ts'
 import { supabaseClient } from '../utils/supabase.ts'
 
@@ -30,6 +32,11 @@ interface OrgBody {
 
 interface PaymentMethodBody extends OrgBody {
   intentId?: string
+  role?: unknown
+}
+
+interface RemovePaymentMethodBody extends OrgBody {
+  paymentMethodId?: string
 }
 
 interface CancelBody extends OrgBody {
@@ -69,13 +76,13 @@ app.use('*', useCors)
 app.post('/overview', middlewareAuth, async (c) => {
   const body = await parseBody<OrgBody>(c)
   const ctx = await resolveBillingContext(c, body.orgId, 'org.read_billing')
-  const [card, subscription, invoices, openInvoice] = await Promise.all([
-    getDefaultCard(ctx),
+  const [{ card, backupCard }, subscription, invoices, openInvoice] = await Promise.all([
+    getSavedCards(ctx),
     getSubscriptionSummary(c, ctx),
     listInvoices(ctx),
     getOpenInvoiceSummary(c, ctx),
   ])
-  return c.json({ publishableKey: ctx.publishableKey, card, subscription, invoices, openInvoice })
+  return c.json({ publishableKey: ctx.publishableKey, card, backupCard, subscription, invoices, openInvoice })
 })
 
 app.post('/setup-intent', middlewareAuth, async (c) => {
@@ -88,8 +95,17 @@ app.post('/payment-method', middlewareAuth, async (c) => {
   const body = await parseBody<PaymentMethodBody>(c)
   if (typeof body.intentId !== 'string')
     throw simpleError('invalid_intent_id', 'Missing intentId')
+  const role = parsePaymentMethodRole(body.role)
   const ctx = await resolveBillingContext(c, body.orgId, 'org.update_billing')
-  return c.json({ card: await setDefaultPaymentMethodFromIntent(c, ctx, body.intentId) })
+  return c.json({ card: await savePaymentMethodFromIntent(c, ctx, body.intentId, role) })
+})
+
+app.post('/remove-backup-card', middlewareAuth, async (c) => {
+  const body = await parseBody<RemovePaymentMethodBody>(c)
+  if (typeof body.paymentMethodId !== 'string' || !/^pm_\w+$/.test(body.paymentMethodId))
+    throw simpleError('invalid_payment_method', 'Missing paymentMethodId')
+  const ctx = await resolveBillingContext(c, body.orgId, 'org.update_billing')
+  return c.json(await removeBackupCard(c, ctx, body.paymentMethodId))
 })
 
 app.post('/cancel', middlewareAuth, async (c) => {

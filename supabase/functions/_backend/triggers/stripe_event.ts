@@ -21,7 +21,8 @@ import * as schema from '../utils/postgres_schema.ts'
 import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { getRetryablePostgrestStatus, isRetryablePostgrestError } from '../utils/retry.ts'
 import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
-import { ensureCustomerMetadata, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionCharge, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
+import { ensureCustomerMetadata, findLatestOpenSubscriptionInvoice, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionCharge, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
+import { payInvoiceWithBackupCard } from '../utils/stripe_in_app.ts'
 import { buildTransferInvoiceFooter, getStripeCustomerEmailFromEvent, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
@@ -1634,11 +1635,35 @@ async function handleActiveSubscriptionUpdate(
   return null
 }
 
+// Stripe only retries the default card; charge the backup before the org is marked failed.
+async function chargeBackupCard(c: Context<MiddlewareKeyVariablesStripe>, stripeEvent: Stripe.Event, customerId: string) {
+  if (stripeEvent.type !== 'charge.failed')
+    return false
+  const billingAccount = getWebhookBillingAccount(c)
+  try {
+    const invoice = await findLatestOpenSubscriptionInvoice(c, customerId, billingAccount)
+    if (!invoice?.id)
+      return false
+    const failedPaymentMethod = stripeEvent.data.object.payment_method
+    return await payInvoiceWithBackupCard(c, getStripe(c, billingAccount), customerId, invoice.id, typeof failedPaymentMethod === 'string' ? failedPaymentMethod : null)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'chargeBackupCard', customerId, error })
+    return false
+  }
+}
+
 async function handleFailedSubscriptionPayment(
   c: Context<MiddlewareKeyVariablesStripe>,
+  stripeEvent: Stripe.Event,
   stripeData: StripeData,
   org: Org,
 ) {
+  if (await chargeBackupCard(c, stripeEvent, stripeData.data.customer_id)) {
+    // charge.succeeded follows and keeps the plan active.
+    cloudlog({ requestId: c.get('requestId'), message: 'Renewal recovered with backup card', orgId: org.id })
+    return null
+  }
   if (await orgHasActiveUsageCredits(c, org.id)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment email because org has active usage credits', orgId: org.id })
   }
@@ -1738,7 +1763,7 @@ async function handleSubscriptionStripeEvent(
       return response
   }
   else if (stripeData.data.status === 'failed') {
-    await handleFailedSubscriptionPayment(c, stripeData, org)
+    await handleFailedSubscriptionPayment(c, stripeEvent, stripeData, org)
   }
   else if (isSubscriptionUpdateStatus(stripeData.data.status) && (!stripeData.data.price_id || !stripeData.data.product_id)) {
     handleSubscriptionMissingPriceData(c, stripeData)

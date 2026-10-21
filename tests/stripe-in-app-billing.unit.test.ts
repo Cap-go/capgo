@@ -15,12 +15,16 @@ vi.mock('../supabase/functions/_backend/utils/stripe.ts', () => ({
 
 const {
   createCardSetupIntent,
+  getSavedCards,
   parseCancelComment,
   parseCancelFeedback,
+  parsePaymentMethodRole,
+  payInvoiceWithBackupCard,
   payOpenInvoice,
+  removeBackupCard,
   resumeSubscription,
+  savePaymentMethodFromIntent,
   scheduleSubscriptionCancel,
-  setDefaultPaymentMethodFromIntent,
 } = await import('../supabase/functions/_backend/utils/stripe_in_app.ts')
 
 function createContext() {
@@ -29,11 +33,11 @@ function createContext() {
 
 function createStripe() {
   return {
-    customers: { update: vi.fn() },
+    customers: { retrieve: vi.fn(), update: vi.fn() },
     invoicePayments: { list: vi.fn() },
     invoices: { pay: vi.fn() },
     paymentIntents: { retrieve: vi.fn(), update: vi.fn() },
-    paymentMethods: { attach: vi.fn(), retrieve: vi.fn() },
+    paymentMethods: { attach: vi.fn(), detach: vi.fn(), list: vi.fn(), retrieve: vi.fn() },
     setupIntents: { retrieve: vi.fn() },
     subscriptions: { retrieve: vi.fn(), update: vi.fn() },
   }
@@ -122,17 +126,17 @@ describe('without a publishable key', () => {
   })
 })
 
-describe('setDefaultPaymentMethodFromIntent', () => {
+describe('savePaymentMethodFromIntent', () => {
   it('rejects a SetupIntent that belongs to another customer', async () => {
     const stripe = createStripe()
     stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_other', status: 'succeeded', payment_method: 'pm_1' })
 
-    await expect(setDefaultPaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123')).rejects.toThrow()
+    await expect(savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123')).rejects.toThrow()
     expect(stripe.customers.update).not.toHaveBeenCalled()
   })
 
   it('rejects ids that are not Stripe intents', async () => {
-    await expect(setDefaultPaymentMethodFromIntent(createContext(), createBillingContext(), 'pm_123')).rejects.toThrow()
+    await expect(savePaymentMethodFromIntent(createContext(), createBillingContext(), 'pm_123')).rejects.toThrow()
   })
 
   it('sets the card as customer and subscription default', async () => {
@@ -141,12 +145,70 @@ describe('setDefaultPaymentMethodFromIntent', () => {
     stripe.paymentMethods.retrieve.mockResolvedValue({ id: 'pm_1', customer: 'cus_123', card: { brand: 'visa', last4: '4242', exp_month: 4, exp_year: 2030 } })
     mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
 
-    const card = await setDefaultPaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123')
+    const card = await savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123')
 
     expect(stripe.paymentMethods.attach).not.toHaveBeenCalled()
     expect(stripe.customers.update).toHaveBeenCalledWith('cus_123', { invoice_settings: { default_payment_method: 'pm_1' } })
     expect(stripe.subscriptions.update).toHaveBeenCalledWith('sub_123', { default_payment_method: 'pm_1' })
     expect(card).toEqual({ id: 'pm_1', brand: 'visa', last4: '4242', expMonth: 4, expYear: 2030 })
+  })
+})
+
+function card(id: string, fingerprint: string, expYear = 2099) {
+  return { id, customer: 'cus_123', card: { brand: 'visa', last4: id.slice(-4), exp_month: 4, exp_year: expYear, fingerprint } }
+}
+
+function mockSavedCards(stripe: ReturnType<typeof createStripe>, defaultCard: unknown, cards: unknown[]) {
+  stripe.customers.retrieve.mockResolvedValue({ invoice_settings: { default_payment_method: defaultCard } })
+  stripe.paymentMethods.list.mockResolvedValue({ data: cards })
+}
+
+describe('backup card', () => {
+  it('picks the newest valid card that is not the default', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [card('pm_same', 'fp_main'), card('pm_expired', 'fp_old', 2020), main, card('pm_back', 'fp_back')])
+
+    const cards = await getSavedCards(createBillingContext(stripe))
+
+    expect(cards.card?.id).toBe('pm_main')
+    expect(cards.backupCard?.id).toBe('pm_back')
+  })
+
+  it('saves a backup card without changing the default', async () => {
+    const stripe = createStripe()
+    stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_back' })
+    stripe.paymentMethods.retrieve.mockResolvedValue(card('pm_back', 'fp_back'))
+
+    const saved = await savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup')
+
+    expect(saved?.id).toBe('pm_back')
+    expect(stripe.customers.update).not.toHaveBeenCalled()
+    expect(stripe.subscriptions.update).not.toHaveBeenCalled()
+  })
+
+  it('only accepts known roles', () => {
+    expect(parsePaymentMethodRole(undefined)).toBe('default')
+    expect(parsePaymentMethodRole('backup')).toBe('backup')
+    expect(() => parsePaymentMethodRole('primary')).toThrow()
+  })
+
+  it('refuses to remove the default card', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [main, card('pm_back', 'fp_back')])
+
+    await expect(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_main')).rejects.toThrow()
+    expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
+  })
+
+  it('does not retry the backup card that just failed', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [main, card('pm_back', 'fp_back')])
+
+    await expect(payInvoiceWithBackupCard(createContext(), stripe as any, 'cus_123', 'in_123', 'pm_back')).resolves.toBe(false)
+    expect(stripe.invoices.pay).not.toHaveBeenCalled()
   })
 })
 
@@ -173,8 +235,23 @@ describe('payOpenInvoice', () => {
     })
   })
 
+  it('falls back to the backup card when the default is declined', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [main, card('pm_back', 'fp_back')])
+    mocks.findLatestOpenSubscriptionInvoice.mockResolvedValue({ id: 'in_123' })
+    stripe.invoices.pay
+      .mockRejectedValueOnce(Object.assign(new Error('Your card was declined.'), { code: 'card_declined' }))
+      .mockResolvedValueOnce({ status: 'paid' })
+
+    await expect(payOpenInvoice(createContext(), createBillingContext(stripe))).resolves.toEqual({ status: 'paid' })
+    expect(stripe.invoices.pay).toHaveBeenLastCalledWith('in_123', { payment_method: 'pm_back', off_session: true })
+  })
+
   it('asks for a new card when the saved card is declined', async () => {
     const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [main])
     mocks.findLatestOpenSubscriptionInvoice.mockResolvedValue({ id: 'in_123' })
     stripe.invoices.pay.mockRejectedValue(Object.assign(new Error('Your card was declined.'), { code: 'card_declined' }))
 

@@ -249,6 +249,8 @@ export interface BillingInvoice {
 export interface BillingOverview {
   publishableKey: string
   card: BillingCard | null
+  // Charged automatically when the default card fails a renewal.
+  backupCard: BillingCard | null
   subscription: BillingSubscription | null
   invoices: BillingInvoice[]
   openInvoice: { id: string, amountDue: number, currency: string } | null
@@ -301,8 +303,12 @@ export function getInvoicePaymentIntent(orgId: string) {
 }
 
 // intentId is the confirmed SetupIntent (new card) or PaymentIntent (invoice paid with a new card).
-export function saveDefaultPaymentMethod(orgId: string, intentId: string) {
-  return callBilling<{ card: BillingCard | null }>('payment-method', { orgId, intentId })
+export function savePaymentMethod(orgId: string, intentId: string, role: 'default' | 'backup' = 'default') {
+  return callBilling<{ card: BillingCard | null }>('payment-method', { orgId, intentId, role })
+}
+
+export function removeBackupCard(orgId: string, paymentMethodId: string) {
+  return callBilling<{ card: BillingCard | null, backupCard: BillingCard | null }>('remove-backup-card', { orgId, paymentMethodId })
 }
 
 export function cancelSubscriptionWithReason(orgId: string, reason: CancelReason, comment: string) {
