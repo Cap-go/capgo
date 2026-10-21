@@ -19,14 +19,16 @@ const state = {
 Object.assign(window, { emailVerificationPreview: state })
 
 // Isolate the real page from external services; no emails or API writes occur.
+// Every console request goes through fetch to the Capgo API, including the
+// verification call (auth/console-verify-email).
 window.fetch = async (input, init) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-  const verifying = url.includes('/verify_email_otp')
+  const verifying = url.includes('/console-verify-email')
   if (verifying)
     state.verifications.push(JSON.parse(String(init?.body)).token)
   const failed = verifying && state.verificationError
   return new Response(JSON.stringify(verifying
-    ? failed ? { message: 'Invalid verification code' } : { verified_at: new Date().toISOString() }
+    ? failed ? { error: 'invalid_token', message: 'Invalid verification code' } : { verified_at: new Date().toISOString() }
     : { email_otp_verified_at: null }), {
     status: failed ? 400 : 200,
     headers: { 'Content-Type': 'application/json' },
@@ -42,12 +44,6 @@ supabase.auth.signInWithOtp = async () => {
   if (state.sendDelayMs)
     await new Promise(resolve => setTimeout(resolve, state.sendDelayMs))
   return { data: { user: null, session: null }, error: state.sendError as any }
-}
-supabase.functions.invoke = async (_, options) => {
-  state.verifications.push((options?.body as { token: string }).token)
-  return state.verificationError
-    ? { data: null, error: new Error('Invalid verification code') }
-    : { data: { verified_at: new Date().toISOString() }, error: null }
 }
 
 // A deterministic widget exercises the page's CAPTCHA transitions in the browser.
