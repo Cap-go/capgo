@@ -113,13 +113,20 @@ function isExpired(paymentMethod: Stripe.PaymentMethod, now = new Date()) {
   return card.exp_year < year || (card.exp_year === year && card.exp_month < now.getUTCMonth() + 1)
 }
 
+// known is false when the lookup failed: the subscription card is then unknown, not absent.
 async function getSubscriptionDefaultPaymentMethod(c: Context, stripe: Stripe, customerId: string) {
-  const subscriptionId = await getActiveSubscriptionId(c, customerId)
-  if (!subscriptionId)
-    return null
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId, { expand: ['default_payment_method'] })
-  const paymentMethod = subscription.default_payment_method
-  return paymentMethod && typeof paymentMethod === 'object' ? paymentMethod : null
+  try {
+    const subscriptionId = await getActiveSubscriptionId(c, customerId)
+    if (!subscriptionId)
+      return { paymentMethod: null, known: true }
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, { expand: ['default_payment_method'] })
+    const paymentMethod = subscription.default_payment_method
+    return { paymentMethod: paymentMethod && typeof paymentMethod === 'object' ? paymentMethod : null, known: true }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getSubscriptionDefaultPaymentMethod', customerId, error })
+    return { paymentMethod: null, known: false }
+  }
 }
 
 // Primary: the card Stripe charges (subscription card, then customer default). The backup is the
@@ -129,10 +136,12 @@ async function findSavedPaymentMethods(c: Context, stripe: Stripe, customerId: s
   const customer = await stripe.customers.retrieve(customerId, { expand: ['invoice_settings.default_payment_method'] })
   if (customer.deleted)
     return { defaultPaymentMethod: null, backupPaymentMethod: null, isCustomerDefault: false, spareCards: [] }
-  const [cards, subscriptionDefault] = await Promise.all([
-    stripe.paymentMethods.list({ customer: customerId, type: 'card', limit: 10 }),
+  const [cards, subscriptionLookup] = await Promise.all([
+    // Stripe's page maximum; customers never get near it, so older eligible cards are not missed.
+    stripe.paymentMethods.list({ customer: customerId, type: 'card', limit: 100 }),
     getSubscriptionDefaultPaymentMethod(c, stripe, customerId),
   ])
+  const subscriptionDefault = subscriptionLookup.paymentMethod
   const customerDefault = customer.invoice_settings?.default_payment_method
   const isCustomerDefault = !!customerDefault && typeof customerDefault === 'object'
   // Very old customers only have the card Checkout saved, without any default.
@@ -146,7 +155,8 @@ async function findSavedPaymentMethods(c: Context, stripe: Stripe, customerId: s
     && (!defaultFingerprint || paymentMethod.card?.fingerprint !== defaultFingerprint)) ?? null
   // Cards Stripe may charge on its own (subscription card, customer default) are never spare.
   const inUse = new Set([subscriptionDefault?.id, isCustomerDefault ? customerDefault.id : undefined, defaultPaymentMethod?.id])
-  const spareCards = cards.data.filter(paymentMethod => !inUse.has(paymentMethod.id))
+  // Without the subscription card we cannot tell which cards are spare: detach nothing.
+  const spareCards = subscriptionLookup.known ? cards.data.filter(paymentMethod => !inUse.has(paymentMethod.id)) : []
   return { defaultPaymentMethod, backupPaymentMethod, isCustomerDefault, spareCards }
 }
 
@@ -297,21 +307,44 @@ export async function removeBackupCard(c: Context, ctx: InAppBillingContext, pay
   return await getSavedCards(c, ctx)
 }
 
-// Charges the open renewal with the backup card after the default failed. Returns true once paid.
-export async function payInvoiceWithBackupCard(c: Context, stripe: Stripe, customerId: string, invoiceId: string, failedPaymentMethodId?: string | null) {
+export interface FailedAttempt {
+  chargeId?: string | null
+  paymentMethodId?: string | null
+}
+
+export type BackupChargeResult = 'paid' | 'declined' | 'no_backup' | 'failed_card_is_backup'
+
+function isCardError(error: unknown) {
+  return !!error && typeof error === 'object' && 'type' in error && error.type === 'StripeCardError'
+}
+
+// Charges an open renewal with the backup card after the default was declined. Card declines are a
+// result; any other Stripe error is thrown, since the outcome is unknown and the caller must retry.
+// The key is scoped to the failed charge: the webhook and Pay now share one backup charge per attempt,
+// and a later failed attempt (a new charge) is still eligible.
+export async function payInvoiceWithBackupCard(c: Context, stripe: Stripe, customerId: string, invoiceId: string, attempt: FailedAttempt = {}): Promise<BackupChargeResult> {
+  const { backupPaymentMethod } = await findSavedPaymentMethods(c, stripe, customerId)
+  if (!backupPaymentMethod)
+    return 'no_backup'
+  // A failed backup charge fires charge.failed again: never retry the card that just failed.
+  if (backupPaymentMethod.id === attempt.paymentMethodId)
+    return 'failed_card_is_backup'
+  const options = attempt.chargeId ? { idempotencyKey: `capgo-backup-${invoiceId}-${attempt.chargeId}` } : undefined
   try {
-    const { backupPaymentMethod } = await findSavedPaymentMethods(c, stripe, customerId)
-    // A failed backup charge fires charge.failed again: never retry the card that just failed.
-    if (!backupPaymentMethod || backupPaymentMethod.id === failedPaymentMethodId)
-      return false
-    const paid = await stripe.invoices.pay(invoiceId, { payment_method: backupPaymentMethod.id, off_session: true })
+    const paid = await stripe.invoices.pay(invoiceId, { payment_method: backupPaymentMethod.id, off_session: true }, options)
     cloudlog({ requestId: c.get('requestId'), message: 'backup card charged', customerId, invoiceId, status: paid.status })
-    return paid.status === 'paid'
+    return paid.status === 'paid' ? 'paid' : 'declined'
   }
   catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'backup card charge failed', customerId, invoiceId, code: getStripeErrorCode(error), error: getStripeErrorMessage(error) })
-    return false
+    if (!isCardError(error))
+      throw error
+    cloudlog({ requestId: c.get('requestId'), message: 'backup card declined', customerId, invoiceId, code: getStripeErrorCode(error) })
+    return 'declined'
   }
+}
+
+function getStripeErrorChargeId(error: unknown) {
+  return error && typeof error === 'object' && 'charge' in error && typeof error.charge === 'string' ? error.charge : null
 }
 
 export function parseCancelFeedback(value: unknown): CancelFeedback {
@@ -379,6 +412,22 @@ function getStripeErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Payment failed'
 }
 
+// Only after a real decline, and only while the invoice is still open.
+async function tryBackupAfterDecline(c: Context, ctx: InAppBillingContext, invoiceId: string, failedChargeId: string | null) {
+  try {
+    const invoice = await ctx.stripe.invoices.retrieve(invoiceId)
+    if (invoice.status === 'paid')
+      return true
+    if (invoice.status !== 'open')
+      return false
+    return await payInvoiceWithBackupCard(c, ctx.stripe, ctx.customerId, invoiceId, { chargeId: failedChargeId }) === 'paid'
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'in-app backup card fallback', customerId: ctx.customerId, invoiceId, error })
+    return false
+  }
+}
+
 // Retry the open renewal invoice with the default card; 3DS is finished client-side.
 export async function payOpenInvoice(c: Context, ctx: InAppBillingContext): Promise<PayInvoiceResult> {
   const invoice = await findLatestOpenSubscriptionInvoice(c, ctx.customerId, ctx.billingAccount)
@@ -393,7 +442,7 @@ export async function payOpenInvoice(c: Context, ctx: InAppBillingContext): Prom
     const code = getStripeErrorCode(error)
     cloudlog({ requestId: c.get('requestId'), message: 'in-app invoice pay failed', customerId: ctx.customerId, invoiceId: invoice.id, code })
     if (code !== 'invoice_payment_intent_requires_action') {
-      if (await payInvoiceWithBackupCard(c, ctx.stripe, ctx.customerId, invoice.id))
+      if (isCardError(error) && await tryBackupAfterDecline(c, ctx, invoice.id, getStripeErrorChargeId(error)))
         return { status: 'paid' }
       return { status: 'requires_payment_method', message: getStripeErrorMessage(error) }
     }

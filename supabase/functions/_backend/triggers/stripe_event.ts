@@ -1635,24 +1635,32 @@ async function handleActiveSubscriptionUpdate(
   return null
 }
 
+type BackupRecovery = 'recovered' | 'backup_attempt_failed' | 'not_recovered'
+
 // Stripe only retries the default card; charge the backup before the org is marked failed.
-async function chargeBackupCard(c: Context<MiddlewareKeyVariablesStripe>, stripeEvent: Stripe.Event, customerId: string) {
+// Stripe errors propagate so the webhook is retried; the backup charge is idempotent per failed charge.
+async function chargeBackupCard(c: Context<MiddlewareKeyVariablesStripe>, stripeEvent: Stripe.Event, customerId: string): Promise<BackupRecovery> {
   if (stripeEvent.type !== 'charge.failed')
-    return false
+    return 'not_recovered'
   const charge = stripeEvent.data.object
   const stripe = getStripe(c, getWebhookBillingAccount(c))
-  try {
-    // Retry the invoice this charge was for, not whichever invoice is newest.
-    const invoice = await findInvoiceForCharge(stripe, charge)
-    if (!invoice?.id || invoice.status !== 'open' || !isSubscriptionInvoice(invoice))
-      return false
-    const failedPaymentMethod = typeof charge.payment_method === 'string' ? charge.payment_method : null
-    return await payInvoiceWithBackupCard(c, stripe, customerId, invoice.id, failedPaymentMethod)
-  }
-  catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'chargeBackupCard', customerId, error })
-    return false
-  }
+  // Retry the invoice this charge was for, not whichever invoice is newest.
+  const invoice = await findInvoiceForCharge(stripe, charge)
+  if (!invoice?.id || !isSubscriptionInvoice(invoice))
+    return 'not_recovered'
+  // Already settled (for example Pay now charged the backup first): nothing failed anymore.
+  if (invoice.status === 'paid')
+    return 'recovered'
+  if (invoice.status !== 'open')
+    return 'not_recovered'
+  const result = await payInvoiceWithBackupCard(c, stripe, customerId, invoice.id, {
+    chargeId: charge.id,
+    paymentMethodId: typeof charge.payment_method === 'string' ? charge.payment_method : null,
+  })
+  if (result === 'paid')
+    return 'recovered'
+  // The default card's failure already sent dunning; the backup's own failure must not send it twice.
+  return result === 'failed_card_is_backup' ? 'backup_attempt_failed' : 'not_recovered'
 }
 
 async function handleFailedSubscriptionPayment(
@@ -1661,9 +1669,10 @@ async function handleFailedSubscriptionPayment(
   stripeData: StripeData,
   org: Org,
 ) {
-  if (await chargeBackupCard(c, stripeEvent, stripeData.data.customer_id)) {
-    // charge.succeeded follows and keeps the plan active.
-    cloudlog({ requestId: c.get('requestId'), message: 'Renewal recovered with backup card', orgId: org.id })
+  const recovery = await chargeBackupCard(c, stripeEvent, stripeData.data.customer_id)
+  if (recovery !== 'not_recovered') {
+    // recovered: charge.succeeded keeps the plan active. backup_attempt_failed: dunning already ran.
+    cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment handling', recovery, orgId: org.id })
     return null
   }
   if (await orgHasActiveUsageCredits(c, org.id)) {

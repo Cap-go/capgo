@@ -46,6 +46,14 @@ describe('findInvoiceForCharge', () => {
     expect(await findInvoiceForCharge(stripe, { payment_intent: 'pi_renewal' })).toMatchObject({ id: 'in_failed' })
   })
 
+  it('looks up the same charge only once per webhook', async () => {
+    const { stripe, list } = stripeWithInvoice({ id: 'in_failed', status: 'open', billing_reason: 'subscription_cycle', parent: null })
+    const charge = { payment_intent: 'pi_renewal' }
+    expect(await isSubscriptionCharge(stripe, charge)).toBe(true)
+    expect(await findInvoiceForCharge(stripe, charge)).toMatchObject({ id: 'in_failed' })
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+
   it('returns nothing for legacy charges without a PaymentIntent', async () => {
     const { stripe, list } = stripeWithInvoice(null)
     expect(await findInvoiceForCharge(stripe, { payment_intent: null })).toBeNull()

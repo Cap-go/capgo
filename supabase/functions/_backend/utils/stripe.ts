@@ -614,8 +614,22 @@ export function isSubscriptionInvoice(invoice: Pick<OpenInvoiceShape, 'billing_r
 // charge.failed fires for every charge, including credit auto top-ups and one-off
 // purchases. Only a failed subscription invoice says anything about the plan.
 // Errors propagate so the webhook is retried instead of guessing.
+// One webhook checks the same charge twice (subscription check, backup retry): look it up once.
+const chargeInvoiceLookups = new WeakMap<object, Promise<Stripe.Invoice | null>>()
+
 // The invoice a charge paid (or tried to pay), through its PaymentIntent.
-export async function findInvoiceForCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
+export function findInvoiceForCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
+  let lookup = chargeInvoiceLookups.get(charge)
+  if (!lookup) {
+    lookup = lookupInvoiceForCharge(stripe, charge)
+    chargeInvoiceLookups.set(charge, lookup)
+    // Errors must not stick: a retried webhook delivery parses a new charge object anyway.
+    lookup.catch(() => chargeInvoiceLookups.delete(charge))
+  }
+  return lookup
+}
+
+async function lookupInvoiceForCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
   const paymentIntentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
   if (!paymentIntentId)
     return null
