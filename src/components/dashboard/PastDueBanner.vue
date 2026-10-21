@@ -52,7 +52,7 @@ watch([orgId, () => !!stripeEnabled.value], async ([id, enabled]) => {
     return
   pastDue.value = status
   if (status?.past_due) {
-    pushEvent('past_due_banner_shown', config.supaHost, {
+    pushEvent('past_due_banner_shown', config.apiHost, {
       org_id: id,
       attempt_count: status.invoice?.attempt_count ?? 0,
     })
@@ -83,12 +83,12 @@ async function payNow() {
   const url = invoice.value?.hosted_invoice_url
   if (!url)
     return
-  pushEvent('past_due_banner_pay_clicked', config.supaHost, { org_id: orgId.value })
+  pushEvent('past_due_banner_pay_clicked', config.apiHost, { org_id: orgId.value })
   await openBlank(url)
 }
 
 async function updateCard() {
-  pushEvent('past_due_banner_update_card_clicked', config.supaHost, { org_id: orgId.value })
+  pushEvent('past_due_banner_update_card_clicked', config.apiHost, { org_id: orgId.value })
   await openPortal(orgId.value, t)
 }
 </script>

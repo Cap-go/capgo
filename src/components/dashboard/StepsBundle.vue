@@ -40,7 +40,7 @@ interface Step {
 }
 
 const config = getLocalConfig()
-const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``
+const localCommand = isLocal(config.apiHost) ? ` --api-host ${config.apiHost}` : ``
 const steps = ref<Step[]>([
   {
     title: t('add-another-bundle'),

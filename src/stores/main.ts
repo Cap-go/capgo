@@ -107,7 +107,7 @@ export const useMainStore = defineStore('main', () => {
     auth.value = undefined
     user.value = undefined
     isAdmin.value = false
-    reset(config.supaHost)
+    reset(config.apiHost)
     clearSpoof()
     if (error)
       console.error('Failed to log out', error)

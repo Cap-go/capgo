@@ -70,12 +70,12 @@ describe('isAllowedConfirmationUrl', () => {
 })
 
 describe('getAllowedConfirmationHosts', () => {
-  it('parses configured app and supabase hosts', () => {
+  it('parses configured app and API hosts', () => {
     vi.stubEnv('VITE_APP_URL', 'https://console.capgo.app')
-    vi.stubEnv('VITE_SUPABASE_URL', 'https://sb.capgo.app')
+    vi.stubEnv('VITE_API_URL', 'https://api.capgo.app')
     try {
       const hosts = getAllowedConfirmationHosts()
-      expect(hosts).toEqual(['console.capgo.app', 'sb.capgo.app'])
+      expect(hosts).toEqual(['console.capgo.app', 'api.capgo.app'])
     }
     finally {
       vi.unstubAllEnvs()
@@ -84,11 +84,11 @@ describe('getAllowedConfirmationHosts', () => {
 
   it('falls back to production config hosts when build env is empty', () => {
     vi.stubEnv('VITE_APP_URL', '')
-    vi.stubEnv('VITE_SUPABASE_URL', '')
+    vi.stubEnv('VITE_API_URL', '')
     try {
       const hosts = getAllowedConfirmationHosts()
       expect(hosts).toContain('console.capgo.app')
-      expect(hosts).toContain('sb.capgo.app')
+      expect(hosts).toContain('api.capgo.app')
     }
     finally {
       vi.unstubAllEnvs()

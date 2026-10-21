@@ -43,7 +43,7 @@ describe('console-owned Apple OAuth completion', () => {
     const capture = bootstrap.indexOf('prepareAppleOAuthLanding()')
     expect(capture).toBeGreaterThan(0)
     expect(capture).toBeLessThan(bootstrap.indexOf('createRouter({'))
-    expect(capture).toBeLessThan(bootstrap.indexOf('posthogLoader(config.supaHost)'))
+    expect(capture).toBeLessThan(bootstrap.indexOf('posthogLoader(config.apiHost)'))
   })
   it('strips invalid landing callbacks and defers a generic error to the login page', () => {
     vi.stubGlobal('location', { href: `https://console.capgo.app/login#apple_code=${code}&state=foreign` })

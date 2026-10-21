@@ -897,8 +897,11 @@ Also applies to dialog/Teleport content, admin filters, and hidden utility input
 - We intentionally route auth email links through `/confirm-signup` to avoid
   mailbox link prefetchers triggering Supabase verification/recovery links.
 - `confirm-signup.vue` only allows redirects to the console host and the
-  Supabase host; if you change `VITE_APP_URL` or `VITE_SUPABASE_URL`, update
+  Capgo API host; if you change `VITE_APP_URL` or `VITE_API_URL`, update
   both allow-lists accordingly.
+- The console and the CLI never talk to Supabase (no SDK, no REST/Auth/Storage
+  URLs, no anon key). Everything goes through the Capgo API (`VITE_API_HOST`);
+  only the backend under `supabase/functions` uses Supabase.
 
 ## Frontend Testing
 

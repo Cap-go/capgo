@@ -56,7 +56,7 @@ function getSlides(): HTMLElement[] {
 }
 
 function track(event: string, props_: Record<string, string | number | boolean | null> = {}) {
-  pushEvent(event, config.supaHost, props_)
+  pushEvent(event, config.apiHost, props_)
 }
 
 function drawCheck(s: HTMLElement) {

@@ -28,7 +28,6 @@ describe('spoof session storage', () => {
     vi.resetModules()
     vi.clearAllMocks()
     mocks.createClient.mockReset()
-    vi.stubEnv('VITE_SUPABASE_URL', 'https://test.supabase.co')
     stubLocalStorage()
   })
 
@@ -82,7 +81,7 @@ describe('spoof session storage', () => {
       refresh_token: 'fresh-admin-refresh-token',
     })
     expect(localStorage.setItem).toHaveBeenCalledWith(
-      expect.stringContaining('.spoof_admin_jwt'),
+      'capgo.console.spoof_admin_jwt',
       JSON.stringify({ jwt: 'fresh-admin-jwt', refreshToken: 'fresh-admin-refresh-token' }),
     )
     expect(isSpoofed()).toBe(false)
@@ -161,7 +160,7 @@ describe('spoof session storage', () => {
       refresh_token: 'fresh-admin-refresh-token',
     })
     expect(localStorage.setItem).toHaveBeenCalledWith(
-      expect.stringContaining('.spoof_admin_jwt'),
+      'capgo.console.spoof_admin_jwt',
       JSON.stringify({ jwt: 'fresh-admin-jwt', refreshToken: 'fresh-admin-refresh-token' }),
     )
     expect(isSpoofed()).toBe(true)

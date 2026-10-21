@@ -30,7 +30,7 @@ let shownTracked = false
 let reqToken = 0
 
 function track(event: string) {
-  pushEvent(event, config.supaHost, {})
+  pushEvent(event, config.apiHost, {})
 }
 
 function openModal() {

@@ -307,7 +307,7 @@ router.beforeEach((to, from, next) => {
 })
 
 const config = getLocalConfig()
-posthogLoader(config.supaHost)
+posthogLoader(config.apiHost)
 captureConsoleAttributionFromLocation()
 
 // install all modules under `modules/`

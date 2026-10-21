@@ -15,7 +15,7 @@ vi.mock('../src/services/posthog.ts', () => ({
 vi.mock('~/services/console', () => ({
   findBestPlan: mockFindBestPlan,
   getAllDashboard: mockGetAllDashboard,
-  getLocalConfig: () => ({ supaHost: 'https://supabase.capgo.test' }),
+  getLocalConfig: () => ({ apiHost: 'https://supabase.capgo.test' }),
   getTotalStorage: mockGetTotalStorage,
   isPlatformAdmin: mockIsPlatformAdmin,
   normalizeDashboardDateRange: mockNormalizeDashboardDateRange,

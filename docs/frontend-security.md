@@ -8,8 +8,8 @@ Capgo ships browser security controls in the console web app. This note covers
 - **CSP** — `scripts/console-security-policy.ts` is the source of truth for the
   console policy. Sync it into `public/_headers` with
   `bun run security:sync-headers` before merging CSP changes. Self-hosted builds
-  should set `SUPA_URL` and `API_DOMAIN` before syncing so `connect-src` includes
-  the deploy-time API and Supabase origins.
+  should set `API_DOMAIN` before syncing so `connect-src` includes the
+  deploy-time API origin. The console never connects to Supabase directly.
 - **SRI** — `bun run security:compute-integrity` hashes real remote bytes for
   any pinned third-party asset. Pass URLs on the command line, or use
   `--file docs/external-integrity-sources.json` for the checked-in inventory.

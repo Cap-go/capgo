@@ -34,7 +34,7 @@ function normalizeAuth<T>(result: { data: T, error: { message?: string, code?: s
 const configuredBaseURL = ((import.meta.env.VITE_API_HOST as string | undefined) ?? '').replace(/\/$/, '')
 const TOKEN_KEY = 'capgo.console.session'
 
-export function createConsoleClient(_host?: string, _key?: string, options?: { auth?: { persistSession?: boolean, autoRefreshToken?: boolean, detectSessionInUrl?: boolean } }) {
+export function createConsoleClient(options?: { auth?: { persistSession?: boolean, autoRefreshToken?: boolean, detectSessionInUrl?: boolean } }) {
   const baseURL = configuredBaseURL.startsWith('/') ? new URL(configuredBaseURL, location.origin).href : configuredBaseURL
   const persist = options?.auth?.persistSession !== false
   // Public signup shares the API cookie, which can replace a previous account.

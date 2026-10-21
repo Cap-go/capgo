@@ -125,9 +125,8 @@ accounts. SSO-only accounts use their authenticated SSO session.
 
 Self-hosted deployments configure `API_DOMAIN` (the console's `VITE_API_HOST`)
 for both Better Auth and console API traffic. Point it at the Capgo API, or the
-local `/functions/v1` gateway hosting these routes. `VITE_SUPABASE_URL` remains
-backend compatibility configuration; it no longer selects a separate browser
-transport. Local worktree startup enables and exposes its isolated SMTP mailbox.
+local `/functions/v1` gateway hosting these routes. The console build no longer
+carries any Supabase URL or anon key; the browser only talks to the Capgo API. Local worktree startup enables and exposes its isolated SMTP mailbox.
 For hosted backends, configure `CONSOLE_SMTP_URL` explicitly rather than deriving
 a port from the backend URL.
 

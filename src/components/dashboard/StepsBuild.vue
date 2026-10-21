@@ -62,7 +62,7 @@ const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 const config = getLocalConfig()
 const initialOnboarding = props.onboarding
-const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
+const localCommand = isLocal(config.apiHost) ? ` --api-host ${config.apiHost}` : ''
 
 const platformBuildCounts = computed<PlatformBuildCounts>(() => ({
   ios: props.platformBuildCounts?.ios ?? 0,

@@ -89,9 +89,9 @@ async function updateUser(
           nickname: [userRecord.first_name, userRecord.last_name].filter(Boolean).join(' ') || undefined,
           avatar: avatar ?? undefined,
         },
-        config.supaHost,
+        config.apiHost,
       )
-      applySignupAttributionToPostHog(authUser, config.supaHost)
+      applySignupAttributionToPostHog(authUser, config.apiHost)
     }
 
     main.user = userRecord
@@ -301,7 +301,7 @@ async function guard(
     if (!main.auth || main.auth.id !== sessionUser.id || authConfirmedAt !== sessionUser.email_confirmed_at) {
       main.auth = sessionUser
     }
-    applySignupAttributionToPostHog(sessionUser, getLocalConfig().supaHost)
+    applySignupAttributionToPostHog(sessionUser, getLocalConfig().apiHost)
   }
 
   const { data: mfaData, error: mfaError }

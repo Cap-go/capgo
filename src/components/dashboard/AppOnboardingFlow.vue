@@ -255,7 +255,7 @@ const onboardingTelemetry = createOnboardingTelemetryIdentity({
   continueFrom: setupHandoff,
   flow: props.preOrg ? 'pre_org' : 'existing_org',
   onboardingVersion: onboardingAnalyticsVersion,
-  supaHost: config.supaHost,
+  apiHost: config.apiHost,
 })
 const webNativeRecommendationDismissed = ref(false)
 const orgNameInput = ref('')
@@ -306,7 +306,7 @@ const startingOutUserCountStop: UserCountStop = {
 }
 const planNameOrder = ['Solo', 'Maker', 'Team', 'Enterprise'] as const
 
-const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
+const localCommand = isLocal(config.apiHost) ? ` --api-host ${config.apiHost}` : ''
 // TODO(2027-03-19): Remove v3 compatibility after all existing OTA checklists have migrated.
 const usesOtaTodoList = computed(() => !!createdApp.value && hasSupportedOtaTodoList(parseAppOnboarding(createdApp.value.onboarding)))
 const usesDualTodoList = computed(() => !!createdApp.value && hasDualOnboardingChecklists(createdApp.value.onboarding))
@@ -464,8 +464,8 @@ const cliCommandArgs = computed(() => {
   if (usesBuilderSetupCommand.value && apiKey.value)
     args.push('-a', apiKey.value)
 
-  if (isLocal(config.supaHost))
-    args.push('--supa-host', config.supaHost, '--supa-anon', config.supaKey)
+  if (isLocal(config.apiHost))
+    args.push('--api-host', config.apiHost)
 
   return args
 })
@@ -719,7 +719,7 @@ function initializeProgressTracking(resumed: boolean) {
     onboardingVersion: onboardingAnalyticsVersion,
     resumed: resumed && !setupHandoff,
     steps: trackedAnalyticsSteps,
-    supaHost: config.supaHost,
+    apiHost: config.apiHost,
     onboardingAttemptId: onboardingTelemetry.attemptId,
     onboardingRunId: onboardingTelemetry.runId,
   })

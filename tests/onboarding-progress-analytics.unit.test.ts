@@ -49,7 +49,7 @@ describe('onboarding progress analytics', () => {
       capture,
       flow: 'pre_org',
       idFactory: () => ids.shift()!,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
     identity.prepareResumeCandidate({
       lastRunId: RUN_R1,
@@ -105,7 +105,7 @@ describe('onboarding progress analytics', () => {
       capture,
       flow,
       idFactory: () => ids.shift()!,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
     identity.prepareResumeCandidate({
       lastRunId: RUN_R1,
@@ -149,7 +149,7 @@ describe('onboarding progress analytics', () => {
       capture,
       flow: 'pre_org',
       idFactory: () => ids.shift()!,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
     identity.prepareResumeCandidate({
       lastRunId: RUN_R1,
@@ -194,7 +194,7 @@ describe('onboarding progress analytics', () => {
         capture,
         flow: 'pre_org',
         idFactory: () => ids.shift()!,
-        supaHost: 'https://supabase.capgo.test',
+        apiHost: 'https://supabase.capgo.test',
       })
       identity.prepareResumeCandidate({
         lastRunId: RUN_R1,
@@ -237,7 +237,7 @@ describe('onboarding progress analytics', () => {
       now: () => 100,
       resumed: false,
       steps,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.viewStep('intent')
@@ -269,7 +269,7 @@ describe('onboarding progress analytics', () => {
       flow: 'pre_org',
       idFactory: () => ids.shift()!,
       onboardingVersion,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
     identity.prepareResumeCandidate({
       savedStep: 'organization',
@@ -285,7 +285,7 @@ describe('onboarding progress analytics', () => {
       flow: 'pre_org',
       resumed: false,
       steps,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
     tracker.viewStep('intent')
     tracker.trackStepEvent('onboarding_webnative_recommendation_clicked', 'organization', {
@@ -314,7 +314,7 @@ describe('onboarding progress analytics', () => {
       now: () => now,
       resumed: false,
       steps: ['intent', 'details', 'setup'],
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.viewStep('intent')
@@ -367,7 +367,7 @@ describe('onboarding progress analytics', () => {
       now: () => 5_000,
       resumed: false,
       steps: ['intent', 'setup'],
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.viewStep('intent')
@@ -406,7 +406,7 @@ describe('onboarding progress analytics', () => {
       now: () => now,
       resumed: false,
       steps: ['intent', 'details', 'setup'],
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.viewStep('intent')
@@ -431,7 +431,7 @@ describe('onboarding progress analytics', () => {
       now: () => now,
       resumed: false,
       steps: ['intent', 'setup'],
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.trackVisibilityChange('hidden')
@@ -457,7 +457,7 @@ describe('onboarding progress analytics', () => {
       flow: 'pre_org',
       resumed: false,
       steps,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.viewStep('intent')
@@ -479,7 +479,7 @@ describe('onboarding progress analytics', () => {
       now: () => now,
       resumed: false,
       steps,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.viewStep('intent')
@@ -533,7 +533,7 @@ describe('onboarding progress analytics', () => {
       flow: 'pre_org',
       resumed: false,
       steps,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.viewStep('intent')
@@ -559,7 +559,7 @@ describe('onboarding progress analytics', () => {
       flow: 'pre_org',
       resumed: false,
       steps,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.trackDetailsEvent('onboarding_app_name_entered', 'details', { field_length: 11 })
@@ -587,7 +587,7 @@ describe('onboarding progress analytics', () => {
       flow: 'pre_org',
       resumed: false,
       steps: pageSteps,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.viewStep('app_name')
@@ -614,7 +614,7 @@ describe('onboarding progress analytics', () => {
       flow: 'pre_org',
       resumed: false,
       steps,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.trackDetailsEvent('onboarding_app_creation_succeeded', 'details', {
@@ -644,7 +644,7 @@ describe('onboarding progress analytics', () => {
       flow: 'pre_org',
       resumed: false,
       steps,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.trackStepEvent('onboarding_organization_import_opened', 'organization')
@@ -670,7 +670,7 @@ describe('onboarding progress analytics', () => {
       flow: 'pre_org',
       resumed: false,
       steps,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.trackStepEvent('onboarding_webnative_recommendation_clicked', 'organization', {
@@ -697,7 +697,7 @@ describe('onboarding progress analytics', () => {
       flow: 'pre_org',
       resumed: true,
       steps,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
     tracker.viewStep('setup')
     capture.mockClear()
@@ -740,7 +740,7 @@ describe('onboarding progress analytics', () => {
       flow: 'pre_org',
       resumed: true,
       steps,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
     tracker.viewStep('setup')
     capture.mockClear()
@@ -771,7 +771,7 @@ describe('onboarding progress analytics', () => {
       now: () => now,
       resumed: true,
       steps: ['details', 'choice', 'install'],
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.viewStep('choice')
@@ -803,7 +803,7 @@ describe('onboarding progress analytics', () => {
       now: () => 50,
       resumed: true,
       steps: ['details', 'choice', 'install', 'setup'],
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.viewStep('setup')
@@ -834,7 +834,7 @@ describe('onboarding progress analytics', () => {
       flow: 'existing_org',
       steps: ['details', 'choice', 'install'],
       resumed: false,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     tracker.completeStep('details', { nextStep: 'choice' })
@@ -848,7 +848,7 @@ describe('onboarding progress analytics', () => {
   it.concurrent('only exposes approved fields and never lets capture failures escape', () => {
     const capture = vi.fn<(
       name: string,
-      supaHost: string,
+      apiHost: string,
       properties?: Record<string, string | number | boolean | null>,
     ) => void>(() => {
       throw new Error('PostHog unavailable')
@@ -859,7 +859,7 @@ describe('onboarding progress analytics', () => {
       flow: 'existing_org',
       steps: ['details', 'choice', 'install'],
       resumed: false,
-      supaHost: 'https://supabase.capgo.test',
+      apiHost: 'https://supabase.capgo.test',
     })
 
     expect(() => tracker.viewStep('details')).not.toThrow()

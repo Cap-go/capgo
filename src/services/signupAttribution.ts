@@ -113,7 +113,7 @@ export function getSignupAttributionEventTags(user?: User | null) {
   return signupAttributionEventTags(resolveSignupAttribution(user))
 }
 
-export function applySignupAttributionToPostHog(user: User | null | undefined, _supaHost: string): void {
+export function applySignupAttributionToPostHog(user: User | null | undefined, _apiHost: string): void {
   if (!user?.id)
     return
 

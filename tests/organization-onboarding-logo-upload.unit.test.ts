@@ -23,7 +23,7 @@ vi.mock('~/services/onboardingAppCreate', () => ({ createOnboardingAppFromDraft:
 vi.mock('~/services/photos', () => ({ uploadOrgLogoFile: mocks.uploadOrgLogoFile }))
 vi.mock('~/services/posthog', () => ({ pushEvent: vi.fn() }))
 vi.mock('~/services/console', () => ({
-  getLocalConfig: () => ({ supaHost: 'https://sb.capgo.app' }),
+  getLocalConfig: () => ({ apiHost: 'https://api.capgo.app' }),
   isLocal: () => false,
   useConsole: () => ({}),
 }))

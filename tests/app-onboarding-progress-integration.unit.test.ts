@@ -84,7 +84,7 @@ vi.mock('~/services/capgoApi', async (importOriginal) => {
   }
 })
 vi.mock('~/services/console', () => ({
-  getLocalConfig: () => ({ supaHost: 'https://sb.capgo.app', supaKey: 'anon-key' }),
+  getLocalConfig: () => ({ apiHost: 'https://api.capgo.app' }),
   isLocal: () => false,
   useConsole: () => {
     return {

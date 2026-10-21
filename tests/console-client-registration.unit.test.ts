@@ -16,7 +16,7 @@ afterEach(() => {
 describe('console registration session', () => {
   it('preserves the console invalid-credentials error contract', async () => {
     signin.mockResolvedValue({ data: null, error: { code: 'INVALID_EMAIL_OR_PASSWORD', message: 'Invalid email or password', status: 401 } })
-    const client = createConsoleClient(undefined, undefined, { auth: { persistSession: false } })
+    const client = createConsoleClient({ auth: { persistSession: false } })
     const result = await client.auth.signInWithPassword({ email: 'wrong@example.com', password: 'wrongpass' })
     expect(result.error).toMatchObject({ code: 'invalid_credentials', message: 'Invalid login credentials', status: 401 })
   })
@@ -26,7 +26,7 @@ describe('console registration session', () => {
     signup.mockResolvedValue({ data: { token: 'test-token', user: session.user }, error: null })
     const request = vi.fn(async (_input: unknown, _init?: RequestInit) => new Response(JSON.stringify({ session }), { headers: { 'content-type': 'application/json' } }))
     vi.stubGlobal('fetch', request)
-    const client = createConsoleClient(undefined, undefined, { auth: { persistSession: false } })
+    const client = createConsoleClient({ auth: { persistSession: false } })
     const listener = vi.fn()
     client.auth.onAuthStateChange(listener)
     const result = await client.auth.signUp({ email: 'registration@example.com', password: 'Test-password1!', options: { data: {} } })
@@ -52,7 +52,7 @@ describe('console registration session', () => {
   it('leaves an unconfirmed account without a session', async () => {
     signup.mockResolvedValue({ data: { token: null, user: { id: 'fixture-user' } }, error: null })
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ session: null }))))
-    const client = createConsoleClient(undefined, undefined, { auth: { persistSession: false } })
+    const client = createConsoleClient({ auth: { persistSession: false } })
     const listener = vi.fn()
     client.auth.onAuthStateChange(listener)
     const result = await client.auth.signUp({ email: 'registration@example.com', password: 'Test-password1!', options: { data: {} } })
@@ -124,19 +124,19 @@ describe('console auth failure isolation', () => {
 
   it('passes the email OTP CAPTCHA to Better Auth', async () => {
     sendOtp.mockResolvedValue({ data: { success: true }, error: null })
-    await createConsoleClient(undefined, undefined, { auth: { persistSession: false } }).auth.signInWithOtp({ email: 'otp@example.com', options: { captchaToken: 'fixture-captcha' } })
+    await createConsoleClient({ auth: { persistSession: false } }).auth.signInWithOtp({ email: 'otp@example.com', options: { captchaToken: 'fixture-captcha' } })
     expect(sendOtp).toHaveBeenCalledWith(expect.objectContaining({ fetchOptions: { headers: { 'x-captcha-response': 'fixture-captcha' } } }))
   })
 
   it('preserves backend CAPTCHA error codes for account reauthentication', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'invalid_captcha' }), { status: 400 })))
-    const result = await createConsoleClient(undefined, undefined, { auth: { persistSession: false } }).auth.reauthenticate({ password: 'fixture-password' })
+    const result = await createConsoleClient({ auth: { persistSession: false } }).auth.reauthenticate({ password: 'fixture-password' })
     expect(result.error).toMatchObject({ code: 'invalid_captcha', message: 'invalid_captcha' })
   })
 
   it('rejects failed queries when throwOnError was requested', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ data: null, error: { message: 'Row not found', code: 'PGRST116' } }))))
-    const client = createConsoleClient(undefined, undefined, { auth: { persistSession: false } })
+    const client = createConsoleClient({ auth: { persistSession: false } })
     await expect(client.from('channel_devices').select().single().throwOnError()).rejects.toMatchObject({ code: 'PGRST116' })
   })
 })

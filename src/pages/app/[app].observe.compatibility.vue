@@ -128,7 +128,7 @@ const compatDocsUrl = 'https://capgo.app/docs/live-updates/compatibility/'
 // Send the user to the in-app native build flow (Builds tab), tracking the click
 // so this Builder entry point can be compared with the banner / upload CTAs.
 function openBuilder() {
-  pushEvent('builder_cta_compatibility_clicked', config.supaHost, { app_id: id.value })
+  pushEvent('builder_cta_compatibility_clicked', config.apiHost, { app_id: id.value })
   router.push(`/app/${encodeURIComponent(id.value)}/builds`)
 }
 

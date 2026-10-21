@@ -1,30 +1,24 @@
 import type { CapgoConfig } from '~/services/console'
 import { describe, expect, it } from 'vitest'
-import { mergeRemoteConfig, resolveSupabaseHost } from '~/services/console'
+import { isLocal, mergeRemoteConfig, PROD_API_URL } from '~/services/console'
 
-describe('supabase config merging', () => {
+describe('console config merging', () => {
   const localConfig: CapgoConfig = {
-    supaHost: 'https://sb.capgo.app',
-    supaKey: 'local-anon-key',
-    supbaseId: 'sb',
+    apiHost: PROD_API_URL,
     host: 'https://capgo.app',
     hostWeb: 'https://capgo.app',
     stripeEnabled: true,
   }
 
-  it.concurrent('keeps Supabase connection parameters from the local build config', () => {
+  it.concurrent('keeps the API host from the local build config', () => {
     const merged = mergeRemoteConfig(localConfig, {
-      supaHost: 'https://evil.example.com',
-      supaKey: 'evil-key',
-      supbaseId: 'evil',
+      apiHost: 'https://evil.example.com',
       host: 'https://console.capgo.app',
       hostWeb: 'https://www.capgo.app',
       stripeEnabled: false,
     })
 
-    expect(merged.supaHost).toBe(localConfig.supaHost)
-    expect(merged.supaKey).toBe(localConfig.supaKey)
-    expect(merged.supbaseId).toBe(localConfig.supbaseId)
+    expect(merged.apiHost).toBe(localConfig.apiHost)
     expect(merged.host).toBe('https://console.capgo.app')
     expect(merged.hostWeb).toBe('https://www.capgo.app')
     expect(merged.stripeEnabled).toBe(false)
@@ -35,6 +29,12 @@ describe('supabase config merging', () => {
     expect(mergeRemoteConfig(localConfig, remote as Partial<CapgoConfig>)).not.toHaveProperty('nativeAppleLoginEnabled')
   })
 
+  it.concurrent('ignores legacy remote Supabase connection fields', () => {
+    const remote = { apiHost: 'https://evil.supabase.co', supaKey: 'evil-key', supbaseId: 'evil' }
+    const merged = mergeRemoteConfig(localConfig, remote as Partial<CapgoConfig>)
+    expect(merged).toEqual(localConfig)
+  })
+
   it.concurrent('falls back to local values when remote config omits optional fields', () => {
     const merged = mergeRemoteConfig(localConfig, {})
 
@@ -42,9 +42,10 @@ describe('supabase config merging', () => {
   })
 })
 
-describe('supabase host resolution', () => {
-  it.concurrent('keeps the configured Supabase host when the proxy option is disabled', () => {
-    expect(resolveSupabaseHost('https://sb.capgo.app/', '')).toBe('https://sb.capgo.app')
-    expect(resolveSupabaseHost('https://sb.capgo.app/', undefined)).toBe('https://sb.capgo.app')
+describe('isLocal', () => {
+  it.concurrent('treats only the Capgo cloud API as non-local', () => {
+    expect(isLocal(PROD_API_URL)).toBe(false)
+    expect(isLocal('https://api.preprod.capgo.app')).toBe(true)
+    expect(isLocal('http://localhost:54321/functions/v1')).toBe(true)
   })
 })

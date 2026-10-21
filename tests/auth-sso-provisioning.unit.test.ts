@@ -189,7 +189,7 @@ vi.mock('~/services/websiteAuthCookie', () => ({
 }))
 
 vi.mock('~/services/console', () => ({
-  getLocalConfig: () => ({ supaHost: 'https://supabase.capgo.test' }),
+  getLocalConfig: () => ({ apiHost: 'https://supabase.capgo.test' }),
   getPlans: () => getContext().mockGetPlans(),
   isPlatformAdmin: () => getContext().mockIsPlatformAdmin(),
   useConsole: () => {

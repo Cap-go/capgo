@@ -67,7 +67,7 @@ export function captureOrganizationInvitationEvent(input: OrganizationInvitation
     pushEventForUser(
       input.event,
       input.userId,
-      getLocalConfig().supaHost,
+      getLocalConfig().apiHost,
       {
         ...(input.invitationId && (input.event === 'organization_membership_invitation_accepted' || input.event === 'organization_membership_invitation_declined')
           ? { $insert_id: invitationInsertId(input.event, input.userId, input.invitationId) }

@@ -12,27 +12,25 @@ let supaClient: ConsoleClient<Database> = null as any
 
 export const defaultApiHost = import.meta.env.VITE_API_HOST as string
 
+export const PROD_API_URL = 'https://api.capgo.app'
+
 export interface CapgoConfig {
-  supaHost: string
-  supaKey: string
-  supbaseId: string
-  supaProxyPath?: string
+  /** Absolute Capgo API URL for this build (CLI commands, analytics gating). */
+  apiHost: string
   host: string
   hostWeb: string
   stripeEnabled?: boolean
 }
 
-export function isLocal(supaHost: string) {
-  return supaHost !== 'https://sb.capgo.app'
+/** Anything that is not the Capgo cloud API (local, preprod, dev, self-host). */
+export function isLocal(apiHost: string) {
+  return apiHost !== PROD_API_URL
 }
 
 export function getLocalConfig() {
   const stripeEnabledEnv = import.meta.env.VITE_STRIPE_ENABLED as string | undefined
   return {
-    supaHost: import.meta.env.VITE_SUPABASE_URL as string,
-    supaKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-    supbaseId: import.meta.env.VITE_SUPABASE_URL?.split('//')[1].split('.')[0].split(':')[0] as string,
-    supaProxyPath: import.meta.env.VITE_SUPABASE_PROXY_PATH as string | undefined,
+    apiHost: (import.meta.env.VITE_API_URL as string | undefined) ?? defaultApiHost,
     host: import.meta.env.VITE_APP_URL as string,
     hostWeb: import.meta.env.LANDING_URL as string,
     stripeEnabled: stripeEnabledEnv === undefined ? true : stripeEnabledEnv !== 'false',
@@ -50,7 +48,7 @@ interface SpoofedAdminSession {
 const SPOOF_ADMIN_TOKEN_REFRESH_WINDOW_SECONDS = 60
 
 function getSpoofedAdminStorageKey() {
-  return `supabase-${config.supbaseId}.spoof_admin_jwt`
+  return 'capgo.console.spoof_admin_jwt'
 }
 
 function saveSpoofedAdminSession(session: SpoofedAdminSession) {
@@ -107,8 +105,8 @@ function isSpoofedAdminJwtUsable(jwt: string) {
   return expiresAt !== null && expiresAt > Date.now() / 1000
 }
 
-function createSpoofAdminSupabase() {
-  return createConsoleClient(getSupabaseHost(), config.supaKey, {
+function createSpoofAdminClient() {
+  return createConsoleClient({
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -118,7 +116,7 @@ function createSpoofAdminSupabase() {
 }
 
 async function refreshSpoofedAdminSession(session: SpoofedAdminSession): Promise<SpoofedAdminSession | null> {
-  const { data, error } = await createSpoofAdminSupabase().auth.refreshSession({ refresh_token: session.refreshToken })
+  const { data, error } = await createSpoofAdminClient().auth.refreshSession({ refresh_token: session.refreshToken })
   if (error || !data.session?.access_token || !data.session.refresh_token)
     return null
 
@@ -159,33 +157,6 @@ export async function getRemoteConfig() {
   }
 }
 
-export function getSupabaseHost(): string {
-  return resolveSupabaseHost(config.supaHost, config.supaProxyPath)
-}
-
-function trimLeadingSlashes(value: string): string {
-  let start = 0
-  while (value[start] === '/')
-    start++
-  return value.slice(start)
-}
-
-function trimTrailingSlashes(value: string): string {
-  let end = value.length
-  while (end > 0 && value[end - 1] === '/')
-    end--
-  return value.slice(0, end)
-}
-
-export function resolveSupabaseHost(supaHost: string, proxyPath?: string, runtimeOrigin = globalThis.location?.origin): string {
-  const normalizedHost = trimTrailingSlashes(supaHost)
-  if (!proxyPath || !runtimeOrigin)
-    return normalizedHost
-
-  const normalizedProxyPath = `/${trimLeadingSlashes(trimTrailingSlashes(proxyPath))}/`
-  return new URL(normalizedProxyPath, runtimeOrigin).href
-}
-
 export function useConsole() {
   const options = {
     auth: {
@@ -197,7 +168,7 @@ export function useConsole() {
   if (supaClient)
     return supaClient
 
-  supaClient = createConsoleClient(getSupabaseHost(), config.supaKey, options)
+  supaClient = createConsoleClient(options)
   return supaClient
 }
 
