@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, h, nextTick, ref } from 'vue'
 import BuildTable from '../src/components/tables/BuildTable.vue'
 
-const mocks = vi.hoisted(() => ({ api: vi.fn() }))
+const mocks = vi.hoisted(() => ({ api: vi.fn(), builds: [] as any[] }))
 vi.mock('../src/services/capgoApi', () => ({ invokeCapgoApi: mocks.api }))
 vi.mock('../src/services/date', () => ({ formatDate: () => '' }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
@@ -12,7 +12,7 @@ vi.mock('../src/stores/dialogv2', () => ({ useDialogV2Store: () => ({}) }))
 vi.mock('../src/stores/organization', () => ({ useOrganizationStore: () => ({ currentOrganization: { gid: 'fixture-org' }, getOrgByAppId: () => ({ paying: true }), awaitInitialLoad: async () => {} }) }))
 vi.mock('../src/services/supabase', () => ({ useSupabase: () => ({
   from: () => {
-    const query: any = { then: (resolve: (data: unknown) => void) => resolve({ data: [], count: 0, error: null }) }
+    const query: any = { then: (resolve: (data: unknown) => void) => resolve({ data: mocks.builds, count: mocks.builds.length, error: null }) }
     for (const method of ['select', 'eq', 'order', 'range'])
       query[method] = () => query
     return query
@@ -26,13 +26,19 @@ function mount() {
   const host = document.createElement('div')
   const app = createApp(defineComponent({ setup: () => () => h(BuildTable, { appId: appId.value }) }))
   app.component('StepsBuild', { render: () => h('div', { 'data-test': 'commands' }) })
-  app.component('DataTable', { render: () => h('div', { 'data-test': 'table' }) })
+  app.component('DataTable', defineComponent({
+    props: { isLoading: Boolean, elementList: { type: Array, default: () => [] } },
+    setup: props => () => h('div', { 'data-test': 'table', 'data-loading': String(props.isLoading), 'data-count': props.elementList.length }),
+  }))
   app.mount(host)
   cleanups.push(() => app.unmount())
   return { host, appId }
 }
 
-beforeEach(() => vi.resetAllMocks())
+beforeEach(() => {
+  vi.resetAllMocks()
+  mocks.builds = []
+})
 afterEach(() => cleanups.splice(0).forEach(cleanup => cleanup()))
 
 describe('builds page checklist activation access', () => {
@@ -59,7 +65,34 @@ describe('builds page checklist activation access', () => {
     await nextTick()
     await vi.waitFor(() => expect(host.querySelector('[data-test="commands"]')).not.toBeNull())
     resolveFirst({ data: { canEnable: true }, error: null })
+    await new Promise(resolve => setTimeout(resolve, 0))
     await nextTick()
     expect(host.querySelector('[data-test="intro"]')).toBeNull()
+  })
+
+  it('shows existing builds while the permission check is still pending', async () => {
+    let resolveAccess!: (value: unknown) => void
+    mocks.api.mockImplementation(() => new Promise(resolve => resolveAccess = resolve))
+    mocks.builds = [{ builder_job_id: null, platform: 'ios' }]
+    const { host } = mount()
+    await vi.waitFor(() => {
+      const table = host.querySelector('[data-test="table"]')!
+      expect(table.getAttribute('data-count')).toBe('1')
+      expect(table.getAttribute('data-loading')).toBe('false')
+    })
+    resolveAccess({ data: { canEnable: true }, error: null })
+    await nextTick()
+    expect(host.querySelector('[data-test="intro"]')).toBeNull()
+  })
+
+  it('keeps an empty app loading until the access result chooses its setup view', async () => {
+    let resolveAccess!: (value: unknown) => void
+    mocks.api.mockImplementation(() => new Promise(resolve => resolveAccess = resolve))
+    const { host } = mount()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(host.querySelector('[data-test="table"]')?.getAttribute('data-loading')).toBe('true')
+    expect(host.querySelector('[data-test="commands"]')).toBeNull()
+    resolveAccess({ data: { canEnable: false }, error: null })
+    await vi.waitFor(() => expect(host.querySelector('[data-test="commands"]')).not.toBeNull())
   })
 })

@@ -43,9 +43,11 @@ const currentPage = ref(1)
 const total = ref(0)
 const totalAllBuilds = ref<number | null>(null)
 const canEnableBuilder = ref(false)
+const builderAccessReady = ref(false)
 let reloadSequence = 0
 const platformBuildCounts = ref<Record<Platform, number>>({ ios: 0, android: 0 })
-const showSetupFlow = computed(() => showSteps.value || totalAllBuilds.value === 0)
+const showSetupFlow = computed(() => showSteps.value || (totalAllBuilds.value === 0 && builderAccessReady.value))
+const isTableLoading = computed(() => isLoading.value || (elements.value.length === 0 && totalAllBuilds.value === null) || (totalAllBuilds.value === 0 && !builderAccessReady.value))
 const organizationStore = useOrganizationStore()
 const builderEntitlement = computed(() => {
   const org = organizationStore.getOrgByAppId(props.appId)
@@ -193,15 +195,20 @@ async function reload() {
   currentPage.value = 1
   elements.value = []
   canEnableBuilder.value = false
+  builderAccessReady.value = false
+  isLoading.value = true
   totalAllBuilds.value = null
   const sequence = ++reloadSequence
   const appId = props.appId
   try {
-    const { data, error } = await invokeCapgoApi<{ canEnable: boolean }>(`app/${encodeURIComponent(appId)}/onboarding/builder`, { method: 'GET' })
-    if (sequence !== reloadSequence || appId !== props.appId)
-      return
-    canEnableBuilder.value = !error && data?.canEnable === true
-    await Promise.all([getData(), updateOverallBuildsCount()])
+    const loadAccess = async () => {
+      const { data, error } = await invokeCapgoApi<{ canEnable: boolean }>(`app/${encodeURIComponent(appId)}/onboarding/builder`, { method: 'GET' })
+      if (sequence !== reloadSequence || appId !== props.appId)
+        return
+      canEnableBuilder.value = !error && data?.canEnable === true
+      builderAccessReady.value = true
+    }
+    await Promise.all([getData(), updateOverallBuildsCount(), loadAccess()])
   }
   catch (error) {
     console.error(error)
@@ -372,7 +379,7 @@ watch(showSetupFlow, (newValue) => {
       :entitlement="builderEntitlement"
     />
     <StepsBuild
-      v-else-if="showSteps || totalAllBuilds === 0"
+      v-else-if="showSetupFlow"
       :onboarding="(totalAllBuilds ?? 0) === 0"
       :app-id="props.appId"
       :platform-build-counts="platformBuildCounts"
@@ -387,7 +394,7 @@ watch(showSetupFlow, (newValue) => {
         v-model:current-page="currentPage"
         :columns="columns"
         :element-list="elements"
-        :is-loading="isLoading"
+        :is-loading="isTableLoading"
         :search-function="(e: Element, s: string) => e.platform.toLowerCase().includes(s.toLowerCase()) || e.status.toLowerCase().includes(s.toLowerCase())"
         :search-placeholder="t('search-builds')"
         :show-add="!isMobile"

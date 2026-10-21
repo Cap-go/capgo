@@ -20,6 +20,7 @@ it('retains a successful activation after leaving the page without navigating ba
   const app = createApp(BuilderIntroduction, { appId: 'com.example.builder' })
   app.mount(host)
   host.querySelector('button')!.click()
+  expect(mocks.api).toHaveBeenCalledExactlyOnceWith('app/com.example.builder/onboarding/builder', { method: 'POST' })
   app.unmount()
   const onboarding = { setup: { todo_list_version: 4, selected_path: 'builder' } }
   resolveRequest({ data: { onboarding }, error: null })
