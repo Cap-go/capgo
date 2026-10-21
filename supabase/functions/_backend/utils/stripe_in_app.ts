@@ -128,7 +128,7 @@ async function getSubscriptionDefaultPaymentMethod(c: Context, stripe: Stripe, c
 async function findSavedPaymentMethods(c: Context, stripe: Stripe, customerId: string, newCardId?: string) {
   const customer = await stripe.customers.retrieve(customerId, { expand: ['invoice_settings.default_payment_method'] })
   if (customer.deleted)
-    return { defaultPaymentMethod: null, backupPaymentMethod: null, isCustomerDefault: false }
+    return { defaultPaymentMethod: null, backupPaymentMethod: null, isCustomerDefault: false, spareCards: [] }
   const [cards, subscriptionDefault] = await Promise.all([
     stripe.paymentMethods.list({ customer: customerId, type: 'card', limit: 10 }),
     getSubscriptionDefaultPaymentMethod(c, stripe, customerId),
@@ -144,7 +144,22 @@ async function findSavedPaymentMethods(c: Context, stripe: Stripe, customerId: s
   const backupPaymentMethod = cards.data.find(paymentMethod => paymentMethod.id !== defaultPaymentMethod?.id
     && !isExpired(paymentMethod)
     && (!defaultFingerprint || paymentMethod.card?.fingerprint !== defaultFingerprint)) ?? null
-  return { defaultPaymentMethod, backupPaymentMethod, isCustomerDefault }
+  // Cards Stripe may charge on its own (subscription card, customer default) are never spare.
+  const inUse = new Set([subscriptionDefault?.id, isCustomerDefault ? customerDefault.id : undefined, defaultPaymentMethod?.id])
+  const spareCards = cards.data.filter(paymentMethod => !inUse.has(paymentMethod.id))
+  return { defaultPaymentMethod, backupPaymentMethod, isCustomerDefault, spareCards }
+}
+
+// Only one backup at a time: an older spare card must never come back as the backup.
+async function detachSpareCards(c: Context, ctx: InAppBillingContext, spareCards: Stripe.PaymentMethod[], keepId?: string) {
+  await Promise.all(spareCards.filter(paymentMethod => paymentMethod.id !== keepId).map(async (paymentMethod) => {
+    try {
+      await ctx.stripe.paymentMethods.detach(paymentMethod.id)
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'detachSpareCards', customerId: ctx.customerId, paymentMethodId: paymentMethod.id, error })
+    }
+  }))
 }
 
 export async function getSavedCards(c: Context, ctx: InAppBillingContext): Promise<SavedCards> {
@@ -231,11 +246,18 @@ export async function savePaymentMethodFromIntent(c: Context, ctx: InAppBillingC
   if (paymentMethod.customer !== ctx.customerId)
     await ctx.stripe.paymentMethods.attach(paymentMethodId, { customer: ctx.customerId })
   if (role === 'backup') {
-    const { defaultPaymentMethod, isCustomerDefault } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId, paymentMethodId)
+    const { defaultPaymentMethod, isCustomerDefault, spareCards } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId, paymentMethodId)
     if (defaultPaymentMethod && defaultPaymentMethod.id !== paymentMethodId) {
+      const fingerprint = paymentMethod.card?.fingerprint
+      if (fingerprint && fingerprint === defaultPaymentMethod.card?.fingerprint) {
+        // The same physical card cannot back itself up.
+        await ctx.stripe.paymentMethods.detach(paymentMethodId)
+        throw simpleError('backup_same_as_primary', 'This card is already your main card')
+      }
       // Pin the current primary so the newer backup can never be mistaken for it.
       if (!isCustomerDefault)
         await ctx.stripe.customers.update(ctx.customerId, { invoice_settings: { default_payment_method: defaultPaymentMethod.id } })
+      await detachSpareCards(c, ctx, spareCards, paymentMethodId)
       cloudlog({ requestId: c.get('requestId'), message: 'in-app backup card saved', customerId: ctx.customerId, paymentMethodId })
       return toCardSummary(paymentMethod)
     }
@@ -265,10 +287,12 @@ export function parsePaymentMethodRole(value: unknown): PaymentMethodRole {
 
 // Only the backup can be removed: the default keeps renewals working.
 export async function removeBackupCard(c: Context, ctx: InAppBillingContext, paymentMethodId: string) {
-  const { backupPaymentMethod } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId)
+  const { backupPaymentMethod, spareCards } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId)
   if (!backupPaymentMethod || backupPaymentMethod.id !== paymentMethodId)
     throw simpleError('invalid_payment_method', 'This card is not the backup card')
   await ctx.stripe.paymentMethods.detach(paymentMethodId)
+  // Older spare cards would otherwise become the next backup and keep fallback charging on.
+  await detachSpareCards(c, ctx, spareCards, paymentMethodId)
   cloudlog({ requestId: c.get('requestId'), message: 'in-app backup card removed', customerId: ctx.customerId, paymentMethodId })
   return await getSavedCards(c, ctx)
 }

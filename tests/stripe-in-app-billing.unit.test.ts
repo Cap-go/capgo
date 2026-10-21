@@ -167,7 +167,7 @@ describe('backup card', () => {
   it('picks the newest valid card that is not the default', async () => {
     const stripe = createStripe()
     const main = card('pm_main', 'fp_main')
-    mockSavedCards(stripe, main, [card('pm_same', 'fp_main'), card('pm_expired', 'fp_old', 2020), main, card('pm_back', 'fp_back')])
+    mockSavedCards(stripe, main, [card('pm_same', 'fp_main'), card('pm_expired', 'fp_old', 2020), main, card('pm_back', 'fp_back'), card('pm_older', 'fp_older')])
 
     const cards = await getSavedCards(createContext(), createBillingContext(stripe))
 
@@ -224,6 +224,56 @@ describe('backup card', () => {
     expect(saved?.id).toBe('pm_back')
     expect(stripe.customers.update).not.toHaveBeenCalled()
     expect(stripe.subscriptions.update).not.toHaveBeenCalled()
+  })
+
+  it('retires the previous backup when a new one is saved', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [card('pm_new', 'fp_new'), main, card('pm_old', 'fp_old')])
+    stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_new' })
+    stripe.paymentMethods.retrieve.mockResolvedValue(card('pm_new', 'fp_new'))
+
+    await savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup')
+
+    expect(stripe.paymentMethods.detach).toHaveBeenCalledTimes(1)
+    expect(stripe.paymentMethods.detach).toHaveBeenCalledWith('pm_old')
+  })
+
+  it('rejects the main card as its own backup', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [card('pm_dup', 'fp_main'), main])
+    stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_dup' })
+    stripe.paymentMethods.retrieve.mockResolvedValue(card('pm_dup', 'fp_main'))
+
+    await expect(savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup')).rejects.toThrow()
+    expect(stripe.paymentMethods.detach).toHaveBeenCalledWith('pm_dup')
+  })
+
+  it('removing the backup does not revive an older card', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [card('pm_back', 'fp_back'), main, card('pm_old', 'fp_old')])
+
+    await removeBackupCard(createContext(), createBillingContext(stripe), 'pm_back')
+
+    expect(stripe.paymentMethods.detach).toHaveBeenCalledWith('pm_back')
+    expect(stripe.paymentMethods.detach).toHaveBeenCalledWith('pm_old')
+    expect(stripe.paymentMethods.detach).not.toHaveBeenCalledWith('pm_main')
+  })
+
+  it('never detaches the customer default when the subscription uses another card', async () => {
+    const stripe = createStripe()
+    const subscriptionCard = card('pm_sub', 'fp_sub')
+    const customerDefault = card('pm_cust', 'fp_cust')
+    mockSavedCards(stripe, customerDefault, [card('pm_back', 'fp_back'), customerDefault, subscriptionCard])
+    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    stripe.subscriptions.retrieve.mockResolvedValue({ default_payment_method: subscriptionCard })
+
+    await removeBackupCard(createContext(), createBillingContext(stripe), 'pm_back')
+
+    expect(stripe.paymentMethods.detach).toHaveBeenCalledTimes(1)
+    expect(stripe.paymentMethods.detach).toHaveBeenCalledWith('pm_back')
   })
 
   it('only accepts known roles', () => {

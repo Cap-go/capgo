@@ -116,18 +116,26 @@ async function openCardForm(mode: 'setup' | 'backup' = 'setup') {
 
 async function removeBackup() {
   const backup = backupCard.value
-  if (!backup || isRemovingBackup.value || !await requireUpdateBilling())
+  // Scope the request to the org that rendered this card.
+  const id = orgId.value
+  if (!backup || !id || isRemovingBackup.value)
     return
+  // Lock before the async permission check so double clicks send one request.
   isRemovingBackup.value = true
   try {
-    const cards = await removeBackupCard(orgId.value, backup.id)
+    if (!await requireUpdateBilling())
+      return
+    const cards = await removeBackupCard(id, backup.id)
+    if (orgId.value !== id)
+      return
     if (overview.value)
       overview.value = { ...overview.value, ...cards }
     toast.success(t('billing-backup-card-removed'))
   }
   catch (error) {
     console.error('Cannot remove backup card', error)
-    toast.error(t('billing-backup-card-remove-failed'))
+    if (orgId.value === id)
+      toast.error(t('billing-backup-card-remove-failed'))
   }
   finally {
     isRemovingBackup.value = false

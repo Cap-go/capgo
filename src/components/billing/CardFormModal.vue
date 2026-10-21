@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconLock from '~icons/heroicons/lock-closed'
 import BillingModal from '~/components/billing/BillingModal.vue'
+import { getCapgoApiErrorCode } from '~/services/capgoApi'
 import { createCardSetupIntent, getInvoicePaymentIntent, getStripeJs, savePaymentMethod } from '~/services/stripe'
 
 const props = defineProps<{
@@ -134,7 +135,10 @@ async function submit() {
   }
   catch (error) {
     console.error('Card form submit failed', error)
-    errorMessage.value = props.mode === 'invoice' ? t('billing-payment-failed') : t('billing-card-save-failed')
+    if (props.mode === 'backup' && await getCapgoApiErrorCode(error) === 'backup_same_as_primary')
+      errorMessage.value = t('billing-backup-card-same-as-main')
+    else
+      errorMessage.value = props.mode === 'invoice' ? t('billing-payment-failed') : t('billing-card-save-failed')
   }
   finally {
     isSubmitting.value = false
