@@ -4,29 +4,32 @@
  *
  * Asks trial organizations to save a card right after an activation milestone:
  * the first device that installed an update, or the first successful native build.
- * Saving a card only stores it on the Stripe customer (SetupIntent); the trial keeps
- * running and nothing is charged. When the trial ends, checkout offers the saved card.
+ * The card schedules the plan picked during onboarding to start when the trial ends;
+ * nothing is charged before then and the trial keeps running.
  *
  * Visibility conditions:
  * - Stripe billing is enabled and external purchase flows are allowed
  * - The organization is on trial (not paying, trial_left > 0)
  * - The user can manage org billing (org.update_billing)
  * - An app of the organization reached a milestone the user was not asked about yet
- * - The Stripe customer has no card on file
+ * - The org has an onboarding plan to start and it is not scheduled yet
  */
 
+import type { TrialPlan } from '~/services/stripe'
 import type { TrialCardMilestone } from '~/utils/trialCardPrompt'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { toast } from 'vue-sonner'
 import IconCheckCircle from '~icons/heroicons/check-circle'
 import IconLock from '~icons/heroicons/lock-closed'
 import BillingModal from '~/components/billing/BillingModal.vue'
 import CardFormModal from '~/components/billing/CardFormModal.vue'
+import { formatLocalDate } from '~/services/date'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { pushEvent } from '~/services/posthog'
-import { getBillingCard } from '~/services/stripe'
+import { formatStripeAmount, getTrialPlan, scheduleTrialPlan } from '~/services/stripe'
 import { getLocalConfig, stripeEnabled } from '~/services/supabase'
 import { isPendingOrganizationInvite, useOrganizationStore } from '~/stores/organization'
 import {
@@ -48,10 +51,13 @@ interface ActivePrompt {
   milestone: TrialCardMilestone
   reached: TrialCardMilestone[]
   trialDaysLeft: number
+  plan: TrialPlan
+  hasCard: boolean
 }
 
 const prompt = ref<ActivePrompt | null>(null)
 const step = ref<'ask' | 'card' | null>(null)
+const isScheduling = ref(false)
 let lookupRun = 0
 
 const currentOrg = computed(() => organizationStore.currentOrganization)
@@ -92,9 +98,9 @@ watch([orgId, pendingMilestone, () => !!stripeEnabled.value], async ([id, pendin
     return
   if (!await checkPermissions('org.update_billing', { orgId: id }) || run !== lookupRun)
     return
-  let hasCard: boolean
+  let trial: Awaited<ReturnType<typeof getTrialPlan>>
   try {
-    hasCard = !!(await getBillingCard(id)).card
+    trial = await getTrialPlan(id)
   }
   catch (error) {
     // Billing unavailable for this org (no customer, region not configured): skip quietly.
@@ -105,15 +111,17 @@ watch([orgId, pendingMilestone, () => !!stripeEnabled.value], async ([id, pendin
     return
   // Every milestone reached so far counts as asked: one prompt per new milestone, not a backlog.
   const reached = reachedMilestones.value.map(entry => entry.milestone)
-  if (hasCard) {
+  if (!trial.plan || trial.plan.scheduled) {
     markTrialCardMilestonesHandled(id, reached)
     return
   }
-  prompt.value = { orgId: id, milestone: pending, reached, trialDaysLeft: currentOrg.value?.trial_left ?? 0 }
+  prompt.value = { orgId: id, milestone: pending, reached, trialDaysLeft: currentOrg.value?.trial_left ?? 0, plan: trial.plan, hasCard: !!trial.card }
   step.value = 'ask'
   track('trial_card_prompt_shown')
 }, { immediate: true })
 
+const planPrice = computed(() => prompt.value ? formatStripeAmount(prompt.value.plan.amount, prompt.value.plan.currency) : '')
+const planDate = computed(() => prompt.value ? formatLocalDate(prompt.value.plan.startsAt) : '')
 const title = computed(() => prompt.value?.milestone === 'builder' ? t('trial-card-prompt-title-builder') : t('trial-card-prompt-title-ota'))
 
 function close(event: string) {
@@ -128,13 +136,37 @@ function dismiss() {
   close(step.value === 'card' ? 'trial_card_prompt_card_closed' : 'trial_card_prompt_dismissed')
 }
 
-function addCard() {
+async function startPlan() {
+  const current = prompt.value
+  if (!current || isScheduling.value)
+    return
+  isScheduling.value = true
+  try {
+    const { plan } = await scheduleTrialPlan(current.orgId)
+    toast.success(t('trial-plan-scheduled', { plan: plan.planName, date: formatLocalDate(plan.startsAt) }))
+    close('trial_card_prompt_plan_scheduled')
+  }
+  catch (error) {
+    console.error('Cannot schedule trial plan', error)
+    toast.error(t('trial-plan-schedule-error'))
+    close('trial_card_prompt_schedule_failed')
+  }
+  finally {
+    isScheduling.value = false
+  }
+}
+
+function accept() {
   track('trial_card_prompt_add_clicked')
-  step.value = 'card'
+  if (prompt.value?.hasCard)
+    void startPlan()
+  else
+    step.value = 'card'
 }
 
 function onCardSaved() {
-  close('trial_card_prompt_card_saved')
+  track('trial_card_prompt_card_saved')
+  void startPlan()
 }
 </script>
 
@@ -149,6 +181,9 @@ function onCardSaved() {
       <div class="space-y-2 text-sm leading-6 text-slate-700 dark:text-slate-200">
         <p>{{ t('trial-card-prompt-message') }}</p>
         <p class="font-medium">
+          {{ t('trial-card-prompt-plan', { plan: prompt.plan.planName, price: planPrice, date: planDate }) }}
+        </p>
+        <p class="text-slate-600 dark:text-slate-300">
           {{ t('trial-card-prompt-no-charge', { days: prompt.trialDaysLeft }) }}
         </p>
       </div>
@@ -158,11 +193,12 @@ function onCardSaved() {
       {{ t('billing-card-secure') }}
     </p>
     <div class="mt-6 flex flex-wrap justify-end gap-2">
-      <button type="button" class="d-btn d-btn-ghost" data-test="trial-card-prompt-later" @click="dismiss">
+      <button type="button" class="d-btn d-btn-ghost" :disabled="isScheduling" data-test="trial-card-prompt-later" @click="dismiss">
         {{ t('trial-card-prompt-later') }}
       </button>
-      <button type="button" class="d-btn d-btn-primary" data-test="trial-card-prompt-add" @click="addCard">
-        {{ t('trial-card-prompt-add') }}
+      <button type="button" class="d-btn d-btn-primary" :disabled="isScheduling" data-test="trial-card-prompt-add" @click="accept">
+        <span v-if="isScheduling" class="d-loading d-loading-spinner d-loading-sm" />
+        {{ prompt?.hasCard ? t('trial-plan-start', { plan: prompt.plan.planName }) : t('trial-card-prompt-add') }}
       </button>
     </div>
   </BillingModal>

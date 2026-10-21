@@ -23,6 +23,7 @@ import { getRetryablePostgrestStatus, isRetryablePostgrestError } from '../utils
 import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
 import { ensureCustomerMetadata, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
 import { buildTransferInvoiceFooter, getStripeCustomerEmailFromEvent, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
+import { cancelTrialPlanScheduleForSubscription } from '../utils/stripe_trial_plan.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { trackUsChargeRefunded, trackUsChargeSucceeded } from '../utils/us_revenue_tracking.ts'
@@ -1794,6 +1795,13 @@ async function stripeEventHandler(c: Context<MiddlewareKeyVariablesStripe>) {
     if (getWebhookBillingAccount(c) === 'us')
       await backgroundTask(c, trackUsChargeSucceeded(c, stripeEvent.data.object))
     return handleChargeSucceededStripeEvent(c, org, stripeData)
+  }
+
+  if (stripeEvent.type === 'customer.subscription.created') {
+    const billingAccount = getWebhookBillingAccount(c)
+    await backgroundTask(c, cancelTrialPlanScheduleForSubscription(c, getStripe(c, billingAccount), stripeEvent.data.object).catch((error) => {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'cancel trial plan schedule failed', subscriptionId: stripeEvent.data.object.id, error })
+    }))
   }
 
   const subscriptionResponse = await handleSubscriptionStripeEvent(c, stripeEvent, stripeData, org, customer)

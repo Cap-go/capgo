@@ -14,7 +14,7 @@ import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { formatLocalDate } from '~/services/date'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
-import { formatStripeAmount, getBillingOverview, payOpenInvoice, resumeSubscription } from '~/services/stripe'
+import { cancelTrialPlan, formatStripeAmount, getBillingOverview, payOpenInvoice, resumeSubscription, scheduleTrialPlan } from '~/services/stripe'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -30,6 +30,9 @@ const isLoading = ref(true)
 const loadFailed = ref(false)
 const isPaying = ref(false)
 const isResuming = ref(false)
+const isUpdatingTrialPlan = ref(false)
+// Start the trial plan once the card form saves a card.
+let scheduleAfterCardSave = false
 const showCardModal = ref<'setup' | 'invoice' | null>(null)
 const showCancelModal = ref(false)
 const permissionModal = ref<'org.read_billing' | 'org.update_billing' | null>(null)
@@ -42,6 +45,9 @@ const canEnterCard = computed(() => !!overview.value?.publishableKey)
 const subscription = computed(() => overview.value?.subscription ?? null)
 const openInvoice = computed(() => overview.value?.openInvoice ?? null)
 const invoices = computed(() => overview.value?.invoices ?? [])
+const trialPlan = computed(() => subscription.value ? null : overview.value?.trialPlan ?? null)
+const trialPlanPrice = computed(() => trialPlan.value ? formatStripeAmount(trialPlan.value.amount, trialPlan.value.currency) : '')
+const trialPlanDate = computed(() => trialPlan.value ? formatLocalDate(trialPlan.value.startsAt) : '')
 const openInvoiceAmount = computed(() => openInvoice.value ? formatStripeAmount(openInvoice.value.amountDue, openInvoice.value.currency) : '')
 
 const subscriptionLine = computed(() => {
@@ -173,10 +179,60 @@ async function resume() {
   }
 }
 
+async function startTrialPlan() {
+  if (!await requireUpdateBilling() || isUpdatingTrialPlan.value)
+    return
+  if (!card.value) {
+    scheduleAfterCardSave = true
+    showCardModal.value = 'setup'
+    return
+  }
+  isUpdatingTrialPlan.value = true
+  try {
+    await scheduleTrialPlan(orgId.value)
+    toast.success(t('trial-plan-scheduled', { plan: trialPlan.value?.planName ?? '', date: trialPlanDate.value }))
+    await loadOverview()
+  }
+  catch (error) {
+    console.error('Cannot schedule trial plan', error)
+    toast.error(t('trial-plan-schedule-error'))
+  }
+  finally {
+    isUpdatingTrialPlan.value = false
+  }
+}
+
+async function stopTrialPlan() {
+  if (!await requireUpdateBilling() || isUpdatingTrialPlan.value)
+    return
+  isUpdatingTrialPlan.value = true
+  try {
+    await cancelTrialPlan(orgId.value)
+    toast.success(t('trial-plan-canceled'))
+    await loadOverview()
+  }
+  catch (error) {
+    console.error('Cannot cancel trial plan', error)
+    toast.error(t('trial-plan-cancel-error'))
+  }
+  finally {
+    isUpdatingTrialPlan.value = false
+  }
+}
+
+function closeCardModal() {
+  scheduleAfterCardSave = false
+  showCardModal.value = null
+}
+
 async function onCardSaved() {
   const mode = showCardModal.value
   showCardModal.value = null
   await loadOverview()
+  if (scheduleAfterCardSave) {
+    scheduleAfterCardSave = false
+    await startTrialPlan()
+  }
   if (mode === 'invoice')
     await refreshOrganization()
 }
@@ -257,10 +313,41 @@ onMounted(async () => {
             <p class="mt-3 text-base font-medium text-slate-900 dark:text-white">
               {{ subscriptionLine }}
             </p>
+            <p v-if="trialPlan" class="mt-2 text-sm text-slate-600 dark:text-slate-300" data-test="billing-trial-plan">
+              {{ trialPlan.scheduled
+                ? t('trial-plan-scheduled-line', { plan: trialPlan.planName, price: trialPlanPrice, date: trialPlanDate })
+                : t('trial-plan-offer-line', { plan: trialPlan.planName, price: trialPlanPrice, date: trialPlanDate }) }}
+            </p>
             <div class="mt-4 flex flex-wrap gap-2">
-              <router-link to="/settings/organization/plans" class="d-btn d-btn-sm d-btn-primary">
+              <button
+                v-if="trialPlan && !trialPlan.scheduled && (card || canEnterCard)"
+                type="button"
+                class="d-btn d-btn-sm d-btn-primary"
+                :disabled="isUpdatingTrialPlan"
+                data-test="billing-trial-plan-start"
+                @click="startTrialPlan"
+              >
+                <span v-if="isUpdatingTrialPlan" class="d-loading d-loading-spinner d-loading-xs" />
+                {{ t('trial-plan-start', { plan: trialPlan.planName }) }}
+              </button>
+              <router-link
+                to="/settings/organization/plans"
+                class="d-btn d-btn-sm"
+                :class="trialPlan && !trialPlan.scheduled ? 'd-btn-outline' : 'd-btn-primary'"
+              >
                 {{ subscription ? t('billing-change-plan') : t('billing-choose-plan') }}
               </router-link>
+              <button
+                v-if="trialPlan?.scheduled"
+                type="button"
+                class="d-btn d-btn-sm d-btn-ghost text-slate-600 hover:text-red-600 dark:text-slate-300 dark:hover:text-red-400"
+                :disabled="isUpdatingTrialPlan"
+                data-test="billing-trial-plan-cancel"
+                @click="stopTrialPlan"
+              >
+                <span v-if="isUpdatingTrialPlan" class="d-loading d-loading-spinner d-loading-xs" />
+                {{ t('trial-plan-cancel') }}
+              </button>
               <button
                 v-if="subscription && (subscription.cancelAtPeriodEnd || subscription.cancelAt)"
                 type="button"
@@ -346,7 +433,7 @@ onMounted(async () => {
       :org-id="orgId"
       :mode="showCardModal"
       :amount-label="openInvoiceAmount"
-      @close="showCardModal = null"
+      @close="closeCardModal"
       @saved="onCardSaved"
     />
     <CancelPlanModal

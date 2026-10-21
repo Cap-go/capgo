@@ -246,12 +246,23 @@ export interface BillingInvoice {
   pdfUrl: string | null
 }
 
+// The onboarding plan that starts (and is first charged) when the free trial ends.
+export interface TrialPlan {
+  planName: string
+  amount: number
+  currency: string
+  interval: 'month'
+  startsAt: string
+  scheduled: boolean
+}
+
 export interface BillingOverview {
   publishableKey: string
   card: BillingCard | null
   subscription: BillingSubscription | null
   invoices: BillingInvoice[]
   openInvoice: { id: string, amountDue: number, currency: string } | null
+  trialPlan: TrialPlan | null
 }
 
 export const CANCEL_REASONS = [
@@ -292,8 +303,23 @@ export function getBillingOverview(orgId: string) {
   return callBilling<BillingOverview>('overview', { orgId })
 }
 
-export function getBillingCard(orgId: string) {
-  return callBilling<{ card: BillingCard | null }>('card', { orgId })
+export function getTrialPlan(orgId: string) {
+  return callBilling<{ card: BillingCard | null, plan: TrialPlan | null }>('trial-plan', { orgId })
+}
+
+export async function scheduleTrialPlan(orgId: string) {
+  const datafastAttribution = await getDatafastAttribution()
+  const affonsoReferral = await getAffonsoReferral()
+  return callBilling<{ plan: TrialPlan }>('trial-plan/schedule', {
+    orgId,
+    affonsoReferral,
+    datafastVisitorId: datafastAttribution.visitorId,
+    datafastSessionId: datafastAttribution.sessionId,
+  })
+}
+
+export function cancelTrialPlan(orgId: string) {
+  return callBilling<{ plan: TrialPlan | null }>('trial-plan/cancel', { orgId })
 }
 
 export function createCardSetupIntent(orgId: string) {

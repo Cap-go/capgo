@@ -254,6 +254,10 @@ async function mockReleaseLive(page: Page) {
  * Console pages captured for before/after visual diffs.
  * Add routes here when a PR touches a new screen reviewers should compare.
  */
+function visualTrialPlan(scheduled: boolean) {
+  return { planName: 'Solo', amount: 1400, currency: 'usd', interval: 'month', startsAt: '2026-10-30T00:00:00.000Z', scheduled }
+}
+
 export const visualDiffRoutes: VisualDiffRoute[] = [
   ...[
     { slug: 'onboarding-dual-goals', progress: null },
@@ -424,10 +428,27 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
           : row
         await route.fulfill({ response, json: Array.isArray(json) ? json.map(withOtaSuccess) : withOtaSuccess(json) })
       })
-      await page.route('**/private/stripe_billing/card', route => route.fulfill({ json: { card: null } }))
+      await page.route('**/private/stripe_billing/trial-plan', route => route.fulfill({ json: { card: null, plan: visualTrialPlan(false) } }))
       await page.reload()
       // The base branch has no prompt: capture the plain dashboard there.
       await page.locator('[data-test="trial-card-prompt-add"]').waitFor({ timeout: 15_000 }).catch(() => {})
+    },
+  },
+  {
+    slug: 'org-billing-trial-plan-scheduled',
+    path: '/settings/organization/billing',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/private/stripe_billing/overview', route => route.fulfill({ json: {
+        publishableKey: '',
+        card: { id: 'pm_visual', brand: 'visa', last4: '4242', expMonth: 12, expYear: 2030 },
+        subscription: null,
+        invoices: [],
+        openInvoice: null,
+        trialPlan: visualTrialPlan(true),
+      } }))
+      await page.reload()
+      await page.locator('[data-test="billing-subscription"]').waitFor()
     },
   },
   { slug: 'account-settings', path: '/settings/account', auth: true },
