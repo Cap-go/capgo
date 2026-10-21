@@ -3112,6 +3112,8 @@
   "trial-card-prompt-plan": "Your {plan} plan ({price}/month) starts on {date}, when your free trial ends, and renews monthly.",
   "trial-card-prompt-title-builder": "Your first native build succeeded!",
   "trial-card-prompt-title-ota": "Your first device just got an update!",
+  "trial-plan-picker-hint": "You can switch plan now. Nothing is charged until your free trial ends.",
+  "trial-plan-picker-label": "Plan that starts after your trial",
   "trial-plan-cancel": "Don't start plan",
   "trial-plan-cancel-error": "We could not cancel the scheduled plan. Please try again.",
   "trial-plan-canceled": "Your plan will not start automatically when the trial ends.",
