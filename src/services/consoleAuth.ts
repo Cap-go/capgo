@@ -524,5 +524,3 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
     },
   }
 }
-
-export type ConsoleAuthClient = ReturnType<typeof createConsoleAuthClient>
