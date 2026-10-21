@@ -134,8 +134,11 @@ async function removeBackup() {
   }
   catch (error) {
     console.error('Cannot remove backup card', error)
-    if (orgId.value === id)
+    if (orgId.value === id) {
       toast.error(t('billing-backup-card-remove-failed'))
+      // Server may have already dropped the card; refresh so retries match reality.
+      void loadOverview()
+    }
   }
   finally {
     isRemovingBackup.value = false

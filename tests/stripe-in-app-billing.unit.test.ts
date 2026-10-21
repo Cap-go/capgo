@@ -276,6 +276,34 @@ describe('backup card', () => {
     expect(stripe.paymentMethods.detach).toHaveBeenCalledWith('pm_back')
   })
 
+  it('does not treat the customer default as a removable backup', async () => {
+    const stripe = createStripe()
+    const subscriptionCard = card('pm_sub', 'fp_sub')
+    const customerDefault = card('pm_cust', 'fp_cust')
+    mockSavedCards(stripe, customerDefault, [customerDefault, subscriptionCard])
+    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    stripe.subscriptions.retrieve.mockResolvedValue({ default_payment_method: subscriptionCard })
+
+    const cards = await getSavedCards(createContext(), createBillingContext(stripe))
+    expect(cards.card?.id).toBe('pm_sub')
+    expect(cards.backupCard).toBeNull()
+    await expect(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_cust')).rejects.toThrow()
+    expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
+  })
+
+  it('prefers a spare card over the customer default as backup', async () => {
+    const stripe = createStripe()
+    const subscriptionCard = card('pm_sub', 'fp_sub')
+    const customerDefault = card('pm_cust', 'fp_cust')
+    mockSavedCards(stripe, customerDefault, [card('pm_back', 'fp_back'), customerDefault, subscriptionCard])
+    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    stripe.subscriptions.retrieve.mockResolvedValue({ default_payment_method: subscriptionCard })
+
+    const cards = await getSavedCards(createContext(), createBillingContext(stripe))
+    expect(cards.card?.id).toBe('pm_sub')
+    expect(cards.backupCard?.id).toBe('pm_back')
+  })
+
   it('only accepts known roles', () => {
     expect(parsePaymentMethodRole(undefined)).toBe('default')
     expect(parsePaymentMethodRole('backup')).toBe('backup')
@@ -367,13 +395,35 @@ describe('payOpenInvoice', () => {
     mocks.findLatestOpenSubscriptionInvoice.mockResolvedValue({ id: 'in_123' })
     stripe.invoices.retrieve.mockResolvedValue({ id: 'in_123', status: 'open' })
     stripe.invoices.pay
-      .mockRejectedValueOnce(Object.assign(new Error('Your card was declined.'), { type: 'StripeCardError', code: 'card_declined', charge: 'ch_1' }))
+      .mockRejectedValueOnce(Object.assign(new Error('Your card was declined.'), {
+        type: 'StripeCardError',
+        code: 'card_declined',
+        charge: 'ch_1',
+        payment_method: 'pm_main',
+      }))
       .mockResolvedValueOnce({ status: 'paid' })
 
     await expect(payOpenInvoice(createContext(), createBillingContext(stripe))).resolves.toEqual({ status: 'paid' })
     expect(stripe.invoices.pay).toHaveBeenCalledTimes(2)
     expect(stripe.invoices.pay).toHaveBeenNthCalledWith(1, 'in_123')
     expect(stripe.invoices.pay).toHaveBeenNthCalledWith(2, 'in_123', { payment_method: 'pm_back', off_session: true }, { idempotencyKey: 'capgo-backup-in_123-ch_1' })
+  })
+
+  it('does not retry Pay now when the declined card is already the backup', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [main, card('pm_back', 'fp_back')])
+    mocks.findLatestOpenSubscriptionInvoice.mockResolvedValue({ id: 'in_123' })
+    stripe.invoices.retrieve.mockResolvedValue({ id: 'in_123', status: 'open' })
+    stripe.invoices.pay.mockRejectedValueOnce(Object.assign(new Error('Your card was declined.'), {
+      type: 'StripeCardError',
+      code: 'card_declined',
+      charge: 'ch_back',
+      payment_method: 'pm_back',
+    }))
+
+    await expect(payOpenInvoice(createContext(), createBillingContext(stripe))).resolves.toMatchObject({ status: 'requires_payment_method' })
+    expect(stripe.invoices.pay).toHaveBeenCalledTimes(1)
   })
 
   it('does not charge the backup when the default failed for a non-card reason', async () => {
