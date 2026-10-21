@@ -10,6 +10,7 @@ import IconCard from '~icons/heroicons/credit-card'
 import IconExclamationTriangle from '~icons/heroicons/exclamation-triangle'
 import CancelPlanModal from '~/components/billing/CancelPlanModal.vue'
 import CardFormModal from '~/components/billing/CardFormModal.vue'
+import TrialPlanOfferModal from '~/components/billing/TrialPlanOfferModal.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { formatLocalDate } from '~/services/date'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
@@ -31,6 +32,7 @@ const loadFailed = ref(false)
 const isPaying = ref(false)
 const isResuming = ref(false)
 const isUpdatingTrialPlan = ref(false)
+const showTrialPlanOffer = ref(false)
 // Start the trial plan once the card form saves a card.
 let scheduleAfterCardSave = false
 const showCardModal = ref<'setup' | 'invoice' | null>(null)
@@ -232,6 +234,10 @@ async function onCardSaved() {
   if (scheduleAfterCardSave) {
     scheduleAfterCardSave = false
     await startTrialPlan()
+  }
+  // The user added a card on their own during the trial: offer to start the plan too.
+  else if (mode === 'setup' && trialPlan.value && !trialPlan.value.scheduled) {
+    showTrialPlanOffer.value = true
   }
   if (mode === 'invoice')
     await refreshOrganization()
@@ -435,6 +441,13 @@ onMounted(async () => {
       :amount-label="openInvoiceAmount"
       @close="closeCardModal"
       @saved="onCardSaved"
+    />
+    <TrialPlanOfferModal
+      v-if="showTrialPlanOffer"
+      :org-id="orgId"
+      source="billing"
+      @close="showTrialPlanOffer = false"
+      @scheduled="showTrialPlanOffer = false; loadOverview()"
     />
     <CancelPlanModal
       v-if="showCancelModal"
