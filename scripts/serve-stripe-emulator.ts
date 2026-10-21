@@ -11,6 +11,9 @@ if (!Number.isFinite(parsedPort) || parsedPort <= 0) {
 const emulator = await createEmulator({
   service: 'stripe' as any,
   port: parsedPort,
+  // emulate >= 0.12 binds to 127.0.0.1 by default; the Supabase edge runtime runs in Docker
+  // and reaches the emulator through host.docker.internal, so listen on all interfaces.
+  hostname: env.STRIPE_EMULATOR_HOSTNAME ?? '0.0.0.0',
 })
 
 console.log(`[stripe-emulator] listening on ${emulator.url}`)
