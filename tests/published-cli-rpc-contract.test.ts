@@ -124,7 +124,7 @@ function createAnonymousApiKeyClient(apikey: string) {
   })
 }
 
-describe('CRITICAL published CLI RPC contract', () => {
+describe('cRITICAL published CLI RPC contract', () => {
   // Resolved at collection time so the RPC cases can be skipped for an RPC-free CLI.
   const contract = loadPublishedCliContract()
   const publishedCliUsesRpc = contract.rpcCalls.length > 0

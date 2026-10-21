@@ -54,6 +54,7 @@ import { app as sso_sp_metadata } from '../_backend/private/sso/sp-metadata.ts'
 import { app as sso_verify_dns } from '../_backend/private/sso/verify-dns.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
 import { app as storeTop } from '../_backend/private/store_top.ts'
+import { app as stripe_billing } from '../_backend/private/stripe_billing.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
 import { app as stripe_past_due } from '../_backend/private/stripe_past_due.ts'
 import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
@@ -101,6 +102,7 @@ appGlobal.route('/log_as', log_as)
 appGlobal.route('/mcp_oauth', mcp_oauth)
 appGlobal.route('/stats', stats_priv)
 appGlobal.route('/stripe_checkout', stripe_checkout)
+appGlobal.route('/stripe_billing', stripe_billing)
 appGlobal.route('/stripe_portal', stripe_portal)
 appGlobal.route('/stripe_past_due', stripe_past_due)
 appGlobal.route('/upload_link', upload_link)

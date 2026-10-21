@@ -64,6 +64,8 @@ interface StartTopUpRequest {
   datafastVisitorId?: string
   datafastSessionId?: string
   affonsoReferral?: string
+  // Request an in-app embedded Checkout session instead of a hosted page URL.
+  embedded?: boolean
 }
 
 interface CompleteTopUpRequest {
@@ -542,9 +544,10 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
       sessionId: body.datafastSessionId,
     },
     body.affonsoReferral,
+    body.embedded === true,
   )
 
-  return c.json({ url: checkout.url })
+  return c.json(checkout)
 })
 
 app.post('/complete-top-up', middlewareAuth, async (c) => {
