@@ -534,6 +534,24 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.locator('[data-test="billing-subscription"]').waitFor()
     },
   },
+  {
+    slug: 'org-billing-trial-plan-start-now',
+    path: '/settings/organization/billing',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/private/stripe_billing/overview', route => route.fulfill({ json: {
+        publishableKey: '',
+        card: { id: 'pm_visual', brand: 'visa', last4: '4242', expMonth: 12, expYear: 2030 },
+        subscription: null,
+        invoices: [],
+        openInvoice: null,
+        trialPlan: visualTrialPlan(true),
+      } }))
+      await page.reload()
+      await page.locator('[data-test="billing-trial-plan-start-now"]').click()
+      await page.locator('[data-test="trial-plan-start-now-confirm"]').waitFor()
+    },
+  },
   { slug: 'account-settings', path: '/settings/account', auth: true },
   {
     slug: 'email-verification-send',

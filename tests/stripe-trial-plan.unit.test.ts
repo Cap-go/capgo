@@ -6,6 +6,7 @@ import {
   isTrialPlanFirstInvoiceUnpaid,
   releaseTrialPlanSchedule,
   cancelTrialPlanScheduleForSubscription,
+  createStartNowSubscription,
   findPendingTrialPlanSchedule,
   getTrialPlanStartDate,
   settleTrialPlanFirstInvoice,
@@ -96,6 +97,31 @@ describe('trial plan schedules', () => {
   it('keeps the schedule while the checkout subscription is still incomplete', async () => {
     const { stripe, cancel, list } = fakeStripe([{ id: 'sub_sched_trial', status: 'not_started', metadata: { capgo_trial_plan: 'true' } }])
     await cancelTrialPlanScheduleForSubscription(context, stripe, { id: 'sub_1', customer: 'cus_1', schedule: null, status: 'incomplete' } as unknown as Stripe.Subscription)
+    expect(list).not.toHaveBeenCalled()
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('cancels the pending trial-end schedule once the plan was started now', async () => {
+    const { stripe, cancel } = fakeStripe([{ id: 'sub_sched_trial', status: 'not_started', metadata: { capgo_trial_plan: 'true' } }])
+    await cancelTrialPlanScheduleForSubscription(context, stripe, {
+      id: 'sub_now',
+      customer: 'cus_1',
+      schedule: null,
+      status: 'active',
+      metadata: { capgo_trial_plan: 'true', capgo_trial_started_now: 'true' },
+    } as unknown as Stripe.Subscription)
+    expect(cancel).toHaveBeenCalledWith('sub_sched_trial')
+  })
+
+  it('keeps the schedule for the subscription a trial plan schedule started', async () => {
+    const { stripe, cancel, list } = fakeStripe([{ id: 'sub_sched_trial', status: 'not_started', metadata: { capgo_trial_plan: 'true' } }])
+    await cancelTrialPlanScheduleForSubscription(context, stripe, {
+      id: 'sub_trial',
+      customer: 'cus_1',
+      schedule: null,
+      status: 'active',
+      metadata: { capgo_trial_plan: 'true' },
+    } as unknown as Stripe.Subscription)
     expect(list).not.toHaveBeenCalled()
     expect(cancel).not.toHaveBeenCalled()
   })
@@ -263,5 +289,61 @@ describe('schedulable trial plans', () => {
   it('exposes Solo, Maker and Team for the plan picker', async () => {
     const { SCHEDULABLE_TRIAL_PLAN_NAMES } = await import('../supabase/functions/_backend/utils/stripe_trial_plan.ts')
     expect([...SCHEDULABLE_TRIAL_PLAN_NAMES]).toEqual(['Solo', 'Maker', 'Team'])
+  })
+})
+
+describe('start trial plan now', () => {
+  const input = {
+    customerId: 'cus_1',
+    orgId: 'org_1',
+    priceId: 'price_solo',
+    paymentMethodId: 'pm_1',
+    automaticTax: true,
+    metadata: { affonso_referral: 'ref_example' },
+  }
+
+  it('charges the first invoice now and marks the subscription as a trial plan started now', async () => {
+    const create = vi.fn(async () => ({ id: 'sub_now', created: 1 }))
+    const stripe = { subscriptions: { create } } as unknown as Stripe
+    await createStartNowSubscription(stripe, input)
+    expect(create).toHaveBeenCalledWith({
+      customer: 'cus_1',
+      items: [{ price: 'price_solo', quantity: 1 }],
+      default_payment_method: 'pm_1',
+      collection_method: 'charge_automatically',
+      payment_behavior: 'error_if_incomplete',
+      automatic_tax: { enabled: true },
+      metadata: { affonso_referral: 'ref_example', org_id: 'org_1', capgo_trial_plan: 'true', capgo_trial_started_now: 'true' },
+    }, { idempotencyKey: expect.stringMatching(/^capgo-trial-start-now:cus_1:[0-9a-f]{64}$/) })
+  })
+
+  it('reuses the idempotency key for a double click and changes it for another card', async () => {
+    const create = vi.fn(async () => ({ id: 'sub_now', created: 1 }))
+    const stripe = { subscriptions: { create } } as unknown as Stripe
+    await createStartNowSubscription(stripe, input)
+    await createStartNowSubscription(stripe, input)
+    await createStartNowSubscription(stripe, { ...input, paymentMethodId: 'pm_2' })
+    const keys = create.mock.calls.map(call => (call as unknown[])[1] as { idempotencyKey: string }).map(options => options.idempotencyKey)
+    expect(keys[0]).toBe(keys[1])
+    expect(keys[2]).not.toBe(keys[0])
+  })
+
+  it('reports a declined card without leaving a subscription behind', async () => {
+    const create = vi.fn(async () => {
+      throw Object.assign(new Error('Your card was declined.'), { type: 'StripeCardError', statusCode: 402, code: 'card_declined' })
+    })
+    const stripe = { subscriptions: { create } } as unknown as Stripe
+    await expect(createStartNowSubscription(stripe, input)).rejects.toMatchObject({
+      status: 400,
+      cause: { error: 'trial_plan_payment_failed', moreInfo: { code: 'card_declined' } },
+    })
+  })
+
+  it('rethrows other Stripe failures', async () => {
+    const create = vi.fn(async () => {
+      throw Object.assign(new Error('rate limited'), { type: 'StripeRateLimitError', statusCode: 429 })
+    })
+    const stripe = { subscriptions: { create } } as unknown as Stripe
+    await expect(createStartNowSubscription(stripe, input)).rejects.toThrow('rate limited')
   })
 })

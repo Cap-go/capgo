@@ -16,6 +16,12 @@ import { supabaseAdmin } from './supabase.ts'
 
 export const TRIAL_CARD_ADDED_BENTO_EVENT = 'org:trial_card_added'
 export const TRIAL_PLAN_CANCELED_BENTO_EVENT = 'org:trial_plan_canceled'
+export const TRIAL_PLAN_STARTED_NOW_BENTO_EVENT = 'org:trial_plan_started_now'
+
+// Marks a trial plan subscription the user started before the trial ended ("Start now").
+// It also carries TRIAL_PLAN_SCHEDULE_METADATA_KEY so the webhook converts it like a
+// schedule-born trial plan once its first invoice is paid.
+export const TRIAL_PLAN_STARTED_NOW_METADATA_KEY = 'capgo_trial_started_now'
 
 // Fixed monthly plans that can auto-start when the trial ends. Enterprise needs a custom MAU quote.
 export const SCHEDULABLE_TRIAL_PLAN_NAMES = ['Solo', 'Maker', 'Team'] as const
@@ -315,13 +321,19 @@ async function getTrialPlanBentoEmails(c: Context, orgId: string, userId: string
     .map(email => email.trim().toLowerCase())))
 }
 
-async function notifyBento(c: Context, orgId: string, userId: string | undefined, scheduled: boolean, summary: TrialPlanSummary) {
+type TrialPlanBentoChange = 'scheduled' | 'canceled' | 'started_now'
+
+async function notifyBento(c: Context, orgId: string, userId: string | undefined, change: TrialPlanBentoChange, summary: TrialPlanSummary) {
   try {
     const emails = await getTrialPlanBentoEmails(c, orgId, userId)
-    const tags = scheduled
+    const tags = change === 'scheduled'
       ? { segments: [TRIAL_CARD_BENTO_TAG], deleteSegments: [] }
       : { segments: [], deleteSegments: [TRIAL_CARD_BENTO_TAG] }
-    const event = scheduled ? TRIAL_CARD_ADDED_BENTO_EVENT : TRIAL_PLAN_CANCELED_BENTO_EVENT
+    const event = {
+      scheduled: TRIAL_CARD_ADDED_BENTO_EVENT,
+      canceled: TRIAL_PLAN_CANCELED_BENTO_EVENT,
+      started_now: TRIAL_PLAN_STARTED_NOW_BENTO_EVENT,
+    }[change]
     const data = {
       org_id: orgId,
       plan_name: summary.planName,
@@ -333,7 +345,7 @@ async function notifyBento(c: Context, orgId: string, userId: string | undefined
     await Promise.all(emails.map(email => trackBentoEvent(c, email, data, event)))
   }
   catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'trial plan bento sync failed', orgId, scheduled, error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'trial plan bento sync failed', orgId, change, error })
   }
 }
 
@@ -395,8 +407,114 @@ export async function scheduleTrialPlan(
   if (!summary)
     throw simpleError('trial_plan_unavailable', 'This organization is not on a free trial')
   if (notifiedNewSchedule)
-    await notifyBento(c, orgId, c.get('auth')?.userId, true, summary)
+    await notifyBento(c, orgId, c.get('auth')?.userId, 'scheduled', summary)
   return summary
+}
+
+async function sha256Hex(value: string) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+export interface StartNowSubscriptionInput {
+  customerId: string
+  orgId: string
+  priceId: string
+  paymentMethodId: string
+  automaticTax: boolean
+  metadata: Record<string, string>
+}
+
+// Charges the first month right away. error_if_incomplete makes Stripe reject the request
+// (no subscription is left behind) when the card is declined or needs authentication.
+// The idempotency key covers the card and parameters, so a double click returns the same
+// subscription while a retry with another card is a new attempt.
+export async function createStartNowSubscription(stripe: Stripe, input: StartNowSubscriptionInput) {
+  const metadata = {
+    ...input.metadata,
+    org_id: input.orgId,
+    [TRIAL_PLAN_SCHEDULE_METADATA_KEY]: 'true',
+    [TRIAL_PLAN_STARTED_NOW_METADATA_KEY]: 'true',
+  }
+  const params: Stripe.SubscriptionCreateParams = {
+    customer: input.customerId,
+    items: [{ price: input.priceId, quantity: 1 }],
+    default_payment_method: input.paymentMethodId,
+    collection_method: 'charge_automatically',
+    payment_behavior: 'error_if_incomplete',
+    automatic_tax: { enabled: input.automaticTax },
+    metadata,
+  }
+  const idempotencyKey = `capgo-trial-start-now:${input.customerId}:${await sha256Hex(JSON.stringify(params))}`
+  try {
+    return await stripe.subscriptions.create(params, { idempotencyKey })
+  }
+  catch (error) {
+    const stripeError = error as { type?: string, statusCode?: number, code?: string }
+    if (stripeError.type === 'StripeCardError' || stripeError.statusCode === 402)
+      throw simpleError('trial_plan_payment_failed', 'The card could not be charged', { code: stripeError.code })
+    throw error
+  }
+}
+
+export function isTrialPlanStartedNow(subscription: Pick<Stripe.Subscription, 'metadata'>) {
+  return subscription.metadata?.[TRIAL_PLAN_STARTED_NOW_METADATA_KEY] === 'true'
+}
+
+// "Start now": begin the trial plan today instead of when the trial ends. Stripe's billing
+// period starts today, and the billing cycle (subscription_anchor_start/end) follows it, so
+// the monthly usage counters restart from zero.
+export async function startTrialPlanNow(
+  c: Context,
+  ctx: InAppBillingContext,
+  orgId: string,
+  attribution: TrialPlanAttribution = {},
+  productId?: string,
+) {
+  const state = await applyTrialPlanProduct(c, ctx, productId)
+  if (!state)
+    throw simpleError('trial_plan_unavailable', 'This organization is not on a free trial')
+  if (!await ensureDefaultPaymentMethod(ctx))
+    throw simpleError('missing_payment_method', 'Add a card before starting the plan')
+  await ensureCustomerTaxAddress(ctx)
+  const metadata = attributionMetadata(attribution)
+  if (Object.keys(metadata).length)
+    await ctx.stripe.customers.update(ctx.customerId, { metadata })
+  const customer = await ctx.stripe.customers.retrieve(ctx.customerId)
+  const defaultPaymentMethod = customer.deleted ? null : customer.invoice_settings?.default_payment_method
+  const paymentMethodId = typeof defaultPaymentMethod === 'string' ? defaultPaymentMethod : defaultPaymentMethod?.id
+  if (!paymentMethodId)
+    throw simpleError('missing_payment_method', 'Add a card before starting the plan')
+
+  const price = await ctx.stripe.prices.retrieve(state.priceId)
+  const subscription = await createStartNowSubscription(ctx.stripe, {
+    customerId: ctx.customerId,
+    orgId,
+    priceId: state.priceId,
+    paymentMethodId,
+    automaticTax: isAutomaticTaxEnabled(ctx.billingAccount),
+    metadata,
+  })
+  cloudlog({ requestId: c.get('requestId'), message: 'trial plan started now', orgId, subscriptionId: subscription.id, productId: state.productId })
+  // The plan already started: a pending trial-end schedule would bill a second subscription.
+  // The webhook repeats this for the new subscription, so a failure here is retried there.
+  try {
+    await cancelAllPendingTrialPlanSchedules(c, ctx.stripe, ctx.customerId, `trial plan schedule replaced by start now ${subscription.id}`)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'trial plan start now schedule cleanup failed', orgId, subscriptionId: subscription.id, error })
+  }
+  const summary: TrialPlanSummary = {
+    planName: state.planName,
+    productId: state.productId,
+    amount: price.unit_amount ?? 0,
+    currency: price.currency,
+    interval: 'month',
+    startsAt: new Date(subscription.created * 1000).toISOString(),
+    scheduled: false,
+  }
+  await notifyBento(c, orgId, c.get('auth')?.userId, 'started_now', summary)
+  return { plan: summary, subscriptionId: subscription.id }
 }
 
 export async function cancelTrialPlan(c: Context, ctx: InAppBillingContext, orgId: string) {
@@ -426,7 +544,7 @@ export async function cancelTrialPlan(c: Context, ctx: InAppBillingContext, orgI
   }
   const next = summary ? { ...summary, scheduled: false } : null
   if (next)
-    await notifyBento(c, orgId, c.get('auth')?.userId, false, next)
+    await notifyBento(c, orgId, c.get('auth')?.userId, 'canceled', next)
   return next
 }
 
@@ -436,8 +554,9 @@ export async function cancelTrialPlan(c: Context, ctx: InAppBillingContext, orgI
 // checkout that is abandoned must keep the scheduled plan.
 const REPLACING_SUBSCRIPTION_STATUSES = new Set<Stripe.Subscription.Status>(['active', 'trialing'])
 
+// A trial plan started now (no schedule) replaces the pending trial-end schedule too.
 export async function cancelTrialPlanScheduleForSubscription(c: Context, stripe: Stripe, subscription: Stripe.Subscription) {
-  if (subscription.schedule || isTrialPlanSubscription(subscription) || !REPLACING_SUBSCRIPTION_STATUSES.has(subscription.status))
+  if (subscription.schedule || (isTrialPlanSubscription(subscription) && !isTrialPlanStartedNow(subscription)) || !REPLACING_SUBSCRIPTION_STATUSES.has(subscription.status))
     return
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
   await cancelAllPendingTrialPlanSchedules(c, stripe, customerId, `trial plan schedule replaced by subscription ${subscription.id}`)
