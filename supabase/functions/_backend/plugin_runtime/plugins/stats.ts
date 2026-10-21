@@ -10,7 +10,7 @@ import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hon
 import { invalidIpInfo } from '../utils/invalids_ip.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
-import { closeClient, createLazyPgClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getEffectiveDeviceChannelNamePostgres, getLazyPgQueryCount, getPgClient } from '../utils/pg.ts'
+import { closeClient, createLazyPgClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getEffectiveDeviceChannelNamePostgres, getLazyPgQueryCount, getPgClient, getReadReplicaBinding } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/plugin_stats.ts'
 import { statsRequestSchema } from '../utils/plugin_validation.ts'
@@ -413,7 +413,7 @@ async function processStatsEvents(
     }
     if (result.success) {
       if (result.snippetFill)
-        setSnippetStatsFill(c, bodyParsed.app_id, result.snippetFill)
+        await setSnippetStatsFill(c, bodyParsed.app_id, { ...result.snippetFill, replicaSource: getReadReplicaBinding(c) })
       return c.json(BRES)
     }
     if (result.error === 'need_plan_upgrade') {
@@ -488,7 +488,7 @@ async function processStatsEvents(
   if (firstAppId && results.length > 0 && snippetFill
     && events.every(event => (event as AppStats | undefined)?.app_id === firstAppId)
     && results.every(result => result.status === 'ok')) {
-    setSnippetStatsFill(c, firstAppId, snippetFill)
+    await setSnippetStatsFill(c, firstAppId, { ...snippetFill, replicaSource: getReadReplicaBinding(c) })
   }
   return c.json({ status: 'ok', results })
 }

@@ -166,8 +166,8 @@ describe('main pg.ts Hyperdrive pg Client lifecycle', () => {
     }))
   })
 
-  it('logs primary-read rollback failures without masking the request error or ending Hyperdrive', async () => {
-    const query = vi.fn().mockResolvedValueOnce({}).mockRejectedValue(new Error('connection lost'))
+  it('keeps Hyperdrive primary readers free of pinned transactions and never ends them', async () => {
+    const query = vi.fn().mockResolvedValue({})
     ClientMock.mockImplementation(function (this: any) {
       this.on = clientOnMock
       this.connect = clientConnectMock
@@ -176,14 +176,13 @@ describe('main pg.ts Hyperdrive pg Client lifecycle', () => {
       return this
     })
     const { getPgClient, closeClient } = await import('../supabase/functions/_backend/utils/pg.ts')
-    const { cloudlogErr } = await import('../supabase/functions/_backend/utils/logging.ts')
     const c = createContext({
       HYPERDRIVE_CAPGO_READ_EU: undefined,
       HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'postgres://hyperdrive-primary' },
     })
     const reader = await getPgClient(c, true)
-    await expect(closeClient(c, reader)).resolves.toBeUndefined()
+    expect(closeClient(c, reader)).toBeUndefined()
+    expect(query).not.toHaveBeenCalled()
     expect(reader.end).not.toHaveBeenCalled()
-    expect(cloudlogErr).toHaveBeenCalledWith(expect.objectContaining({ message: 'PG read transaction cleanup failed' }))
   })
 })

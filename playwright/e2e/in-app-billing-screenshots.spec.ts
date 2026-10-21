@@ -5,6 +5,7 @@ import { expect, test } from '../support/commands'
 import { dismissSupportPrompt } from '../support/dismissSupportPrompt'
 
 const screenshotDir = resolve(process.cwd(), 'docs/pr-screenshots/in-app-billing')
+const backupScreenshotDir = resolve(process.cwd(), 'docs/pr-screenshots/backup-card')
 
 // Stripe.js needs a real account, so the screenshots stub its iframes with a labelled placeholder.
 // Everything else on screen is real Capgo UI.
@@ -65,6 +66,7 @@ const STRIPE_STUB = `
 const overview = {
   publishableKey: 'pk_test_screenshot',
   card: { id: 'pm_1', brand: 'visa', last4: '4242', expMonth: 4, expYear: 2030 },
+  backupCard: null as null | { id: string, brand: string, last4: string, expMonth: number, expYear: number },
   subscription: { status: 'active', cancelAtPeriodEnd: false, cancelAt: null, currentPeriodEnd: new Date(Date.now() + 18 * 86400000).toISOString() },
   openInvoice: null as null | { id: string, amountDue: number, currency: string },
   invoices: [0, 1, 2, 3].map(index => ({
@@ -83,7 +85,7 @@ function json(body: unknown) {
   return { status: 200, contentType: 'application/json', body: JSON.stringify(body) }
 }
 
-async function setupMocks(page: Page, options: { pastDue?: boolean } = {}) {
+async function setupMocks(page: Page, options: { pastDue?: boolean, backupCard?: boolean } = {}) {
   await page.route('https://js.stripe.com/**', route => route.fulfill({ status: 200, contentType: 'application/javascript', body: STRIPE_STUB }))
   await page.route('**/private/sso/check-enforcement', route => route.fulfill(json({ allowed: true })))
   const openInvoice = options.pastDue ? { id: 'in_open', amountDue: 9900, currency: 'usd' } : null
@@ -92,6 +94,7 @@ async function setupMocks(page: Page, options: { pastDue?: boolean } = {}) {
     : { past_due: false, invoice: null })))
   await page.route('**/private/stripe_billing/overview', route => route.fulfill(json({
     ...overview,
+    backupCard: options.backupCard ? { id: 'pm_2', brand: 'mastercard', last4: '5454', expMonth: 9, expYear: 2031 } : null,
     openInvoice,
     subscription: options.pastDue ? { ...overview.subscription, status: 'past_due' } : overview.subscription,
     invoices: options.pastDue
@@ -104,9 +107,9 @@ async function setupMocks(page: Page, options: { pastDue?: boolean } = {}) {
   await page.route('**/private/stripe_checkout', route => route.fulfill(json({ url: null, clientSecret: 'cs_test_1_secret_x', publishableKey: 'pk_test_screenshot', sessionId: 'cs_test_1' })))
 }
 
-async function snap(page: Page, name: string) {
+async function snap(page: Page, name: string, dir = screenshotDir) {
   await page.waitForTimeout(800)
-  await page.screenshot({ path: resolve(screenshotDir, `${name}.png`), animations: 'disabled' })
+  await page.screenshot({ path: resolve(dir, `${name}.png`), animations: 'disabled' })
 }
 
 // Local-only: CAPGO_PR_SCREENSHOTS=1 bunx playwright test playwright/e2e/in-app-billing-screenshots.spec.ts
@@ -115,6 +118,7 @@ test.describe('In-app billing screenshots', () => {
 
   test.beforeAll(() => {
     mkdirSync(screenshotDir, { recursive: true })
+    mkdirSync(backupScreenshotDir, { recursive: true })
   })
 
   for (const scheme of ['light', 'dark'] as const) {
@@ -137,6 +141,32 @@ test.describe('In-app billing screenshots', () => {
       await page.locator('[data-test="cancel-reason-missing_features"]').click()
       await page.locator('[data-test="cancel-comment"]').fill('We need SSO on the Team plan.')
       await snap(page, `cancel-plan-${scheme}`)
+    })
+
+    test(`backup card recommendation (${scheme})`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme })
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await setupMocks(page)
+      await page.login('test@capgo.app', 'testtest')
+      await page.goto('/settings/organization/billing')
+      await dismissSupportPrompt(page)
+      await expect(page.locator('[data-test="billing-backup-card-recommendation"]')).toBeVisible({ timeout: 30000 })
+      await snap(page, `recommendation-${scheme}`, backupScreenshotDir)
+
+      await page.locator('[data-test="billing-add-backup-card"]').click()
+      await expect(page.locator('[data-test="billing-card-submit"]')).toBeEnabled()
+      await snap(page, `backup-card-form-${scheme}`, backupScreenshotDir)
+    })
+
+    test(`backup card saved (${scheme})`, async ({ page }) => {
+      await page.emulateMedia({ colorScheme: scheme })
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await setupMocks(page, { backupCard: true })
+      await page.login('test@capgo.app', 'testtest')
+      await page.goto('/settings/organization/billing')
+      await dismissSupportPrompt(page)
+      await expect(page.locator('[data-test="billing-backup-card"]')).toBeVisible({ timeout: 30000 })
+      await snap(page, `backup-card-saved-${scheme}`, backupScreenshotDir)
     })
 
     test(`past due pay flow (${scheme})`, async ({ page }) => {
