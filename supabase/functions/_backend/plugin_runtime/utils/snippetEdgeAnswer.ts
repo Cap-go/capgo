@@ -182,9 +182,12 @@ export async function setSnippetUpdatesFill(c: Context, appId: string, answer: S
   })
 }
 
-/** Call on an all-ok /stats answer of a cloud app with a valid plan. */
-export async function setSnippetStatsFill(c: Context, appId: string, opts: { blockProviderInfraRequests: boolean, planValidUntil: number | null }) {
-  const base = await fillBase(c, appId, opts.blockProviderInfraRequests, opts.planValidUntil)
+/**
+ * Call on an all-ok /stats answer of a cloud app with a valid plan.
+ * `replicaSource`: as for setSnippetUpdatesFill (edge cache hits read no database).
+ */
+export async function setSnippetStatsFill(c: Context, appId: string, opts: { blockProviderInfraRequests: boolean, planValidUntil: number | null, replicaSource?: string | null }) {
+  const base = await fillBase(c, appId, opts.blockProviderInfraRequests, opts.planValidUntil, opts.replicaSource)
   if (!base)
     return
   setFillHeader(c, { ...base, e: 'stats', actions: SNIPPET_EDGE_STATS_ACTIONS })

@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { edgeCacheTtlForReplicaLag, isReadReplicaSource, REPLICA_LAG_QUERY, resetReplicationLagMemory, setReplicationLagMemoryEntry } from '../supabase/functions/_backend/plugin_runtime/utils/replicaFreshness.ts'
+import { CacheHelper } from '../supabase/functions/_backend/plugin_runtime/utils/cache.ts'
+import { getReadReplicaBinding } from '../supabase/functions/_backend/plugin_runtime/utils/pg.ts'
+import { edgeCacheTtlForReplicaLag, isReadReplicaSource, REPLICA_LAG_QUERY, replicationLagCacheRequest, resetReplicationLagMemory, setReplicationLagMemoryEntry } from '../supabase/functions/_backend/plugin_runtime/utils/replicaFreshness.ts'
 
 function contextFrom(source: string | undefined) {
   return {
@@ -63,6 +65,47 @@ describe('replica freshness', () => {
     expect(await edgeCacheTtlForReplicaLag(c, 3600)).toBe(30)
     // Never raises a shorter TTL.
     expect(await edgeCacheTtlForReplicaLag(c, 10)).toBe(10)
+    // An expired figure no longer counts.
+    setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_HK', { status: 'lagging', max_lag_seconds: 2400 }, Date.now() - 1)
+    expect(await edgeCacheTtlForReplicaLag(c, 3600)).toBe(3600)
+  })
+
+  it('ignores an expired data center figure', async () => {
+    stubCaches()
+    const c = contextFrom('HYPERDRIVE_CAPGO_READ_ME')
+    const helper = new CacheHelper(c)
+    await helper.putJson(replicationLagCacheRequest(helper, 'HYPERDRIVE_CAPGO_READ_ME'), { status: 'lagging', max_lag_seconds: 2400, expiresAt: Date.now() - 1 }, 60)
+    expect(await edgeCacheTtlForReplicaLag(c, 3600)).toBe(3600)
+  })
+
+  it('keeps a figure measured while the data center read was in flight', async () => {
+    const cache = stubCaches()
+    const c = contextFrom('HYPERDRIVE_CAPGO_READ_AF')
+    const helper = new CacheHelper(c)
+    await helper.putJson(replicationLagCacheRequest(helper, 'HYPERDRIVE_CAPGO_READ_AF'), { status: 'ok', max_lag_seconds: 1, expiresAt: Date.now() + 60_000 }, 60)
+    const match = cache.match.getMockImplementation()!
+    cache.match.mockImplementationOnce(async (request: Request) => {
+      // A probe lands first with a lagging figure.
+      setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_AF', { status: 'lagging', max_lag_seconds: 2400 })
+      return match(request)
+    })
+    expect(await edgeCacheTtlForReplicaLag(c, 3600)).toBe(30)
+    // The older data center figure did not replace it.
+    expect(await edgeCacheTtlForReplicaLag(c, 3600)).toBe(30)
+  })
+
+  it('names the local read replica on local workers', () => {
+    vi.stubEnv('ENV_NAME', 'capgo_plugin-local')
+    vi.stubEnv('LOCAL_READ_REPLICA_SUPABASE_DB_URL', 'postgresql://postgres:postgres@127.0.0.1:54322/postgres')
+    try {
+      expect(getReadReplicaBinding(contextFrom(undefined))).toBe('local_read_replica')
+      vi.unstubAllEnvs()
+      vi.stubEnv('ENV_NAME', 'capgo_plugin-local')
+      expect(getReadReplicaBinding(contextFrom(undefined))).toBeNull()
+    }
+    finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it('uses an explicit source when the request itself read no database', async () => {

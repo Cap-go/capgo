@@ -139,6 +139,10 @@ async function loadReplicationLag(c: Context, source: string): Promise<Replicati
   try {
     const helper = new CacheHelper(c)
     const cached = await helper.matchJson<ReplicationLagCacheEntry>(replicationLagCacheRequest(helper, source))
+    // A probe may have stored a newer figure while this read awaited.
+    const current = getFreshReplicationLagMemoryEntry(source)
+    if (current)
+      return current
     if (cached && cached.expiresAt > Date.now()) {
       const status = { status: cached.status, max_lag_seconds: cached.max_lag_seconds }
       setReplicationLagMemoryEntry(source, status, cached.expiresAt)

@@ -292,9 +292,14 @@ function findReadReplicaRoute(c: Context, dbRegion: string | undefined) {
   return READ_REPLICA_ROUTES.find(route => route.region === dbRegion && c.env[route.binding])
 }
 
-/** Read replica binding this worker reads from, without selecting or connecting it. */
+/** Read replica source this worker reads from, without selecting or connecting it. */
 export function getReadReplicaBinding(c: Context): string | null {
-  return findReadReplicaRoute(c, getClientDbRegionSB(c))?.binding ?? null
+  const route = findReadReplicaRoute(c, getClientDbRegionSB(c))
+  if (route)
+    return route.binding
+  return isLocalWorkerEnv(c) && existInEnv(c, 'LOCAL_READ_REPLICA_SUPABASE_DB_URL')
+    ? 'local_read_replica'
+    : null
 }
 
 function getReadOnlyDatabaseURL(c: Context, dbRegion: string | undefined): string | null {
