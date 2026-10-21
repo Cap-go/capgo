@@ -79,10 +79,10 @@ describe('file_read_cache deleted lookup', () => {
     ])
 
     expect(getPgClientMock).toHaveBeenCalledTimes(1)
-    expect(queryMock).toHaveBeenCalledTimes(4)
-    expect(queryMock.mock.calls[0]?.[0]).toBe('BEGIN')
-    expect(queryMock.mock.calls[1]?.[0]).toContain('set_config')
-    expect(queryMock.mock.calls[3]?.[0]).toBe('COMMIT')
+    expect(queryMock).toHaveBeenCalledTimes(3)
+    // BEGIN and both timeouts go in one round trip, so an abandoned lookup can never leave an unbounded transaction.
+    expect(queryMock.mock.calls[0]?.[0]).toMatch(/^BEGIN READ ONLY; SET LOCAL statement_timeout = '2000ms'; SET LOCAL idle_in_transaction_session_timeout = '2000ms'$/)
+    expect(queryMock.mock.calls[2]?.[0]).toBe('COMMIT')
   })
 
   it('re-checks the deleted marker on every call within the same request', async () => {
