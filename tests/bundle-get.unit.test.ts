@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../supabase/functions/_backend/utils/hono.ts'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { HTTPException } from 'hono/http-exception'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const checkPermissionMock = vi.fn()
 const supabaseApikeyMock = vi.fn()
@@ -48,14 +48,21 @@ function createContext(auth?: { userId: string }) {
 }
 
 function makeSupabaseChain(result: { data?: unknown, error?: unknown }) {
-  const chain: Record<string, ReturnType<typeof vi.fn>> = {}
+  const eqCalls: Array<[string, unknown]> = []
+  const chain: Record<string, any> = {}
   const self = () => chain
   chain.from = vi.fn(self)
   chain.select = vi.fn(self)
-  chain.eq = vi.fn(self)
+  chain.eq = vi.fn((column: string, value: unknown) => {
+    eqCalls.push([column, value])
+    return chain
+  })
   chain.range = vi.fn(self)
-  chain.order = vi.fn(() => Promise.resolve(result))
+  chain.limit = vi.fn(self)
+  chain.order = vi.fn(self)
   chain.maybeSingle = vi.fn(() => Promise.resolve(result))
+  chain.then = (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) => Promise.resolve(result).then(resolve, reject)
+  chain.eqCalls = eqCalls
   return chain
 }
 
@@ -102,13 +109,36 @@ describe('bundle GET handler', () => {
     expect(causeErrorCode(error)).toBe('cannot_get_bundle')
   })
 
-  it('returns bundle rows on success', async () => {
-    const rows = [{ id: 1, name: '1.0.0', app_id: 'com.example.app' }]
-    const versionsChain = makeSupabaseChain({ data: rows, error: null })
-    supabaseApikeyMock.mockReturnValue(versionsChain)
+  it.each([
+    ['bundle rows', [{ id: 1, name: '1.0.0', app_id: 'com.example.app' }]],
+    ['an empty array when the app has no bundles', []],
+  ])('returns %s on success', async (_label, rows) => {
+    supabaseApikeyMock.mockReturnValue(makeSupabaseChain({ data: rows, error: null }))
 
     const response = await get(createContext({ userId: 'user-1' }), { app_id: 'com.example.app' }, apikey)
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual(rows)
+  })
+
+  it('excludes deleted bundles by default on version lookup', async () => {
+    const chain = makeSupabaseChain({ data: [], error: null })
+    supabaseApikeyMock.mockReturnValue(chain)
+
+    const response = await get(createContext({ userId: 'user-1' }), { app_id: 'com.example.app', version: '1.0.0' }, apikey)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual([])
+    expect(chain.eqCalls).toContainEqual(['deleted', false])
+  })
+
+  it('include_deleted matches soft-deleted bundles for name occupancy checks', async () => {
+    const row = { id: 12, name: '1.0.0', checksum: 'abc', deleted: true, created_at: '2026-01-01T00:00:00.000Z' }
+    const chain = makeSupabaseChain({ data: [row], error: null })
+    supabaseApikeyMock.mockReturnValue(chain)
+
+    const response = await get(createContext({ userId: 'user-1' }), { app_id: 'com.example.app', version: '1.0.0', include_deleted: '1' }, apikey)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual([row])
+    expect(chain.eqCalls).not.toContainEqual(['deleted', false])
+    expect(chain.eqCalls).toContainEqual(['name', '1.0.0'])
   })
 })

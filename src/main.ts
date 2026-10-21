@@ -16,6 +16,7 @@ import { getLocalConfig } from '~/services/supabase'
 import { getAllowedConfirmationHosts, resolveConfirmationUrl } from '~/utils/safeRedirect'
 import App from './App.vue'
 import { getRemoteConfig } from './services/supabase'
+import '@fontsource-variable/inter'
 // your custom styles here
 import './styles/style.css'
 

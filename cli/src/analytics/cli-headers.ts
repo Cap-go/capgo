@@ -14,10 +14,6 @@ export function setCurrentCliCommand(command: string) {
   currentCliCommand = command
 }
 
-export function getCurrentCliCommand(): string {
-  return currentCliCommand
-}
-
 function isByteStringSafe(value: string): boolean {
   for (let i = 0; i < value.length; i++) {
     if (value.charCodeAt(i) > 0xFF)
