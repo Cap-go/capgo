@@ -40,12 +40,12 @@ export class ConsoleEvents {
         controller.enqueue(encoder.encode(': connected\n\n'))
         heartbeat = setInterval(() => controller.enqueue(encoder.encode(': heartbeat\n\n')), 10000)
         // Every reconnect revalidates session revocation and organization access.
-        // Five minutes keeps that bound while making the reconnect gap, during which
-        // nothing is buffered, rare.
+        // One minute bounds how long a revoked session can keep listening while
+        // keeping the unbuffered reconnect gap infrequent.
         timeout = setTimeout(() => {
           cleanup()
           controller.close()
-        }, 5 * 60 * 1000)
+        }, 60 * 1000)
       },
       cancel: cleanup,
     })

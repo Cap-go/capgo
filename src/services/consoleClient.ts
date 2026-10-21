@@ -158,7 +158,8 @@ export function createConsoleClient(options: { persistSession?: boolean } = {}) 
         return (...operationArgs: unknown[]) => {
           // JSON turns undefined into null, which would defeat SDK default parameters on the server.
           const args = [...operationArgs]
-          while (args.length && args.at(-1) === undefined)
+          // Index access on purpose: older native WebViews lack Array.prototype.at.
+          while (args.length && args[args.length - 1] === undefined)
             args.pop()
           request.operations.push({ method, args })
           return builder

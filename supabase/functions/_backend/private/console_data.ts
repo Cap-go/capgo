@@ -19,6 +19,8 @@ const querySchema = z.object({
   args: z.array(z.unknown()).max(2),
   operations: z.array(z.object({ method: operations, args: z.array(z.unknown()).max(3) })).max(64),
 })
+// Same ceiling the storage bucket applied before uploads went through the API.
+const MAX_IMAGE_BYTES = 50 * 1024 * 1024
 const imagePathSchema = z.string().min(1).max(1024).refine(path => path.split('/').every(segment => segment !== '.' && segment !== '..'))
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -64,9 +66,12 @@ app.post('/images/upload', middlewareAuth, async (c) => {
   if (!parsedPath.success)
     return quickError(400, 'invalid_path', 'Invalid image path')
   const path = parsedPath.data
+  // Refuse declared oversize uploads before buffering; the byte check below covers undeclared ones.
+  if (Number(c.req.header('content-length') ?? 0) > MAX_IMAGE_BYTES)
+    return quickError(413, 'image_too_large', 'Image must be smaller than 50 MB')
   const file = await c.req.arrayBuffer()
   // Same ceiling the storage bucket applied before uploads went through the API.
-  if (file.byteLength > 50 * 1024 * 1024)
+  if (file.byteLength > MAX_IMAGE_BYTES)
     return quickError(413, 'image_too_large', 'Image must be smaller than 50 MB')
   const client = supabaseClient(c, c.get('authorization')!)
   const result = await client.storage.from('images').upload(path, file, {

@@ -142,6 +142,27 @@ describe('/login-cli page', () => {
     expect(container.innerHTML).not.toContain(preparedKey)
   })
 
+  it('stops waiting for a silent event stream after the fallback delay', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      route.query = { session: 'AbCdEfGhIjKlMnOpQrStUv' }
+      // The channel never reports a status, as when the events request hangs.
+      const channel = { on: vi.fn(() => channel), subscribe: vi.fn(() => channel) }
+      capgo.channel.mockReturnValue(channel)
+      const container = mountLoginCliPage()
+      await flushPromises()
+      expect(container.textContent).not.toContain(messages['cli-login-realtime-unavailable'])
+
+      await vi.advanceTimersByTimeAsync(15_000)
+      await flushPromises()
+      expect(container.textContent).toContain(messages['cli-login-realtime-unavailable'])
+      expect(container.textContent).toContain('capgo_xxxxxxxxxxxxxxxxxxxx')
+    }
+    finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('copies a prompt containing the prepared key in AI mode', async () => {
     const container = mountLoginCliPage()
     await flushPromises()

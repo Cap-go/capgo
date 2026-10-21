@@ -400,8 +400,9 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
     }
 
     return {
-      global: global.toSorted((a, b) => a.date.localeCompare(b.date)),
-      byApp: byApp.toSorted((a, b) => a.date.localeCompare(b.date)),
+      // Copy then sort: older native WebViews lack Array.prototype.toSorted.
+      global: [...global].sort((a, b) => a.date.localeCompare(b.date)),
+      byApp: [...byApp].sort((a, b) => a.date.localeCompare(b.date)),
     }
   }
   catch (error) {
