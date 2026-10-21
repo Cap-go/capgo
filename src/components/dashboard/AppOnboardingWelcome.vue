@@ -2,6 +2,8 @@
 import { useI18n } from 'vue-i18n'
 import IconArrowRight from '~icons/lucide/arrow-right'
 
+defineProps<{ disabled?: boolean }>()
+
 const emit = defineEmits<{
   continue: []
 }>()
@@ -44,6 +46,8 @@ const { t } = useI18n()
             type="button"
             class="d-btn d-btn-primary onboarding-welcome-primary group relative z-[1] min-h-[3.375rem] gap-3 overflow-hidden rounded-[0.875rem] border-blue-700/90 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 px-[1.5625rem] text-[0.9375rem] font-[750] text-white shadow-[0_0.5rem_1.25rem_rgba(37,99,235,0.16),inset_0_1px_0_rgba(255,255,255,0.28)] transition duration-150 ease-out hover:-translate-y-px hover:brightness-105 focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-blue-500/35 motion-reduce:transition-none"
             data-test="onboarding-welcome-continue"
+            :disabled="disabled"
+            :aria-busy="disabled || undefined"
             @click="emit('continue')"
           >
             <span>{{ t('onboarding-welcome-cta') }}</span>

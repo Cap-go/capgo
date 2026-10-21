@@ -246,7 +246,7 @@
     },
     "cli": {
       "name": "@capgo/cli",
-      "version": "8.90.1",
+      "version": "8.90.2",
       "bin": {
         "capgo": "dist/index.js",
       },
@@ -320,7 +320,7 @@
     },
     "packages/capacitor-notifications": {
       "name": "@capgo/capacitor-notifications",
-      "version": "8.1.0",
+      "version": "8.1.1",
       "devDependencies": {
         "@capacitor/android": "^8.4.2",
         "@capacitor/ios": "^8.4.2",

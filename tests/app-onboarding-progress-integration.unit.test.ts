@@ -22,6 +22,8 @@ const writerMocks = vi.hoisted(() => ({
     user: {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: {},
     },
   },
@@ -88,6 +90,13 @@ vi.mock('~/services/supabase', () => ({
     return {
       from: (table: string) => {
         const query = {
+          update: (payload: { onboarding: unknown }) => ({
+            eq: (userId: string) => ({
+              filter: (_column: string, _operator: string, expected: string) => ({
+                select: () => ({ maybeSingle: () => writerMocks.replaceUserOnboardingIfUnchanged(userId, JSON.parse(expected), payload.onboarding) }),
+              }),
+            }),
+          }),
           eq: () => query,
           maybeSingle: writerMocks.refreshUser,
           select: () => query,
@@ -140,7 +149,10 @@ describe('app onboarding progress analytics integration', () => {
         writerMocks.main.user = {
           id: 'user-bento-retry',
           image_url: 'avatar.png',
+          first_name: 'Example',
+          last_name: 'User',
           onboarding: {
+            profile_completed_at: '2026-10-20T10:00:00.000Z',
             abtests,
             app_id: appId,
             final_step: preOrg ? 'setup' : 'install',
@@ -247,7 +259,10 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: {
+        profile_completed_at: '2026-10-20T10:00:00.000Z',
         app_id: 'com.example.final',
         final_step: 'setup',
         flow: 'pre_org',
@@ -306,7 +321,10 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-missing-app',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: {
+        profile_completed_at: '2026-10-20T10:00:00.000Z',
         app_id: 'com.example.other',
         final_step: 'setup',
         flow: 'pre_org',
@@ -354,7 +372,10 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: {
+        profile_completed_at: '2026-10-20T10:00:00.000Z',
         abtests,
         app_id: appId,
         flow: 'existing_org',
@@ -460,7 +481,10 @@ describe('app onboarding progress analytics integration', () => {
           writerMocks.main.user = {
             id: 'user-bento-retry',
             image_url: 'avatar.png',
+            first_name: 'Example',
+            last_name: 'User',
             onboarding: {
+              profile_completed_at: '2026-10-20T10:00:00.000Z',
               abtests,
               app_id: appId,
               final_step: preOrg ? 'setup' : 'install',
@@ -557,6 +581,7 @@ describe('app onboarding progress analytics integration', () => {
       },
     }
     const initialOnboarding = {
+      profile_completed_at: '2026-10-20T10:00:00.000Z',
       abtests: initialABTests,
       bento_events: initialBentoEvents,
       future_server_state: { revision: 1 },
@@ -571,6 +596,8 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: initialOnboarding,
     }
     writerMocks.refreshUser.mockResolvedValueOnce({
@@ -633,6 +660,7 @@ describe('app onboarding progress analytics integration', () => {
     const matchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
     const assignedAt = '2026-09-11T10:00:00.000Z'
     const currentOnboarding = {
+      profile_completed_at: '2026-10-20T10:00:00.000Z',
       abtests: {
         new_channel: {
           assigned_at: assignedAt,
@@ -655,6 +683,8 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: currentOnboarding,
     }
     writerMocks.loadApp.mockReset()
@@ -712,6 +742,7 @@ describe('app onboarding progress analytics integration', () => {
     const previousAssignments = writerMocks.abTestAssignments
     const matchMediaDescriptor = Object.getOwnPropertyDescriptor(window, 'matchMedia')
     const currentOnboarding = {
+      profile_completed_at: '2026-10-20T10:00:00.000Z',
       abtests: {
         new_channel: {
           assigned_at: '2026-09-11T10:00:00.000Z',
@@ -729,6 +760,8 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: currentOnboarding,
     }
     writerMocks.replaceUserOnboardingIfUnchanged.mockReset()
@@ -788,7 +821,10 @@ describe('app onboarding progress analytics integration', () => {
     writerMocks.main.user = {
       id: 'user-bento-retry',
       image_url: 'avatar.png',
+      first_name: 'Example',
+      last_name: 'User',
       onboarding: {
+        profile_completed_at: '2026-10-20T10:00:00.000Z',
         abtests,
         app_id: pendingApp.app_id,
         flow: 'existing_org',
