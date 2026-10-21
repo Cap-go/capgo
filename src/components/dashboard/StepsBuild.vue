@@ -15,7 +15,7 @@ import IconAndroid from '~icons/mdi/android'
 import IconApple from '~icons/mdi/apple'
 import { createDefaultApiKey, findUsablePlainApiKey } from '~/services/apikeys'
 import { sendOnboardingEvent } from '~/services/onboardingTracking'
-import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
+import { defaultApiHost, getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -62,7 +62,7 @@ const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 const config = getLocalConfig()
 const initialOnboarding = props.onboarding
-const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
+const localCommand = isLocal(config.supaHost) ? ` --api-host ${defaultApiHost}` : ''
 
 const platformBuildCounts = computed<PlatformBuildCounts>(() => ({
   ios: props.platformBuildCounts?.ios ?? 0,
