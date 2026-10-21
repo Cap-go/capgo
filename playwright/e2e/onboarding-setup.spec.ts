@@ -63,6 +63,7 @@ test.describe('Actionable onboarding setup checklist', () => {
     await expect(page.locator('[data-test="setup-checklist-task-actions"] button, [data-test="setup-checklist-task-actions"] a')).toHaveCount(3)
     await aiButton.click()
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.events.filter((event: string) => event === 'copy-ai').length)).toBe(1)
+    expect(await page.evaluate(() => (window as any).onboardingSetupPreview.copyAiPlacements)).toEqual(['checklist'])
     await expect(page.locator('[data-test="app-onboarding-cli-step-run_device"]')).toHaveAttribute('data-status', 'pending')
     await page.getByRole('button', { name: 'Back to the current task' }).click()
     await expect(page.locator(instructions).getByRole('heading', { name: 'Start guided setup' })).toBeVisible()
@@ -72,6 +73,7 @@ test.describe('Actionable onboarding setup checklist', () => {
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.events)).toContain('copy-command')
     await aiButton.click()
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.events.filter((event: string) => event === 'copy-ai').length)).toBe(2)
+    expect(await page.evaluate(() => (window as any).onboardingSetupPreview.copyAiPlacements)).toEqual(['checklist', 'start'])
     await expect(page.getByText('They’ll need to complete the setup for you.', { exact: false })).toBeVisible()
     await page.getByRole('button', { name: 'Send setup instructions', exact: true }).click()
     await expect(page.locator('#invite-email')).toBeVisible()
@@ -574,6 +576,7 @@ test.describe('Actionable onboarding setup checklist', () => {
     expect(returnBox!.x).toBeGreaterThanOrEqual(actionsBox!.x)
     expect(returnBox!.x + returnBox!.width).toBeLessThanOrEqual(actionsBox!.x + actionsBox!.width)
     expect(await returnButton.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
   })
 
   test('renders desktop, mobile, dark and loading states without console errors', async ({ page }) => {

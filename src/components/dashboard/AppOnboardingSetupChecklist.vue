@@ -270,7 +270,7 @@ function statusLabel(status: string | undefined) {
           </output>
 
           <div class="mt-auto flex flex-wrap items-stretch gap-2 pt-4" data-test="setup-checklist-task-actions">
-            <AppOnboardingAiButton @copy="emit('copyAi', 'checklist')" />
+            <AppOnboardingAiButton @copy="emit('copyAi', isFirstStep ? undefined : 'checklist')" />
             <button v-if="!isSelectedCurrent && currentStep" type="button" class="d-btn d-btn-ghost h-auto min-h-11 gap-2 rounded-lg border-slate-200 bg-transparent px-3 py-2 text-sm font-medium text-slate-600 shadow-none hover:border-slate-300 hover:bg-slate-100 hover:text-slate-950 focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 dark:border-white/15 dark:text-slate-300 dark:hover:border-white/25 dark:hover:bg-white/5 dark:hover:text-white dark:focus-visible:ring-offset-slate-900 min-w-0 max-w-full shrink whitespace-normal" @click="selectStep(currentStep.id)">
               {{ t('setup-checklist-return-current') }}
             </button>

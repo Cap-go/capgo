@@ -60,6 +60,7 @@ test('shows live Builder progress while keeping platform tasks separate', async 
   expect(returnBox!.x).toBeGreaterThanOrEqual(actionsBox!.x)
   expect(returnBox!.x + returnBox!.width).toBeLessThanOrEqual(actionsBox!.x + actionsBox!.width)
   expect(await returnButton.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
   expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites)).toEqual([])
 })
 
