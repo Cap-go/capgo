@@ -85,6 +85,16 @@ describe('file_read_cache deleted lookup', () => {
     expect(queryMock.mock.calls[2]?.[0]).toBe('COMMIT')
   })
 
+  it('rolls back when the BEGIN batch fails', async () => {
+    const { isAttachmentVersionDeleted } = await import('../supabase/functions/_backend/files/file_read_cache.ts')
+    queryMock.mockRejectedValueOnce(new Error('SET LOCAL failed'))
+
+    await expect(isAttachmentVersionDeleted(createContext(), 'orgs/test-org/apps/test-app/bundle.zip')).resolves.toBe(false)
+
+    expect(queryMock.mock.calls.map(([text]) => text).at(-1)).toBe('ROLLBACK')
+    expect(closeClientMock).toHaveBeenCalledTimes(1)
+  })
+
   it('re-checks the deleted marker on every call within the same request', async () => {
     const { isAttachmentVersionDeleted } = await import('../supabase/functions/_backend/files/file_read_cache.ts')
     const fileId = 'orgs/test-org/apps/test-app/bundle.zip'

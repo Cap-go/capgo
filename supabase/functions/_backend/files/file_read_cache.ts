@@ -209,8 +209,9 @@ async function lookupAttachmentVersionDeletedFromPrimary(c: Context, fileId: str
   try {
     pgClient = await raceWithDeadline(deadlineMs, clientPromise)
     const result = await raceWithDeadline(deadlineMs, (async () => {
-      await pgClient!.query(DELETED_LOOKUP_BEGIN)
       try {
+        // Inside try: if the batch fails after BEGIN ran, the catch still rolls it back.
+        await pgClient!.query(DELETED_LOOKUP_BEGIN)
         const queryResult = await pgClient!.query<{ deleted: boolean | null, deleted_at: string | null }>(
           `
           SELECT deleted, deleted_at
