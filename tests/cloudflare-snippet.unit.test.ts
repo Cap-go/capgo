@@ -337,11 +337,14 @@ describe('cloudflare snippet edge answers', () => {
     vi.stubGlobal('fetch', fetchMock)
     await snippet.fetch(buildRequest('/stats', statsEvent()))
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    // The same device a minute it is not sampled, and a batch keyed by its first event.
-    vi.setSystemTime(ANSWER_TIME)
+    // A batch follows its first event: answered when only a later device is sampled...
+    vi.setSystemTime(minuteWhere(minute => !isLearnSample(DEVICE_ID, minute) && isLearnSample(OTHER_DEVICE_ID, minute)))
     const answered = await snippet.fetch(buildRequest('/stats', [statsEvent(), statsEvent({ device_id: OTHER_DEVICE_ID })]))
     expect(answered.headers.get('X-Capgo-Edge')).toBe('answer')
     expect(fetchMock).toHaveBeenCalledTimes(1)
+    // ...and sent to the worker when its first device is.
+    await snippet.fetch(buildRequest('/stats', [statsEvent({ device_id: OTHER_DEVICE_ID }), statsEvent()]))
+    expect(fetchMock).toHaveBeenCalledTimes(2)
     // About 5% of devices per minute.
     const sampled = Array.from({ length: 4000 }, (_, i) => isLearnSample(`00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, 29_700_000)).filter(Boolean).length
     expect(sampled).toBeGreaterThan(120)
