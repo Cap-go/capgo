@@ -614,11 +614,11 @@ export function isSubscriptionInvoice(invoice: Pick<OpenInvoiceShape, 'billing_r
 // charge.failed fires for every charge, including credit auto top-ups and one-off
 // purchases. Only a failed subscription invoice says anything about the plan.
 // Errors propagate so the webhook is retried instead of guessing.
-export async function isSubscriptionCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
+// The invoice a charge paid (or tried to pay), through its PaymentIntent.
+export async function findInvoiceForCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
   const paymentIntentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
-  // Legacy charges without a PaymentIntent keep the previous behavior.
   if (!paymentIntentId)
-    return true
+    return null
   const payments = await stripe.invoicePayments.list({
     payment: { type: 'payment_intent', payment_intent: paymentIntentId },
     limit: 1,
@@ -626,8 +626,16 @@ export async function isSubscriptionCharge(stripe: Stripe, charge: Pick<Stripe.C
   })
   const invoice = payments.data[0]?.invoice
   if (!invoice || typeof invoice === 'string' || invoice.deleted)
-    return false
-  return isSubscriptionInvoice(invoice)
+    return null
+  return invoice
+}
+
+export async function isSubscriptionCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
+  // Legacy charges without a PaymentIntent keep the previous behavior.
+  if (!charge.payment_intent)
+    return true
+  const invoice = await findInvoiceForCharge(stripe, charge)
+  return !!invoice && isSubscriptionInvoice(invoice)
 }
 
 export function toOpenSubscriptionInvoiceSummary(invoice: OpenInvoiceShape): OpenSubscriptionInvoiceSummary {

@@ -48,7 +48,7 @@ function createBillingContext(stripe = createStripe(), publishableKey = 'pk_test
 }
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
 })
 
 describe('cancel reason parsing', () => {
@@ -169,14 +169,53 @@ describe('backup card', () => {
     const main = card('pm_main', 'fp_main')
     mockSavedCards(stripe, main, [card('pm_same', 'fp_main'), card('pm_expired', 'fp_old', 2020), main, card('pm_back', 'fp_back')])
 
-    const cards = await getSavedCards(createBillingContext(stripe))
+    const cards = await getSavedCards(createContext(), createBillingContext(stripe))
 
     expect(cards.card?.id).toBe('pm_main')
     expect(cards.backupCard?.id).toBe('pm_back')
   })
 
+  it('uses the subscription card as primary when the customer has no default', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, null, [card('pm_new', 'fp_new'), main])
+    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    stripe.subscriptions.retrieve.mockResolvedValue({ default_payment_method: main })
+
+    const cards = await getSavedCards(createContext(), createBillingContext(stripe))
+
+    expect(cards.card?.id).toBe('pm_main')
+    expect(cards.backupCard?.id).toBe('pm_new')
+  })
+
+  it('pins the current primary when a backup is added without a customer default', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    // The new backup is already attached and listed first.
+    mockSavedCards(stripe, null, [card('pm_back', 'fp_back'), main])
+    stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_back' })
+    stripe.paymentMethods.retrieve.mockResolvedValue(card('pm_back', 'fp_back'))
+
+    await savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup')
+
+    expect(stripe.customers.update).toHaveBeenCalledWith('cus_123', { invoice_settings: { default_payment_method: 'pm_main' } })
+  })
+
+  it('makes the card primary when there is nothing to back up', async () => {
+    const stripe = createStripe()
+    mockSavedCards(stripe, null, [card('pm_back', 'fp_back')])
+    stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_back' })
+    stripe.paymentMethods.retrieve.mockResolvedValue(card('pm_back', 'fp_back'))
+
+    await savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup')
+
+    expect(stripe.customers.update).toHaveBeenCalledWith('cus_123', { invoice_settings: { default_payment_method: 'pm_back' } })
+  })
+
   it('saves a backup card without changing the default', async () => {
     const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [card('pm_back', 'fp_back'), main])
     stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_back' })
     stripe.paymentMethods.retrieve.mockResolvedValue(card('pm_back', 'fp_back'))
 

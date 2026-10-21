@@ -77,7 +77,7 @@ app.post('/overview', middlewareAuth, async (c) => {
   const body = await parseBody<OrgBody>(c)
   const ctx = await resolveBillingContext(c, body.orgId, 'org.read_billing')
   const [{ card, backupCard }, subscription, invoices, openInvoice] = await Promise.all([
-    getSavedCards(ctx),
+    getSavedCards(c, ctx),
     getSubscriptionSummary(c, ctx),
     listInvoices(ctx),
     getOpenInvoiceSummary(c, ctx),

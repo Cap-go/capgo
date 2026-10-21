@@ -21,7 +21,7 @@ import * as schema from '../utils/postgres_schema.ts'
 import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { getRetryablePostgrestStatus, isRetryablePostgrestError } from '../utils/retry.ts'
 import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
-import { ensureCustomerMetadata, findLatestOpenSubscriptionInvoice, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionCharge, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
+import { ensureCustomerMetadata, findInvoiceForCharge, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionCharge, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
 import { payInvoiceWithBackupCard } from '../utils/stripe_in_app.ts'
 import { buildTransferInvoiceFooter, getStripeCustomerEmailFromEvent, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
@@ -1639,13 +1639,15 @@ async function handleActiveSubscriptionUpdate(
 async function chargeBackupCard(c: Context<MiddlewareKeyVariablesStripe>, stripeEvent: Stripe.Event, customerId: string) {
   if (stripeEvent.type !== 'charge.failed')
     return false
-  const billingAccount = getWebhookBillingAccount(c)
+  const charge = stripeEvent.data.object
+  const stripe = getStripe(c, getWebhookBillingAccount(c))
   try {
-    const invoice = await findLatestOpenSubscriptionInvoice(c, customerId, billingAccount)
-    if (!invoice?.id)
+    // Retry the invoice this charge was for, not whichever invoice is newest.
+    const invoice = await findInvoiceForCharge(stripe, charge)
+    if (!invoice?.id || invoice.status !== 'open' || !isSubscriptionInvoice(invoice))
       return false
-    const failedPaymentMethod = stripeEvent.data.object.payment_method
-    return await payInvoiceWithBackupCard(c, getStripe(c, billingAccount), customerId, invoice.id, typeof failedPaymentMethod === 'string' ? failedPaymentMethod : null)
+    const failedPaymentMethod = typeof charge.payment_method === 'string' ? charge.payment_method : null
+    return await payInvoiceWithBackupCard(c, stripe, customerId, invoice.id, failedPaymentMethod)
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'chargeBackupCard', customerId, error })
