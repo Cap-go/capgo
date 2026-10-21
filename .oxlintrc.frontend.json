@@ -1283,7 +1283,10 @@
         "unused-imports/no-unused-vars": "off"
       },
       "jsPlugins": [
-        "@eslint-community/eslint-plugin-eslint-comments",
+        {
+          "name": "eslint-comments",
+          "specifier": "@eslint-community/eslint-plugin-eslint-comments"
+        },
         "eslint-plugin-unused-imports"
       ]
     }
