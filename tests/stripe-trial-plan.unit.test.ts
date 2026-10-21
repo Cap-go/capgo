@@ -81,11 +81,15 @@ describe('trial plan schedules', () => {
     expect(cancel).toHaveBeenCalledWith('sub_sched_b')
   })
 
-  it('cancels the pending trial plan when checkout creates another subscription', async () => {
-    const { stripe, cancel, list } = fakeStripe([{ id: 'sub_sched_trial', status: 'not_started', metadata: { capgo_trial_plan: 'true' } }])
+  it('cancels every pending trial plan when checkout creates another subscription', async () => {
+    const { stripe, cancel, list } = fakeStripe([
+      { id: 'sub_sched_trial', status: 'not_started', created: 1, metadata: { capgo_trial_plan: 'true' } },
+      { id: 'sub_sched_dup', status: 'not_started', created: 2, metadata: { capgo_trial_plan: 'true' } },
+    ])
     await cancelTrialPlanScheduleForSubscription(context, stripe, { id: 'sub_1', customer: 'cus_1', schedule: null, status: 'active' } as unknown as Stripe.Subscription)
     expect(list).toHaveBeenCalledWith({ customer: 'cus_1', limit: 100 })
     expect(cancel).toHaveBeenCalledWith('sub_sched_trial')
+    expect(cancel).toHaveBeenCalledWith('sub_sched_dup')
   })
 
   it('keeps the schedule while the checkout subscription is still incomplete', async () => {

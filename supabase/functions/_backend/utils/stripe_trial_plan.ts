@@ -92,13 +92,24 @@ export async function findPendingTrialPlanSchedule(stripe: Stripe, customerId: s
   return (await listPendingTrialPlanSchedules(stripe, customerId))[0] ?? null
 }
 
+async function cancelSchedules(c: Context, stripe: Stripe, customerId: string, schedules: readonly Stripe.SubscriptionSchedule[], message: string) {
+  await Promise.all(schedules.map(async (schedule) => {
+    await stripe.subscriptionSchedules.cancel(schedule.id)
+    cloudlog({ requestId: c.get('requestId'), message, customerId, scheduleId: schedule.id })
+  }))
+}
+
 // Keep the oldest pending schedule; concurrent requests may each have created one.
 export async function cancelDuplicateTrialPlanSchedules(c: Context, stripe: Stripe, customerId: string) {
   const [, ...duplicates] = await listPendingTrialPlanSchedules(stripe, customerId)
-  for (const schedule of duplicates) {
-    await stripe.subscriptionSchedules.cancel(schedule.id)
-    cloudlog({ requestId: c.get('requestId'), message: 'duplicate trial plan schedule canceled', customerId, scheduleId: schedule.id })
-  }
+  await cancelSchedules(c, stripe, customerId, duplicates, 'duplicate trial plan schedule canceled')
+}
+
+// Cancel every pending trial plan schedule, duplicates included, so none can still charge.
+async function cancelAllPendingTrialPlanSchedules(c: Context, stripe: Stripe, customerId: string, message: string) {
+  const schedules = await listPendingTrialPlanSchedules(stripe, customerId)
+  await cancelSchedules(c, stripe, customerId, schedules, message)
+  return schedules.length
 }
 
 export async function getTrialPlanSummary(c: Context, ctx: InAppBillingContext): Promise<TrialPlanSummary | null> {
@@ -244,12 +255,10 @@ export async function scheduleTrialPlan(c: Context, ctx: InAppBillingContext, or
 }
 
 export async function cancelTrialPlan(c: Context, ctx: InAppBillingContext, orgId: string) {
-  const schedule = await findPendingTrialPlanSchedule(ctx.stripe, ctx.customerId)
   const summary = await getTrialPlanSummary(c, ctx)
-  if (!schedule)
+  const canceled = await cancelAllPendingTrialPlanSchedules(c, ctx.stripe, ctx.customerId, 'trial plan schedule canceled')
+  if (!canceled)
     return summary
-  await ctx.stripe.subscriptionSchedules.cancel(schedule.id)
-  cloudlog({ requestId: c.get('requestId'), message: 'trial plan schedule canceled', orgId, scheduleId: schedule.id })
   const next = summary ? { ...summary, scheduled: false } : null
   if (next)
     await notifyBento(c, orgId, c.get('auth')?.userId, false, next)
@@ -260,17 +269,13 @@ export async function cancelTrialPlan(c: Context, ctx: InAppBillingContext, orgI
 // so the customer is not billed twice when the trial ends.
 // Only a subscription that is live (paid checkout) replaces the trial plan; an incomplete
 // checkout that is abandoned must keep the scheduled plan.
-const REPLACING_SUBSCRIPTION_STATUSES: readonly Stripe.Subscription.Status[] = ['active', 'trialing']
+const REPLACING_SUBSCRIPTION_STATUSES = new Set<Stripe.Subscription.Status>(['active', 'trialing'])
 
 export async function cancelTrialPlanScheduleForSubscription(c: Context, stripe: Stripe, subscription: Stripe.Subscription) {
-  if (subscription.schedule || isTrialPlanSubscription(subscription) || !REPLACING_SUBSCRIPTION_STATUSES.includes(subscription.status))
+  if (subscription.schedule || isTrialPlanSubscription(subscription) || !REPLACING_SUBSCRIPTION_STATUSES.has(subscription.status))
     return
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
-  const schedule = await findPendingTrialPlanSchedule(stripe, customerId)
-  if (!schedule)
-    return
-  await stripe.subscriptionSchedules.cancel(schedule.id)
-  cloudlog({ requestId: c.get('requestId'), message: 'trial plan schedule replaced by subscription', customerId, scheduleId: schedule.id, subscriptionId: subscription.id })
+  await cancelAllPendingTrialPlanSchedules(c, stripe, customerId, `trial plan schedule replaced by subscription ${subscription.id}`)
 }
 
 // A trial plan subscription whose first invoice never got paid (e.g. Stripe gave up on it).

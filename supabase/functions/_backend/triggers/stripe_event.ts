@@ -1740,6 +1740,25 @@ async function getTrialPlanPaymentState(c: Context<MiddlewareKeyVariablesStripe>
   return await settleTrialPlanFirstInvoice(c, getStripe(c, getWebhookBillingAccount(c)), subscription)
 }
 
+// Keep the live subscription visible to Billing (pay now, cancel) without converting the org.
+// Same row-locked, ordered write as other subscription events, so an older unpaid event
+// cannot overwrite a newer paid state.
+async function persistUnpaidTrialPlanSubscription(c: Context<MiddlewareKeyVariablesStripe>, stripeEvent: Stripe.Event, stripeData: StripeData) {
+  cloudlog({ requestId: c.get('requestId'), message: 'Trial plan subscription waits for its first payment', subscriptionId: stripeData.data.subscription_id })
+  stripeData.data.status = 'failed'
+  const persisted = await persistStripeInfoAndRevenueMovement(
+    c,
+    stripeData.data.customer_id,
+    stripeEvent.id,
+    toStripeInfoUpdate(stripeData.data),
+    new Date(stripeEvent.created * 1000).toISOString(),
+    ZERO_REVENUE_MOVEMENT,
+  )
+  if (persisted === 'missing')
+    return quickError(404, 'customer_id_not_found', 'customer_id not found', { stripeData })
+  return c.json(BRES)
+}
+
 async function handleSubscriptionStripeEvent(
   c: Context<MiddlewareKeyVariablesStripe>,
   stripeEvent: Stripe.Event,
@@ -1754,24 +1773,8 @@ async function handleSubscriptionStripeEvent(
     // Renewals (including a failed one reported as past_due) keep the normal flow.
     if (trialPlanPayment === 'first_paid' && customer.status !== 'succeeded' && stripeData.data.status !== 'past_due')
       stripeData.data.status = 'created'
-    if (trialPlanPayment === 'unpaid') {
-      // Keep the live subscription visible to Billing (pay now, cancel) without converting the org.
-      cloudlog({ requestId: c.get('requestId'), message: 'Trial plan subscription waits for its first payment', subscriptionId: stripeData.data.subscription_id })
-      stripeData.data.status = 'failed'
-      // Same row-locked, ordered write as other subscription events, so an older unpaid
-      // event cannot overwrite a newer paid state.
-      const persisted = await persistStripeInfoAndRevenueMovement(
-        c,
-        stripeData.data.customer_id,
-        stripeEvent.id,
-        toStripeInfoUpdate(stripeData.data),
-        new Date(stripeEvent.created * 1000).toISOString(),
-        ZERO_REVENUE_MOVEMENT,
-      )
-      if (persisted === 'missing')
-        return quickError(404, 'customer_id_not_found', 'customer_id not found', { stripeData })
-      return c.json(BRES)
-    }
+    if (trialPlanPayment === 'unpaid')
+      return persistUnpaidTrialPlanSubscription(c, stripeEvent, stripeData)
     const response = await handleActiveSubscriptionUpdate(c, stripeEvent, stripeData, org, customer)
     if (response)
       return response
