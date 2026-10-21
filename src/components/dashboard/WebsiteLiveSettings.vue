@@ -37,7 +37,8 @@ const canUpdateSettings = computedAsync(async () => {
 }, false)
 
 // The app's owner org, not the selected org: app URLs can point to another org.
-const appOrgId = computed(() => organizationStore.getOrgByAppId(props.appId)?.gid ?? organizationStore.currentOrganization?.gid ?? '')
+// No fallback to the selected org: an unknown owner means an unknown plan.
+const appOrgId = computed(() => organizationStore.getOrgByAppId(props.appId)?.gid ?? '')
 const isPlanLoading = ref(false)
 // Read the plan directly: the shared helper falls back to 'Solo' when the
 // user cannot read billing, which would wrongly look like a full plan.

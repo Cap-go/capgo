@@ -169,6 +169,9 @@ onMounted(async () => {
     return
   }
 
+  // The settings row already carries the update mode: do not depend on the
+  // layout's separate mode fetch to hide the classic options for Web2App apps.
+  appUpdateModeStore.prime(props.appId, data)
   await organizationStore.awaitInitialLoad()
   const rawIconUrl = data.icon_url
   const iconLoadRun = ++appIconLoadRun

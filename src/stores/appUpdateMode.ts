@@ -40,6 +40,12 @@ export const useAppUpdateModeStore = defineStore('appUpdateMode', () => {
     }
   }
 
+  /** Seeds the mode from an apps row fetched elsewhere, unless it is already known. */
+  function prime(appId: string, row: { update_mode: string, website_url: string | null }) {
+    if (appId && !modes.value[appId])
+      set(appId, toState(row))
+  }
+
   async function load(appId: string, force = false): Promise<AppUpdateModeState | null> {
     if (!appId)
       return null
@@ -55,7 +61,13 @@ export const useAppUpdateModeStore = defineStore('appUpdateMode', () => {
         .select('update_mode, website_url')
         .eq('app_id', appId)
         .maybeSingle()
-      if (error || !data)
+      if (error) {
+        // Not cached: the next load() call retries instead of treating the
+        // app as classic for the rest of the session.
+        console.error('Cannot load app update mode', appId, error)
+        return modes.value[appId] ?? null
+      }
+      if (!data)
         return modes.value[appId] ?? null
       const state = toState(data)
       if ((writeGeneration.get(appId) ?? 0) === generation)
@@ -86,14 +98,25 @@ export const useAppUpdateModeStore = defineStore('appUpdateMode', () => {
     if (!data)
       throw new Error('App update mode was not saved')
     const saved = toState(data)
+    // Bump again: a load that started while this write was in flight read the
+    // pre-write generation and could still resolve with the old row.
+    writeGeneration.set(appId, (writeGeneration.get(appId) ?? 0) + 1)
     set(appId, saved)
     return saved
   }
 
-  return { modes, get, isWebsiteMode, load, save, set }
+  return { modes, get, isWebsiteMode, load, prime, save, set }
 })
 
-/** Normalizes user input to the https URL format accepted by apps.website_url. */
+// Mirrors isBlockedWebsiteHost in supabase/functions/_backend/utils/website_live_check.ts.
+const BLOCKED_HOST_SUFFIXES = ['.localhost', '.local', '.internal', '.lan', '.home.arpa']
+
+function isBlockedWebsiteHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/\.$/, '')
+  return host === 'localhost' || BLOCKED_HOST_SUFFIXES.some(suffix => host.endsWith(suffix))
+}
+
+/** Normalizes user input to the https URL format accepted by apps.website_url and the API. */
 export function normalizeWebsiteLiveUrl(input: string): string | null {
   const trimmed = input.trim()
   if (!trimmed)
@@ -107,7 +130,7 @@ export function normalizeWebsiteLiveUrl(input: string): string | null {
     return null
   }
   // Public domain names only: no IP literals, localhost or single-label hosts.
-  if (url.protocol !== 'https:' || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/i.test(url.hostname) || url.username || url.password)
+  if (url.protocol !== 'https:' || !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/i.test(url.hostname) || url.username || url.password || isBlockedWebsiteHost(url.hostname))
     return null
   // The updater stores files relative to the bundle root, so the app must be
   // served from the root of the domain.
