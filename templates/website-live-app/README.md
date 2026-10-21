@@ -25,13 +25,13 @@ The website URL is not in the config. The backend returns it.
 
 The Capgo native builder runs Fastlane directly on the uploaded project. It does **not** run `bun install`, a web build or `cap sync`. Because of that, everything `cap sync` generates is committed:
 
-- `ios/App/App/capacitor.config.json`
+- `ios/App/App/capacitor.config.json`, `ios/App/App/config.xml`
 - `android/app/src/main/assets/capacitor.config.json`, `capacitor.plugins.json`
-
-The web assets copied into `ios/App/App/public/` and `android/app/src/main/assets/public/` and the `android/capacitor-cordova-android-plugins` module are not committed (they are generated): run `bunx cap sync` before packing, as the publish workflow does.
-- `ios/capacitor-cordova-ios-plugins/`, `android/capacitor-cordova-android-plugins/`
+- `ios/capacitor-cordova-ios-plugins/`
 
 The native `.gitignore` files were edited so these paths stay tracked.
+
+The web assets copied into `ios/App/App/public/` and `android/app/src/main/assets/public/` and the `android/capacitor-cordova-android-plugins/` module are not committed (they are generated and still ignored): run `bunx cap sync` before packing, as the publish workflow does. The pack script fails if they are missing.
 
 - iOS uses Swift Package Manager (`ios/App/CapApp-SPM`). There is no CocoaPods.
 - Android `namespace` is fixed to `app.capgo.websitelive` (`MainActivity` lives in that package). Only `applicationId` changes per customer.

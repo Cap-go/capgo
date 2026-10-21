@@ -25,7 +25,13 @@ describe('publish intent onboarding schema migration', () => {
     expect(orgsAdd).toBeGreaterThan(orgsDrop)
     expect(usersDrop).toBeGreaterThan(orgsAdd)
     expect(usersAdd).toBeGreaterThan(usersDrop)
-    expect(publishIntentOnboardingMigration).toContain(`<> ALL (ARRAY['ota'::"text", 'builder'::"text", 'both'::"text", 'exploring'::"text", 'publish'::"text"])`)
-    expect(publishIntentOnboardingMigration).toContain(`<> ALL (ARRAY['unknown'::"text", 'ota'::"text", 'builder'::"text", 'both'::"text", 'exploring'::"text", 'publish'::"text"])`)
+    // Check the allowed values inside the new CHECK constraints, not the
+    // backfill predicates that repeat them.
+    const orgsConstraint = publishIntentOnboardingMigration.slice(orgsAdd, usersDrop)
+    const usersConstraint = publishIntentOnboardingMigration.slice(usersAdd)
+    expect(orgsConstraint).toContain(`= ANY (ARRAY['unknown'::"text", 'ota'::"text", 'builder'::"text", 'both'::"text", 'exploring'::"text", 'publish'::"text"])`)
+    expect(usersConstraint).toContain(`("onboarding" ->> 'intent'::"text") = ANY (ARRAY['ota'::"text", 'builder'::"text", 'both'::"text", 'exploring'::"text", 'publish'::"text"])`)
+    for (const constraint of [orgsConstraint, usersConstraint])
+      expect(constraint).toContain(`("onboarding" ->> 'development_environment'::"text") = ANY (ARRAY['hosted_builder'::"text", 'ai_assistant'::"text", 'hand_coded'::"text", 'other'::"text", 'local_project'::"text", 'exploring'::"text", 'skipped'::"text"])`)
   })
 })
