@@ -138,8 +138,16 @@ async function getSubscriptionDefaultPaymentMethod(c: Context, stripe: Stripe, c
 // newCardId is a card being saved right now: it must never be guessed as the primary.
 async function findSavedPaymentMethods(c: Context, stripe: Stripe, customerId: string, newCardId?: string) {
   const customer = await stripe.customers.retrieve(customerId, { expand: ['invoice_settings.default_payment_method'] })
-  if (customer.deleted)
-    return { defaultPaymentMethod: null, backupPaymentMethod: null, isCustomerDefault: false, spareCards: [], customerDefaultId: null }
+  if (customer.deleted) {
+    return {
+      defaultPaymentMethod: null,
+      backupPaymentMethod: null,
+      isCustomerDefault: false,
+      spareCards: [],
+      customerDefaultId: null,
+      subscriptionKnown: true,
+    }
+  }
   const [cards, subscriptionLookup] = await Promise.all([
     // Stripe's page maximum; customers never get near it, so older eligible cards are not missed.
     stripe.paymentMethods.list({ customer: customerId, type: 'card', limit: 100 }),
@@ -157,12 +165,22 @@ async function findSavedPaymentMethods(c: Context, stripe: Stripe, customerId: s
   // Cards Stripe may charge on its own (subscription card, customer default) are never spare
   // and never the removable backup: detaching the customer default would break credit auto top-up.
   const inUse = new Set([subscriptionDefault?.id, isCustomerDefault ? customerDefault.id : undefined, defaultPaymentMethod?.id])
-  const backupPaymentMethod = cards.data.find(paymentMethod => !inUse.has(paymentMethod.id)
-    && !isExpired(paymentMethod)
-    && (!defaultFingerprint || paymentMethod.card?.fingerprint !== defaultFingerprint)) ?? null
+  // Without a known subscription default, another saved card might be the live subscription card.
+  const backupPaymentMethod = subscriptionLookup.known
+    ? cards.data.find(paymentMethod => !inUse.has(paymentMethod.id)
+      && !isExpired(paymentMethod)
+      && (!defaultFingerprint || paymentMethod.card?.fingerprint !== defaultFingerprint)) ?? null
+    : null
   // Without the subscription card we cannot tell which cards are spare: detach nothing.
   const spareCards = subscriptionLookup.known ? cards.data.filter(paymentMethod => !inUse.has(paymentMethod.id)) : []
-  return { defaultPaymentMethod, backupPaymentMethod, isCustomerDefault, spareCards, customerDefaultId: isCustomerDefault ? customerDefault.id : null }
+  return {
+    defaultPaymentMethod,
+    backupPaymentMethod,
+    isCustomerDefault,
+    spareCards,
+    customerDefaultId: isCustomerDefault ? customerDefault.id : null,
+    subscriptionKnown: subscriptionLookup.known,
+  }
 }
 
 // Only one backup at a time: an older spare card must never come back as the backup.
@@ -302,8 +320,9 @@ export function parsePaymentMethodRole(value: unknown): PaymentMethodRole {
 
 // Only the backup can be removed: the default keeps renewals working.
 export async function removeBackupCard(c: Context, ctx: InAppBillingContext, paymentMethodId: string) {
-  const { backupPaymentMethod, spareCards, customerDefaultId } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId)
-  if (!backupPaymentMethod || backupPaymentMethod.id !== paymentMethodId || paymentMethodId === customerDefaultId)
+  const { backupPaymentMethod, spareCards, customerDefaultId, subscriptionKnown } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId)
+  // Refuse until the subscription default is verified: an unknown lookup can mislabel it as backup.
+  if (!subscriptionKnown || !backupPaymentMethod || backupPaymentMethod.id !== paymentMethodId || paymentMethodId === customerDefaultId)
     throw simpleError('invalid_payment_method', 'This card is not the backup card')
   await ctx.stripe.paymentMethods.detach(paymentMethodId)
   // Older spare cards would otherwise become the next backup and keep fallback charging on.

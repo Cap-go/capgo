@@ -357,7 +357,7 @@ describe('backup card', () => {
     await expect(payInvoiceWithBackupCard(createContext(), stripe as any, 'cus_123', 'in_123')).rejects.toThrow('timeout')
   })
 
-  it('keeps the customer card and detaches nothing when the subscription lookup fails', async () => {
+  it('hides the backup and refuses removal when the subscription lookup fails', async () => {
     const stripe = createStripe()
     const main = card('pm_main', 'fp_main')
     mockSavedCards(stripe, main, [card('pm_back', 'fp_back'), main, card('pm_old', 'fp_old')])
@@ -366,10 +366,10 @@ describe('backup card', () => {
 
     const cards = await getSavedCards(createContext(), createBillingContext(stripe))
     expect(cards.card?.id).toBe('pm_main')
+    expect(cards.backupCard).toBeNull()
 
-    await removeBackupCard(createContext(), createBillingContext(stripe), 'pm_back')
-    expect(stripe.paymentMethods.detach).toHaveBeenCalledTimes(1)
-    expect(stripe.paymentMethods.detach).toHaveBeenCalledWith('pm_back')
+    await expect(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_back')).rejects.toThrow()
+    expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
   })
 
   it('does not detach spare cards when stripe_info lookup fails', async () => {
@@ -383,6 +383,18 @@ describe('backup card', () => {
 
     await savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup')
 
+    expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
+  })
+
+  it('refuses to remove a card that could be the subscription default while lookup is unknown', async () => {
+    const stripe = createStripe()
+    const customerDefault = card('pm_cust', 'fp_cust')
+    mockSavedCards(stripe, customerDefault, [card('pm_sub', 'fp_sub'), customerDefault])
+    mockActiveSubscription(null, false)
+
+    const cards = await getSavedCards(createContext(), createBillingContext(stripe))
+    expect(cards.backupCard).toBeNull()
+    await expect(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_sub')).rejects.toThrow()
     expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
   })
 })
