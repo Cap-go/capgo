@@ -13,7 +13,7 @@ import { getClientDbRegionSB } from './geolocation.ts'
 import { freshQueryArgs } from './hyperdriveFreshRead.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { isReadOnlyPgConnectionRetryError } from './pg_errors.ts'
-import { closePrimaryReadClient, configureTransactionAccessMode, readOnlyStartupOptions, restrictPrimaryReadClient } from './pg_transaction_mode.ts'
+import { configureTransactionAccessMode, readOnlyStartupOptions, setPgAccessMode } from './pg_transaction_mode.ts'
 import { serializePostgresError, serializePostgresLogValue } from './postgres_error.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
@@ -439,7 +439,7 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PluginP
     })
     await client.connect()
     skipEndClients.add(client)
-    return restrictPrimaryReadClient(client, dbName, readOnly, true)
+    return setPgAccessMode(client, readOnly)
   }
 
   const pool = new Pool({
@@ -457,7 +457,7 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PluginP
     cloudlogErr({ requestId, message: 'PG Pool Error', databaseSource: dbName, error: serializePostgresError(err) })
   })
 
-  return restrictPrimaryReadClient(pool, dbName, readOnly, false)
+  return setPgAccessMode(pool, readOnly)
 }
 
 /**
@@ -668,13 +668,6 @@ export function logPgError(
 }
 
 export function closeClient(c: Context, db: PluginPgClient) {
-  const closingRead = closePrimaryReadClient(db)
-  if (closingRead) {
-    return backgroundTask(c, closingRead.catch((error: unknown) => {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'PG read transaction cleanup failed', error: serializePostgresError(error) })
-    }))
-  }
-
   // Hyperdrive: do not end() — connection-lifecycle docs say GC cleans the edge hop.
   // https://developers.cloudflare.com/hyperdrive/concepts/connection-lifecycle/
   if (skipEndClients.has(db))

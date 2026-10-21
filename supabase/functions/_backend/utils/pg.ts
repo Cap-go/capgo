@@ -7,7 +7,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
 import { Client, Pool } from 'pg'
-import { closePrimaryReadClient, configureTransactionAccessMode, getPgAccessMode, inheritPgAccessMode, isPrimaryReadSession, readOnlyStartupOptions, restrictPrimaryReadClient } from '../plugin_runtime/utils/pg_transaction_mode.ts'
+import { configureTransactionAccessMode, getPgAccessMode, inheritPgAccessMode, readOnlyStartupOptions, setPgAccessMode } from '../plugin_runtime/utils/pg_transaction_mode.ts'
 import { serializePostgresError } from '../plugin_runtime/utils/postgres_error.ts'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
@@ -33,7 +33,7 @@ export type PgQueryClient = PoolClient | Client
 const skipEndClients = new WeakSet<object>()
 
 export async function checkoutPgClient(pg: PgClient): Promise<PgQueryClient> {
-  if (skipEndClients.has(pg) || isPrimaryReadSession(pg))
+  if (skipEndClients.has(pg))
     return pg as Client
   const client = await (pg as Pool).connect()
   inheritPgAccessMode(pg, client)
@@ -41,7 +41,7 @@ export async function checkoutPgClient(pg: PgClient): Promise<PgQueryClient> {
 }
 
 export function releasePgClient(pg: PgClient | null | undefined, client: object | null | undefined, error?: boolean | Error): void {
-  if (!pg || !client || skipEndClients.has(pg) || isPrimaryReadSession(pg))
+  if (!pg || !client || skipEndClients.has(pg))
     return
   if ('release' in client && typeof client.release === 'function')
     client.release(error)
@@ -444,7 +444,7 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PgClien
     })
     await client.connect()
     skipEndClients.add(client)
-    return restrictPrimaryReadClient(client, dbName, readOnly, true)
+    return setPgAccessMode(client, readOnly)
   }
 
   const pool = new Pool({
@@ -466,15 +466,13 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PgClien
     cloudlogErr({ requestId, message: 'PG Pool Error', databaseSource: dbName, error: serializePostgresError(err) })
   })
 
-  return restrictPrimaryReadClient(pool, dbName, readOnly, false)
+  return setPgAccessMode(pool, readOnly)
 }
 
 // Transactions must run on one checked-out connection: BEGIN/COMMIT issued on
 // the Pool itself can land on different connections and leave one idle in
 // transaction, holding row locks until the server kills it.
 export async function withPgTransaction<T>(pgPool: PgClient, run: (client: PgQueryClient) => Promise<T>): Promise<T> {
-  if (isPrimaryReadSession(pgPool))
-    throw new Error('Cannot start a root transaction inside a primary read session')
   const client = await checkoutPgClient(pgPool)
   try {
     await client.query(getPgAccessMode(pgPool) === 'read only' ? 'BEGIN READ ONLY' : 'BEGIN READ WRITE')
@@ -515,13 +513,6 @@ export function logPgError(c: Context, functionName: string, error: unknown) {
 }
 
 export function closeClient(c: Context, db: PgClient) {
-  const closingRead = closePrimaryReadClient(db)
-  if (closingRead) {
-    return backgroundTask(c, closingRead.catch((error: unknown) => {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'PG read transaction cleanup failed', error: serializePostgresError(error) })
-    }))
-  }
-
   // Hyperdrive: do not end() — connection-lifecycle docs say GC cleans the edge hop.
   // https://developers.cloudflare.com/hyperdrive/concepts/connection-lifecycle/
   if (skipEndClients.has(db))
