@@ -380,8 +380,26 @@ export function extractPublishedCliRpcCallsFromSource(source: string): Published
   return [...calls.values()].sort(comparePublishedCliRpcCalls)
 }
 
+/** `git grep` exits 1 with empty stderr when nothing matches; that is a valid (empty) contract. */
+function isGitGrepNoMatch(error: unknown): boolean {
+  const failure = error as { status?: unknown, stderr?: unknown } | null
+  const stderr = typeof failure?.stderr === 'string' ? failure.stderr.trim() : ''
+  return failure?.status === 1 && stderr === ''
+}
+
+/**
+ * RPC calls still made by the published CLI at `tag`. Returns [] once the
+ * published CLI only talks to the Capgo HTTP API (no Supabase RPC at all).
+ */
 export function extractPublishedCliRpcCalls(tag: string, runGit: GitRunner = defaultGitRunner): PublishedCliRpcCall[] {
-  const output = runGit(['grep', '-l', '-E', String.raw`\.rpc\(["'\`][a-z][a-z0-9_]*["'\`]`, tag, '--', 'cli/src'])
+  let output = ''
+  try {
+    output = runGit(['grep', '-l', '-E', String.raw`\.rpc\(["'\`][a-z][a-z0-9_]*["'\`]`, tag, '--', 'cli/src'])
+  }
+  catch (error) {
+    if (!isGitGrepNoMatch(error))
+      throw error
+  }
   const files = output
     .split('\n')
     .map(line => line.trim())

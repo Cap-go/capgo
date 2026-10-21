@@ -8,6 +8,10 @@
  *
  * CI job: CRITICAL — Published CLI / do not break old CLI
  * Do NOT invert these tests to expect permission denied (42501). Success is the contract.
+ *
+ * Once the published CLI no longer calls any Supabase RPC (8.90.1+ talks only to
+ * the Capgo HTTP API), the RPC checks are vacuous and only the end-to-end
+ * `app list` run against this schema remains.
  */
 import type { Database } from '../src/types/supabase.types'
 import { execFile } from 'node:child_process'
@@ -121,24 +125,25 @@ function createAnonymousApiKeyClient(apikey: string) {
 }
 
 describe('CRITICAL published CLI RPC contract', () => {
-  let pool: Pool
-  let contract: PublishedCliContractContext
+  // Resolved at collection time so the RPC cases can be skipped for an RPC-free CLI.
+  const contract = loadPublishedCliContract()
+  const publishedCliUsesRpc = contract.rpcCalls.length > 0
+  const rpcIt = publishedCliUsesRpc ? it.concurrent : it.concurrent.skip
+  let pool: Pool | undefined
 
   beforeAll(() => {
-    contract = loadPublishedCliContract()
     pool = new Pool({ connectionString: POSTGRES_URL })
-    expect(contract.rpcCalls.length, `No RPC calls extracted from ${contract.rpcSourceTag}`).toBeGreaterThan(0)
   })
 
   afterAll(async () => {
-    await pool.end()
+    await pool?.end()
   })
 
-  it.concurrent('keeps anon EXECUTE on every RPC still called by the published CLI', async () => {
+  rpcIt('keeps anon EXECUTE on every RPC still called by the published CLI', async () => {
     const missing: string[] = []
 
     for (const call of contract.rpcCalls) {
-      const overloads = await loadFunctionPrivileges(pool, call.name)
+      const overloads = await loadFunctionPrivileges(pool!, call.name)
       expect(overloads.length, `${call.name} is missing from public schema`).toBeGreaterThan(0)
 
       const matches = resolveMatchingOverloads(call, overloads)
@@ -159,7 +164,7 @@ describe('CRITICAL published CLI RPC contract', () => {
     expect(missing, `Published CLI ${contract.rpcSourceTag} would break in production:\n${missing.join('\n')}`).toEqual([])
   })
 
-  it.concurrent(`published CLI identity RPC get_user_id({ apikey }) MUST succeed for valid API keys`, async () => {
+  rpcIt(`published CLI identity RPC get_user_id({ apikey }) MUST succeed for valid API keys`, async () => {
     const client = createAnonymousApiKeyClient(APIKEY_TEST_ORG_SUPER_ADMIN)
 
     const { data, error } = await client.rpc('get_user_id', {
@@ -177,10 +182,11 @@ describe('CRITICAL published CLI RPC contract', () => {
       'list',
       '-a',
       APIKEY_TEST_ORG_SUPER_ADMIN,
-      '--supa-host',
-      SUPABASE_URL,
-      '--supa-anon',
-      SUPABASE_ANON_KEY,
+      // RPC-free CLIs dropped --supa-host/--supa-anon; they reach the local
+      // backend through the Capgo API host (the Supabase functions gateway).
+      ...(publishedCliUsesRpc
+        ? ['--supa-host', SUPABASE_URL, '--supa-anon', SUPABASE_ANON_KEY]
+        : ['--api-host', `${SUPABASE_URL.replace(/\/$/, '')}/functions/v1`]),
       '--output-text',
     ], {
       timeout: 180_000,

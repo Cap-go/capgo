@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   comparePublishedCliTags,
+  extractPublishedCliRpcCalls,
   extractPublishedCliRpcCallsFromSource,
   normalizePublishedCliNpmVersions,
   resolveLatestPublishedCliTag,
@@ -59,6 +60,23 @@ describe('published CLI contract helpers', () => {
     })
 
     expect(version).toBe('8.42.3')
+  })
+
+  it.concurrent('treats a git grep with no rpc matches as an empty contract', () => {
+    const noMatch = Object.assign(new Error('Command failed: git grep'), { status: 1, stderr: '' })
+    const runGit = (args: string[]) => {
+      if (args[0] === 'grep')
+        throw noMatch
+      throw new Error(`unexpected git ${args.join(' ')}`)
+    }
+    expect(extractPublishedCliRpcCalls('cli-8.90.1', runGit)).toEqual([])
+  })
+
+  it.concurrent('still surfaces real git failures while extracting rpc calls', () => {
+    const failure = Object.assign(new Error('fatal: bad revision'), { status: 128, stderr: 'fatal: bad revision' })
+    expect(() => extractPublishedCliRpcCalls('cli-0.0.0', () => {
+      throw failure
+    })).toThrow('fatal: bad revision')
   })
 
   it.concurrent('extracts rpc calls and argument keys from CLI source', () => {
