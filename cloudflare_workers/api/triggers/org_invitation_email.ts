@@ -15,6 +15,7 @@ export interface OrgInvitation {
   tmp_user_id: number | null
   sent_at: string | null
   bento_synced_at: string | null
+  bento_email: string | null
   is_pending: boolean
   email: string
   first_name: string | null
@@ -29,7 +30,7 @@ export interface OrgInvitation {
 export async function selectOrgInvitationForUpdate(client: PgQueryClient, invitationId: string): Promise<OrgInvitation | undefined> {
   const { rows } = await client.query<OrgInvitation>(`
     SELECT r.id, r.org_user_id, r.tmp_user_id, r.sent_at::text AS sent_at,
-      r.bento_synced_at::text AS bento_synced_at, u.id AS recipient_user_id,
+      r.bento_synced_at::text AS bento_synced_at, r.bento_email, u.id AS recipient_user_id,
       o.id AS org_id, o.name AS org_name,
       COALESCE(t.email, u.email) AS email,
       COALESCE(t.first_name, u.first_name) AS first_name,

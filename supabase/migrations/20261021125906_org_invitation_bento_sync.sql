@@ -23,8 +23,9 @@ COMMENT ON COLUMN public.org_invitation_email_requests.bento_synced_at IS
 'When Bento accepted org:invite_sent for this generation. Reset on resend so
 the new generation starts its own reminder flow.';
 COMMENT ON COLUMN public.org_invitation_email_requests.bento_email IS
-'The exact Bento subscriber address that received org:invite_sent. Field
-syncs target this address even if the account email changes later.';
+'The normalized Bento subscriber address, committed before attempting
+org:invite_sent so even uncertain acceptance can be reconciled on close.
+Field syncs use this address even if the account email changes later.';
 
 CREATE INDEX org_invitation_email_requests_bento_email_idx
 ON public.org_invitation_email_requests (bento_email)
@@ -167,8 +168,8 @@ AS $$
 DECLARE
     v_bento_email text;
 BEGIN
-    -- Only invitations Bento already knows about need their field rewritten;
-    -- this avoids creating Bento subscribers for never-delivered invitations.
+    -- Only delivered invitations prepared for Bento enrollment need a field
+    -- rewrite, including uncertain acceptance after a lost response.
     -- Lock the request row unconditionally: an in-flight Bento enrollment
     -- holds it, so this waits and then reads its committed bento_email.
     -- BEFORE DELETE runs ahead of the request row's ON DELETE CASCADE.

@@ -63,8 +63,8 @@ async function createFixture(kind: Kind, recipientEmail?: string) {
   const inviteId = invitations[0]!.id
   const column = kind === 'new' ? 'tmp_user_id' : 'org_user_id'
   const state = async () => {
-    const rows = await executeSQL<{ id: string, sent_at: string | null, message_id: string | null, bento_synced_at: string | null }>(`
-      SELECT id, sent_at, message_id, bento_synced_at FROM public.org_invitation_email_requests WHERE ${column} = $1
+    const rows = await executeSQL<{ id: string, sent_at: string | null, message_id: string | null, bento_synced_at: string | null, bento_email: string | null }>(`
+      SELECT id, sent_at, message_id, bento_synced_at, bento_email FROM public.org_invitation_email_requests WHERE ${column} = $1
     `, [inviteId])
     const row = rows[0]!
     if (row && !generations.includes(row.id))
@@ -114,6 +114,31 @@ async function createFixture(kind: Kind, recipientEmail?: string) {
 }
 
 describe.each(['new', 'existing'] as const)('%s-account invitation delivery with PostgreSQL', (kind) => {
+  it.concurrent('reconciles a close after Bento acceptance with a lost response', async () => {
+    const fixture = await createFixture(kind)
+    try {
+      const queued = await fixture.state()
+      bentoHooks.set(queued.id, async () => { throw new Error('test response lost after acceptance') })
+      expect((await fixture.post(queued.id)).status).toBe(500)
+      expect(await fixture.state()).toMatchObject({ bento_email: fixture.email, bento_synced_at: null })
+      expect(fixture.inviteSentEvents()).toHaveLength(1)
+      await executeSQL(kind === 'new'
+        ? 'DELETE FROM public.tmp_users WHERE id = $1'
+        : 'UPDATE public.org_users SET is_invite = false WHERE id = $1', [fixture.inviteId])
+      const jobs = await executeSQL<{ count: string }>(`
+        SELECT count(*) FROM pgmq.q_send_email
+        WHERE message->'payload'->'org_invitation_bento_sync'->>'email' = $1
+      `, [fixture.email])
+      expect(jobs[0]!.count).toBe('1')
+      expect((await fixture.sync()).status).toBe(200)
+      expect(bentoEvents.filter(event => event.type === '$update_fields' && event.email === fixture.email).at(-1)?.fields)
+        .toEqual({ capgo_open_invites: '' })
+    }
+    finally {
+      await fixture.cleanup()
+    }
+  })
+
   it.concurrent('reconciles a close that waits for in-flight Bento enrollment', async () => {
     const fixture = await createFixture(kind)
     const applicationName = `invitation-close-${fixture.orgId}`

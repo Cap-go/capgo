@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { sendMock, queryMock, releaseMock, logMock, runtimeMock, trackBentoEventsMock, updateBentoFieldsMock } = vi.hoisted(() => ({
+const { sendMock, queryMock, releaseMock, logMock, runtimeMock, bentoConfiguredMock, trackBentoEventsMock, updateBentoFieldsMock } = vi.hoisted(() => ({
   sendMock: vi.fn(async (_message: unknown) => ({ messageId: 'message-id' })),
   queryMock: vi.fn(),
   releaseMock: vi.fn(),
   logMock: vi.fn(),
   runtimeMock: vi.fn(() => 'node'),
+  bentoConfiguredMock: vi.fn(() => true),
   trackBentoEventsMock: vi.fn(async (..._args: unknown[]): Promise<boolean | undefined> => true),
   updateBentoFieldsMock: vi.fn(async (..._args: unknown[]): Promise<boolean | undefined> => true),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/bento.ts', async () => ({
   ...await vi.importActual('../supabase/functions/_backend/utils/bento.ts'),
+  isBentoConfigured: bentoConfiguredMock,
   trackBentoEvents: trackBentoEventsMock,
   updateBentoFields: updateBentoFieldsMock,
 }))
@@ -82,6 +84,7 @@ const invitation = {
   tmp_user_id: 42 as number | null,
   sent_at: null as string | null,
   bento_synced_at: null as string | null,
+  bento_email: null as string | null,
   is_pending: true,
   email: 'invitee@example.com',
   first_name: 'Alex',
@@ -95,7 +98,11 @@ const invitation = {
 // update is visible to the Bento transaction that follows it.
 function mockInvitation(overrides: Partial<typeof invitation> = {}, openInvites = [orgInvitationId]) {
   let row = { ...invitation, ...overrides }
-  queryMock.mockImplementation(async (query: string) => {
+  queryMock.mockImplementation(async (query: string, params?: unknown[]) => {
+    if (query.includes('SET bento_email')) {
+      row = { ...row, bento_email: params![1] as string }
+      return { rows: [], rowCount: 1 }
+    }
     if (query.includes('SET sent_at')) {
       row = { ...row, sent_at: providerAcceptedAt }
       return { rows: [], rowCount: 1 }
@@ -131,6 +138,7 @@ describe('send_email queue handler', () => {
     trackBentoEventsMock.mockReset().mockResolvedValue(true)
     updateBentoFieldsMock.mockReset().mockResolvedValue(true)
     runtimeMock.mockReturnValue('node')
+    bentoConfiguredMock.mockReturnValue(true)
     mockInvitation()
   })
 
@@ -176,7 +184,10 @@ describe('send_email queue handler', () => {
     expect(JSON.stringify(logMock.mock.calls)).toContain('message-id')
     expect(JSON.stringify(logMock.mock.calls)).not.toContain('secret-invite-token')
     expect(JSON.stringify(logMock.mock.calls)).not.toContain('invitee@example.com')
-    expect(releaseMock).toHaveBeenCalledTimes(2)
+    const targetCommit = queryMock.mock.calls.findIndex(([query], index) => index > sqlIndex('SET bento_email') && query === 'COMMIT')
+    expect(targetCommit).toBeGreaterThan(sqlIndex('SET bento_email'))
+    expect(queryMock.mock.invocationCallOrder[targetCommit]).toBeLessThan(trackBentoEventsMock.mock.invocationCallOrder[0]!)
+    expect(releaseMock).toHaveBeenCalledTimes(3)
   })
 
   it('keeps the invitation delivery alive in the Worker when the queue client disconnects', async () => {
@@ -232,6 +243,12 @@ describe('send_email queue handler', () => {
     expect(queryMock).toHaveBeenCalledWith(expect.stringContaining('SET bento_synced_at'), [orgInvitationId, 'invitee@example.com'])
   })
 
+  it('retries an uncertain enrollment against its original subscriber after an account email change', async () => {
+    mockInvitation({ email: 'changed@example.com', bento_email: 'original@example.com', sent_at: providerAcceptedAt })
+    expect((await postSendEmail({ org_invitation_id: orgInvitationId })).status).toBe(200)
+    expect(trackBentoEventsMock.mock.calls[0]![1]).toBe('original@example.com')
+  })
+
   it.each([
     { sent_at: providerAcceptedAt, bento_synced_at: providerAcceptedAt },
     { is_pending: false },
@@ -280,10 +297,12 @@ describe('send_email queue handler', () => {
   })
 
   it('does not mark the flow started when Bento is not configured', async () => {
-    trackBentoEventsMock.mockResolvedValueOnce(undefined)
+    bentoConfiguredMock.mockReturnValueOnce(false)
     const response = await postSendEmail({ org_invitation_id: orgInvitationId })
     expect(response.status).toBe(200)
     expect(sqlIndex('SET bento_synced_at')).toBe(-1)
+    expect(sqlIndex('SET bento_email')).toBe(-1)
+    expect(trackBentoEventsMock).not.toHaveBeenCalled()
   })
 
   it('rejects a malformed organization send generation before using the database or sending', async () => {
