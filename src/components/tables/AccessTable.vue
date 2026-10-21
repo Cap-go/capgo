@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
+import type { SsoManagedAccess } from '~/services/ssoManaged'
 import type { Database } from '~/types/supabase.types'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -13,7 +14,7 @@ import ChannelAccessPanel from '~/components/permissions/ChannelAccessPanel.vue'
 import { invokeCapgoApi } from '~/services/capgoApi'
 import { formatDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
-import { emptySsoManagedAccess, fetchSsoManagedAccess } from '~/services/ssoManaged'
+import { fetchSsoManagedAccess } from '~/services/ssoManaged'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { getRbacRoleI18nKey } from '~/stores/organization'
@@ -80,12 +81,12 @@ const elements = ref<Element[]>([])
 const isLoading = ref(true)
 const currentPage = ref(1)
 const canUpdateUserRoles = ref(false)
-const ssoManaged = ref(emptySsoManagedAccess())
+const ssoManaged = ref<SsoManagedAccess>(new Map())
 
 // The SSO role mapping owns the app role of SSO members on the apps it maps
 // (channel roles stay manual).
 function isSsoManagedAppRole(principalType: 'user' | 'group', principalId: string, scopeType: 'app' | 'channel') {
-  return scopeType === 'app' && principalType === 'user' && !!app.value?.id && ssoManaged.value.appIds.has(app.value.id) && ssoManaged.value.userIds.has(principalId)
+  return scopeType === 'app' && principalType === 'user' && !!app.value?.id && !!ssoManaged.value.get(principalId)?.appIds.has(app.value.id)
 }
 const selectedRole = ref('')
 const selectedRoleScope = ref<'app' | 'channel'>('app')
@@ -192,7 +193,7 @@ async function loadAccessReferenceData() {
 
   const nextPrincipalOptions: PrincipalOption[] = []
   if (canUpdateUserRoles.value) {
-    ssoManaged.value = await fetchSsoManagedAccess(app.value.owner_org)
+    ssoManaged.value = await fetchSsoManagedAccess(app.value.owner_org, app.value.app_id)
     const { data: principals, error: principalsError } = await invokeCapgoApi(`private/role_bindings/app/${app.value.id}/principals`, { method: 'GET' })
 
     if (principalsError) {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { Tab, TableColumn } from '~/components/comp_def'
+import type { SsoManagedAccess } from '~/services/ssoManaged'
 import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -14,7 +15,7 @@ import DataTable from '~/components/DataTable.vue'
 import RoleCapabilitiesHint from '~/components/forms/RoleCapabilitiesHint.vue'
 import SearchInput from '~/components/forms/SearchInput.vue'
 import { checkPermissions } from '~/services/permissions'
-import { emptySsoManagedAccess, fetchSsoManagedAccess } from '~/services/ssoManaged'
+import { fetchSsoManagedAccess } from '~/services/ssoManaged'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -148,11 +149,11 @@ const groupAppBindings = computed(() =>
   groupBindings.value.filter((b: RoleBinding) => b.scope_type === 'app' && !!b.app_id),
 )
 
-const ssoManaged = ref(emptySsoManagedAccess())
+const ssoManaged = ref<SsoManagedAccess>(new Map())
 
 // The SSO role mapping owns the membership of SSO members in the groups it maps.
 function isSsoManagedMember(userId: string) {
-  return !!group.value && ssoManaged.value.groupIds.has(group.value.id) && ssoManaged.value.userIds.has(userId)
+  return !!group.value && !!ssoManaged.value.get(userId)?.groupIds.has(group.value.id)
 }
 
 const availableMembersToAdd = computed(() => {

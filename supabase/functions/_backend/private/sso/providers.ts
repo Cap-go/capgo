@@ -772,10 +772,19 @@ app.get('/:orgId/links', async (c) => {
 // silently reverted at the next login.
 app.get('/:orgId/managed', async (c) => {
   const orgId = parseUuidParam(c.req.param('orgId'), 'invalid_org_id', 'Invalid org_id')
-  if (!await checkPermission(c, 'org.read_members', { orgId }))
-    quickError(403, 'not_authorized', 'Not authorized')
+  // App role editors (app.update_user_roles) may lack org.read_members: they
+  // pass the app they manage so its access screen can lock the same controls.
+  const appId = c.req.query('app_id')
 
   const result = await withPgPool(c, async (pool) => {
+    if (!await checkPermission(c, 'org.read_members', { orgId })) {
+      const ownedApp = appId
+        ? await pool.query('select 1 from public.apps where app_id = $1 and owner_org = $2', [appId, orgId])
+        : null
+      if (!ownedApp?.rowCount || !await checkPermission(c, 'app.update_user_roles', { appId }))
+        quickError(403, 'not_authorized', 'Not authorized')
+    }
+
     const { rows } = await pool.query<{ provider_id: string, role_mapping: unknown }>(
       `
         select p.provider_id, p.role_mapping
@@ -789,25 +798,34 @@ app.get('/:orgId/managed', async (c) => {
       `,
       [orgId],
     )
-    const mapped = rows.filter(row => parseStoredRoleMapping(row.role_mapping))
-    if (mapped.length === 0)
-      return { user_ids: [], app_ids: [], group_ids: [] }
+    // A login only applies the mapping of the provider that authenticated it,
+    // so targets are kept per provider, then per user.
+    const targetsByProvider = new Map<string, ReturnType<typeof mappingTargets>>()
+    for (const row of rows) {
+      const mapping = parseStoredRoleMapping(row.role_mapping)
+      if (mapping)
+        targetsByProvider.set(`sso:${row.provider_id}`, mappingTargets(mapping))
+    }
+    const users: Record<string, { app_ids: string[], group_ids: string[] }> = {}
+    if (targetsByProvider.size === 0)
+      return { users }
 
-    const targets = mapped.map(row => mappingTargets(parseStoredRoleMapping(row.role_mapping)))
-    const users = await pool.query<{ user_id: string }>(
+    const identities = await pool.query<{ user_id: string, provider: string }>(
       `
-        select distinct ou.user_id
+        select distinct ou.user_id, i.provider
         from public.org_users ou
         join auth.identities i on i.user_id = ou.user_id
         where ou.org_id = $1 and i.provider = any($2::text[])
       `,
-      [orgId, mapped.map(row => `sso:${row.provider_id}`)],
+      [orgId, [...targetsByProvider.keys()]],
     )
-    return {
-      user_ids: users.rows.map(row => row.user_id),
-      app_ids: [...new Set(targets.flatMap(target => [...target.appIds]))],
-      group_ids: [...new Set(targets.flatMap(target => [...target.groupIds]))],
+    for (const { user_id, provider } of identities.rows) {
+      const targets = targetsByProvider.get(provider)!
+      const user = users[user_id] ??= { app_ids: [], group_ids: [] }
+      user.app_ids = [...new Set([...user.app_ids, ...targets.appIds])]
+      user.group_ids = [...new Set([...user.group_ids, ...targets.groupIds])]
     }
+    return { users }
   })
   return c.json(result)
 })

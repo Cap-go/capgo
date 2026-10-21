@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
+import type { SsoManagedAccess } from '~/services/ssoManaged'
 import type { ExtendedOrganizationMember } from '~/stores/organization'
 
 import { computedAsync } from '@vueuse/core'
@@ -18,7 +19,7 @@ import RoleSelect from '~/components/forms/RoleSelect.vue'
 import SearchInput from '~/components/forms/SearchInput.vue'
 import { invokeCapgoApi } from '~/services/capgoApi'
 import { checkPermissions } from '~/services/permissions'
-import { emptySsoManagedAccess, fetchSsoManagedAccess } from '~/services/ssoManaged'
+import { fetchSsoManagedAccess } from '~/services/ssoManaged'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -112,10 +113,10 @@ const selectedUserToDelegateAdmin = ref()
 const searchUserForAdminDelegation = ref('')
 
 const members = ref([] as OrganizationMemberRows)
-const ssoManaged = ref(emptySsoManagedAccess())
+const ssoManaged = ref<SsoManagedAccess>(new Map())
 
 function isSsoManaged(member: OrganizationMemberRow) {
-  return !!member.uid && ssoManaged.value.userIds.has(member.uid)
+  return !!member.uid && ssoManaged.value.has(member.uid)
 }
 let memberImageLoadRun = 0
 
@@ -328,6 +329,8 @@ const membersOptions = computed(() => {
   const searchLower = searchUserForAdminDelegation.value.toLowerCase()
   const options = members.value
     .filter(m => !isSuperAdminRole(m.role))
+    // The SSO role mapping would revert the delegated role at the next login.
+    .filter(m => !isSsoManaged(m))
     .filter(m => m.email.toLowerCase().includes(searchLower))
     .map((m) => {
       return { label: m.email, value: m.id }
@@ -419,6 +422,9 @@ async function reloadData() {
       supabase.rpc('get_org_members_rbac', { p_org_id: orgId }),
       fetchSsoManagedAccess(orgId),
     ])
+    // The org may have changed while loading.
+    if (currentOrganization.value?.gid !== orgId)
+      return
     ssoManaged.value = managed
 
     if (rbError) {
@@ -1266,7 +1272,7 @@ function updateAppAccessSaveButton() {
 
 // Roles on the apps of the SSO role mapping are rewritten at each SSO login.
 function isSsoManagedApp(appId: string) {
-  return !!appAccessMember.value && isSsoManaged(appAccessMember.value) && ssoManaged.value.appIds.has(appId)
+  return !!appAccessMember.value?.uid && !!ssoManaged.value.get(appAccessMember.value.uid)?.appIds.has(appId)
 }
 
 async function openAppAccessModal(member: OrganizationMemberRow) {
