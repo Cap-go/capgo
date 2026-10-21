@@ -16,31 +16,38 @@ import { useAppOnboardingCliProgress } from '~/composables/useAppOnboardingCliPr
 import { getAppOnboardingStepIds } from '~/services/appOnboarding'
 import { isAppOnboardingChecklistStep } from '~/utils/appOnboardingChecklist'
 import { APP_ONBOARDING_STEP_GUIDES } from '~/utils/appOnboardingGuides'
+import { hasDualOnboardingChecklists } from '~/utils/dualOnboardingChecklists'
+import AppOnboardingAiAgentCard from './AppOnboardingAiAgentCard.vue'
 import ChannelSetupOnboardingDialog from './ChannelSetupOnboardingDialog.vue'
 import TechnicalTeammateInviteCard from './TechnicalTeammateInviteCard.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   appId: string
   initialOnboarding?: unknown
   command: string
   hiding: boolean
   leaving: boolean
-}>()
+  active?: boolean
+  hideFooter?: boolean
+  completionAction?: string
+}>(), { active: true })
 
 const emit = defineEmits<{
   copyCommand: []
-  copyAi: []
+  copyAi: [placement?: 'checklist']
   hide: []
   explore: []
   complete: []
   inviteOpened: []
   inviteSucceeded: [invite: { email: string, firstName: string, lastName: string }]
   channelAnalytics: [event: OnboardingChannelEvent, properties: OnboardingChannelEventProperties]
+  snapshot: [onboarding: unknown, hasChannel: boolean | null]
 }>()
 
 const { t } = useI18n()
 const panelId = useId()
-const { onboarding, refreshError, refreshOnboarding } = useAppOnboardingCliProgress(() => props.appId, () => props.initialOnboarding)
+const { onboarding, rawOnboarding, hasChannel, refreshError, refreshOnboarding } = useAppOnboardingCliProgress(() => props.appId, () => props.initialOnboarding, () => props.active !== false)
+watch([rawOnboarding, hasChannel], ([value, observedChannel]) => emit('snapshot', value, observedChannel))
 const steps = computed(() => getAppOnboardingStepIds(onboarding.value.todo_list_version, onboarding.value.ota_todo_list_version).filter(isAppOnboardingChecklistStep).map((id, index) => ({
   id,
   index,
@@ -63,7 +70,9 @@ const waitingMessageKey = computed(() => {
     return `setup-checklist-waiting-${selectedStep.value.id}`
   return 'setup-checklist-waiting-step'
 })
-const completed = computed(() => onboarding.value.outcome === 'completed')
+const completed = computed(() => hasDualOnboardingChecklists(rawOnboarding.value)
+  ? steps.value.length > 0 && doneCount.value === steps.value.length
+  : onboarding.value.outcome === 'completed')
 const checklistOpen = ref(false)
 const channelFlowOpen = ref(false)
 
@@ -115,6 +124,9 @@ function statusLabel(status: string | undefined) {
       </p>
     </header>
 
+    <!-- The first task already offers the AI prompt next to the CLI command; keep it reachable for every later task too. -->
+    <AppOnboardingAiAgentCard v-if="!completed && !isFirstStep" @copy="emit('copyAi', 'checklist')" />
+
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-6" data-test="setup-checklist-progress">
       <p class="shrink-0 text-sm font-medium text-slate-800 dark:text-slate-200" aria-live="polite" aria-atomic="true">
         {{ t('setup-checklist-progress', { done: doneCount, total: steps.length }) }}
@@ -127,28 +139,30 @@ function statusLabel(status: string | undefined) {
       />
     </div>
 
-    <div class="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)] dark:border-white/15 dark:bg-slate-900">
-      <nav class="border-b border-slate-200 p-4 sm:p-6 lg:border-b-0 lg:border-r dark:border-white/15" :aria-label="t('setup-checklist-list-title')">
-        <h2 class="text-lg font-semibold text-slate-950 dark:text-white">
-          {{ t('setup-checklist-list-title') }}
-        </h2>
-        <p class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
+    <div class="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/15 dark:bg-slate-900" :class="{ 'lg:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)]': checklistOpen }">
+      <nav class="border-b border-slate-200 px-4 py-3 sm:px-6 dark:border-white/15" :class="{ 'sm:py-6 lg:border-b-0 lg:border-r': checklistOpen }" :aria-label="t('setup-checklist-list-title')">
+        <!-- New users see one task at a time; the full list stays one click away. -->
+        <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <h2 class="text-lg font-semibold text-slate-950 dark:text-white">
+            {{ t('setup-checklist-list-title') }}
+          </h2>
+          <button
+            type="button"
+            class="d-btn d-btn-ghost min-h-11 px-2 text-sky-700 dark:text-azure-300"
+            :aria-expanded="checklistOpen"
+            :aria-controls="`${panelId}-list`"
+            data-test="setup-checklist-toggle"
+            @click="checklistOpen = !checklistOpen"
+          >
+            {{ checklistOpen ? t('setup-checklist-hide-steps') : t('setup-checklist-show-steps', { total: steps.length }) }}
+            <IconChevronDown class="h-4 w-4 shrink-0" :class="{ 'rotate-180': checklistOpen }" aria-hidden="true" />
+          </button>
+        </div>
+        <p v-if="checklistOpen" class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400">
           {{ t('setup-checklist-list-subtitle') }}
         </p>
 
-        <button
-          type="button"
-          class="d-btn d-btn-ghost mt-3 h-auto min-h-11 w-full justify-between px-0 text-left lg:hidden"
-          :aria-expanded="checklistOpen"
-          :aria-controls="`${panelId}-list`"
-          data-test="setup-checklist-mobile-toggle"
-          @click="checklistOpen = !checklistOpen"
-        >
-          <span class="min-w-0 text-sm">{{ selectedStep.index + 1 }}. {{ selectedStep.title }}</span>
-          <IconChevronDown class="h-4 w-4 shrink-0" :class="{ 'rotate-180': checklistOpen }" aria-hidden="true" />
-        </button>
-
-        <ol :id="`${panelId}-list`" class="mt-4 lg:block" :class="checklistOpen ? 'block' : 'hidden'">
+        <ol :id="`${panelId}-list`" class="mt-4" :class="checklistOpen ? 'block' : 'hidden'">
           <li
             v-for="step in steps"
             :key="step.id"
@@ -188,13 +202,13 @@ function statusLabel(status: string | undefined) {
             {{ t('setup-checklist-complete-description') }}
           </p>
           <button type="button" class="d-btn mt-6 min-h-12 self-start border-primary-500 bg-primary-500 text-white hover:border-primary-600 hover:bg-primary-600" :disabled="hiding || leaving" @click="emit('complete')">
-            {{ t('setup-checklist-open-app') }}
+            {{ completionAction || t('setup-checklist-open-app') }}
             <IconArrowRight class="h-4 w-4" aria-hidden="true" />
           </button>
         </template>
         <template v-else>
           <p class="text-sm font-medium text-sky-700 dark:text-azure-400">
-            {{ isSelectedCurrent ? t('setup-checklist-current-task') : t('setup-checklist-task-number', { number: selectedStep.index + 1, total: steps.length }) }}
+            {{ t(isSelectedCurrent ? 'setup-checklist-current-task-number' : 'setup-checklist-task-number', { number: selectedStep.index + 1, total: steps.length }) }}
           </p>
           <h2 class="mt-3 text-2xl font-semibold leading-tight text-slate-950 sm:text-3xl dark:text-white">
             {{ selectedStep.title }}
@@ -291,7 +305,7 @@ function statusLabel(status: string | undefined) {
       />
     </div>
 
-    <footer class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
+    <footer v-if="!hideFooter" class="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
       <button
         type="button"
         class="d-btn min-h-12 shrink-0 border-slate-300 bg-white px-4 text-slate-700 hover:border-slate-400 hover:bg-slate-50 dark:border-white/20 dark:bg-slate-900 dark:text-slate-200"

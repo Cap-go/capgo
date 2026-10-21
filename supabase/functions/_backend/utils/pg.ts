@@ -7,6 +7,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
 import { Client, Pool } from 'pg'
+import { closePrimaryReadClient, configureTransactionAccessMode, getPgAccessMode, inheritPgAccessMode, isPrimaryReadSession, readOnlyStartupOptions, restrictPrimaryReadClient } from '../plugin_runtime/utils/pg_transaction_mode.ts'
 import { serializePostgresError } from '../plugin_runtime/utils/postgres_error.ts'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
@@ -32,13 +33,15 @@ export type PgQueryClient = PoolClient | Client
 const skipEndClients = new WeakSet<object>()
 
 export async function checkoutPgClient(pg: PgClient): Promise<PgQueryClient> {
-  if (skipEndClients.has(pg))
+  if (skipEndClients.has(pg) || isPrimaryReadSession(pg))
     return pg as Client
-  return (pg as Pool).connect()
+  const client = await (pg as Pool).connect()
+  inheritPgAccessMode(pg, client)
+  return client
 }
 
 export function releasePgClient(pg: PgClient | null | undefined, client: object | null | undefined, error?: boolean | Error): void {
-  if (!pg || !client || skipEndClients.has(pg))
+  if (!pg || !client || skipEndClients.has(pg) || isPrimaryReadSession(pg))
     return
   if ('release' in client && typeof client.release === 'function')
     client.release(error)
@@ -425,9 +428,7 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PgClien
   const dbName = String(c.get('databaseSource') ?? c.res.headers.get('X-Database-Source') ?? 'unknown source')
   cloudlog({ requestId, message: 'SUPABASE_DB_URL selected', dbName, appName, readOnly })
 
-  const isPooler = dbName.startsWith('sb_pooler')
-  // PgBouncer/Supabase pooler doesn't support the 'options' startup parameter
-  const readOnlyOptions = readOnly && !isPooler ? '-c default_transaction_read_only=on' : undefined
+  const readOnlyOptions = readOnlyStartupOptions(dbName, readOnly)
   const isWorkerd = getRuntimeKey() === 'workerd'
   // Match on the actual connection string so the Hyperdrive Client contract cannot
   // silently become Pool+end() if c.set is missed.
@@ -443,7 +444,7 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PgClien
     })
     await client.connect()
     skipEndClients.add(client)
-    return client
+    return restrictPrimaryReadClient(client, dbName, readOnly, true)
   }
 
   const pool = new Pool({
@@ -465,16 +466,18 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PgClien
     cloudlogErr({ requestId, message: 'PG Pool Error', databaseSource: dbName, error: serializePostgresError(err) })
   })
 
-  return pool
+  return restrictPrimaryReadClient(pool, dbName, readOnly, false)
 }
 
 // Transactions must run on one checked-out connection: BEGIN/COMMIT issued on
 // the Pool itself can land on different connections and leave one idle in
 // transaction, holding row locks until the server kills it.
 export async function withPgTransaction<T>(pgPool: PgClient, run: (client: PgQueryClient) => Promise<T>): Promise<T> {
+  if (isPrimaryReadSession(pgPool))
+    throw new Error('Cannot start a root transaction inside a primary read session')
   const client = await checkoutPgClient(pgPool)
   try {
-    await client.query('BEGIN')
+    await client.query(getPgAccessMode(pgPool) === 'read only' ? 'BEGIN READ ONLY' : 'BEGIN READ WRITE')
     try {
       await client.query('SET LOCAL statement_timeout = 10000')
       await client.query('SET LOCAL idle_in_transaction_session_timeout = 15000')
@@ -498,7 +501,7 @@ export function getDrizzleClient(db: PgClient | PgQueryClient, options?: { logge
   // Keep SQL logging on by default for API/trigger diagnostics.
   // Plugin hot paths pass `{ logger: false }` to avoid per-request log CPU/volume.
   const enableLogger = options?.logger ?? true
-  return drizzle({ client: db, logger: enableLogger ? capgoDrizzleQueryLogger : false })
+  return configureTransactionAccessMode(drizzle({ client: db, logger: enableLogger ? capgoDrizzleQueryLogger : false }), db)
 }
 
 // Keep the original driver cause, not just Drizzle's "Failed query" wrapper.
@@ -512,6 +515,13 @@ export function logPgError(c: Context, functionName: string, error: unknown) {
 }
 
 export function closeClient(c: Context, db: PgClient) {
+  const closingRead = closePrimaryReadClient(db)
+  if (closingRead) {
+    return backgroundTask(c, closingRead.catch((error: unknown) => {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'PG read transaction cleanup failed', error: serializePostgresError(error) })
+    }))
+  }
+
   // Hyperdrive: do not end() — connection-lifecycle docs say GC cleans the edge hop.
   // https://developers.cloudflare.com/hyperdrive/concepts/connection-lifecycle/
   if (skipEndClients.has(db))

@@ -117,11 +117,11 @@ Each batch runs four workflows concurrently, at most one storage request each.
 Forty concurrent batches therefore allow up to 160 storage workflows across 40
 independent invocations, each with its own six-connection limit. Each batch
 releases its DB connection before storage and never opens a per-file connection.
-Cleanup adds at most 40 active application DB clients to the existing
-notification and repair consumers' combined two. The independently scheduled
+Cleanup adds at most 40 active application DB clients to the
+notification and repair consumers' combined 41. The independently scheduled
 upstream producer/health invocation can add one inventory and one source-database
-client: at most 43 inventory clients and one source client across these paths.
-These inventory clients connect through Hyperdrive; they are not 43 dedicated
+client: at most 82 inventory clients and one source client across these paths.
+These inventory clients connect through Hyperdrive; they are not 82 dedicated
 PlanetScale origin connections. Hyperdrive shares origin connections across Worker
 invocations using transaction pooling. Its separately configured
 `origin_connection_limit` is a soft target shared with other users of the same

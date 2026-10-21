@@ -2816,45 +2816,6 @@ export type Database = {
         }
         Relationships: []
       }
-      stripe_refunds: {
-        Row: {
-          amount: number
-          charge_id: string
-          created_at: string
-          currency: string
-          customer_id: string | null
-          id: string
-          reason: string | null
-          refunded_at: string
-          status: string
-          updated_at: string
-        }
-        Insert: {
-          amount: number
-          charge_id: string
-          created_at?: string
-          currency: string
-          customer_id?: string | null
-          id: string
-          reason?: string | null
-          refunded_at: string
-          status: string
-          updated_at?: string
-        }
-        Update: {
-          amount?: number
-          charge_id?: string
-          created_at?: string
-          currency?: string
-          customer_id?: string | null
-          id?: string
-          reason?: string | null
-          refunded_at?: string
-          status?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       tmp_users: {
         Row: {
           cancelled_at: string | null
@@ -2936,51 +2897,6 @@ export type Database = {
             columns: ["account_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      trial_extension_events: {
-        Row: {
-          created_at: string
-          customer_id: string
-          extension_days: number
-          id: number
-          new_trial_at: string
-          org_id: string
-          previous_trial_at: string
-        }
-        Insert: {
-          created_at?: string
-          customer_id: string
-          extension_days: number
-          id?: number
-          new_trial_at: string
-          org_id: string
-          previous_trial_at: string
-        }
-        Update: {
-          created_at?: string
-          customer_id?: string
-          extension_days?: number
-          id?: number
-          new_trial_at?: string
-          org_id?: string
-          previous_trial_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "trial_extension_events_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "stripe_info"
-            referencedColumns: ["customer_id"]
-          },
-          {
-            foreignKeyName: "trial_extension_events_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
             referencedColumns: ["id"]
           },
         ]

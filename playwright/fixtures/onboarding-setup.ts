@@ -17,6 +17,7 @@ import { BUILDER_STEP_IDS } from '../../src/services/builderOnboardingChecklist'
 import { useSupabase } from '../../src/services/supabase'
 import { useMainStore } from '../../src/stores/main'
 import { useOrganizationStore } from '../../src/stores/organization'
+import { ONBOARDING_SETUP_HANDOFF_STATE_KEY } from '../../src/utils/onboardingRedirect'
 import '../../src/styles/style.css'
 
 const params = new URLSearchParams(location.search)
@@ -49,17 +50,52 @@ const state = {
   channelInsertDelayMs: 0,
   channelInserts: [] as Record<string, unknown>[],
   appWrites: [] as Array<{ method: string, body: unknown }>,
+  setupWrites: [] as Array<{ method: string, body: unknown }>,
+  userWrites: [] as unknown[],
+}
+if (params.get('checklistState') === 'completed') {
+  for (const id of ['login_cli_mcp', 'add_updater', 'add_code', 'add_channel', 'run_device', 'upload_bundle', 'test_update'])
+    state.steps[id] = { status: id === 'add_code' ? 'skipped' : 'done' }
+  state.channels.push({ id: 1, app_id: previewAppId, name: 'production' })
+  for (const platform of ['ios', 'android'] as const) {
+    for (const id of BUILDER_STEP_IDS[platform])
+      state.builderSteps[platform][id] = { status: id === 'connect_google_play' ? 'skipped' : 'done' }
+  }
+  state.outcome = 'completed'
+}
+else if (params.get('checklistState') === 'dismissed') {
+  state.steps.login_cli_mcp = { status: 'done' }
+  state.steps.add_updater = { status: 'skipped' }
+  state.builderSteps.android.start_setup = { status: 'done' }
+  state.builderSteps.android.connect_google_play = { status: 'skipped' }
 }
 const events: string[] = []
+if (params.get('otaProgress') === '1')
+  state.steps.login_cli_mcp = { status: 'done' }
+for (const platform of ['ios', 'android'] as const) {
+  if (params.get('builderProgress') === platform)
+    state.builderSteps[platform].start_setup = { status: 'done' }
+  if (params.get('builderComplete') === platform) {
+    for (const step of Object.values(state.builderSteps[platform]))
+      step.status = 'done'
+  }
+}
+if (params.get('otaComplete') === '1') {
+  for (const id of ['login_cli_mcp', 'add_channel', 'add_updater', 'add_code', 'run_device', 'upload_bundle', 'test_update'])
+    state.steps[id] = { status: 'done' }
+  state.outcome = 'completed'
+  state.channels.push({ id: 1, app_id: previewAppId, name: 'staging', public: true })
+}
 const channelEvents: Array<{ event: OnboardingChannelEvent, properties: OnboardingChannelEventProperties }> = []
 const preview = { state, events, channelEvents, appId: ref(previewAppId), command: ref('npx @capgo/cli@latest i [API_KEY]'), hiding: ref(false), selectedOrgId: ref('') }
 const previewUserOnboarding = {
+  profile_completed_at: '2026-09-25T00:00:00.000Z',
   abtests: {
     ...(params.get('channelTreatment') === '1' ? { new_channel: { assigned_at: '2026-09-25T00:00:00.000Z', branch: 'A' } } : {}),
     ...(params.get('todoListTreatment') === '1' ? { ota_todo_list_v3: { assigned_at: '2026-09-25T00:00:00.000Z', branch: 'A' } } : {}),
   },
   intent: assignment ? 'builder' : 'ota',
-  status: 'in_progress',
+  status: params.get('checklistState') === 'completed' ? 'completed' : 'in_progress',
   step: 'setup',
   flow: 'existing_org',
   setup_stage: 'cli',
@@ -67,16 +103,29 @@ const previewUserOnboarding = {
   ...(params.get('legacyChannel') === '1' ? {} : { final_step: 'setup' }),
 }
 Object.assign(window, { onboardingSetupPreview: preview })
+if (params.get('preOrg') === '1') {
+  window.history.replaceState({
+    ...window.history.state,
+    [ONBOARDING_SETUP_HANDOFF_STATE_KEY]: {
+      appId: previewAppId,
+      attemptId: 'preview-attempt',
+      runId: 'preview-run',
+      flow: 'pre_org',
+      previousStep: 'organization',
+    },
+  }, '')
+}
 
 function previewOnboarding() {
   const features = params.get('otaInstalled') === '1'
     ? { ota: { succeeded_at: '2026-09-01T00:00:00.000Z' } }
     : {}
+  const dismissal = params.get('checklistState') === 'dismissed' ? { getting_started_dismissed_at: '2026-10-01T00:00:00.000Z' } : {}
   const selectedPath = assignment === 'both-ota' || assignment === 'ota-only' ? 'ota' : 'builder'
   const hasBuilder = builderComponentView || assignment === 'builder-only' || assignment === 'both-builder' || assignment === 'both-ota'
   const hasOta = assignment === 'ota-only' || assignment === 'both-builder' || assignment === 'both-ota'
   if (hasBuilder || hasOta) {
-    return { features, setup: {
+    return { ...dismissal, features, setup: {
       todo_list_version: 4,
       ...(hasBuilder ? { builder_todo_list_version: '1' } : {}),
       ...(hasOta ? { ota_todo_list_version: '1' } : {}),
@@ -88,15 +137,25 @@ function previewOnboarding() {
         ...(hasBuilder ? { builder: state.builderSteps } : {}),
       },
       outcome: state.outcome,
+      source: params.has('checklistState') ? 'cli' : undefined,
     } }
   }
-  return { features, setup: { todo_list_version: state.version, steps: state.steps, outcome: state.outcome } }
+  return { ...dismissal, features, setup: { todo_list_version: state.version, steps: state.steps, outcome: state.outcome, source: params.has('checklistState') ? 'cli' : undefined } }
 }
 
 // This isolated component fixture never sends requests to production.
 window.fetch = async (input, init) => {
   const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.origin)
   const method = init?.method?.toUpperCase() ?? 'GET'
+  if (url.pathname.endsWith('/users') && method === 'PATCH')
+    state.userWrites.push(JSON.parse(String(init?.body)))
+  if ((url.pathname.endsWith('/apps') || url.pathname.endsWith('/rpc/mark_onboarding_feature_started') || url.pathname.endsWith('/rpc/verify_getting_started') || url.pathname.includes('/app/')) && method !== 'GET' && method !== 'HEAD') {
+    state.setupWrites.push({
+      method,
+      body: init?.body ? JSON.parse(String(init.body)) : undefined,
+    })
+  }
+  // Existing component tests track app-table edits separately from setup RPCs.
   if (url.pathname.endsWith('/apps') && method !== 'GET' && method !== 'HEAD') {
     state.appWrites.push({
       method,
@@ -159,8 +218,10 @@ window.fetch = async (input, init) => {
     })
   }
   if (params.get('view') === 'flow' || navigationView) {
+    if (url.pathname.endsWith('/apps') && params.get('unavailable') === '1')
+      return new Response(JSON.stringify({ message: 'App unavailable' }), { status: 406, headers: { 'Content-Type': 'application/json' } })
     const app = { id: '00000000-0000-4000-8000-000000000003', app_id: previewAppId, name: 'My Capacitor app', icon_url: '', owner_org: '00000000-0000-4000-8000-000000000002', need_onboarding: true, onboarding: previewOnboarding() }
-    const user = { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', onboarding: previewUserOnboarding }
+    const user = { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', first_name: 'Preview', last_name: 'User', onboarding: previewUserOnboarding }
     const rows = url.pathname.endsWith('/apps') ? (!url.searchParams.get('owner_org') || url.searchParams.get('owner_org') === `eq.${app.owner_org}` ? [app] : []) : url.pathname.endsWith('/users') ? [user] : url.pathname.endsWith('/apikeys') ? [{ key: '00000000-0000-4000-8000-000000000004', rbac_id: '00000000-0000-4000-8000-000000000005', expires_at: null }] : url.pathname.endsWith('/role_bindings') ? [{ principal_id: '00000000-0000-4000-8000-000000000005', scope_type: 'org', roles: { name: 'org_super_admin' } }] : []
     const single = new Headers(init?.headers).get('Accept')?.includes('object')
     return new Response(JSON.stringify(single ? rows[0] ?? {} : rows), { headers: { 'Content-Type': 'application/json' } })
@@ -230,11 +291,11 @@ const app = createApp(defineComponent({
 const pinia = createPinia()
 app.use(pinia)
 // Supply identity to the real channel form without starting dashboard store watchers.
-Object.defineProperty(useMainStore(pinia), 'user', { value: { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', onboarding: previewUserOnboarding } })
+Object.defineProperty(useMainStore(pinia), 'user', { value: { id: '00000000-0000-4000-8000-000000000001', email: 'preview@example.com', first_name: 'Preview', last_name: 'User', onboarding: previewUserOnboarding } })
 Object.defineProperty(useMainStore(pinia), 'auth', { value: { id: '00000000-0000-4000-8000-000000000001' } })
 useMainStore(pinia).awaitInitialLoad = async () => true
 const organization = useOrganizationStore(pinia)
-const previewOrganization = { gid: '00000000-0000-4000-8000-000000000002' }
+const previewOrganization = { gid: '00000000-0000-4000-8000-000000000002', name: 'Preview organization' }
 const selectedOrganization = ref(params.get('wrongOrg') === '1' ? { gid: '00000000-0000-4000-8000-000000000099' } : previewOrganization)
 preview.selectedOrgId.value = selectedOrganization.value.gid
 Object.defineProperty(organization, 'currentOrganization', { get: () => selectedOrganization.value })

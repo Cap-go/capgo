@@ -77,6 +77,7 @@ function mockBillingAccountLookup(billingAccount = 'ee') {
 
 afterEach(() => {
   delete mockedEnv.STRIPE_API_BASE_URL
+  delete mockedEnv.STRIPE_PUBLISHABLE_KEY
   mockedEnv.ENV = 'local'
   mockedEnv.STRIPE_SECRET_KEY = 'sk_test_123'
   mockedSupabaseAdmin.mockReset()
@@ -201,13 +202,15 @@ describe('stripe redirect URL allowlist', () => {
       'prod_test',
       '/app/success',
       '/app/cancel',
-      'org_123',
-      'legacy_visitor_123',
       {
-        visitorId: 'visitor_123',
-        sessionId: 'session_123',
+        clientReferenceId: 'org_123',
+        attributionId: 'legacy_visitor_123',
+        datafastAttribution: {
+          visitorId: 'visitor_123',
+          sessionId: 'session_123',
+        },
+        affonsoReferral: 'affonso_ref_123',
       },
-      'affonso_ref_123',
     )
 
     expect(result.url).toBe('https://pay.capgo.test/p/pay')
@@ -226,6 +229,63 @@ describe('stripe redirect URL allowlist', () => {
         affonso_referral: 'affonso_ref_123',
       },
     }))
+  })
+
+  it('creates an embedded checkout session when a publishable key is configured', async () => {
+    mockedEnv.STRIPE_PUBLISHABLE_KEY = 'pk_test_123'
+    const createSession = vi.fn().mockResolvedValue({ id: 'cs_test_123', url: null, client_secret: 'cs_test_123_secret' })
+    vi.mocked(Stripe).mockImplementation(function () {
+      return {
+        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList() }) },
+        checkout: { sessions: { create: createSession } },
+      }
+    } as any)
+
+    const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const result = await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', { embedded: true })
+
+    expect(result).toEqual({ url: null, clientSecret: 'cs_test_123_secret', publishableKey: 'pk_test_123', sessionId: 'cs_test_123' })
+    const params = createSession.mock.calls[0][0]
+    expect(params).toMatchObject({
+      ui_mode: 'embedded_page',
+      redirect_on_completion: 'if_required',
+      return_url: 'https://capgo.test/app/success?success=true&session_id={CHECKOUT_SESSION_ID}',
+    })
+    expect(params).not.toHaveProperty('success_url')
+    expect(params).not.toHaveProperty('cancel_url')
+  })
+
+  it('keeps hosted checkout when embedded is requested without a publishable key', async () => {
+    const createSession = vi.fn().mockResolvedValue({ id: 'cs_test_123', url: 'https://pay.capgo.test/p/pay' })
+    vi.mocked(Stripe).mockImplementation(function () {
+      return {
+        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList() }) },
+        checkout: { sessions: { create: createSession } },
+      }
+    } as any)
+
+    const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const result = await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', { embedded: true })
+
+    expect(result).toEqual({ url: 'https://pay.capgo.test/p/pay' })
+    expect(createSession.mock.calls[0][0]).not.toHaveProperty('ui_mode')
+  })
+
+  it('keeps the credit session placeholder on embedded one-time checkout', async () => {
+    mockedEnv.STRIPE_PUBLISHABLE_KEY = 'pk_test_123'
+    const createSession = vi.fn().mockResolvedValue({ id: 'cs_test_456', url: null, client_secret: 'cs_test_456_secret' })
+    vi.mocked(Stripe).mockImplementation(function () {
+      return {
+        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList('month', 'one_time') }) },
+        checkout: { sessions: { create: createSession } },
+      }
+    } as any)
+
+    const { createOneTimeCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const result = await createOneTimeCheckout(createContext(), 'cus_123', 'prod_credit', 50, '/settings/organization/credits?creditCheckout=success&session_id={CHECKOUT_SESSION_ID}', '/settings/organization/credits', 'org_123', undefined, undefined, true)
+
+    expect(result.clientSecret).toBe('cs_test_456_secret')
+    expect(createSession.mock.calls[0][0].return_url).toBe('https://capgo.test/settings/organization/credits?creditCheckout=success&session_id={CHECKOUT_SESSION_ID}&success=true')
   })
 
   it('rejects external success URLs for checkout', async () => {
@@ -293,75 +353,33 @@ describe('stripe redirect URL allowlist', () => {
     expect(createSession).not.toHaveBeenCalled()
   })
 
-  it('uses a custom Stripe API base URL when configured', async () => {
-    mockedEnv.STRIPE_API_BASE_URL = 'http://127.0.0.1:4510'
-
-    const stripeClient = {
-      checkout: {
-        sessions: {},
-      },
-    } as any
-
+  it.each([
+    ['a custom loopback base URL', 'http://127.0.0.1:4510', 'sk_test_123', '127.0.0.1', 4510],
+    ['host.docker.internal for the Playwright emulator', 'http://host.docker.internal:4520', 'sk_test_emulator', 'host.docker.internal', 4520],
+  ])('uses %s as the Stripe API base URL', async (_label, baseUrl, secretKey, host, port) => {
+    mockedEnv.STRIPE_API_BASE_URL = baseUrl
+    mockedEnv.STRIPE_SECRET_KEY = secretKey
     vi.mocked(Stripe).mockImplementation(function () {
-      return stripeClient
+      return { checkout: { sessions: {} } }
     } as any)
 
     const { getStripe } = await import('../supabase/functions/_backend/utils/stripe.ts')
     getStripe(createContext())
 
-    expect(Stripe).toHaveBeenCalledWith('sk_test_123', expect.objectContaining({
-      host: '127.0.0.1',
-      port: 4510,
-      protocol: 'http',
-    }))
+    expect(Stripe).toHaveBeenCalledWith(secretKey, expect.objectContaining({ host, port, protocol: 'http' }))
   })
 
-  it('allows host.docker.internal for Playwright Stripe emulator base URL', async () => {
-    mockedEnv.STRIPE_API_BASE_URL = 'http://host.docker.internal:4520'
-    mockedEnv.STRIPE_SECRET_KEY = 'sk_test_emulator'
-
-    const stripeClient = {
-      checkout: {
-        sessions: {},
-      },
-    } as any
-
-    vi.mocked(Stripe).mockImplementation(function () {
-      return stripeClient
-    } as any)
+  it.each([
+    ['live credentials', 'http://host.docker.internal:4520', 'sk_live_123', 'local', 'STRIPE_API_BASE_URL must use https when using live Stripe credentials'],
+    ['host.docker.internal outside local emulator config', 'http://host.docker.internal:4520', 'sk_test_123', 'production', 'STRIPE_API_BASE_URL host.docker.internal is only allowed for local emulator config'],
+    ['non-loopback hosts', 'http://stripe.example.com', 'sk_test_123', 'local', 'STRIPE_API_BASE_URL must use https for non-loopback hosts'],
+  ])('rejects an http Stripe API base URL for %s', async (_label, baseUrl, secretKey, envName, message) => {
+    mockedEnv.STRIPE_API_BASE_URL = baseUrl
+    mockedEnv.STRIPE_SECRET_KEY = secretKey
+    mockedEnv.ENV = envName
 
     const { getStripe } = await import('../supabase/functions/_backend/utils/stripe.ts')
-    getStripe(createContext())
-
-    expect(Stripe).toHaveBeenCalledWith('sk_test_emulator', expect.objectContaining({
-      host: 'host.docker.internal',
-      port: 4520,
-      protocol: 'http',
-    }))
-  })
-
-  it('rejects http Stripe API base URL when using live credentials', async () => {
-    mockedEnv.STRIPE_API_BASE_URL = 'http://host.docker.internal:4520'
-    mockedEnv.STRIPE_SECRET_KEY = 'sk_live_123'
-
-    const { getStripe } = await import('../supabase/functions/_backend/utils/stripe.ts')
-    expect(() => getStripe(createContext())).toThrow('STRIPE_API_BASE_URL must use https when using live Stripe credentials')
-  })
-
-  it('rejects host.docker.internal http base URL outside local emulator config', async () => {
-    mockedEnv.STRIPE_API_BASE_URL = 'http://host.docker.internal:4520'
-    mockedEnv.STRIPE_SECRET_KEY = 'sk_test_123'
-    mockedEnv.ENV = 'production'
-
-    const { getStripe } = await import('../supabase/functions/_backend/utils/stripe.ts')
-    expect(() => getStripe(createContext())).toThrow('STRIPE_API_BASE_URL host.docker.internal is only allowed for local emulator config')
-  })
-
-  it('rejects non-local http Stripe API base URLs', async () => {
-    mockedEnv.STRIPE_API_BASE_URL = 'http://stripe.example.com'
-
-    const { getStripe } = await import('../supabase/functions/_backend/utils/stripe.ts')
-    expect(() => getStripe(createContext())).toThrow('STRIPE_API_BASE_URL must use https for non-loopback hosts')
+    expect(() => getStripe(createContext())).toThrow(message)
   })
 
   it('falls back to checkout metadata for credit top-ups when line items are unavailable in emulator mode', async () => {

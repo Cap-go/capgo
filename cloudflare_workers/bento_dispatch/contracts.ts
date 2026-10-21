@@ -41,6 +41,8 @@ export interface Evaluation {
 export interface RunRecord extends QueryResultRow {
   id: string
   evaluation_key: string
+  scheduled_for: Date | string
+  status: string
   enqueue_claim_token: string | null
   execution_claim_token: string | null
   eligible_users: EligibleUser[] | null

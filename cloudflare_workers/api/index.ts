@@ -7,6 +7,7 @@ import { createMcpApp } from '../../supabase/functions/_backend/mcp/index.ts'
 import { app as accept_invitation } from '../../supabase/functions/_backend/private/accept_invitation.ts'
 import { app as billing_region } from '../../supabase/functions/_backend/private/billing_region.ts'
 import { app as bundle_install_stats } from '../../supabase/functions/_backend/private/bundle_install_stats.ts'
+import { app as cli } from '../../supabase/functions/_backend/private/cli/index.ts'
 import { app as channel_device } from '../../supabase/functions/_backend/private/channel_device.ts'
 import { app as channel_stats } from '../../supabase/functions/_backend/private/channel_stats.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
@@ -26,6 +27,7 @@ import { app as latency } from '../../supabase/functions/_backend/private/latenc
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
 import { app as mcp_oauth } from '../../supabase/functions/_backend/private/mcp_oauth.ts'
 import { app as native_observe_stats } from '../../supabase/functions/_backend/private/native_observe_stats.ts'
+import { app as notification_self_proof } from '../../supabase/functions/_backend/private/notification_self_proof.ts'
 import { app as observe } from '../../supabase/functions/_backend/private/observe.ts'
 import { app as onboarding_ab_tests } from '../../supabase/functions/_backend/private/onboarding_ab_tests.ts'
 import { app as onboarding_progress } from '../../supabase/functions/_backend/private/onboarding_progress.ts'
@@ -51,6 +53,7 @@ import { app as sso_sp_metadata } from '../../supabase/functions/_backend/privat
 import { app as sso_verify_dns } from '../../supabase/functions/_backend/private/sso/verify-dns.ts'
 import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
 import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
+import { app as stripe_billing } from '../../supabase/functions/_backend/private/stripe_billing.ts'
 import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
 import { app as stripe_past_due } from '../../supabase/functions/_backend/private/stripe_past_due.ts'
 import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
@@ -164,6 +167,7 @@ appPrivate.route('/plans', plans)
 appPrivate.route('/credits', credits)
 appPrivate.route('/store_top', storeTop)
 appPrivate.route('/website_stats', publicStats)
+appPrivate.route('/cli', cli)
 appPrivate.route('/billing_region', billing_region)
 appPrivate.route('/config', config)
 appPrivate.route('/config/builder', configBuilder)
@@ -184,12 +188,14 @@ appPrivate.route('/native_observe_stats', native_observe_stats)
 appPrivate.route('/observe', observe)
 appPrivate.route('/onboarding_ab_tests', onboarding_ab_tests)
 appPrivate.route('/onboarding_progress', onboarding_progress)
+appPrivate.route('/notification_self_proof', notification_self_proof)
 appPrivate.route('/org_notification_stats', org_notification_stats)
 appPrivate.route('/organization_invitation', organization_invitation)
 appPrivate.route('/update_delivery_stats', update_delivery_stats)
 appPrivate.route('/bundle_install_stats', bundle_install_stats)
 appPrivate.route('/release_live', release_live)
 appPrivate.route('/stripe_checkout', stripe_checkout)
+appPrivate.route('/stripe_billing', stripe_billing)
 appPrivate.route('/stripe_portal', stripe_portal)
 appPrivate.route('/stripe_past_due', stripe_past_due)
 appPrivate.route('/verify_email_otp', verify_email_otp)

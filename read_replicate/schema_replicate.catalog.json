@@ -2532,13 +2532,6 @@
       "valid": true
     },
     {
-      "constraintOwned": false,
-      "definition": "CREATE INDEX idx_manifest_file_name ON public.manifest USING btree (file_name)",
-      "name": "idx_manifest_file_name",
-      "table": "manifest",
-      "valid": true
-    },
-    {
       "constraintOwned": true,
       "definition": "CREATE UNIQUE INDEX manifest_pkey ON public.manifest USING btree (id)",
       "name": "manifest_pkey",

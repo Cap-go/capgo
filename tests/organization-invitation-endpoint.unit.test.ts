@@ -196,35 +196,21 @@ describe('magic-link invitation lookup endpoint', () => {
     )
   })
 
-  it('keeps external organization logo URLs unchanged', async () => {
-    const externalLogoUrl = 'https://cdn.example.com/organization-logo.png'
+  it.each([
+    ['external', 'https://cdn.example.com/organization-logo.png'],
+    ['Supabase storage', 'https://example.supabase.co/storage/v1/object/public/images/organization-logo.png'],
+  ])('keeps %s organization logo URLs unchanged', async (_label, logoUrl) => {
     supabaseAdminMock.mockReturnValue(buildAdminClient({
       invitationData: {
         ...INVITATION_DATA,
-        org_logo: externalLogoUrl,
+        org_logo: logoUrl,
       },
     }))
 
     const response = await postMagicLookup()
 
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ org_logo: externalLogoUrl })
-    expect(createSignedImageUrlMock).not.toHaveBeenCalled()
-  })
-
-  it('keeps Supabase storage URLs unchanged', async () => {
-    const storageLogoUrl = 'https://example.supabase.co/storage/v1/object/public/images/organization-logo.png'
-    supabaseAdminMock.mockReturnValue(buildAdminClient({
-      invitationData: {
-        ...INVITATION_DATA,
-        org_logo: storageLogoUrl,
-      },
-    }))
-
-    const response = await postMagicLookup()
-
-    expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({ org_logo: storageLogoUrl })
+    expect(await response.json()).toMatchObject({ org_logo: logoUrl })
     expect(createSignedImageUrlMock).not.toHaveBeenCalled()
   })
 

@@ -4,12 +4,13 @@ import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { formatAppTodoList, getAppTodoSteps, readAppTodoProgress, TODO_BACKGROUND_WAIT_MS, waitForTodoBackgroundChecks } from '../src/app/todo.ts'
+import { formatAppTodoList, getAppTodoSteps, readAppTodoProgress, waitForTodoBackgroundChecks } from '../src/app/todo.ts'
 import { getAppOnboardingStepIds, parseAppOnboarding } from '../../supabase/functions/_backend/utils/appOnboarding.ts'
 import messages from '../../messages/en.json'
 
 const appId = 'com.example.todo'
-const options = { apikey: 'test-todo-key', supaHost: 'http://localhost:54321', supaAnon: 'test-anon-key' }
+const options = { apikey: 'test-todo-key' }
+const apiHost = 'http://localhost:54321/functions/v1'
 const progress = {
   onboarding: {
     setup: {
@@ -27,7 +28,6 @@ const progress = {
   checkErrors: [],
 }
 
-assert.equal(TODO_BACKGROUND_WAIT_MS, 10_000)
 const countdown = []
 const timedOutAt = Date.now()
 assert.equal(await waitForTodoBackgroundChecks([new Promise(() => {})], seconds => countdown.push(seconds), 2_200), false)
@@ -118,20 +118,20 @@ for (const [id, action, completion] of [
 const originalFetch = globalThis.fetch
 try {
   globalThis.fetch = async (input, init) => {
-    assert.equal(String(input), options.supaHost + '/functions/v1/private/onboarding_progress')
+    assert.equal(String(input), apiHost + '/private/onboarding_progress')
     assert.equal(init.method, 'POST')
     assert.deepEqual(JSON.parse(init.body), { appId, N: 0, initial: true })
     assert.equal(init.headers.capgkey, options.apikey)
-    assert.equal(init.headers.Authorization, 'Bearer ' + options.supaAnon)
+    assert.equal(init.headers.Authorization, options.apikey, 'the API key is the only credential')
     return Response.json(progress)
   }
-  assert.deepEqual(await readAppTodoProgress(appId, options), progress)
+  assert.deepEqual(await readAppTodoProgress(appId, { apikey: options.apikey, apiHost }), progress)
   for (const [status, expected] of [[401, /app.read permission/], [403, /app.read permission/], [404, /App not found/], [500, /database_unavailable/]]) {
     globalThis.fetch = async () => Response.json({ error: 'database_unavailable' }, { status })
-    await assert.rejects(() => readAppTodoProgress(appId, options), expected)
+    await assert.rejects(() => readAppTodoProgress(appId, { apikey: options.apikey, apiHost }), expected)
   }
   globalThis.fetch = async () => Response.json({ status: 'ok' })
-  await assert.rejects(() => readAppTodoProgress(appId, options), /invalid progress response/)
+  await assert.rejects(() => readAppTodoProgress(appId, { apikey: options.apikey, apiHost }), /invalid progress response/)
 }
 finally {
   globalThis.fetch = originalFetch
@@ -158,8 +158,12 @@ try {
         if (event.event === 'CLI Command Invoked')
           writeFileSync(process.env.CAPGO_TODO_TRACKING_FILE, JSON.stringify({ key: init.headers.capgkey, command: event.tags.command_path }))
       }
-      if (url.includes('/private/config')) return Response.json({ supaHost: ${JSON.stringify(options.supaHost)}, supaKey: ${JSON.stringify(options.supaAnon)} })
-      if (url.includes('/rpc/reject_access_due_to_2fa_for_app')) return Response.json(scenario === 'two-factor')
+      if (url.includes('/private/config')) return Response.json({})
+      if (url.includes('/private/cli/preflight')) {
+        if (!url.startsWith(${JSON.stringify(apiHost)})) return Response.json({ error: 'wrong_host' }, { status: 500 })
+        if (scenario === 'two-factor') return Response.json({ error: '2fa_required', message: 'Two-factor authentication is required by this organization' }, { status: 403 })
+        return Response.json({ user_id: 'u1', org_id: 'org-1', app_id: ${JSON.stringify(appId)}, trial_days_left: null, warnings: [] })
+      }
       if (scenario?.startsWith('background-updated') && init?.method === 'PUT' && url.endsWith('/app/${appId}')) {
         await new Promise(resolve => setTimeout(resolve, 700))
         const steps = JSON.parse(init.body).onboarding.steps
@@ -201,7 +205,7 @@ try {
       const child = spawnSync('node', [
         '--import', preload, builtCli, 'app', alias,
         ...(scenario === 'inferred' ? [] : [appId]),
-        '-a', options.apikey, '--supa-host', options.supaHost, '--supa-anon', options.supaAnon,
+        '-a', options.apikey, '--api-host', apiHost,
       ], {
         cwd: fixture, encoding: 'utf8', timeout: 15000,
         env: { ...process.env, CAPGO_TODO_SCENARIO: scenario, CAPGO_DISABLE_TELEMETRY: '1', CAPGO_DISABLE_POSTHOG: '1', CI: '1' },
@@ -235,7 +239,7 @@ try {
     }
   }
   const trackingFile = join(fixture, 'tracking.json')
-  const tracked = spawnSync('node', ['--import', preload, builtCli, 'app', 'todo', appId, '-a', options.apikey, '--supa-host', options.supaHost, '--supa-anon', options.supaAnon], {
+  const tracked = spawnSync('node', ['--import', preload, builtCli, 'app', 'todo', appId, '-a', options.apikey, '--api-host', apiHost], {
     cwd: fixture, encoding: 'utf8', timeout: 15000,
     env: { ...process.env, CAPGO_TOKEN: 'stale-saved-key', CAPGO_TODO_TRACKING_FILE: trackingFile, CI: '1', CAPGO_DISABLE_TELEMETRY: '', CAPGO_DISABLE_POSTHOG: '' },
   })
@@ -254,7 +258,7 @@ try {
       rmSync(join(fixture, name), { force: true })
     const backgroundUpdate = spawnSync('node', [
       '--import', preload, builtCli, 'app', 'todo', appId,
-      '-a', options.apikey, '--supa-host', options.supaHost, '--supa-anon', options.supaAnon,
+      '-a', options.apikey, '--api-host', apiHost,
     ], {
       cwd: fixture, encoding: 'utf8', timeout: 15_000,
       env: { ...process.env, CAPGO_TODO_SCENARIO: scenario, CAPGO_DISABLE_TELEMETRY: '1', CAPGO_DISABLE_POSTHOG: '1', CI: '1' },

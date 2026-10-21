@@ -188,10 +188,12 @@ async function fetchLiveClientMetadataDocument(c: McpContext, clientId: string):
   try {
     const response = await fetch(clientId, {
       headers: { 'accept': 'application/json', 'user-agent': 'Capgo-MCP-OAuth/1.0 (+https://capgo.app/docs/ai/mcp/)' },
-      redirect: 'error',
+      // Cloudflare Workers reject redirect: 'error' (only 'follow' | 'manual'); a 3xx is treated as a failure below.
+      redirect: 'manual',
       signal: AbortSignal.timeout(5000),
     })
     if (!response.ok) {
+      await response.body?.cancel().catch(() => {})
       cloudlog({ requestId: c.get('requestId'), message: 'mcp_oauth_client_metadata_fetch_status', clientId, status: response.status })
       return null
     }
@@ -213,7 +215,7 @@ async function fetchLiveClientMetadataDocument(c: McpContext, clientId: string):
     }
   }
   catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'mcp_oauth_client_metadata_fetch_failed', clientId, error })
+    cloudlog({ requestId: c.get('requestId'), message: 'mcp_oauth_client_metadata_fetch_failed', clientId, error: error instanceof Error ? error.message : String(error) })
     return null
   }
 }

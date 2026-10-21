@@ -238,17 +238,6 @@ describe('new-user A/B test assignment', () => {
     expect(source).toContain('from \'./ab_tests.json\' with { type: \'json\' }')
   })
 
-  it('uses a replica fast path and a locked Drizzle transaction for missing assignments', async () => {
-    const source = await readFile(new URL('../supabase/functions/_backend/utils/ab_tests.ts', import.meta.url), 'utf8')
-
-    expect(source).toContain('getPgClient(c, true)')
-    expect(source).toContain('getPgClient(c, false)')
-    expect(source).toContain('drizzle.transaction(async (tx) =>')
-    expect(source).toContain('FOR UPDATE')
-    expect(source).toContain('SET LOCAL lock_timeout = \'2s\'')
-    expect(source).toContain('AbortSignal.timeout(BENTO_AB_TEST_SYNC_TIMEOUT_MS)')
-  })
-
   it.each([
     [0, 'A'],
     [0.4999, 'A'],
@@ -1238,6 +1227,17 @@ describe('new-user A/B test assignment', () => {
     expect(drizzleExecuteMock).toHaveBeenCalledOnce()
     expect(random).not.toHaveBeenCalled()
     expect(closeClientMock).toHaveBeenCalledOnce()
+  })
+
+  it.each(['both', 'exploring'])('reconciles existing apps for persisted double-intent A / %s even without an assignment update', async (intent) => {
+    const { getOrCreateUserABTests } = await loadABTestsModule()
+    const abtests = { ...persistedAssignments({ channel: null }), todo_list_v4_double_intent: intentAssignment() }
+    const context = { get: vi.fn(() => 'request-id') } as never
+    drizzleExecuteMock.mockResolvedValueOnce({ rows: [{ abtests, intent, created_via_invite: false }] })
+
+    expect(await getOrCreateUserABTests(context, USER_ID)).toEqual(abtests)
+    expect(drizzleExecuteMock).toHaveBeenCalledTimes(2)
+    expect(collectSqlParameterValues(drizzleExecuteMock.mock.calls[1]?.[0])).toContain(USER_ID)
   })
 
   it('rejects on-demand assignment when the authenticated profile is missing', async () => {

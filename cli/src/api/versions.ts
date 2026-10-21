@@ -1,16 +1,16 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '../types/supabase.types'
+import type { AppVersionInsert, AppVersionRow } from '../types/api'
+import type { CapgoClient } from '../utils'
 import { log } from '@clack/prompts'
 import { Table } from '@sauber/table'
 import { CliUserError } from '../shared/cli-user-error'
-import { formatError, formatCapgoCliInvokeError, getCapgoCliHttpStatus, getHumanDate, invokeCapgoCliApi, readCapgoCliApiErrorPayload } from '../utils'
+import { formatCapgoCliInvokeError, formatError, getCapgoCliHttpStatus, getHumanDate, invokeCapgoCliApi, readCapgoCliApiErrorPayload } from '../utils'
 import { checkVersionNotUsedInChannel } from './channels'
+import { setBundlesDeleted } from './cli-data'
 
 interface VersionOptions {
   silent?: boolean
   apikey?: string
-  supaHost?: string
-  supaAnon?: string
+  apiHost?: string
   /** Injectable for unit tests; defaults to invokeCapgoCliApi. */
   invoke?: typeof invokeCapgoCliApi
 }
@@ -22,15 +22,45 @@ interface DeleteSpecificVersionOptions extends VersionOptions {
 interface CapgoHttpOptions {
   apikey: string
   silent?: boolean
-  supaHost?: string
-  supaAnon?: string
+  apiHost?: string
 }
 
 const BUNDLE_PAGE_SIZE = 50
 
-async function isEmptyBundleListError(error: unknown) {
-  const payload = await readCapgoCliApiErrorPayload(error)
-  return payload?.error === 'cannot_get_bundle' && payload?.message === 'Cannot get bundle'
+export type BundleVersionLookupRow = Pick<
+  AppVersionRow,
+  'id' | 'name' | 'checksum' | 'deleted' | 'created_at'
+>
+
+export async function fetchBundleVersionRow(
+  apikey: string,
+  appId: string,
+  version: string,
+  options: VersionOptions & { includeDeleted?: boolean } = {},
+): Promise<BundleVersionLookupRow | null> {
+  const params = new URLSearchParams({
+    app_id: appId,
+    version,
+  })
+  if (options.includeDeleted)
+    params.set('include_deleted', '1')
+
+  const { data, error } = await invokeCapgoCliApi<BundleVersionLookupRow[]>(
+    `bundle?${params.toString()}`,
+    {
+      apikey,
+      method: 'GET',
+      body: undefined,
+      apiHost: options.apiHost,
+    },
+  )
+
+  // Any error must stop callers (upload duplicate guard / auto-bump) from reusing an existing name.
+  if (error)
+    throw new Error(`Cannot check bundle ${appId}@${version}: ${await formatCapgoCliInvokeError(error)}`, { cause: error })
+  if (!Array.isArray(data))
+    throw new Error(`Cannot check bundle ${appId}@${version}: unexpected response`)
+  return data[0] ?? null
 }
 
 async function isBundleAccessDeniedError(error: unknown) {
@@ -50,18 +80,27 @@ async function throwBundleHttpInvokeError(
   silent: boolean,
   requiredPermissionKey: string,
 ): Promise<never> {
+  const details = await formatCapgoCliInvokeError(error)
+
   if (await isBundleAccessDeniedError(error)) {
-    const message = action === 'channels'
-      ? 'Cannot list channels. Check that your API key is valid and has app.read_channels permission for this app.'
+    const status = getCapgoCliHttpStatus(error)
+    const authHint = status === 401
+      ? 'Provide a valid API key (capgo login or CAPGO_API_KEY).'
+      : 'Your API key is valid but lacks the required permission for this app.'
+    const baseMessage = action === 'channels'
+      ? `Cannot list channels. ${authHint} Required permission: app.read_channels.`
       : action === 'delete'
-        ? `Cannot delete bundles for app ${appid}. Check that your API key is valid and has the required bundle permissions for this app.`
-        : `Cannot list bundles for app ${appid}. Check that your API key is valid and has app.read_bundles permission for this app.`
+        ? `Cannot delete bundles for app ${appid}. ${authHint} Required permission: app bundle delete permissions.`
+        : `Cannot list bundles for app ${appid}. ${authHint} Required permission: app.read_bundles.`
+    const message = `${baseMessage} (${details})`
     if (!silent)
       log.error(message)
-    throw new CliUserError(message, { appId: appid, requiredPermissionKey })
+    throw new CliUserError(
+      message,
+      { appId: appid, requiredPermissionKey, httpStatus: status },
+      error,
+    )
   }
-
-  const details = await formatCapgoCliInvokeError(error)
   const payload = await readCapgoCliApiErrorPayload(error)
   const status = getCapgoCliHttpStatus(error)
   if (status === 404 || payload?.error === 'app_not_found') {
@@ -84,25 +123,21 @@ async function throwBundleHttpInvokeError(
 
 async function fetchBundlePages(appid: string, options: CapgoHttpOptions & Pick<VersionOptions, 'invoke'>) {
   const invoke = options.invoke ?? invokeCapgoCliApi
-  const all: Database['public']['Tables']['app_versions']['Row'][] = []
+  const all: AppVersionRow[] = []
   let page = 0
   while (true) {
     const params = new URLSearchParams({ app_id: appid, page: String(page) })
-    const { data, error } = await invoke<Database['public']['Tables']['app_versions']['Row'][]>(
+    const { data, error } = await invoke<AppVersionRow[]>(
       `bundle?${params.toString()}`,
       {
         apikey: options.apikey,
         method: 'GET',
         body: undefined,
-        supaHost: options.supaHost,
-        supaAnon: options.supaAnon,
+        apiHost: options.apiHost,
       },
     )
-    if (error) {
-      if (await isEmptyBundleListError(error))
-        return all
+    if (error)
       await throwBundleHttpInvokeError(appid, error, 'list', !!options.silent, 'app.read_bundles')
-    }
     const batch = Array.isArray(data) ? data : []
     if (!batch.length)
       break
@@ -114,29 +149,70 @@ async function fetchBundlePages(appid: string, options: CapgoHttpOptions & Pick<
   return all
 }
 
+export type UpsertAppVersionInput = Pick<AppVersionInsert, 'app_id' | 'name'>
+  & Partial<Omit<AppVersionInsert, 'app_id' | 'name'>>
+
+export async function upsertAppVersion(
+  apikey: string,
+  versionData: UpsertAppVersionInput,
+  options: VersionOptions = {},
+) {
+  const { data, error } = await invokeCapgoCliApi<AppVersionRow>('bundle/upsert', {
+    apikey,
+    method: 'POST',
+    body: {
+      app_id: versionData.app_id,
+      name: versionData.name,
+      ...(versionData.session_key !== undefined ? { session_key: versionData.session_key } : {}),
+      ...(versionData.external_url !== undefined ? { external_url: versionData.external_url } : {}),
+      ...(versionData.storage_provider !== undefined ? { storage_provider: versionData.storage_provider } : {}),
+      ...(versionData.min_update_version !== undefined ? { min_update_version: versionData.min_update_version } : {}),
+      ...(versionData.native_packages !== undefined ? { native_packages: versionData.native_packages } : {}),
+      ...(versionData.checksum !== undefined ? { checksum: versionData.checksum } : {}),
+      ...(versionData.link !== undefined ? { link: versionData.link } : {}),
+      ...(versionData.comment !== undefined ? { comment: versionData.comment } : {}),
+      ...(versionData.key_id !== undefined ? { key_id: versionData.key_id } : {}),
+      ...(versionData.cli_version !== undefined ? { cli_version: versionData.cli_version } : {}),
+      ...(versionData.manifest !== undefined ? { manifest: versionData.manifest } : {}),
+      ...(versionData.r2_path !== undefined ? { r2_path: versionData.r2_path } : {}),
+    },
+    apiHost: options.apiHost,
+  })
+
+  if (error)
+    throw error
+  if (typeof data?.id !== 'number')
+    throw new Error('bundle/upsert did not return a version id')
+  return data.id
+}
+
 export async function deleteAppVersion(
-  supabase: SupabaseClient<Database> | null,
+  client: CapgoClient | null,
   appid: string,
   bundle: string,
   options: VersionOptions = {},
 ) {
-  const { silent = false, apikey, supaHost, supaAnon } = options
+  const { silent = false, apikey, apiHost } = options
 
-  // Soft-delete via PostgREST when a client is provided. HTTP DELETE /bundle
+  // Soft-delete through the CLI data endpoint when a client is provided. HTTP DELETE /bundle
   // rejects bundles still linked to a channel; admin channel cleanup needs this path.
-  if (supabase) {
-    const { error: delAppSpecVersionError } = await supabase
-      .from('app_versions')
-      .update({ deleted: true })
-      .eq('app_id', appid)
-      .eq('deleted', false)
-      .eq('name', bundle)
-
-    if (delAppSpecVersionError) {
+  if (client) {
+    let updated: string[]
+    try {
+      updated = await setBundlesDeleted(client, appid, [bundle], true)
+    }
+    catch (error) {
       const message = `App version ${appid}@${bundle} not found in database`
       if (!silent)
         log.error(message)
-      throw new Error(`${message}: ${formatError(delAppSpecVersionError)}`)
+      throw new Error(`${message}: ${formatError(error)}`)
+    }
+    // Zero rows updated: already deleted, renamed or not visible to this key.
+    if (!updated.includes(bundle)) {
+      const message = `App version ${appid}@${bundle} not found in database`
+      if (!silent)
+        log.error(message)
+      throw new Error(message)
     }
     return
   }
@@ -148,8 +224,7 @@ export async function deleteAppVersion(
     apikey,
     method: 'DELETE',
     body: { app_id: appid, version: bundle },
-    supaHost,
-    supaAnon,
+    apiHost,
   })
   if (error) {
     await throwBundleHttpInvokeError(appid, error, 'delete', silent, 'bundle.delete')
@@ -157,21 +232,21 @@ export async function deleteAppVersion(
 }
 
 export async function deleteSpecificVersion(
-  supabase: SupabaseClient<Database>,
+  client: CapgoClient,
   appid: string,
   bundle: string,
   options: DeleteSpecificVersionOptions = {},
 ) {
-  const { silent = false, autoUnlink = false, apikey, supaHost, supaAnon } = options
+  const { silent = false, autoUnlink = false, apikey, apiHost } = options
   if (!apikey)
     throw new Error('Missing API key for bundle delete')
-  const versionData = await getVersionData(apikey, appid, bundle, { silent, apikey, supaHost, supaAnon })
-  await checkVersionNotUsedInChannel(supabase, appid, versionData, { silent, autoUnlink, apikey, supaHost, supaAnon })
-  await deleteAppVersion(null, appid, bundle, { silent, apikey, supaHost, supaAnon })
+  const versionData = await getVersionData(apikey, appid, bundle, { silent, apikey, apiHost })
+  await checkVersionNotUsedInChannel(client, appid, versionData, { silent, autoUnlink, apikey, apiHost })
+  await deleteAppVersion(null, appid, bundle, { silent, apikey, apiHost })
 }
 
 export function displayBundles(
-  data: (Database['public']['Tables']['app_versions']['Row'] & { keep?: string })[],
+  data: (AppVersionRow & { keep?: string })[],
   silent = false,
 ) {
   if (silent)
@@ -200,7 +275,7 @@ export function displayBundles(
 }
 
 export async function getActiveAppVersions(
-  apikeyOrClient: string | SupabaseClient<Database>,
+  apikeyOrClient: string | CapgoClient,
   appid: string,
   options: VersionOptions = {},
 ) {
@@ -213,8 +288,7 @@ export async function getActiveAppVersions(
   return await fetchBundlePages(appid, {
     apikey,
     silent,
-    supaHost: options.supaHost,
-    supaAnon: options.supaAnon,
+    apiHost: options.apiHost,
     invoke: options.invoke,
   })
 }
@@ -233,8 +307,7 @@ export async function getChannelsVersion(
         apikey: options.apikey,
         method: 'GET',
         body: undefined,
-        supaHost: options.supaHost,
-        supaAnon: options.supaAnon,
+        apiHost: options.apiHost,
       },
     )
     if (channelsError)
@@ -251,7 +324,7 @@ export async function getChannelsVersion(
 }
 
 export async function getVersionData(
-  apikeyOrClient: string | SupabaseClient<Database>,
+  apikeyOrClient: string | CapgoClient,
   appid: string,
   bundle: string,
   options: VersionOptions = {},

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { consumeInventoryBatch } from '../cloudflare_workers/r2_inventory/index.ts'
 import { INVENTORY_CONFIG, inventoryTransaction, parseInventoryEvent, timestampUs } from '../supabase/functions/_backend/utils/r2_inventory.ts'
 
+const wrangler = JSON.parse(readFileSync(new URL('../cloudflare_workers/r2_inventory/wrangler.jsonc', import.meta.url), 'utf8'))
 const mocks = vi.hoisted(() => ({ clients: vi.fn(), apply: vi.fn(), end: vi.fn(), head: vi.fn(), publish: vi.fn(), eventDlq: vi.fn(), repairDlq: vi.fn(), snapshot: vi.fn(), observe: vi.fn() }))
 vi.mock('pg', async importOriginal => ({
   ...await importOriginal<object>(),
@@ -100,9 +101,10 @@ describe('r2 inventory queue', () => {
     }
   })
 
-  it('configures only production inventory with its existing PlanetScale Hyperdrive and bucket', () => {
-    const wrangler = JSON.parse(readFileSync(new URL('../cloudflare_workers/r2_inventory/wrangler.jsonc', import.meta.url), 'utf8'))
+  it('configures only production inventory with its existing PlanetScale Hyperdrive, bucket and minute cleanup cron', () => {
     expect(Object.keys(wrangler.env)).toEqual(['prod'])
+    expect(wrangler.triggers).toBeUndefined()
+    expect(wrangler.env.prod.triggers.crons).toEqual(['* * * * *'])
     expect(wrangler.queues).toBeUndefined()
     expect(wrangler.hyperdrive).toBeUndefined()
     expect(wrangler.env.prod.name).toBe('capgo-r2-inventory-prod')
@@ -114,8 +116,7 @@ describe('r2 inventory queue', () => {
     ])
   })
 
-  it('preserves production queue bindings, batching, concurrency and the five-delivery budget', () => {
-    const wrangler = JSON.parse(readFileSync(new URL('../cloudflare_workers/r2_inventory/wrangler.jsonc', import.meta.url), 'utf8'))
+  it('scales notifications to forty consumers while preserving repair and cleanup limits and delivery budgets', () => {
     expect(wrangler.env.prod.queues.producers).toEqual([
       { binding: 'CLEANUP_QUEUE', queue: 'capgo-r2-inventory-prod-cleanup' },
       { binding: 'REPAIR_QUEUE', queue: 'capgo-r2-inventory-prod-repair' },
@@ -124,7 +125,7 @@ describe('r2 inventory queue', () => {
       { binding: 'CLEANUP_DLQ', queue: 'capgo-r2-inventory-prod-cleanup-dlq' },
     ])
     expect(wrangler.env.prod.queues.consumers).toEqual([
-      { queue: 'capgo-r2-inventory-prod', max_batch_size: 100, max_batch_timeout: 10, max_concurrency: 1, max_retries: 4, dead_letter_queue: 'capgo-r2-inventory-prod-dlq' },
+      { queue: 'capgo-r2-inventory-prod', max_batch_size: 100, max_batch_timeout: 10, max_concurrency: 40, max_retries: 4, dead_letter_queue: 'capgo-r2-inventory-prod-dlq' },
       { queue: 'capgo-r2-inventory-prod-repair', max_batch_size: 10, max_batch_timeout: 10, max_concurrency: 1, max_retries: 4, dead_letter_queue: 'capgo-r2-inventory-prod-repair-dlq' },
       { queue: 'capgo-r2-inventory-prod-cleanup', max_batch_size: 100, max_batch_timeout: 10, max_concurrency: 40, max_retries: 2, retry_delay: 30, dead_letter_queue: 'capgo-r2-inventory-prod-cleanup-dlq' },
     ])

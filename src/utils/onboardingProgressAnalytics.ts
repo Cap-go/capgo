@@ -1,19 +1,23 @@
 import type { OnboardingChannelEvent, OnboardingChannelEventProperties, OnboardingChannelStage } from '~/utils/onboardingChannelAnalytics'
 import { sendOnboardingEvent } from '~/services/onboardingTracking'
 
+export const PROFILE_ONBOARDING_ANALYTICS_VERSION = 6
 export const ONBOARDING_ANALYTICS_VERSION = 4
 export const NEW_CHANNEL_ANALYTICS_VERSION = '5.E'
 export type OnboardingAnalyticsVersion
-  = | typeof ONBOARDING_ANALYTICS_VERSION
+  = | typeof PROFILE_ONBOARDING_ANALYTICS_VERSION
+    | typeof ONBOARDING_ANALYTICS_VERSION
     | typeof NEW_CHANNEL_ANALYTICS_VERSION
 
 export type OnboardingAnalyticsFlow = 'pre_org' | 'existing_org'
-export type OnboardingAnalyticsStep = 'welcome' | 'intent' | 'details' | 'app_name' | 'app_id' | 'app_icon' | 'organization' | 'choice' | 'channel' | 'install' | 'setup'
+export type OnboardingAnalyticsStep = 'name' | 'welcome' | 'intent' | 'details' | 'app_name' | 'app_id' | 'app_icon' | 'organization' | 'choice' | 'channel' | 'install' | 'setup'
 export type OnboardingCopyEvent = 'onboarding_ai_instructions_copied' | 'onboarding_cli_command_copied'
 export type OnboardingDevelopmentEnvironment = 'hosted_builder' | 'ai_assistant' | 'hand_coded' | 'other' | 'local_project' | 'exploring' | 'skipped'
 export type OnboardingIntent = 'ota' | 'builder' | 'both' | 'exploring' | 'publish'
 export type OnboardingInteractionEvent
   = | OnboardingChannelEvent
+    | 'onboarding_profile_saved'
+    | 'onboarding_profile_save_failed'
     | 'onboarding_organization_import_opened'
     | 'onboarding_organization_import_submitted'
     | 'onboarding_organization_import_succeeded'
@@ -25,7 +29,9 @@ export type OnboardingInteractionEvent
     | 'onboarding_technical_invite_opened'
     | 'onboarding_technical_invite_succeeded'
 export type OnboardingDetailsEvent
-  = | 'onboarding_app_creation_failed'
+  = | 'onboarding_first_name_entered'
+    | 'onboarding_last_name_entered'
+    | 'onboarding_app_creation_failed'
     | 'onboarding_app_creation_started'
     | 'onboarding_app_creation_succeeded'
     | 'onboarding_app_icon_import_selected'
@@ -39,6 +45,8 @@ export type OnboardingDetailsEvent
     | 'onboarding_app_icon_picker_opened'
     | 'onboarding_app_icon_upload_failed'
     | 'onboarding_app_icon_uploaded'
+    | 'onboarding_app_id_advanced_hidden'
+    | 'onboarding_app_id_advanced_shown'
     | 'onboarding_app_name_entered'
     | 'onboarding_store_import_failed'
     | 'onboarding_store_import_hidden'
@@ -70,8 +78,9 @@ interface OnboardingResumeCandidate {
 
 interface CreateOnboardingTelemetryIdentityOptions {
   capture?: CaptureEvent
-  // Continue an attempt handed off by another page instead of starting one.
-  continueFrom?: { attemptId: string, runId: string } | null
+  // A handoff retains the run; a resumed visit omits runId to start a new run
+  // within the same saved attempt.
+  continueFrom?: { attemptId: string, runId?: string } | null
   flow: OnboardingAnalyticsFlow
   idFactory?: () => string
   onboardingVersion?: () => OnboardingAnalyticsVersion
@@ -122,9 +131,11 @@ export interface OnboardingCopyEventProperties {
   intent?: OnboardingIntent
   org_id?: string
   setup_command: 'builder' | 'ota'
+  /** Where the AI prompt was copied: the first-task buttons or the card shown on later tasks. */
+  placement?: 'start' | 'checklist'
 }
 
-export type OnboardingDetailsField = 'app_id' | 'app_name' | 'icon_store_url' | 'store_url'
+export type OnboardingDetailsField = 'first_name' | 'last_name' | 'app_id' | 'app_name' | 'icon_store_url' | 'store_url'
 
 export function createOnboardingDetailsFieldDebouncer(
   emit: (
@@ -417,6 +428,8 @@ export function createOnboardingProgressTracker(options: CreateOnboardingProgres
       eventProperties.intent = details.intent
     if (details.org_id)
       eventProperties.org_id = details.org_id
+    if (details.placement)
+      eventProperties.placement = details.placement
 
     safelyCapture(name, eventProperties)
     return eventProperties

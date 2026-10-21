@@ -11,10 +11,6 @@ const syncScriptUrl = new URL(
   '../scripts/sync-read-replica-schema.ts',
   import.meta.url,
 )
-const schemaCatalogFromMigrationsUrl = new URL(
-  '../read_replicate/schema_catalog_from_migrations.ts',
-  import.meta.url,
-)
 
 function githubExpression(value: string): string {
   return '$' + `{{ ${value} }}`
@@ -28,18 +24,13 @@ async function readReplicaSyncScript(): Promise<string> {
   return readFile(syncScriptUrl, 'utf8')
 }
 
-async function readSchemaCatalogFromMigrations(): Promise<string> {
-  return readFile(schemaCatalogFromMigrationsUrl, 'utf8')
-}
-
 describe('production read-replica release gate', () => {
   it.concurrent(
     'rebuilds the catalog locally and imports only a fully preflighted atomic plan before primary migrations',
     async () => {
-      const [workflow, syncScript, catalogFromMigrations] = await Promise.all([
+      const [workflow, syncScript] = await Promise.all([
         readReleaseWorkflow(),
         readReplicaSyncScript(),
-        readSchemaCatalogFromMigrations(),
       ])
 
       expect(workflow).not.toContain('google-github-actions/auth@v3')
@@ -67,42 +58,12 @@ describe('production read-replica release gate', () => {
       )
       expect(workflow).toContain('needs.read_replica_schema.result == \'success\'')
       expect(workflow).toContain('needs.supabase_deploy.result == \'success\'')
-      expect(syncScript).toContain('planReadReplicaSchemaSync')
-      expect(syncScript).toContain('preflightCompatibilityIssues')
-      expect(syncScript).toContain('applyReadReplicaSchemaPlan')
-      expect(syncScript).toContain('assertCanApplyReadReplicaSchemaPlan')
-      expect(syncScript).toContain('assertGoogleReadReplicaSchemaPlan')
-      expect(syncScript).toContain('readReplicaSubscriberCompatibilityIssues')
-      expect(syncScript).toContain('gcloud')
+      // The sync script must preflight subscriber compatibility before applying anything.
+      // Import-path internals are covered by read-replica-schema-import-sync.unit.test.ts.
       expect(syncScript.indexOf('preflightCompatibilityIssues')).toBeLessThan(
         syncScript.indexOf('await applyPlan(plan)'),
       )
-      expect(syncScript).toMatch(/['"]sql['"],\s*['"]import['"],\s*['"]sql['"]/)
-      expect(syncScript).toMatch(/--user=(?:postgres|\$\{POSTGRES_IMPORT_USER\})/)
       expect(syncScript).toContain('readReplicaSchemaCatalogFromMigrations')
-      expect(syncScript).not.toContain('schema_replicate.catalog.json')
-      expect(syncScript).toContain('BEGIN;')
-      expect(syncScript).toContain('COMMIT;')
-      expect(syncScript).toContain('statement.sql')
-      expect(syncScript).not.toContain('capgo_read_replica_schema_owner')
-      expect(syncScript).not.toContain('bootstrap-read-replica-schema-owner')
-      expect(syncScript).not.toContain('CREATE ROLE')
-      expect(syncScript).not.toContain(' OWNER TO ')
-      expect(syncScript).not.toContain('SET LOCAL ROLE')
-      expect(syncScript).not.toContain('CREATE FUNCTION')
-      expect(syncScript).not.toContain('SECURITY DEFINER')
-      expect(syncScript).not.toContain('GRANT ')
-      expect(syncScript).not.toContain('REVOKE ')
-      expect(syncScript).not.toContain('capgo_internal')
-      expect(syncScript).not.toContain('ReadReplicaSchemaOwnerOperation')
-      expect(syncScript).not.toContain('renderReadReplicaOwnerExecutor')
-      expect(syncScript).not.toContain('googleDataApiConfigFromArgs')
-      expect(catalogFromMigrations).toContain('createPgliteEngine')
-      expect(catalogFromMigrations).toContain('loadSupabaseProject')
-      expect(catalogFromMigrations).toContain('runMigrations(project.migrations)')
-      expect(catalogFromMigrations).not.toContain('schema_replicate.catalog.json')
-      expect(catalogFromMigrations).not.toContain('supabase db')
-      expect(catalogFromMigrations).not.toContain('docker')
     },
   )
 

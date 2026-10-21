@@ -1,6 +1,7 @@
 import { app as accept_invitation } from '../_backend/private/accept_invitation.ts'
 import { app as billing_region } from '../_backend/private/billing_region.ts'
 import { app as bundle_install_stats } from '../_backend/private/bundle_install_stats.ts'
+import { app as cli } from '../_backend/private/cli/index.ts'
 import { app as channel_device } from '../_backend/private/channel_device.ts'
 import { app as channel_stats } from '../_backend/private/channel_stats.ts'
 import { app as config } from '../_backend/private/config.ts'
@@ -21,6 +22,7 @@ import { app as latency } from '../_backend/private/latency.ts'
 import { app as log_as } from '../_backend/private/log_as.ts'
 import { app as mcp_oauth } from '../_backend/private/mcp_oauth.ts'
 import { app as native_observe_stats } from '../_backend/private/native_observe_stats.ts'
+import { app as notification_self_proof } from '../_backend/private/notification_self_proof.ts'
 import { app as observe } from '../_backend/private/observe.ts'
 import { app as onboarding_ab_tests } from '../_backend/private/onboarding_ab_tests.ts'
 import { app as onboarding_progress } from '../_backend/private/onboarding_progress.ts'
@@ -47,6 +49,7 @@ import { app as sso_sp_metadata } from '../_backend/private/sso/sp-metadata.ts'
 import { app as sso_verify_dns } from '../_backend/private/sso/verify-dns.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
 import { app as storeTop } from '../_backend/private/store_top.ts'
+import { app as stripe_billing } from '../_backend/private/stripe_billing.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
 import { app as stripe_past_due } from '../_backend/private/stripe_past_due.ts'
 import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
@@ -67,6 +70,7 @@ appGlobal.route('/custom_domains', customDomains)
 appGlobal.route('/credits', credits)
 appGlobal.route('/store_top', storeTop)
 appGlobal.route('/website_stats', publicStats)
+appGlobal.route('/cli', cli)
 appGlobal.route('/billing_region', billing_region)
 appGlobal.route('/config', config)
 appGlobal.route('/config/builder', configBuilder)
@@ -80,6 +84,7 @@ appGlobal.route('/native_observe_stats', native_observe_stats)
 appGlobal.route('/observe', observe)
 appGlobal.route('/onboarding_ab_tests', onboarding_ab_tests)
 appGlobal.route('/onboarding_progress', onboarding_progress)
+appGlobal.route('/notification_self_proof', notification_self_proof)
 appGlobal.route('/org_notification_stats', org_notification_stats)
 appGlobal.route('/organization_invitation', organization_invitation)
 appGlobal.route('/download_link', download_link)
@@ -87,6 +92,7 @@ appGlobal.route('/log_as', log_as)
 appGlobal.route('/mcp_oauth', mcp_oauth)
 appGlobal.route('/stats', stats_priv)
 appGlobal.route('/stripe_checkout', stripe_checkout)
+appGlobal.route('/stripe_billing', stripe_billing)
 appGlobal.route('/stripe_portal', stripe_portal)
 appGlobal.route('/stripe_past_due', stripe_past_due)
 appGlobal.route('/upload_link', upload_link)

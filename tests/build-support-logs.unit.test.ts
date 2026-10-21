@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { checkPermissionMock, mockSupabaseAdmin } = vi.hoisted(() => ({
+const { checkPermissionMock, mockSupabaseAdmin, drizzleExecuteMock } = vi.hoisted(() => ({
   checkPermissionMock: vi.fn(),
   mockSupabaseAdmin: vi.fn(),
+  drizzleExecuteMock: vi.fn(),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
@@ -13,7 +14,17 @@ vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseAdmin: mockSupabaseAdmin,
 }))
 
-const { uploadSupportLogs } = await import('../supabase/functions/_backend/public/build/support_logs.ts')
+vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+  getPgClient: vi.fn(() => ({ id: 'pg-client' })),
+  getDrizzleClient: vi.fn(() => ({ execute: drizzleExecuteMock })),
+  closeClient: vi.fn(),
+}))
+
+vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
+  cloudlogErr: vi.fn(),
+}))
+
+const { hasSupportLogUploadPermission, uploadSupportLogs } = await import('../supabase/functions/_backend/public/build/support_logs.ts')
 
 const apikey = { user_id: 'user-1' } as any
 
@@ -60,6 +71,7 @@ beforeEach(() => {
   checkPermissionMock.mockReset()
   checkPermissionMock.mockResolvedValue(true)
   mockSupabaseAdmin.mockReset()
+  drizzleExecuteMock.mockReset()
   vi.stubEnv('BUILDER_URL', 'https://builder.test')
   vi.stubEnv('BUILDER_API_KEY', 'builder-key')
 })
@@ -143,5 +155,47 @@ describe('uploadSupportLogs metadata forwarding', () => {
     const body = JSON.parse(init.body as string)
     expect(body.email).toBe('dev@capgo.app')
     expect(body.platform).toBeUndefined()
+  })
+})
+
+describe('support logs RBAC upload gate', () => {
+  const rbacApikey = {
+    rbac_id: '00000000-0000-0000-0000-000000000123',
+  }
+
+  it('allows registered app uploads only with app.build_native', async () => {
+    await expect(hasSupportLogUploadPermission(createContext(), rbacApikey as any, 'com.test.app')).resolves.toBe(true)
+
+    expect(checkPermissionMock).toHaveBeenCalledWith(expect.anything(), 'app.build_native', { appId: 'com.test.app' })
+    expect(drizzleExecuteMock).not.toHaveBeenCalled()
+  })
+
+  it('denies read-only keys for registered apps', async () => {
+    checkPermissionMock.mockResolvedValueOnce(false)
+    drizzleExecuteMock.mockResolvedValueOnce({ rows: [{ exists: true }] })
+
+    await expect(hasSupportLogUploadPermission(createContext(), rbacApikey as any, 'com.test.app')).resolves.toBe(false)
+
+    expect(drizzleExecuteMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses current org write capability only when the app is not registered yet', async () => {
+    checkPermissionMock.mockResolvedValueOnce(false)
+    drizzleExecuteMock
+      .mockResolvedValueOnce({ rows: [{ exists: false }] })
+      .mockResolvedValueOnce({ rows: [{ allowed: true }] })
+
+    await expect(hasSupportLogUploadPermission(createContext(), rbacApikey as any, 'com.new.app')).resolves.toBe(true)
+
+    expect(drizzleExecuteMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('denies app-less uploads without a current write-capable org binding', async () => {
+    drizzleExecuteMock.mockResolvedValueOnce({ rows: [{ allowed: false }] })
+
+    await expect(hasSupportLogUploadPermission(createContext(), rbacApikey as any)).resolves.toBe(false)
+
+    expect(checkPermissionMock).not.toHaveBeenCalled()
+    expect(drizzleExecuteMock).toHaveBeenCalledTimes(1)
   })
 })

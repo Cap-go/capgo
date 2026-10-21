@@ -107,13 +107,13 @@ export interface OnboardingShellProps {
   guidedHelperUsable: boolean
   apikey?: string
   loginServices: BuilderLoginServices
-  supaHost?: string
-  /** Custom Supabase anon key for self-hosting (--supa-anon). */
-  supaAnon?: string
+  /** Capgo API override (--api-host); Capgo cloud when omitted. */
+  apiHost?: string
   /** Correlation id for this onboarding run; threaded into every analytics event the apps emit. */
   journeyId: string
   /** Pre-resolved platform (--platform flag or the single existing native dir); skips the picker. */
   initialPlatform?: Platform
+  resolveChecklistPlatform?: (apikey: string, appId: string) => Promise<string | undefined>
   /**
    * Set when a newer @capgo/cli is published. Drives the self-update prompt
    * shown as the FIRST wizard screen (before platform selection / auto-load).
@@ -146,11 +146,12 @@ const AnalyticsNotice: FC = () => (
   </Box>
 )
 
-const OnboardingShell: FC<OnboardingShellProps> = ({ appId, suggestedSource, appSelectionServices, iosBundleIdInitial, appflowPackageName, iosDir, androidDir, guidedHelperUsable, apikey, loginServices, supaHost, supaAnon, journeyId, initialPlatform, updateInfo, analyticsNotice, onResolvePlatform, onStep, onResult, onBeforeExit, onAuthenticated, onAppSelected, onAppSelectionEvent }) => {
+const OnboardingShell: FC<OnboardingShellProps> = ({ appId, suggestedSource, appSelectionServices, iosBundleIdInitial, appflowPackageName, iosDir, androidDir, guidedHelperUsable, apikey, loginServices, apiHost, journeyId, initialPlatform, resolveChecklistPlatform, updateInfo, analyticsNotice, onResolvePlatform, onStep, onResult, onBeforeExit, onAuthenticated, onAppSelected, onAppSelectionEvent }) => {
   const { exit } = useApp()
   const { cols, rows } = useTerminalSize()
   const [ready, setReady] = useState<ReadyApp | null>(null)
   const [authenticatedKey, setAuthenticatedKey] = useState<string | undefined>()
+  const [checklistPlatform, setChecklistPlatform] = useState<Platform | undefined>(initialPlatform)
   const [selectedAppId, setSelectedAppId] = useState<string | undefined>()
   const [switchingKey, setSwitchingKey] = useState(false)
   // Set when progress loading fails (e.g. corrupt saved-progress JSON). loadProgress
@@ -216,9 +217,9 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, suggestedSource, app
   useEffect(() => {
     // Hold the auto-load until the update prompt (if any) is answered, so the
     // update offer is the first screen even when --platform pre-resolves.
-    if (authenticatedKey && selectedAppId && initialPlatform && (!updateInfo || updateAnswered))
-      choose(initialPlatform)
-  }, [authenticatedKey, selectedAppId, initialPlatform, choose, updateInfo, updateAnswered])
+    if (authenticatedKey && selectedAppId && checklistPlatform && (!updateInfo || updateAnswered))
+      choose(checklistPlatform)
+  }, [authenticatedKey, selectedAppId, checklistPlatform, choose, updateInfo, updateAnswered])
 
   useEffect(() => {
     if (authenticatedKey && !selectedAppId && !switchingKey)
@@ -246,11 +247,11 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, suggestedSource, app
   // exiting the wizard. The app owns the size decision so a shrink→regrow keeps
   // the user exactly where they were.
   if (ready?.kind === 'ios' && selectedAppId)
-    return <OnboardingApp appId={selectedAppId} iosBundleIdInitial={iosBundleIdInitial} initialProgress={ready.progress} iosDir={iosDir} guidedHelperUsable={guidedHelperUsable} apikey={authenticatedKey} supaHost={supaHost} supaAnon={supaAnon} journeyId={journeyId} onStep={onStep} onResult={onResult} onBeforeExit={onBeforeExit} />
+    return <OnboardingApp appId={selectedAppId} iosBundleIdInitial={iosBundleIdInitial} initialProgress={ready.progress} iosDir={iosDir} guidedHelperUsable={guidedHelperUsable} apikey={authenticatedKey} apiHost={apiHost} journeyId={journeyId} onStep={onStep} onResult={onResult} onBeforeExit={onBeforeExit} />
   if (ready?.kind === 'android' && selectedAppId)
-    return <AndroidOnboardingApp appId={selectedAppId} initialProgress={ready.progress} androidDir={androidDir} apikey={authenticatedKey} supaHost={supaHost} supaAnon={supaAnon} journeyId={journeyId} onStep={onStep} onResult={onResult} onBeforeExit={onBeforeExit} />
+    return <AndroidOnboardingApp appId={selectedAppId} initialProgress={ready.progress} androidDir={androidDir} apikey={authenticatedKey} apiHost={apiHost} journeyId={journeyId} onStep={onStep} onResult={onResult} onBeforeExit={onBeforeExit} />
   if (ready?.kind === 'appflow' && selectedAppId)
-    return <AppflowApp appId={selectedAppId} packageName={appflowPackageName ?? iosBundleIdInitial} scope={ready.scope} apikey={authenticatedKey} supaHost={supaHost} journeyId={journeyId} onStep={onStep} onResult={onResult} onBeforeExit={onBeforeExit} />
+    return <AppflowApp appId={selectedAppId} packageName={appflowPackageName ?? iosBundleIdInitial} scope={ready.scope} apikey={authenticatedKey} apiHost={apiHost} journeyId={journeyId} onStep={onStep} onResult={onResult} onBeforeExit={onBeforeExit} />
 
   // Not ready yet: the platform picker (or a brief framed load). The picker is
   // NOT gated to the full 80×49 onboarding floor — it's small and adapts
@@ -329,7 +330,9 @@ const OnboardingShell: FC<OnboardingShellProps> = ({ appId, suggestedSource, app
         cols={cols}
         rows={rows}
         footer={analyticsNotice ? <AnalyticsNotice /> : undefined}
-        onSelected={(chosenId) => {
+        onSelected={async (chosenId) => {
+          const platform = await resolveChecklistPlatform?.(authenticatedKey, chosenId)
+          setChecklistPlatform(platform === 'ios' || platform === 'android' ? platform : initialPlatform)
           setSelectedAppId(chosenId)
           onAppSelected?.(chosenId)
         }}

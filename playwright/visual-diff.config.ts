@@ -1,4 +1,6 @@
 import type { Page } from '@playwright/test'
+import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../src/services/appOnboarding'
+import { BUILDER_STEP_IDS } from '../src/services/builderOnboardingChecklist'
 
 export interface VisualDiffRoute {
   slug: string
@@ -7,6 +9,69 @@ export interface VisualDiffRoute {
   auth?: boolean
   /** Optional deterministic UI setup before the screenshot is captured. */
   prepare?: (page: Page) => Promise<void>
+}
+
+async function prepareProfileGoalScreenshot(page: Page, completed = false) {
+  const assignments = {}
+  let profile: Record<string, unknown> | undefined
+  await page.route('**/private/onboarding_ab_tests', route => route.fulfill({ json: { assignments } }))
+  await page.route('**/rest/v1/rpc/get_orgs_v7', route => route.fulfill({ json: [] }))
+  await page.route('**/rest/v1/users?*', async (route) => {
+    // Welcome persists a draft before opening About you. Keep those writes local
+    // instead of returning an empty conditional-update result or altering seed data.
+    if (route.request().method() === 'PATCH' && profile) {
+      Object.assign(profile, route.request().postDataJSON())
+      return route.fulfill({ json: [profile] })
+    }
+    if (route.request().method() !== 'GET')
+      return route.fulfill({ json: [] })
+    if (profile)
+      return route.fulfill({ json: [profile] })
+    const response = await route.fetch()
+    const json = await response.json()
+    const row = Array.isArray(json) ? json[0] : json
+    if (!row)
+      throw new Error('The visual profile fixture requires an existing test user')
+    profile = {
+      ...row,
+      first_name: completed ? 'Example' : '',
+      last_name: completed ? 'User' : '',
+      onboarding: {
+        abtests: assignments,
+        version: 6,
+        ...(completed ? { profile_completed_at: '2026-10-20T11:00:00.000Z' } : {}),
+      },
+    }
+    await route.fulfill({ response, json: [profile] })
+  })
+  await page.reload()
+  const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
+  const goal = page.locator('[data-test="onboarding-intent-ota"]')
+  const name = page.locator('[data-test="onboarding-name-step"]')
+  await welcome.or(goal).or(name).waitFor()
+  if (await name.isVisible())
+    return
+  if (await welcome.isVisible())
+    await welcome.click()
+  await name.or(goal).waitFor()
+  if (await name.isVisible())
+    return
+  await goal.click()
+}
+
+async function prepareProfileResumeScreenshot(page: Page) {
+  await prepareProfileGoalScreenshot(page)
+  const firstName = page.locator('[data-test="onboarding-first-name"]')
+  // The base branch can still show Your goal without a separate name page.
+  if (!await firstName.isVisible())
+    return
+  const saved = page.waitForResponse(response => response.request().method() === 'PATCH'
+    && response.url().includes('/rest/v1/users?')
+    && response.request().postDataJSON()?.onboarding?.profile_draft?.first_name === 'Example')
+  await firstName.fill('Example')
+  await saved
+  await page.reload()
+  await page.locator('[data-test="onboarding-name-step"]').or(page.locator('[data-test="onboarding-resume-continue"]')).waitFor()
 }
 
 const nativeObserveDays = ['2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28', '2026-09-29', '2026-09-30']
@@ -190,7 +255,153 @@ async function mockReleaseLive(page: Page) {
  * Add routes here when a PR touches a new screen reviewers should compare.
  */
 export const visualDiffRoutes: VisualDiffRoute[] = [
+  ...[
+    { slug: 'onboarding-dual-goals', progress: null },
+    { slug: 'onboarding-dual-live-updates', progress: 'ota' },
+    { slug: 'onboarding-dual-builder', progress: 'builder' },
+  ].map(({ slug, progress }): VisualDiffRoute => ({
+    slug,
+    path: '/apps',
+    auth: true,
+    prepare: async (page) => {
+      const onboarding = { setup: {
+        todo_list_version: 4,
+        ota_todo_list_version: '1',
+        builder_todo_list_version: '1',
+        paths: ['ota', 'builder'],
+        selected_path: 'builder',
+        selected_builder_platform: progress === 'builder' ? 'android' : null,
+        source: 'manual',
+        outcome: 'in_progress',
+        steps: {
+          ota: Object.fromEntries(APP_ONBOARDING_OTA_V1_STEP_IDS.map(id => [id, { status: progress === 'ota' && id === 'login_cli_mcp' ? 'done' : 'pending' }])),
+          builder: Object.fromEntries((['ios', 'android'] as const).map(platform => [platform, Object.fromEntries(BUILDER_STEP_IDS[platform].map(id => [id, { status: progress === 'builder' && platform === 'android' && id === 'start_setup' ? 'done' : 'pending' }]))])),
+        },
+      } }
+      // The production preview excludes development-only component fixtures.
+      // Override read responses so base and head render the same assigned app.
+      await page.route('**/rest/v1/apps?*', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json().catch(() => null)
+        const matchesApp = new URL(route.request().url()).searchParams.get('app_id') === 'eq.com.demo.app'
+        const override = (row: any) => row?.app_id === 'com.demo.app' || (matchesApp && row?.onboarding !== undefined)
+          ? { ...row, need_onboarding: true, onboarding }
+          : row
+        await route.fulfill({ response, json: Array.isArray(json) ? json.map(override) : override(json) })
+      })
+      await page.route('**/rpc/verify_getting_started', route => route.fulfill({ json: onboarding }))
+      await page.route('**/private/onboarding_progress', route => route.fulfill({ json: { onboarding, hasChannel: false, checkErrors: [] } }))
+      await page.goto('/app/com.demo.app/getting-started')
+      await page.locator('[data-test="dual-onboarding-checklists"], [data-test="builder-checklist"]').first().waitFor()
+      if (progress === 'builder')
+        await page.locator('[data-test="builder-step-start_setup"][data-status="done"]').waitFor()
+    },
+  })),
   { slug: 'login', path: '/login/', auth: false },
+  { slug: 'register', path: '/register/', auth: false },
+  {
+    slug: 'register-mobile',
+    path: '/register/',
+    auth: false,
+    prepare: page => page.setViewportSize({ width: 390, height: 844 }),
+  },
+  {
+    slug: 'onboarding-profile-goal',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: page => prepareProfileGoalScreenshot(page),
+  },
+  {
+    slug: 'onboarding-profile-goal-mobile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await prepareProfileGoalScreenshot(page)
+    },
+  },
+  {
+    slug: 'onboarding-profile-resume',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: prepareProfileResumeScreenshot,
+  },
+  {
+    slug: 'onboarding-profile-resume-mobile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await prepareProfileResumeScreenshot(page)
+    },
+  },
+  {
+    slug: 'onboarding-profile-intent',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: page => prepareProfileGoalScreenshot(page, true),
+  },
+  {
+    slug: 'onboarding-profile-intent-mobile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await prepareProfileGoalScreenshot(page, true)
+    },
+  },
+  {
+    slug: 'onboarding-organization-profile-legacy',
+    path: '/onboarding/organization?source=org-switcher',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/rest/v1/users?*', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json()
+        const profile = (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: { ...row.onboarding, version: 6 } })
+        await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
+      })
+      await page.reload()
+      await page.locator('[data-test="onboarding-intent-ota"]').click()
+      await page.locator('[data-test="onboarding-mode-name"]').click()
+      await page.locator('[data-test="onboarding-org-name"]').scrollIntoViewIfNeeded()
+    },
+  },
+  {
+    slug: 'onboarding-organization-profile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/rest/v1/users?*', async (route) => {
+        if (route.request().method() !== 'GET')
+          return route.fulfill({ json: [] })
+        const response = await route.fetch()
+        const json = await response.json()
+        const profile = (row: any) => ({ ...row, first_name: 'Example', last_name: 'User', onboarding: { profile_completed_at: '2026-10-20T10:00:00.000Z' } })
+        await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
+      })
+      await page.reload()
+      // Base captures predate the required name step and still open on the legacy welcome canvas.
+      const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
+      const otaIntent = page.locator('[data-test="onboarding-intent-ota"]')
+      await welcome.or(otaIntent).waitFor()
+      if (await welcome.isVisible())
+        await welcome.click()
+      await otaIntent.click()
+      await page.locator('[data-test="app-onboarding-continue-intent"]').click()
+      const assistant = page.locator('[data-test="onboarding-development-environment-ai_assistant"]')
+      const appName = page.locator('[data-test="app-onboarding-name"]')
+      await assistant.or(appName).waitFor()
+      if (await assistant.isVisible()) {
+        await assistant.click()
+        await page.locator('[data-test="app-onboarding-continue-development-environment"]').click()
+      }
+      await appName.fill('Example App')
+      await page.locator('[data-test="app-onboarding-continue"]').click()
+      await page.locator('[data-test="app-onboarding-continue"]').click()
+      await page.locator('[data-test="onboarding-org-name"]').waitFor()
+    },
+  },
   { slug: 'dashboard', path: '/dashboard', auth: true },
   { slug: 'account-settings', path: '/settings/account', auth: true },
   {

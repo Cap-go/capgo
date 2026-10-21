@@ -67,15 +67,16 @@ import { appendInternalLog, getInternalLogPath, startInternalLog } from '../supp
 import { uploadSupportLogs } from '../support/support-upload.js'
 import { offerSupportUploadBeforeAi } from '../support/support-upload-prompt.js'
 import { buildCliRequestHeaders } from '../analytics/cli-headers'
-import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, trimTrailingSlashes, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
+import { assertCliPermission, canPromptInteractively, createCapgoClient, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, trimTrailingSlashes, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { getBuilderAppId } from './app-id'
+import { parseBuildEnv } from './build-env'
 import { syncAndroidVersion } from './android-version'
 import { createBuildCancellationSignalHandler, requestBuildCancellation } from './cancellation'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseAndroidPlayStoreReleaseStatus, parseAndroidPlayStoreTrack, parseInAppUpdatePriority, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
 import { withCwd } from './cwd'
 import { syncIosMarketingVersion } from './ios-marketing-version'
-import { writeBuildOutputRecord } from './output-record'
+import { parseDebugSymbolsUrl, writeBuildOutputRecord } from './output-record'
 import { getPlatformDirFromCapacitorConfig, normalizeNativeDependencyPathsInText } from './platform-paths'
 import { handleCustomMsg } from './qr.js'
 import { prepareBuildSupportLogBundle } from './support-log-bundle.js'
@@ -1469,9 +1470,14 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
   // the logger rather than duplicating dispatch logic so the existing print
   // behaviour stays intact.
   let capturedOutputUrl: string | null = null
+  let capturedSymbolsUrl: string | null = null
   const log: BuildLogger = options.outputRecord
     ? {
         ...baseLogger,
+        buildLog: (msg) => {
+          capturedSymbolsUrl = parseDebugSymbolsUrl(msg) ?? capturedSymbolsUrl
+          baseLogger.buildLog(msg)
+        },
         customMsg: async (kind, data) => {
           if (kind === 'qr_download_link' && typeof data.url === 'string')
             capturedOutputUrl = data.url
@@ -1516,9 +1522,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         : `Android app version is already ${syncResult.packageVersion}`)
     }
 
-    const host = options.supaHost || 'https://api.capgo.app'
-
-    const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
+    const client = await createCapgoClient(options.apikey, options.apiHost)
+    const host = client.apiHost
     // NOTE: the build-permission assert was moved below (after the prescan gate) so prescan's
     // batched report — which includes shared/apikey-permission — is what users see first.
 
@@ -1528,7 +1533,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // run first gives the batched report instead of a bare "Cannot get organization id".
     let orgId = ''
     try {
-      orgId = await getOrganizationId(options.apikey!, appId, { supaHost: options.supaHost, supaAnon: options.supaAnon })
+      orgId = await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
     }
     catch {
       // App not accessible / no org — surfaced by prescan (app-exists) and the permission backstop.
@@ -1664,6 +1669,13 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         ...existingLocalized,
         ...cliStoreReleaseNotesLocalized,
       })
+    }
+    // --build-env / CAPGO_BUILD_ENV: the user's own env vars (Sentry tokens, ...) for Gradle,
+    // and Xcode build phases. Sent as credentials; names only are logged.
+    const buildEnv = parseBuildEnv(options.buildEnv)
+    if (mergedCredentials && Object.keys(buildEnv).length > 0) {
+      Object.assign(mergedCredentials, buildEnv)
+      log.info(`ℹ️  Build env: ${Object.keys(buildEnv).join(', ')}`)
     }
     // --no-playstore-upload: null out PLAY_CONFIG_JSON so it never reaches the builder
     if (options.playstoreUpload === false && mergedCredentials) {
@@ -1992,8 +2004,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           iosDist: options.iosDistribution,
           skip: options.prescanSkip,
           warn: options.prescanWarn,
-          supaHost: options.supaHost,
-          supaAnon: options.supaAnon,
+          apiHost: options.apiHost,
         })).report,
       )
       // Telemetry: emit one `Prescan run` event for the build-request gate on EVERY
@@ -2043,7 +2054,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // missing build permission first — batched with every other problem — and blocks above.
     // This hard assert still runs when prescan is skipped (--no-prescan) or bypassed
     // (--prescan-ignore-fatal), so permission is always enforced before the POST.
-    await assertCliPermission(supabase, options.apikey, 'app.build_native', { appId }, {
+    await assertCliPermission(client, options.apikey, 'app.build_native', { appId }, {
       message: `Capgo rejected this API key: missing app.build_native permission for app ${appId}.`,
       silent,
     })
@@ -2461,6 +2472,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
               buildMode: (options.buildMode ?? 'release') as 'debug' | 'release',
               status: finalStatus,
               outputUrl: capturedOutputUrl,
+              symbolsUrl: capturedSymbolsUrl,
             },
             (msg: string) => log.warn(msg),
           )

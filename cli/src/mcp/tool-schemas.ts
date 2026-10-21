@@ -15,7 +15,8 @@ import {
 } from '../schemas/sdk'
 import { DOCS_SEARCH_MAX_RESULTS } from '../shared/docs-search'
 
-const sdkAuthFields = { apikey: true, supaHost: true, supaAnon: true } as const
+// Host fields stay out of MCP inputs so an agent cannot send the saved key to a host it chooses.
+const sdkAuthFields = { apikey: true, apiHost: true, filesHost: true } as const
 
 export const mcpAddAppInputSchema = z.object({
   appId: z.string(),
@@ -23,11 +24,7 @@ export const mcpAddAppInputSchema = z.object({
   icon: z.string().optional(),
 })
 
-export const mcpUpdateAppInputSchema = updateAppOptionsSchema.omit({
-  apikey: true,
-  supaHost: true,
-  supaAnon: true,
-})
+export const mcpUpdateAppInputSchema = updateAppOptionsSchema.omit(sdkAuthFields)
 
 export const mcpDeleteAppInputSchema = z.object({
   appId: z.string().describe('App ID to delete'),
@@ -186,11 +183,7 @@ export const mcpGetStatsInputSchema = z.object({
   rangeEnd: z.string().optional(),
 })
 
-export const mcpObserveInputSchema = observeOptionsObjectSchema.omit({
-  apikey: true,
-  supaHost: true,
-  supaAnon: true,
-}).superRefine(refineObserveDeviceId)
+export const mcpObserveInputSchema = observeOptionsObjectSchema.omit(sdkAuthFields).superRefine(refineObserveDeviceId)
 
 export const mcpRequestBuildInputSchema = z.object({
   appId: z.string(),
