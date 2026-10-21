@@ -48,12 +48,12 @@ watch(() => props.userId, (userId) => {
   preferenceUserId.value = userId
   if (!hasInteracted.value || changedUser) {
     const next = resolveDualChecklistResume(snapshot.value, saved)
+    const path = !changedUser && !hasInteracted.value ? props.initialPath ?? next.path : next.path
     preference.value = {
       ...saved,
-      ...(next.path ? { path: next.path } : {}),
+      ...(path ? { path } : {}),
       ...(next.platform ? { platform: next.platform } : {}),
     }
-    const path = !changedUser && !hasInteracted.value ? props.initialPath ?? next.path : next.path
     activePath.value = path
     platform.value = next.platform
     if (changedUser) {

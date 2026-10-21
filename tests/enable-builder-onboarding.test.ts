@@ -49,12 +49,12 @@ async function fixture(onboarding: object, needOnboarding = false) {
   return appId
 }
 
-async function requestActivation(appId: string, client = owner) {
+async function requestActivation(appId: string, client = owner, method = 'POST') {
   const { data: { session } } = await client.auth.getSession()
   // Exercise the registered backend route with real JWT verification, RBAC and
   // PostgreSQL transactions; no edge-worker deployment is needed for this test.
   return app.request(`http://local/${encodeURIComponent(appId)}/onboarding/builder`, {
-    method: 'POST',
+    method,
     headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
   }, { SUPABASE_URL: env.SUPABASE_URL!, SUPABASE_ANON_KEY: env.SUPABASE_ANON_KEY!, SUPABASE_DB_URL: POSTGRES_URL })
 }
@@ -117,6 +117,15 @@ describe('explicit Builder checklist activation', () => {
     expect((await activate(appId)).setup.paths).toEqual(['builder'])
   })
 
+  it.concurrent('reports activation access without changing onboarding', async () => {
+    const original = { setup: { todo_list_version: 3, steps: otaSteps } }
+    const appId = await fixture(original)
+    const response = await requestActivation(appId, owner, 'GET')
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ canEnable: true })
+    expect((await admin.from('apps').select('onboarding').eq('app_id', appId).single()).data!.onboarding).toEqual(original)
+  })
+
   it.concurrent('serializes simultaneous activation without losing the existing OTA history', async () => {
     const appId = await fixture({ setup: { todo_list_version: 3, steps: otaSteps } })
     const [first, second] = await Promise.all([activate(appId), activate(appId)])
@@ -132,15 +141,21 @@ describe('explicit Builder checklist activation', () => {
     expect((await admin.from('apps').select('onboarding').eq('app_id', appId).single()).data!.onboarding).toEqual(original)
   })
 
-  it.concurrent('rejects anonymous callers, unrelated users and app readers', async () => {
+  it.concurrent('rejects anonymous callers, unrelated users, app readers and app developers', async () => {
     const original = { setup: { todo_list_version: 3, steps: otaSteps } }
     const appId = await fixture(original)
     expect((await requestActivation(appId, anonymous)).status).toBe(401)
     expect((await requestActivation(appId, outsider)).status).toBe(403)
-    const { data: role } = await admin.from('roles').select('id').eq('name', 'app_reader').eq('scope_type', 'app').single()
     const { data: app } = await admin.from('apps').select('id').eq('app_id', appId).single()
-    expect((await admin.from('role_bindings').insert({ principal_type: 'user', principal_id: users[1], role_id: role!.id, scope_type: 'app', org_id: orgId, app_id: app!.id, granted_by: users[0], reason: 'Builder activation reader test', is_direct: true })).error).toBeNull()
-    expect((await requestActivation(appId, outsider)).status).toBe(403)
+    for (const roleName of ['app_reader', 'app_developer']) {
+      const { data: role } = await admin.from('roles').select('id').eq('name', roleName).eq('scope_type', 'app').single()
+      expect((await admin.from('role_bindings').delete().eq('principal_id', users[1]).eq('app_id', app!.id)).error).toBeNull()
+      expect((await admin.from('role_bindings').insert({ principal_type: 'user', principal_id: users[1], role_id: role!.id, scope_type: 'app', org_id: orgId, app_id: app!.id, granted_by: users[0], reason: 'Builder activation limited role test', is_direct: true })).error).toBeNull()
+      const access = await requestActivation(appId, outsider, 'GET')
+      expect(access.status).toBe(200)
+      expect(await access.json()).toEqual({ canEnable: false })
+      expect((await requestActivation(appId, outsider)).status).toBe(403)
+    }
     expect((await admin.from('apps').select('onboarding').eq('app_id', appId).single()).data!.onboarding).toEqual(original)
   })
 })

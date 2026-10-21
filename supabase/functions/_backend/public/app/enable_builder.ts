@@ -8,6 +8,16 @@ import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission, checkPermissionPg } from '../../utils/rbac.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
+export async function getBuilderOnboardingAccess(c: Context<MiddlewareKeyVariables>, appId: string) {
+  if (!isValidAppId(appId))
+    throw quickError(400, 'invalid_app_id', 'Invalid app ID')
+  if (!(await checkPermission(c, 'app.read', { appId })))
+    throw quickError(403, 'cannot_access_app', 'You cannot access this app')
+  const canEnable = await checkPermission(c, 'app.update_settings', { appId })
+  c.header('Cache-Control', 'no-store')
+  return c.json({ canEnable })
+}
+
 export async function enableBuilderOnboarding(c: Context<MiddlewareKeyVariables>, appId: string) {
   if (!isValidAppId(appId))
     throw quickError(400, 'invalid_app_id', 'Invalid app ID')
@@ -27,7 +37,7 @@ export async function enableBuilderOnboarding(c: Context<MiddlewareKeyVariables>
         throw quickError(403, 'cannot_access_app', 'You cannot update this app')
       const next = enableBuilderChecklist(current.onboarding)
       await tx.execute(sql`
-        UPDATE public.apps SET onboarding = ${JSON.stringify(next)}::jsonb
+        UPDATE public.apps SET onboarding = ${JSON.stringify(next)}::jsonb, updated_at = now()
         WHERE app_id = ${appId} AND onboarding IS DISTINCT FROM ${JSON.stringify(next)}::jsonb
       `)
       return next

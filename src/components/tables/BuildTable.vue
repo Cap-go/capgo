@@ -9,6 +9,7 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconEye from '~icons/heroicons/eye'
 import BuilderIntroduction from '~/components/dashboard/BuilderIntroduction.vue'
+import { invokeCapgoApi } from '~/services/capgoApi'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -41,6 +42,8 @@ const isLoading = ref(true)
 const currentPage = ref(1)
 const total = ref(0)
 const totalAllBuilds = ref<number | null>(null)
+const canEnableBuilder = ref(false)
+let reloadSequence = 0
 const platformBuildCounts = ref<Record<Platform, number>>({ ios: 0, android: 0 })
 const showSetupFlow = computed(() => showSteps.value || totalAllBuilds.value === 0)
 const organizationStore = useOrganizationStore()
@@ -189,7 +192,15 @@ async function reload() {
 
   currentPage.value = 1
   elements.value = []
+  canEnableBuilder.value = false
+  totalAllBuilds.value = null
+  const sequence = ++reloadSequence
+  const appId = props.appId
   try {
+    const { data, error } = await invokeCapgoApi<{ canEnable: boolean }>(`app/${encodeURIComponent(appId)}/onboarding/builder`, { method: 'GET' })
+    if (sequence !== reloadSequence || appId !== props.appId)
+      return
+    canEnableBuilder.value = !error && data?.canEnable === true
     await Promise.all([getData(), updateOverallBuildsCount()])
   }
   catch (error) {
@@ -355,13 +366,13 @@ watch(showSetupFlow, (newValue) => {
 <template>
   <div>
     <BuilderIntroduction
-      v-if="totalAllBuilds === 0"
+      v-if="totalAllBuilds === 0 && canEnableBuilder"
       :key="props.appId"
       :app-id="props.appId"
       :entitlement="builderEntitlement"
     />
     <StepsBuild
-      v-else-if="showSteps"
+      v-else-if="showSteps || totalAllBuilds === 0"
       :onboarding="(totalAllBuilds ?? 0) === 0"
       :app-id="props.appId"
       :platform-build-counts="platformBuildCounts"

@@ -63,7 +63,7 @@ function getSlides(): HTMLElement[] {
 }
 
 function track(event: string, props_: Record<string, string | number | boolean | null> = {}) {
-  pushEvent(event, config.supaHost, props_)
+  pushEvent(event, config.supaHost, { embedded: props.embedded, ...props_ })
 }
 
 function drawCheck(s: HTMLElement) {
@@ -719,7 +719,7 @@ onUnmounted(() => {
                   {{ t('builder-promo-s5-lead1') }} <b>{{ t('builder-promo-s5-lead2') }}</b>
                 </p>
                 <div>
-                  <button type="button" class="bp-cta" :disabled="starting" :aria-busy="starting || undefined" @click="startBuild">
+                  <button type="button" class="bp-cta" :disabled="starting || startAction === 'none'" :aria-busy="starting || undefined" @click="startBuild">
                     {{ t('builder-promo-s5-cta') }}
                     <svg viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
                   </button>

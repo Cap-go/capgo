@@ -41,6 +41,8 @@ describe('explicit Builder checklist activation', () => {
     expect(data.setup.steps.ota).toMatchObject(otaSteps)
     expect(Object.keys(data.setup.steps.ota)).toHaveLength(7)
     expect(data.custom).toBe('keep')
+    if (!nested)
+      expect(data).toMatchObject(setup)
   })
 
   it.concurrent.each(['ota', 'builder', 'both'])('extends or reuses v4 %s without resetting progress', (path) => {

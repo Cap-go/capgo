@@ -37,6 +37,7 @@ let row: { app_id: string, owner_org: string, onboarding: any, need_onboarding: 
 let writes: Array<{ sql: string, params: unknown[] }>
 let order: string[]
 const request = (id = appId) => app.request(`http://local/${encodeURIComponent(id)}/onboarding/builder`, { method: 'POST' })
+const requestAccess = () => app.request(`http://local/${appId}/onboarding/builder`)
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -73,7 +74,7 @@ beforeEach(() => {
   })
 })
 
-describe('pOST /app/:id/onboarding/builder', () => {
+describe('builder activation endpoint (POST /app/:id/onboarding/builder)', () => {
   it.each(['jwt', 'apikey'] as const)('converts the latest locked state after checking %s permissions and closes the connection', async (authType) => {
     mocks.auth = { ...mocks.auth!, authType, apikey: authType === 'apikey' ? { key: 'fixture-key' } : null } as AuthInfo
     const response = await request()
@@ -137,5 +138,52 @@ describe('pOST /app/:id/onboarding/builder', () => {
     mocks.transaction.mockRejectedValue(new Error('database unavailable'))
     expect((await request()).status).toBe(500)
     expect(mocks.close).toHaveBeenCalledOnce()
+  })
+
+  it.each([false, true])('retries app transfers and rejects an unstable scope (repeated=%s)', async (repeated) => {
+    const execute = mocks.execute.getMockImplementation()!
+    let scopeReads = 0
+    mocks.execute.mockImplementation((statement) => {
+      const query = dialect.sqlToQuery(statement)
+      if (query.sql.includes('SELECT owner_org FROM public.apps')) {
+        scopeReads++
+        if (repeated || scopeReads === 1)
+          return { rows: [{ owner_org: 'previous-org' }] }
+      }
+      return execute(statement)
+    })
+    const response = await request()
+    expect(response.status).toBe(repeated ? 409 : 200)
+    expect(mocks.transaction).toHaveBeenCalledTimes(repeated ? 3 : 2)
+    expect(writes).toHaveLength(repeated ? 0 : 1)
+    expect(mocks.close).toHaveBeenCalledOnce()
+    if (repeated) {
+      expect(await response.text()).toContain('changed organizations')
+      expect(mocks.lockedPermission).not.toHaveBeenCalled()
+    }
+  })
+})
+
+describe('builder activation access (GET /app/:id/onboarding/builder)', () => {
+  it.each([true, false])('returns canEnable=%s to an app reader without opening a write transaction', async (allowed) => {
+    mocks.permission.mockImplementation(async (_c, permission) => permission === 'app.read' || allowed)
+    const response = await requestAccess()
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ canEnable: allowed })
+    expect(response.headers.get('cache-control')).toBe('no-store')
+    expect(mocks.transaction).not.toHaveBeenCalled()
+    expect(mocks.permission.mock.calls.map(call => call[1])).toEqual(['app.read', 'app.update_settings'])
+  })
+
+  it('denies unrelated users without revealing activation permission', async () => {
+    mocks.permission.mockResolvedValue(false)
+    expect((await requestAccess()).status).toBe(403)
+    expect(mocks.permission).toHaveBeenCalledTimes(1)
+  })
+
+  it('rejects anonymous callers', async () => {
+    mocks.auth = null
+    expect((await requestAccess()).status).toBe(401)
+    expect(mocks.permission).not.toHaveBeenCalled()
   })
 })

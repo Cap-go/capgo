@@ -69,6 +69,7 @@ describe('dual-checklist identity hydration', () => {
     userId.value = user
     await nextTick()
     expect(host.querySelector('[aria-selected="true"]')?.textContent?.trim()).toBe('setup-goal-builder')
+    expect(loadChecklistPreference(user, appId).path).toBe('builder')
   })
 
   it('opens an explicitly requested Builder path without requiring progress or a goal choice', () => {

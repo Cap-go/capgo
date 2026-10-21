@@ -31,9 +31,9 @@ async function startBuilder() {
     const { data, error } = await invokeCapgoApi<{ onboarding: Json }>(`app/${encodeURIComponent(appId)}/onboarding/builder`, { method: 'POST' })
     if (error || !data?.onboarding)
       throw error ?? new Error('Missing Builder checklist')
+    organizationStore.updateAppOnboarding(appId, data.onboarding)
     if (disposed)
       return
-    organizationStore.updateAppOnboarding(appId, data.onboarding)
     await router.push(`${getAppGettingStartedPath(appId)}?path=builder`)
   }
   catch {
