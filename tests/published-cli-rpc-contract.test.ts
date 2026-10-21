@@ -177,10 +177,9 @@ describe('CRITICAL published CLI RPC contract', () => {
       'list',
       '-a',
       APIKEY_TEST_ORG_SUPER_ADMIN,
-      '--supa-host',
-      SUPABASE_URL,
-      '--supa-anon',
-      SUPABASE_ANON_KEY,
+      // Published CLI >= 8.90 talks only to the versioned Capgo API (no Supabase SDK).
+      '--api-host',
+      `${SUPABASE_URL}/functions/v1`,
       '--output-text',
     ], {
       timeout: 180_000,

@@ -7,7 +7,7 @@ import IconLoader from '~icons/lucide/loader-2'
 import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
 import { createDefaultApiKey, findUsablePlainApiKey } from '~/services/apikeys'
 import { sendOnboardingEvent } from '~/services/onboardingTracking'
-import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
+import { defaultApiHost, getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -40,7 +40,7 @@ interface Step {
 }
 
 const config = getLocalConfig()
-const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``
+const localCommand = isLocal(config.supaHost) ? ` --api-host ${defaultApiHost}` : ``
 const steps = ref<Step[]>([
   {
     title: t('add-another-bundle'),
