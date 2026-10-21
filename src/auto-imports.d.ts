@@ -66,7 +66,6 @@ declare global {
   const makeDestructurable: typeof import('@vueuse/core').makeDestructurable
   const manualResetRef: typeof import('@vueuse/core').manualResetRef
   const markRaw: typeof import('vue').markRaw
-  const nativeNavbarSegmentsSupported: typeof import('./composables/useNativeChrome').nativeNavbarSegmentsSupported
   const nextTick: typeof import('vue').nextTick
   const normalizeNavigationPath: typeof import('./composables/useAppNavigation').normalizeNavigationPath
   const onActivated: typeof import('vue').onActivated
@@ -246,7 +245,6 @@ declare global {
   const useMousePressed: typeof import('@vueuse/core').useMousePressed
   const useMutationObserver: typeof import('@vueuse/core').useMutationObserver
   const useNativeChrome: typeof import('./composables/useNativeChrome').useNativeChrome
-  const useNativeNavbarSegments: typeof import('./composables/useNativeChrome').useNativeNavbarSegments
   const useNativeObserveStats: typeof import('./composables/useNativeObserveStats').useNativeObserveStats
   const useNavigatorLanguage: typeof import('@vueuse/core').useNavigatorLanguage
   const useNetwork: typeof import('@vueuse/core').useNetwork
@@ -454,7 +452,6 @@ declare module 'vue' {
     readonly isSuperAdminRole: UnwrapRef<typeof import('./stores/organization')['isSuperAdminRole']>
     readonly makeDestructurable: UnwrapRef<typeof import('@vueuse/core')['makeDestructurable']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
-    readonly nativeNavbarSegmentsSupported: UnwrapRef<typeof import('./composables/useNativeChrome')['nativeNavbarSegmentsSupported']>
     readonly nextTick: UnwrapRef<typeof import('vue')['nextTick']>
     readonly normalizeNavigationPath: UnwrapRef<typeof import('./composables/useAppNavigation')['normalizeNavigationPath']>
     readonly onActivated: UnwrapRef<typeof import('vue')['onActivated']>
@@ -632,7 +629,6 @@ declare module 'vue' {
     readonly useMousePressed: UnwrapRef<typeof import('@vueuse/core')['useMousePressed']>
     readonly useMutationObserver: UnwrapRef<typeof import('@vueuse/core')['useMutationObserver']>
     readonly useNativeChrome: UnwrapRef<typeof import('./composables/useNativeChrome')['useNativeChrome']>
-    readonly useNativeNavbarSegments: UnwrapRef<typeof import('./composables/useNativeChrome')['useNativeNavbarSegments']>
     readonly useNativeObserveStats: UnwrapRef<typeof import('./composables/useNativeObserveStats')['useNativeObserveStats']>
     readonly useNavigatorLanguage: UnwrapRef<typeof import('@vueuse/core')['useNavigatorLanguage']>
     readonly useNetwork: UnwrapRef<typeof import('@vueuse/core')['useNetwork']>
