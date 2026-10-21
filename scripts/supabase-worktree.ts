@@ -114,10 +114,13 @@ function hashDirContents(dir: string): string {
     for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       const full = resolve(current, entry.name)
       if (entry.isDirectory()) {
+        // Hash directories too, so template sets that differ only by an (empty) folder differ.
+        hash.update(`d:${relative(dir, full)}`)
+        hash.update('\0')
         walk(full)
         continue
       }
-      hash.update(relative(dir, full))
+      hash.update(`f:${relative(dir, full)}`)
       hash.update('\0')
       hash.update(readFileSync(full))
       hash.update('\0')
