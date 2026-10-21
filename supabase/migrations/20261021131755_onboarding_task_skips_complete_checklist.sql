@@ -195,9 +195,12 @@ BEGIN
     IF v_patch_outcome IN ('skipped', 'switched_to_manual') THEN
       v_outcome := v_patch_outcome;
     END IF;
+  ELSIF v_patch_outcome = 'skipped' THEN
+    -- Explicit dismissal (hide onboarding) wins over all-tasks-present completion.
+    v_outcome := 'skipped';
   ELSIF v_all_present THEN
     v_outcome := CASE WHEN v_any_skipped AND v_todo_list_version NOT IN (3, 4) THEN 'skipped' ELSE 'completed' END;
-  ELSIF v_patch_outcome = 'skipped' OR (v_patch_outcome = 'completed' AND v_todo_list_version NOT IN (3, 4)) THEN
+  ELSIF v_patch_outcome = 'completed' AND v_todo_list_version NOT IN (3, 4) THEN
     v_outcome := v_patch_outcome;
   ELSIF v_patch_outcome = 'switched_to_manual' OR v_outcome = 'switched_to_manual' THEN
     v_outcome := 'switched_to_manual';

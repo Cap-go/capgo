@@ -41,4 +41,9 @@ describe('checklist outcome with explicit task skips', () => {
     expect(mergeAppOnboarding({ setup: { todo_list_version: 2 } }, { steps }).outcome).toBe('skipped')
     expect(mergeAppOnboarding({ setup: { todo_list_version: 3 } }, { outcome: 'skipped' }).outcome).toBe('skipped')
   })
+
+  it('records explicit dismissal even when every v3 task is already present', () => {
+    const steps = Object.fromEntries(APP_ONBOARDING_OTA_V1_STEP_IDS.map(id => [id, { status: 'done' as const }]))
+    expect(mergeAppOnboarding({ setup: { todo_list_version: 3, steps } }, { outcome: 'skipped' }).outcome).toBe('skipped')
+  })
 })

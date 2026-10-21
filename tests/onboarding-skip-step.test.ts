@@ -105,4 +105,16 @@ describe('onboarding skip step', () => {
     ])
     expect(rows[0].outcome).toBe('completed')
   })
+
+  it('keeps an explicit hide outcome when every v4 task is already present in SQL', async () => {
+    const done = Object.fromEntries(
+      ['login_cli_mcp', 'add_channel', 'add_updater', 'add_code', 'run_device', 'upload_bundle', 'test_update']
+        .map(id => [id, { status: 'done' }]),
+    )
+    const rows = await executeSQL(`SELECT public.merge_app_onboarding_setup($1::jsonb, $2::jsonb) -> 'setup' ->> 'outcome' AS outcome`, [
+      JSON.stringify({ setup: { todo_list_version: 4, ota_todo_list_version: '1', paths: ['ota'], steps: { ota: done } } }),
+      JSON.stringify({ outcome: 'skipped' }),
+    ])
+    expect(rows[0].outcome).toBe('skipped')
+  })
 })

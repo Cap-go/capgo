@@ -296,13 +296,17 @@ export function deriveAppOnboardingOutcome(
   const allPresent = statuses.every(status => status === 'done' || status === 'skipped')
   const anySkipped = statuses.includes('skipped')
 
-  // v3/v4 task skips are explicit choices; finishing every task completes the
+  // Explicit dismissal (hide onboarding) wins over an all-tasks-present
+  // completion. v3/v4 task skips are otherwise choices that still complete the
   // checklist. Keep the historical skipped outcome for v1/v2. Mirrors
   // public.merge_app_onboarding_setup.
+  if (patch === 'skipped')
+    return 'skipped'
+
   if (allPresent)
     return anySkipped && todoListVersion !== 3 && todoListVersion !== 4 ? 'skipped' : 'completed'
 
-  if ((patch === 'completed' && todoListVersion !== 3 && todoListVersion !== 4) || patch === 'skipped')
+  if (patch === 'completed' && todoListVersion !== 3 && todoListVersion !== 4)
     return patch
 
   if (patch === 'switched_to_manual' || current === 'switched_to_manual')

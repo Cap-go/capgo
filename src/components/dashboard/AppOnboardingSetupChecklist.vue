@@ -111,9 +111,12 @@ function selectStep(id: string) {
 
 async function skipSelectedStep(reason: string) {
   const id = selectedStep.value.id
+  const appId = props.appId
   skipping.value = true
   try {
-    const value = await skipOnboardingStep(props.appId, `ota.${id}`, reason)
+    const value = await skipOnboardingStep(appId, `ota.${id}`, reason)
+    if (appId !== props.appId)
+      return
     if (value === undefined)
       void refreshOnboarding()
     else
