@@ -120,16 +120,14 @@ test('asks to finish or explicitly skip a Builder step passed over by out-of-ord
   await page.clock.install()
   await page.goto(`${fixture}&platform=android`)
   await expect(page.locator('[data-test="builder-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'false')
-  await expect(page.locator('[data-test="setup-checklist-missed"]')).toHaveCount(0)
 
   await page.evaluate(() => {
     (window as any).onboardingSetupPreview.state.builderSteps.android.prepare_keystore = { status: 'done' }
   })
   await page.clock.runFor(5000)
-  const missed = page.locator('[data-test="setup-checklist-missed"]')
-  await expect(missed).toContainText('Steps passed over: 1')
-  await expect(missed.locator('[data-test="setup-checklist-missed-start_setup"]')).toHaveText('1. Start guided Builder setup')
-  await expect(page.locator('[data-test="builder-checklist-instructions"]')).toContainText('Passed over · 1 of 4')
+  // The first unfinished step stays the current task — no orange alarm banner.
+  await expect(page.locator('[data-test="builder-checklist-instructions"]')).toContainText('Current task · 1 of 4')
+  await expect(page.getByText('Already handled this another way?')).toBeVisible()
   await expect(page.locator('[data-test="builder-checklist-skip-reason"]')).toHaveCount(0)
 
   await page.locator('[data-test="builder-checklist-skip-step"]').click()
@@ -137,7 +135,6 @@ test('asks to finish or explicitly skip a Builder step passed over by out-of-ord
   await page.locator('[data-test="builder-checklist-skip-confirm"]').click()
   await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.skips)).toEqual(['builder.android.start_setup'])
   expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.skipReasons)).toEqual(['Keystore came from our old CI'])
-  await expect(missed).toBeHidden()
   await expect(page.locator('[data-test="builder-checklist-instructions"]')).toContainText('Current task · 3 of 4')
   await expect(page.locator('[data-test="builder-step-start_setup"]')).toHaveAttribute('data-status', 'skipped')
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { APP_ONBOARDING_OTA_V1_STEP_IDS, APP_ONBOARDING_V2_STEP_IDS, mergeAppOnboarding } from '../supabase/functions/_backend/utils/appOnboarding.ts'
-import { getMissedStepIds, isSkippableOtaStep } from '../supabase/functions/_backend/utils/onboardingMissedSteps.ts'
+import { getMissedStepIds, isOpenOnboardingStepStatus } from '../supabase/functions/_backend/utils/onboardingMissedSteps.ts'
 
 describe('getMissedStepIds', () => {
   it('returns open steps that sit before the last done step', () => {
@@ -24,9 +24,11 @@ describe('getMissedStepIds', () => {
     expect(getMissedStepIds([{ id: 'a', status: 'warning' }, { id: 'b', status: 'done' }])).toEqual(['a'])
   })
 
-  it('never offers to skip the channel step', () => {
-    expect(isSkippableOtaStep('add_channel')).toBe(false)
-    expect(isSkippableOtaStep('login_cli_mcp')).toBe(true)
+  it('treats pending and warning as open for skip', () => {
+    expect(isOpenOnboardingStepStatus('pending')).toBe(true)
+    expect(isOpenOnboardingStepStatus(undefined)).toBe(true)
+    expect(isOpenOnboardingStepStatus('done')).toBe(false)
+    expect(isOpenOnboardingStepStatus('skipped')).toBe(false)
   })
 })
 

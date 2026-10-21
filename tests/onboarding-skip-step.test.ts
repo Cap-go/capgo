@@ -68,13 +68,23 @@ describe('onboarding skip step', () => {
     expect((await skip(writerKey, 'ota.login_cli_mcp', 'x'.repeat(501))).status).toBe(400)
   })
 
-  it('refuses steps that were not passed over, including the final step', async () => {
-    // add_channel is passed over but a channel is required; ios.start_setup has no stored record.
-    for (const step of ['ota.add_code', 'ota.test_update', 'ota.add_channel', 'builder.android.connect_google_play', 'builder.android.successful_cloud_build', 'builder.ios.start_setup']) {
+  it('refuses builder steps with no stored record, and already finished steps', async () => {
+    // ios.start_setup has no stored record; add_updater is already done.
+    for (const step of ['builder.ios.start_setup', 'ota.add_updater']) {
       const response = await skip(writerKey, step)
       expect(response.status, step).toBe(409)
       expect(await response.json()).toMatchObject({ error: 'step_not_skippable' })
     }
+  })
+
+  it('allows skipping any open live-update step, including channel and the final step', async () => {
+    const channel = await skip(writerKey, 'ota.add_channel', 'Channel already exists in another env')
+    expect(channel.status).toBe(200)
+    expect((await channel.json() as any).onboarding.setup.steps.ota.add_channel.status).toBe('skipped')
+
+    const final = await skip(writerKey, 'ota.test_update', 'Verified the update in TestFlight already')
+    expect(final.status).toBe(200)
+    expect((await final.json() as any).onboarding.setup.steps.ota.test_update.status).toBe('skipped')
   })
 
   it('does not let an app reader skip steps', async () => {
@@ -94,7 +104,7 @@ describe('onboarding skip step', () => {
     const setup = await readSetup()
     expect(setup.steps.builder.android.start_setup.status).toBe('skipped')
     expect(setup.steps.ota.add_updater.status).toBe('done')
-    expect(setup.steps.ota.add_channel.status).toBe('pending')
+    expect(setup.steps.ota.add_channel.status).toBe('skipped')
     expect(setup.outcome).toBe('in_progress')
   })
 

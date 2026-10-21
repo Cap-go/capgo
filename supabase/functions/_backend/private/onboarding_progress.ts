@@ -12,7 +12,7 @@ import { parseBody, quickError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { cloudlogErr, serializeError } from '../utils/logging.ts'
 import { isActiveBuilderChecklistSetup } from '../utils/builder_onboarding_checklist.ts'
-import { BUILDER_STEP_IDS, getMissedStepIds, isSkippableOtaStep } from '../utils/onboardingMissedSteps.ts'
+import { BUILDER_STEP_IDS, isOpenOnboardingStepStatus } from '../utils/onboardingMissedSteps.ts'
 import { appIdSchema } from '../utils/privateAnalyticsValidation.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { readDevices, readStats } from '../utils/stats.ts'
@@ -124,8 +124,8 @@ function readBuilderStatuses(currentValue: unknown, platform: keyof typeof BUILD
   return BUILDER_STEP_IDS[platform].map(id => ({ id: id as string, exists: isRecord(steps[id]), status: isRecord(steps[id]) ? String(steps[id].status) : 'pending' }))
 }
 
-// Only a missed step (open while a later one is done) can be skipped, so the
-// final proof-of-setup step always has to really happen.
+// Any open checklist step can be skipped with a reason. Builder patches only
+// update stored step records, so a step with no record still cannot be skipped.
 function skipStepPatch(currentValue: unknown, current: AppOnboardingState, step: string, at: string): AppOnboardingPatch | null {
   if (current.outcome === 'skipped')
     return null
@@ -134,13 +134,17 @@ function skipStepPatch(currentValue: unknown, current: AppOnboardingState, step:
     if (!hasSupportedOtaTodoList(current))
       return null
     const ids = getAppOnboardingStepIds(current.todo_list_version, current.ota_todo_list_version)
-    const missed = getMissedStepIds(ids.map(id => ({ id, status: current.steps[id]?.status })))
-    return isSkippableOtaStep(first!) && missed.includes(first as AppOnboardingStepId) ? { steps: { [first!]: { status: 'skipped', at } } } : null
+    if (!ids.includes(first as AppOnboardingStepId))
+      return null
+    if (!isOpenOnboardingStepStatus(current.steps[first as AppOnboardingStepId]?.status))
+      return null
+    return { steps: { [first!]: { status: 'skipped', at } } }
   }
   const platform = first as keyof typeof BUILDER_STEP_IDS
   const statuses = readBuilderStatuses(currentValue, platform)
+  const row = statuses?.find(status => status.id === second)
   // A step without a stored record cannot be patched, so do not report success.
-  if (!statuses?.find(status => status.id === second)?.exists || !getMissedStepIds(statuses).includes(second!))
+  if (!row?.exists || !isOpenOnboardingStepStatus(row.status))
     return null
   const builderSteps: NonNullable<AppOnboardingPatch['builderSteps']> = {}
   builderSteps[`builder.${platform}.${second}`] = { status: 'skipped', at }

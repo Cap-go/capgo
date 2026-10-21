@@ -10,4 +10,4 @@ export {
   parseAppOnboarding,
 } from '../../supabase/functions/_backend/utils/appOnboarding.ts'
 
-export { getMissedStepIds, isSkippableOtaStep } from '../../supabase/functions/_backend/utils/onboardingMissedSteps.ts'
+export { getMissedStepIds, isOpenOnboardingStepStatus } from '../../supabase/functions/_backend/utils/onboardingMissedSteps.ts'

@@ -15,18 +15,10 @@ export const BUILDER_STEP_IDS = {
   ],
 } as const
 
-// A channel is required for live updates to work, and the console already
-// offers to create one, so it is pushed but never skippable.
-const UNSKIPPABLE_OTA_STEP_IDS = new Set<string>(['add_channel'])
-
-export function isSkippableOtaStep(id: string) {
-  return !UNSKIPPABLE_OTA_STEP_IDS.has(id)
-}
-
 // People (and their AI agents) rarely follow the checklist in order. A step is
 // "missed" when it is still open although a later step is already done, so the
-// console can ask the user to go back to it or skip it on purpose. The last
-// step can never be missed, so it can never be skipped this way.
+// console can focus that step as the next task. Skipping is allowed on any open
+// step (with a reason), not only missed ones.
 export function getMissedStepIds<T extends string>(steps: ReadonlyArray<{ id: T, status?: string | null }>): T[] {
   let lastDone = -1
   steps.forEach((step, index) => {
@@ -37,4 +29,8 @@ export function getMissedStepIds<T extends string>(steps: ReadonlyArray<{ id: T,
     .slice(0, Math.max(lastDone, 0))
     .filter(step => step.status !== 'done' && step.status !== 'skipped')
     .map(step => step.id)
+}
+
+export function isOpenOnboardingStepStatus(status?: string | null) {
+  return status !== 'done' && status !== 'skipped'
 }

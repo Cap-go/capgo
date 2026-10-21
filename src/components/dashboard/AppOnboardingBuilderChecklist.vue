@@ -4,7 +4,6 @@ import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconCopy from '~icons/ion/copy-outline'
-import IconAlertTriangle from '~icons/lucide/alert-triangle'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconCheck from '~icons/lucide/check'
 import IconChevronDown from '~icons/lucide/chevron-down'
@@ -15,13 +14,12 @@ import IconLoader from '~icons/lucide/loader-2'
 import IconMinus from '~icons/lucide/minus'
 import IconAndroid from '~icons/mdi/android'
 import IconApple from '~icons/mdi/apple'
-import { getMissedStepIds } from '~/services/appOnboarding'
+import { isOpenOnboardingStepStatus } from '~/services/appOnboarding'
 import { BUILDER_STEP_IDS, parseBuilderOnboarding } from '~/services/builderOnboardingChecklist'
 import { useSupabase } from '~/services/supabase'
 import { resolveDualChecklistResume } from '~/utils/dualOnboardingChecklists'
 import { skipOnboardingStep } from '~/utils/onboardingSkipStep'
 import AppOnboardingAiAgentCard from './AppOnboardingAiAgentCard.vue'
-import AppOnboardingMissedSteps from './AppOnboardingMissedSteps.vue'
 import AppOnboardingSkipStep from './AppOnboardingSkipStep.vue'
 
 const props = withDefaults(defineProps<{
@@ -97,9 +95,7 @@ const doneCount = computed(() => steps.value.filter(step => step.status === 'don
 const currentStep = computed(() => steps.value.find(step => step.status !== 'done' && step.status !== 'skipped'))
 const selectedStep = computed(() => steps.value.find(step => step.id === selectedId.value) ?? currentStep.value ?? steps.value.at(-1))
 const isFirstStep = computed(() => selectedStep.value?.index === 0)
-const missedIds = computed<string[]>(() => getMissedStepIds(steps.value))
-const missedSteps = computed(() => steps.value.filter(step => missedIds.value.includes(step.id)))
-const isSelectedMissed = computed(() => !!selectedStep.value && missedIds.value.includes(selectedStep.value.id))
+const canSkipSelected = computed(() => !!selectedStep.value && isOpenOnboardingStepStatus(selectedStep.value.status))
 const checklistOpen = ref(false)
 const skipping = ref(false)
 const completed = computed(() => steps.value.length > 0
@@ -268,8 +264,6 @@ function statusLabel(status: BuilderStepStatus) {
         <progress class="d-progress h-2.5 w-full text-primary-500" :value="doneCount" :max="steps.length" :aria-label="t('setup-checklist-progress', { done: doneCount, total: steps.length })" />
       </div>
 
-      <AppOnboardingMissedSteps v-if="!completed && missedSteps.length" :steps="missedSteps" :selected-id="selectedStep.id" @select="selectStep" />
-
       <div class="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/15 dark:bg-slate-900" :class="{ 'lg:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)]': checklistOpen }">
         <nav class="border-b border-slate-200 px-4 py-3 sm:px-6 dark:border-white/15" :class="{ 'sm:py-6 lg:border-b-0 lg:border-r': checklistOpen }" :aria-label="t('builder-checklist-tasks-title')">
           <!-- One task at a time, like the live-update checklist; the full list stays one click away. -->
@@ -303,9 +297,8 @@ function statusLabel(status: BuilderStepStatus) {
                 @click="selectStep(step.id)"
               >
                 <IconCheck v-if="step.status === 'done'" class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" :aria-label="statusLabel(step.status)" />
-                <IconMinus v-else-if="step.status === 'skipped'" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="statusLabel(step.status)" />
-                <IconAlertTriangle v-else-if="missedIds.includes(step.id)" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="t('setup-checklist-missed-status')" />
-                <IconCircle v-else class="mt-0.5 h-5 w-5 shrink-0 text-slate-400" :aria-label="statusLabel(step.status)" />
+                <IconMinus v-else-if="step.status === 'skipped'" class="mt-0.5 h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" :aria-label="statusLabel(step.status)" />
+                <IconCircle v-else class="mt-0.5 h-5 w-5 shrink-0" :class="currentStep?.id === step.id ? 'text-azure-500' : 'text-slate-400'" :aria-label="statusLabel(step.status)" />
                 <span class="mt-0.5 shrink-0 text-xs text-slate-400" aria-hidden="true">{{ step.index + 1 }}.</span>
                 <span class="min-w-0 flex-1 text-base leading-6" :class="{ 'font-medium': selectedStep.id === step.id }">
                   {{ step.title }}
@@ -332,7 +325,7 @@ function statusLabel(status: BuilderStepStatus) {
           </template>
           <template v-else>
             <p class="text-sm font-medium text-sky-700 dark:text-azure-400">
-              {{ t(isSelectedMissed ? 'setup-checklist-missed-task-number' : selectedStep.id === currentStep?.id ? 'setup-checklist-current-task-number' : 'setup-checklist-task-number', { number: selectedStep.index + 1, total: steps.length }) }}
+              {{ t(selectedStep.id === currentStep?.id ? 'setup-checklist-current-task-number' : 'setup-checklist-task-number', { number: selectedStep.index + 1, total: steps.length }) }}
             </p>
             <h2 class="mt-3 text-2xl font-semibold leading-tight text-slate-950 sm:text-3xl dark:text-white">
               {{ selectedStep.title }}
@@ -340,8 +333,6 @@ function statusLabel(status: BuilderStepStatus) {
             <p class="mt-4 max-w-prose text-base leading-7 text-slate-600 dark:text-slate-300">
               {{ selectedStep.description }}
             </p>
-
-            <AppOnboardingSkipStep v-if="isSelectedMissed" :key="`${viewedPlatform}-${selectedStep.id}`" test-id="builder-checklist" skippable :skipping="skipping" @skip="skipSelectedStep" />
 
             <template v-if="isFirstStep">
               <p class="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -370,11 +361,13 @@ function statusLabel(status: BuilderStepStatus) {
               {{ t('builder-checklist-follow-terminal') }}
             </p>
 
+            <AppOnboardingSkipStep v-if="canSkipSelected" :key="`${viewedPlatform}-${selectedStep.id}`" test-id="builder-checklist" :skipping="skipping" @skip="skipSelectedStep" />
+
             <output class="mt-7 block border-t border-slate-200 py-5 text-sm dark:border-white/15" aria-live="polite" aria-atomic="true">
               <span class="flex items-center gap-3 font-medium text-slate-800 dark:text-slate-200">
                 <IconInfo v-if="refreshError" class="h-5 w-5 text-amber-600" aria-hidden="true" />
                 <IconCheck v-else-if="selectedStep.status === 'done'" class="h-5 w-5 text-emerald-600" aria-hidden="true" />
-                <IconMinus v-else-if="selectedStep.status === 'skipped'" class="h-5 w-5 text-amber-600" aria-hidden="true" />
+                <IconMinus v-else-if="selectedStep.status === 'skipped'" class="h-5 w-5 text-slate-400" aria-hidden="true" />
                 <IconLoader v-else class="h-5 w-5 text-slate-400 motion-safe:animate-spin" aria-hidden="true" />
                 {{ refreshError ? t('setup-checklist-refresh-error') : statusLabel(selectedStep.status) }}
               </span>
