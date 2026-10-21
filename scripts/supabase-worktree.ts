@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { getSupabaseWorktreeConfig } from './supabase-worktree-config'
 
@@ -79,6 +79,18 @@ function ensureSymlink(linkPath: string, targetPath: string): void {
 
   mkdirSync(dirname(linkPath), { recursive: true })
   symlinkSync(targetPath, linkPath)
+}
+
+/**
+ * Replace `destPath` with a fresh copy of the `sourcePath` directory.
+ *
+ * Supabase CLI resolves `content_path` through symlinks and rejects files that end up outside
+ * the workdir, so email templates must be real files inside the per-worktree workdir.
+ */
+function ensureCopiedDir(destPath: string, sourcePath: string): void {
+  rmSync(destPath, { force: true, recursive: true })
+  mkdirSync(dirname(destPath), { recursive: true })
+  cpSync(sourcePath, destPath, { recursive: true, dereference: true })
 }
 
 /**
@@ -168,7 +180,7 @@ function ensureFunctionsEnvFile(repoRoot: string, workdir: string, cfg: ReturnTy
  * Create (or update) the per-worktree Supabase workdir under `.context/`.
  *
  * The resulting directory is suitable to pass to `supabase --workdir`, and contains a rewritten
- * `supabase/config.toml` plus symlinks to the project's Supabase assets.
+ * `supabase/config.toml`, copied email templates, and symlinks to the project's other Supabase assets.
  */
 function ensureWorktreeSupabaseDir(repoRoot: string): { workdir: string, cfg: ReturnType<typeof getSupabaseWorktreeConfig> } {
   const cfg = getSupabaseWorktreeConfig(repoRoot)
@@ -189,8 +201,8 @@ function ensureWorktreeSupabaseDir(repoRoot: string): { workdir: string, cfg: Re
   }
 
   if (existsSync(repoTemplatesDir)) {
-    ensureSymlink(resolve(workdir, 'templates'), repoTemplatesDir)
-    ensureSymlink(resolve(supaDir, 'templates'), repoTemplatesDir)
+    ensureCopiedDir(resolve(workdir, 'templates'), repoTemplatesDir)
+    ensureCopiedDir(resolve(supaDir, 'templates'), repoTemplatesDir)
   }
 
   const baseConfig = readFileSync(resolve(repoSupaDir, 'config.toml'), 'utf8')

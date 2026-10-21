@@ -414,6 +414,7 @@
     "eslint-plugin-unused-imports": "4.4.1",
     "happy-dom": "^21.0.4",
     "jose": "^6.2.13",
+    "jsonc-parser": "^3.3.1",
     "knip": "^6.42.1",
     "miniflare": "^5.20261019.1-beta",
     "oxlint": "^1.89.0",
