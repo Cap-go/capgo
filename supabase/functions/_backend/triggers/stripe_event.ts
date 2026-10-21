@@ -1727,13 +1727,13 @@ async function handleCanceledSubscriptionStripeEvent(
 }
 
 // The trial plan subscription only converts the org once its first invoice is paid.
-async function isUnpaidTrialPlanSubscription(c: Context<MiddlewareKeyVariablesStripe>, stripeEvent: Stripe.Event) {
+async function getTrialPlanPaymentState(c: Context<MiddlewareKeyVariablesStripe>, stripeEvent: Stripe.Event): Promise<'paid' | 'unpaid' | null> {
   if (stripeEvent.type !== 'customer.subscription.created' && stripeEvent.type !== 'customer.subscription.updated')
-    return false
+    return null
   const subscription = stripeEvent.data.object
   if (!isTrialPlanSubscription(subscription))
-    return false
-  return !await settleTrialPlanFirstInvoice(c, getStripe(c, getWebhookBillingAccount(c)), subscription)
+    return null
+  return await settleTrialPlanFirstInvoice(c, getStripe(c, getWebhookBillingAccount(c)), subscription) ? 'paid' : 'unpaid'
 }
 
 async function handleSubscriptionStripeEvent(
@@ -1744,7 +1744,12 @@ async function handleSubscriptionStripeEvent(
   customer: StripeInfoRow,
 ) {
   if (isSubscriptionUpdateStatus(stripeData.data.status) && stripeData.data.price_id && stripeData.data.product_id) {
-    if (await isUnpaidTrialPlanSubscription(c, stripeEvent)) {
+    const trialPlanPayment = await getTrialPlanPaymentState(c, stripeEvent)
+    // A first payment recovered after a decline arrives as an update: record it as the
+    // conversion (paid_at, new business, subscribe event) the deferred create skipped.
+    if (trialPlanPayment === 'paid' && customer.status !== 'succeeded')
+      stripeData.data.status = 'created'
+    if (trialPlanPayment === 'unpaid') {
       // Keep the live subscription visible to Billing (pay now, cancel) without converting the org.
       cloudlog({ requestId: c.get('requestId'), message: 'Trial plan subscription waits for its first payment', subscriptionId: stripeData.data.subscription_id })
       stripeData.data.status = 'failed'

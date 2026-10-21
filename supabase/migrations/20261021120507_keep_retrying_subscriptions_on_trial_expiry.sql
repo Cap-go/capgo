@@ -15,7 +15,7 @@ BEGIN
     status = 'canceled',
     canceled_at = COALESCE(canceled_at, trial_at)
   WHERE (status IS NULL OR status NOT IN ('succeeded', 'deleted', 'canceled'))
-    AND NOT (status = 'failed' AND subscription_id IS NOT NULL)
+    AND (status IS DISTINCT FROM 'failed' OR subscription_id IS NULL)
     AND trial_at IS NOT NULL
     AND trial_at < NOW();
 END;

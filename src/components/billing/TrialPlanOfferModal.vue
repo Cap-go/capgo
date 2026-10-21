@@ -78,7 +78,9 @@ async function accept() {
   try {
     const result = await scheduleTrialPlan(offerOrgId)
     track('trial_plan_offer_accepted')
-    toast.success(t('trial-plan-scheduled', { plan: result.plan.planName, date: formatLocalDate(result.plan.startsAt) }))
+    // The schedule is right for the original org; only skip the toast once the user moved on.
+    if (props.orgId === offerOrgId)
+      toast.success(t('trial-plan-scheduled', { plan: result.plan.planName, date: formatLocalDate(result.plan.startsAt) }))
     emit('scheduled', result.plan)
   }
   catch (error) {

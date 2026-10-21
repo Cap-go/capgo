@@ -5,6 +5,7 @@ import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { findLatestOpenSubscriptionInvoice, getActiveSubscriptionId, getStripe, syncSubscriptionData } from './stripe.ts'
 import { getBillingAccountForCustomer, getStripePublishableKey, isStripeConfiguredForAccount } from './stripe_billing.ts'
+import { releaseTrialPlanSchedule } from './stripe_trial_plan.ts'
 
 // In-app replacements for the Stripe billing portal and hosted invoice page.
 
@@ -225,28 +226,9 @@ async function requireActiveSubscriptionId(c: Context, ctx: InAppBillingContext)
 }
 
 // Ends at period end, like the portal did; the reason is kept on the Stripe subscription.
-// Stripe rejects direct updates to a subscription a schedule still manages (the trial plan
-// schedule): release it so the subscription can be canceled or resumed like any other.
-export async function releaseSubscriptionSchedule(c: Context, stripe: Stripe, subscriptionId: string) {
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
-  const scheduleId = typeof subscription.schedule === 'string' ? subscription.schedule : subscription.schedule?.id
-  if (!scheduleId)
-    return
-  try {
-    await stripe.subscriptionSchedules.release(scheduleId)
-    cloudlog({ requestId: c.get('requestId'), message: 'subscription schedule released', subscriptionId, scheduleId })
-  }
-  catch (error) {
-    // Already released or completed by a concurrent request.
-    const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId)
-    if (schedule.status === 'active' || schedule.status === 'not_started')
-      throw error
-  }
-}
-
 export async function scheduleSubscriptionCancel(c: Context, ctx: InAppBillingContext, feedback: CancelFeedback, comment?: string) {
   const subscriptionId = await requireActiveSubscriptionId(c, ctx)
-  await releaseSubscriptionSchedule(c, ctx.stripe, subscriptionId)
+  await releaseTrialPlanSchedule(c, ctx.stripe, subscriptionId)
   await ctx.stripe.subscriptions.update(subscriptionId, {
     cancel_at_period_end: true,
     cancellation_details: { feedback, ...(comment ? { comment } : {}) },
@@ -258,7 +240,7 @@ export async function scheduleSubscriptionCancel(c: Context, ctx: InAppBillingCo
 
 export async function resumeSubscription(c: Context, ctx: InAppBillingContext) {
   const subscriptionId = await requireActiveSubscriptionId(c, ctx)
-  await releaseSubscriptionSchedule(c, ctx.stripe, subscriptionId)
+  await releaseTrialPlanSchedule(c, ctx.stripe, subscriptionId)
   // Clear both cancel styles: period end, and an explicit cancel_at date.
   await ctx.stripe.subscriptions.update(subscriptionId, {
     cancel_at: '',

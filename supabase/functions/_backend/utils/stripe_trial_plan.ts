@@ -6,15 +6,13 @@ import { syncBentoSubscriberTags, trackBentoEvent } from './bento.ts'
 import { TRIAL_CARD_BENTO_TAG } from './billing_bento_tags.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { findPlanByProductId, getPlanPriceId, isAutomaticTaxEnabled } from './stripe_billing.ts'
-import { releaseSubscriptionSchedule } from './stripe_in_app.ts'
+import { findPlanByProductId, getPlanPriceId, isAutomaticTaxEnabled, TRIAL_PLAN_SCHEDULE_METADATA_KEY } from './stripe_billing.ts'
 import { supabaseAdmin } from './supabase.ts'
 
 // Starts the plan picked during onboarding when the free trial ends, charging the saved card.
 // A subscription schedule creates no subscription until its start date, so the org stays a
 // trial org (no paying flag, revenue or "subscribed" emails) until Stripe actually bills it.
 
-export const TRIAL_PLAN_SCHEDULE_METADATA_KEY = 'capgo_trial_plan'
 export const TRIAL_CARD_ADDED_BENTO_EVENT = 'org:trial_card_added'
 export const TRIAL_PLAN_CANCELED_BENTO_EVENT = 'org:trial_plan_canceled'
 
@@ -230,9 +228,10 @@ export async function scheduleTrialPlan(c: Context, ctx: InAppBillingContext, or
       metadata: { [TRIAL_PLAN_SCHEDULE_METADATA_KEY]: 'true', org_id: orgId },
     })
     cloudlog({ requestId: c.get('requestId'), message: 'trial plan scheduled', orgId, scheduleId: schedule.id, startsAt: state.startsAt.toISOString() })
-    // No idempotency key (it would replay a canceled schedule): drop duplicates from double submits instead.
-    await cancelDuplicateTrialPlanSchedules(c, ctx.stripe, ctx.customerId)
   }
+  // No idempotency key (it would replay a canceled schedule): drop duplicates from concurrent
+  // submits instead, on every call so a retry repairs a cleanup that failed earlier.
+  await cancelDuplicateTrialPlanSchedules(c, ctx.stripe, ctx.customerId)
 
   const summary = await getTrialPlanSummary(c, ctx)
   if (!summary)
@@ -303,6 +302,21 @@ export async function settleTrialPlanFirstInvoice(c: Context, stripe: Stripe, su
   // The schedule only existed to start the plan: release it so plan changes and
   // cancellation work like any other subscription.
   if (subscription.schedule)
-    await releaseSubscriptionSchedule(c, stripe, subscription.id)
+    await releaseTrialPlanSchedule(c, stripe, subscription.id)
   return true
+}
+
+// Stripe rejects direct updates to a subscription a schedule still manages. Release the
+// trial plan schedule (it only existed to start the plan) so cancel/resume work; other
+// schedules keep their future phases.
+export async function releaseTrialPlanSchedule(c: Context, stripe: Stripe, subscriptionId: string) {
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+  const scheduleId = typeof subscription.schedule === 'string' ? subscription.schedule : subscription.schedule?.id
+  if (!scheduleId)
+    return
+  const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId)
+  if (schedule.metadata?.[TRIAL_PLAN_SCHEDULE_METADATA_KEY] !== 'true' || (schedule.status !== 'active' && schedule.status !== 'not_started'))
+    return
+  await stripe.subscriptionSchedules.release(scheduleId)
+  cloudlog({ requestId: c.get('requestId'), message: 'trial plan schedule released', subscriptionId, scheduleId })
 }

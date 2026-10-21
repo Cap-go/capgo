@@ -1,9 +1,10 @@
 BEGIN;
-SELECT plan(6);
+SELECT plan(7);
 
 INSERT INTO public.stripe_info (customer_id, status, product_id, trial_at, is_good_plan, subscription_id, past_due_at)
 VALUES
   ('cus_trial_expiry_trial', NULL, 'prod_LQIregjtNduh4q', now() - interval '1 day', true, NULL, NULL),
+  ('cus_trial_expiry_null_sub', NULL, 'prod_LQIregjtNduh4q', now() - interval '1 day', true, 'sub_trial_expiry_null_sub', NULL),
   ('cus_trial_expiry_retry', 'failed', 'prod_LQIregjtNduh4q', now() - interval '200 days', true, 'sub_trial_expiry_retry', now() - interval '2 days'),
   ('cus_trial_expiry_nosub', 'failed', 'prod_LQIregjtNduh4q', now() - interval '1 day', true, NULL, NULL),
   ('cus_trial_expiry_paying', 'succeeded', 'prod_LQIregjtNduh4q', now() - interval '200 days', true, 'sub_trial_expiry_paying', NULL);
@@ -14,6 +15,11 @@ SELECT is(
   (SELECT status::text FROM public.stripe_info WHERE customer_id = 'cus_trial_expiry_trial'),
   'canceled',
   'expired never-converted trial is canceled'
+);
+SELECT is(
+  (SELECT status::text FROM public.stripe_info WHERE customer_id = 'cus_trial_expiry_null_sub'),
+  'canceled',
+  'expired trial with a NULL status and a subscription id is still canceled'
 );
 SELECT is(
   (SELECT status::text FROM public.stripe_info WHERE customer_id = 'cus_trial_expiry_retry'),

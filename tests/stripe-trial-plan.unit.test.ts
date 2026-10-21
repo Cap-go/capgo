@@ -2,6 +2,7 @@ import type Stripe from 'stripe'
 import { describe, expect, it, vi } from 'vitest'
 import {
   cancelDuplicateTrialPlanSchedules,
+  releaseTrialPlanSchedule,
   cancelTrialPlanScheduleForSubscription,
   findPendingTrialPlanSchedule,
   getTrialPlanStartDate,
@@ -31,7 +32,10 @@ function fakeInvoiceStripe(invoice: Partial<Stripe.Invoice>, payResult: 'paid' |
   const stripe = {
     invoices: { retrieve: vi.fn(async () => ({ ...state })), finalizeInvoice, pay },
     subscriptions: { retrieve: vi.fn(async (id: string) => ({ id, schedule: 'sub_sched_trial' })) },
-    subscriptionSchedules: { release },
+    subscriptionSchedules: {
+      release,
+      retrieve: vi.fn(async (id: string) => ({ id, status: 'active', metadata: { capgo_trial_plan: 'true' } })),
+    },
   } as unknown as Stripe
   return { stripe, finalizeInvoice, pay, release }
 }
@@ -122,5 +126,28 @@ describe('trial plan first invoice', () => {
     const { stripe, pay } = fakeInvoiceStripe({ id: 'in_1', status: 'open', billing_reason: 'subscription_cycle' }, 'declined')
     expect(await settleTrialPlanFirstInvoice(context, stripe, trialSubscription)).toBe(true)
     expect(pay).not.toHaveBeenCalled()
+  })
+})
+
+describe('trial plan schedule release', () => {
+  function stripeWithSchedule(metadata: Record<string, string>) {
+    const release = vi.fn(async (id: string) => ({ id }))
+    const stripe = {
+      subscriptions: { retrieve: vi.fn(async (id: string) => ({ id, schedule: 'sub_sched_1' })) },
+      subscriptionSchedules: { retrieve: vi.fn(async (id: string) => ({ id, status: 'active', metadata })), release },
+    } as unknown as Stripe
+    return { stripe, release }
+  }
+
+  it('releases the trial plan schedule before cancel or resume', async () => {
+    const { stripe, release } = stripeWithSchedule({ capgo_trial_plan: 'true' })
+    await releaseTrialPlanSchedule(context, stripe, 'sub_1')
+    expect(release).toHaveBeenCalledWith('sub_sched_1')
+  })
+
+  it('leaves other schedules and their future phases alone', async () => {
+    const { stripe, release } = stripeWithSchedule({})
+    await releaseTrialPlanSchedule(context, stripe, 'sub_1')
+    expect(release).not.toHaveBeenCalled()
   })
 })
