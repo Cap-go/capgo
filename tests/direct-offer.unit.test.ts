@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { computeNewOrgTrialEnd, DEFAULT_TRIAL_DAYS, isDirectOfferMetadata, isDirectOfferUser, resolveNewOrgTrialEnd } from '../supabase/functions/_backend/utils/direct_offer.ts'
+import { computeNewOrgTrialEnd, DEFAULT_TRIAL_DAYS, getDirectOfferStatus, isDirectOfferMetadata, isDirectOfferUser, resolveNewOrgTrialEnd } from '../supabase/functions/_backend/utils/direct_offer.ts'
 
 describe('direct offer trial', () => {
   it.concurrent('only the literal direct value is a direct offer', () => {
@@ -27,8 +27,8 @@ describe('direct offer trial', () => {
   })
 
   const context = { get: () => 'direct-offer-test' } as any
-  function admin(result: { metadata?: Record<string, unknown>, error?: Error }) {
-    return { auth: { admin: { getUserById: vi.fn(async () => ({ data: { user: result.error ? null : { user_metadata: result.metadata ?? {} } }, error: result.error ?? null })) } } }
+  function admin(result: { metadata?: Record<string, unknown>, userMetadata?: Record<string, unknown>, error?: Error }) {
+    return { auth: { admin: { getUserById: vi.fn(async () => ({ data: { user: result.error ? null : { app_metadata: result.metadata ?? {}, user_metadata: result.userMetadata ?? {} } }, error: result.error ?? null })) } } }
   }
 
   it.concurrent('resolveNewOrgTrialEnd rethrows a failed lookup instead of granting a trial', async () => {
@@ -47,8 +47,14 @@ describe('direct offer trial', () => {
     expect(direct.getTime()).toBeLessThanOrEqual(Date.now())
   })
 
-  it.concurrent('isDirectOfferUser swallows lookup failures by default (Bento tagging)', async () => {
-    await expect(isDirectOfferUser(context, admin({ error: new Error('auth unavailable') }), 'user-id')).resolves.toBe(false)
-    await expect(isDirectOfferUser(context, admin({ error: new Error('auth unavailable') }), 'user-id', { throwOnError: true })).rejects.toThrow('auth unavailable')
+  it.concurrent('getDirectOfferStatus reports a failed lookup as unknown; isDirectOfferUser throws', async () => {
+    await expect(getDirectOfferStatus(context, admin({ error: new Error('auth unavailable') }), 'user-id')).resolves.toBeNull()
+    await expect(isDirectOfferUser(context, admin({ error: new Error('auth unavailable') }), 'user-id')).rejects.toThrow('auth unavailable')
+  })
+
+  it.concurrent('reads the offer from server-only app metadata, not user metadata', async () => {
+    await expect(isDirectOfferUser(context, admin({ metadata: { offer: 'direct' } }), 'user-id')).resolves.toBe(true)
+    await expect(isDirectOfferUser(context, admin({ userMetadata: { offer: 'direct' } }), 'user-id')).resolves.toBe(false)
+    await expect(getDirectOfferStatus(context, admin({}), 'user-id')).resolves.toBe(false)
   })
 })

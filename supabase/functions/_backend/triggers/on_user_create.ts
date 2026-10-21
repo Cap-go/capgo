@@ -5,6 +5,7 @@ import { Hono } from 'hono/tiny'
 import { syncNewUserABTests } from '../utils/ab_tests.ts'
 import { syncBentoSubscriberTags, trackBentoEvent } from '../utils/bento.ts'
 import { normalizeBentoEmail, prepareNewUserProvisioning, syncBentoFirstOrgOnUserCreate } from '../utils/bento_first_org.ts'
+import { directOfferTrialTagsToRemove } from '../utils/billing_bento_tags.ts'
 import { DIRECT_OFFER_BENTO_TAG, isDirectOfferMetadata } from '../utils/direct_offer.ts'
 import { BRES, middlewareAPISecret, quickError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -17,11 +18,18 @@ import { backgroundTask } from '../utils/utils.ts'
 export const app = new Hono<MiddlewareKeyVariables>()
 const BENTO_REGISTERED_FROM_MOBILE_EVENT = 'user:registered_from_mobile'
 
-async function getRegistrationMetadata(c: Context, userId: string) {
+async function getAuthUser(c: Context, userId: string) {
   const { data, error } = await supabaseAdmin(c).auth.admin.getUserById(userId)
   if (error)
     throw error
-  return data.user.user_metadata ?? {}
+  return data.user
+}
+
+async function getTrialPlanNames(c: Context) {
+  const { data, error } = await supabaseAdmin(c).from('plans').select('name')
+  if (error)
+    throw error
+  return (data ?? []).map(plan => plan.name)
 }
 
 app.post('/', middlewareAPISecret, triggerValidator('users', 'INSERT'), async (c) => {
@@ -34,19 +42,22 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'INSERT'), async (c
   if (!shouldProvisionUser)
     return c.json(BRES)
 
-  const registrationMetadata = await getRegistrationMetadata(c, record.id)
+  const authUser = await getAuthUser(c, record.id)
+  const registrationMetadata = authUser.user_metadata ?? {}
   await createApiKey(c, record.id)
   await syncNewUserABTests(c, normalizeBentoEmail(record.email), record)
   cloudlog({ requestId: c.get('requestId'), message: 'createCustomer stripe' })
   await syncUserPreferenceTags(c, normalizeBentoEmail(record.email), record)
   await syncBentoFirstOrgOnUserCreate(c, record)
-  if (isDirectOfferMetadata(registrationMetadata)) {
+  // The offer lives in server-only app metadata (set by /auth/register and the Apple flow).
+  if (isDirectOfferMetadata(authUser.app_metadata)) {
     // Direct-offer (paid ads) signups: tag offer=direct so lifecycle emails can
-    // target them; they never get trial tags. Tag writes are idempotent on retry.
+    // target them, and remove trial tags a reused Bento subscriber may still
+    // carry. Tag writes are idempotent on retry.
     const tagged = await syncBentoSubscriberTags(c, {
       email: normalizeBentoEmail(record.email),
       segments: [DIRECT_OFFER_BENTO_TAG],
-      deleteSegments: [],
+      deleteSegments: directOfferTrialTagsToRemove(await getTrialPlanNames(c)),
     })
     if (tagged === false)
       quickError(500, 'bento_direct_offer_tag_failed', 'Bento direct offer tag delivery failed')

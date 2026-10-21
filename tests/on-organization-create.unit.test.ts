@@ -14,7 +14,7 @@ const {
   creatorMetadata,
 } = vi.hoisted(() => ({
   syncBentoSubscriberTagsMock: vi.fn(async (..._args: unknown[]) => undefined),
-  creatorMetadata: { value: {} as Record<string, unknown> },
+  creatorMetadata: { value: {} as Record<string, unknown> | Error },
   createStripeCustomerMock: vi.fn(async () => 'Solo'),
   finalizePendingStripeCustomerMock: vi.fn(async () => 'Solo'),
   backgroundTaskMock: vi.fn(async (c: unknown, task: unknown) => task),
@@ -97,7 +97,9 @@ function mockOrgReload(customerId: string | null) {
   supabaseAdminMock.mockImplementation(() => ({
     auth: {
       admin: {
-        getUserById: async () => ({ data: { user: { user_metadata: creatorMetadata.value } }, error: null }),
+        getUserById: async () => creatorMetadata.value instanceof Error
+          ? { data: { user: null }, error: creatorMetadata.value }
+          : { data: { user: { app_metadata: creatorMetadata.value } }, error: null },
       },
     },
     from: (table: string) => {
@@ -174,11 +176,28 @@ describe('on_organization_create stripe bootstrap', () => {
     expect(syncBentoSubscriberTagsMock).toHaveBeenCalledWith(expect.anything(), {
       email: 'owner@example.com',
       segments: ['offer=direct'],
-      deleteSegments: ['trial-plan:Solo'],
+      deleteSegments: ['trial-plan:Solo', 'trial', 'trial7', 'trial1', 'trial0', 'trial-card-on-file'],
     })
     const sentSegments = (syncBentoSubscriberTagsMock.mock.calls as unknown as Array<[unknown, { segments: string[] }]>)
       .flatMap(call => call[1].segments)
     expect(sentSegments.some(tag => tag.startsWith('trial'))).toBe(false)
+  })
+
+  it('skips trial tags when the direct-offer lookup fails', async () => {
+    creatorMetadata.value = new Error('auth unavailable')
+    mockOrgReload(`pending_${ORG_ID}`)
+    const { app } = await import('../supabase/functions/_backend/triggers/on_organization_create.ts')
+
+    const response = await app.request('http://localhost/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ table: 'orgs', type: 'INSERT', record: createOrg(null) }),
+    })
+
+    expect(response.status).toBe(200)
+    const sentSegments = (syncBentoSubscriberTagsMock.mock.calls as unknown as Array<[unknown, { segments: string[] }]>)
+      .flatMap(call => call[1].segments)
+    expect(sentSegments.some(tag => tag.startsWith('trial') || tag === 'offer=direct')).toBe(false)
   })
 
   it('persists signup_plugin and attaches attribution tags on Org Created', async () => {

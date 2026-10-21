@@ -12,17 +12,27 @@ describe('billing plan Bento tags', () => {
     expect(buildBillingPlanBentoTags(plan, state, allPlans as string[] | undefined)).toEqual({ segments, deleteSegments })
   })
 
-  it.concurrent('tags direct-offer users offer=direct and never adds trial tags', () => {
+  it.concurrent('tags direct-offer users offer=direct, never adds trial tags and removes legacy ones', () => {
     expect(applyDirectOfferBentoTags(buildBillingPlanBentoTags('Solo', 'trial'), true)).toEqual({
       segments: ['offer=direct'],
-      deleteSegments: ['trial-plan:Solo'],
+      deleteSegments: ['trial-plan:Solo', 'trial', 'trial7', 'trial1', 'trial0', 'trial-card-on-file'],
     })
     expect(applyDirectOfferBentoTags({
       segments: ['capgo', 'onboarded', 'trial', 'trial0'],
       deleteSegments: ['trial7', 'trial1', 'paying'],
-    }, true)).toEqual({
+    }, true, ['Solo', 'Team'])).toEqual({
       segments: ['capgo', 'onboarded', 'offer=direct'],
-      deleteSegments: ['trial7', 'trial1', 'paying', 'trial', 'trial0'],
+      deleteSegments: ['trial7', 'trial1', 'paying', 'trial', 'trial0', 'trial-card-on-file', 'trial-plan:Solo', 'trial-plan:Team'],
+    })
+  })
+
+  it.concurrent('skips trial tags without touching anything else when the offer is unknown', () => {
+    expect(applyDirectOfferBentoTags({
+      segments: ['capgo', 'trial', 'trial7', 'trial-plan:Solo'],
+      deleteSegments: ['paying'],
+    }, null)).toEqual({
+      segments: ['capgo'],
+      deleteSegments: ['paying'],
     })
   })
 

@@ -1,7 +1,9 @@
 -- Paid-ads signups ("pay first") get no free trial.
 --
--- The website sets auth user metadata `offer = 'direct'` at signup for visitors
--- coming from paid ads. When the org creator carries that flag, the default
+-- Signups from paid ads send `offer = 'direct'` to /auth/register (or the Apple
+-- flow), which stores it in server-controlled auth app metadata
+-- (raw_app_meta_data). Users can edit raw_user_meta_data, so it is never read
+-- here. When the org creator carries that flag, the default
 -- stripe_info row is created with trial_at = NOW() (a zero-length trial) instead
 -- of NOW() + 15 days. Only the literal value 'direct' has any effect; every
 -- other value (or no value) keeps the standard 15-day trial.
@@ -75,7 +77,7 @@ BEGIN
     SELECT 1
     FROM auth.users
     WHERE id = NEW.created_by
-      AND raw_user_meta_data ->> 'offer' = 'direct'
+      AND raw_app_meta_data ->> 'offer' = 'direct'
   ) THEN
     -- Direct offer (paid ads): no trial, the user must subscribe first.
     trial_at_date := NOW();

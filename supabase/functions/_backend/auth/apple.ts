@@ -10,7 +10,7 @@ import { checkRegistrationEmail, getCaptchaSecret, isAuthRateLimitError, isCaptc
 import { appleHash, appleQuery, appleRandom, closeAppleQueryClient, openAppleCredential, rememberAppleName, sealAppleCredential } from '../utils/appleAuthStore.ts'
 import { isAppleSignInConfigured, verifyAppleIdentity } from '../utils/appleSignIn.ts'
 import { CacheHelper } from '../utils/cache.ts'
-import { DIRECT_OFFER, isDirectOfferMetadata } from '../utils/direct_offer.ts'
+import { isDirectOfferMetadata, persistDirectOffer } from '../utils/direct_offer.ts'
 import { simpleErrorWithStatus, useCors } from '../utils/hono.ts'
 import { getClientIP } from '../utils/rate_limit.ts'
 import { emptySupabaseWithClientIP, supabaseAdmin } from '../utils/supabase.ts'
@@ -172,12 +172,15 @@ async function updateRegistrationMetadata(c: Context, client: AuthClient, user: 
     if (key.startsWith('registration_') && value)
       metadata[key] = value
   }
-  if (isDirectOfferMetadata(rawMetadata))
-    metadata.offer = DIRECT_OFFER
   // Hooks read auth metadata when the public profile insert queues on_user_create.
   const updated = await client.auth.updateUser({ data: Object.fromEntries(Object.entries(metadata).filter(([key]) => !user.user_metadata[key])) })
   if (updated.error)
     throw new AppleAuthError(500, 'apple_login_failed')
+  // Paid-ads signups get no free trial. The offer goes in server-only app
+  // metadata (users can edit user_metadata), before the profile insert creates
+  // the first org. Only new users reach this point.
+  if (isDirectOfferMetadata(rawMetadata))
+    await persistDirectOffer(supabaseAdmin(c), user.id).catch(() => { throw new AppleAuthError(500, 'apple_login_failed') })
 }
 
 async function saveProfile(c: Context, client: AuthClient, user: User & { email: string }, name: AppleName, metadata: AppleCredential['registration_metadata']) {

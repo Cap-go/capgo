@@ -19,9 +19,9 @@ const {
   const pgReleaseMock = vi.fn<(destroy?: Error | boolean) => void>(() => undefined)
   const pgConnectMock = vi.fn(async () => ({ query: pgQueryMock, release: pgReleaseMock }))
   const getUserByIdMock = vi.fn<(userId: string) => Promise<{
-    data: { user: { user_metadata: Record<string, unknown> | null } | null }
+    data: { user: { app_metadata?: Record<string, unknown> | null, user_metadata: Record<string, unknown> | null } | null }
     error: Error | null
-  }>>(async () => ({ data: { user: { user_metadata: {} } }, error: null }))
+  }>>(async () => ({ data: { user: { app_metadata: {}, user_metadata: {} } }, error: null }))
   return {
     closeClientMock: vi.fn(async () => undefined),
     createApiKeyMock: vi.fn(async () => undefined),
@@ -79,7 +79,10 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', async () => ({
 
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   createApiKey: createApiKeyMock,
-  supabaseAdmin: vi.fn(() => ({ auth: { admin: { getUserById: getUserByIdMock } } })),
+  supabaseAdmin: vi.fn(() => ({
+    auth: { admin: { getUserById: getUserByIdMock } },
+    from: () => ({ select: async () => ({ data: [{ name: 'Solo' }, { name: 'Team' }], error: null }) }),
+  })),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/tracking.ts', () => ({
@@ -166,8 +169,8 @@ function userRecord(overrides: Record<string, unknown> = {}) {
   }
 }
 
-function mockRegistrationMetadata(user_metadata: Record<string, unknown> | null) {
-  getUserByIdMock.mockResolvedValue({ data: { user: { user_metadata } }, error: null })
+function mockRegistrationMetadata(user_metadata: Record<string, unknown> | null, app_metadata: Record<string, unknown> = {}) {
+  getUserByIdMock.mockResolvedValue({ data: { user: { app_metadata, user_metadata } }, error: null })
 }
 
 async function postUser(record = userRecord()) {
@@ -267,21 +270,31 @@ describe('first-organization lifecycle on user registration', () => {
     }
   })
 
-  it('tags direct-offer signups offer=direct in Bento', async () => {
-    mockRegistrationMetadata({ offer: 'direct' })
+  it('tags direct-offer signups offer=direct in Bento and removes trial tags', async () => {
+    mockRegistrationMetadata({}, { offer: 'direct' })
 
     const response = await postUser()
 
     expect(response.status).toBe(200)
     expect(syncBentoSubscriberTagsMock).toHaveBeenCalledWith(expect.anything(), {
-      deleteSegments: [],
+      deleteSegments: ['trial', 'trial7', 'trial1', 'trial0', 'trial-card-on-file', 'trial-plan:Solo', 'trial-plan:Team'],
       email: 'new.user@example.com',
       segments: ['offer=direct'],
     })
   })
 
+  it('ignores a user-writable offer in user metadata', async () => {
+    mockRegistrationMetadata({ offer: 'direct' })
+
+    const response = await postUser()
+    const sentSegments = syncBentoSubscriberTagsMock.mock.calls.flatMap(call => Array.isArray(call[1]) ? call[1].flatMap(item => item.segments) : call[1].segments)
+
+    expect(response.status).toBe(200)
+    expect(sentSegments).not.toContain('offer=direct')
+  })
+
   it('does not add the offer tag for standard signups', async () => {
-    mockRegistrationMetadata({ offer: 'Direct' })
+    mockRegistrationMetadata({}, { offer: 'Direct' })
 
     const response = await postUser()
     const sentSegments = syncBentoSubscriberTagsMock.mock.calls.flatMap(call => Array.isArray(call[1]) ? call[1].flatMap(item => item.segments) : call[1].segments)

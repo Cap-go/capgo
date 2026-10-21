@@ -10,7 +10,7 @@ import { createClient } from '@supabase/supabase-js'
 import { HTTPException } from 'hono/http-exception'
 import { applyDirectOfferBentoTags, buildBillingPlanBentoTags } from './billing_bento_tags.ts'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
-import { isDirectOfferUser } from './direct_offer.ts'
+import { getDirectOfferStatus } from './direct_offer.ts'
 import { quickError, simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { beginWriteTransaction, checkoutPgClient, closeClient, getPgClient, releasePgClient } from './pg.ts'
@@ -1195,8 +1195,9 @@ export async function customerToSegmentOrg(
 ): Promise<{ segments: string[], deleteSegments: string[] }> {
   // Direct-offer (paid ads) orgs never had a trial: tag offer=direct and strip trial tags.
   // Callers already loaded the org, so reuse its created_by instead of re-reading it.
-  const isDirectOffer = await isDirectOfferUser(c, supabaseAdmin(c), org.created_by)
-  return applyDirectOfferBentoTags(await customerToSegmentOrgBase(c, org.id, price_id, plan, trialPlanNamesToRemove), isDirectOffer)
+  // An unknown offer (lookup failed) only withholds trial tags until a later sync.
+  const directOffer = await getDirectOfferStatus(c, supabaseAdmin(c), org.created_by)
+  return applyDirectOfferBentoTags(await customerToSegmentOrgBase(c, org.id, price_id, plan, trialPlanNamesToRemove), directOffer, trialPlanNamesToRemove)
 }
 
 async function customerToSegmentOrgBase(

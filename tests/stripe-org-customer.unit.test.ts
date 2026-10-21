@@ -91,7 +91,7 @@ function mockSupabase(options: {
   insertError?: { code?: string, message?: string } | null
   updateError?: { message?: string } | null
   deleteError?: { message?: string } | null
-  userMetadata?: Record<string, unknown>
+  appMetadata?: Record<string, unknown>
   userLookupError?: Error
 }) {
   const orgState = { customer_id: options.orgCustomerId }
@@ -111,7 +111,7 @@ function mockSupabase(options: {
       admin: {
         getUserById: async () => options.userLookupError
           ? { data: { user: null }, error: options.userLookupError }
-          : { data: { user: { user_metadata: options.userMetadata ?? {} } }, error: null },
+          : { data: { user: { app_metadata: options.appMetadata ?? {} } }, error: null },
       },
     },
     from: (table: string) => {
@@ -201,7 +201,7 @@ describe('createStripeCustomer', () => {
   })
 
   it('gives direct-offer creators a zero-length trial', async () => {
-    const { stripeInfoInsert } = mockSupabase({ orgCustomerId: LOCAL_ID, userMetadata: { offer: 'direct' } })
+    const { stripeInfoInsert } = mockSupabase({ orgCustomerId: LOCAL_ID, appMetadata: { offer: 'direct' } })
     const before = Date.now()
 
     await createStripeCustomer(createContext(), createOrg(LOCAL_ID))
@@ -213,17 +213,22 @@ describe('createStripeCustomer', () => {
   })
 
   it('fails before creating a Stripe customer when the direct-offer lookup fails', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    const { stripeInfoInsert } = mockSupabase({ orgCustomerId: LOCAL_ID, userLookupError: new Error('auth unavailable') })
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { stripeInfoInsert } = mockSupabase({ orgCustomerId: LOCAL_ID, userLookupError: new Error('auth unavailable') })
 
-    await expect(createStripeCustomer(createContext(), createOrg(LOCAL_ID))).rejects.toThrow('auth unavailable')
+      await expect(createStripeCustomer(createContext(), createOrg(LOCAL_ID))).rejects.toThrow('auth unavailable')
 
-    expect(createCustomerMock).not.toHaveBeenCalled()
-    expect(stripeInfoInsert).not.toHaveBeenCalled()
+      expect(createCustomerMock).not.toHaveBeenCalled()
+      expect(stripeInfoInsert).not.toHaveBeenCalled()
+    }
+    finally {
+      consoleError.mockRestore()
+    }
   })
 
   it('keeps the 15-day trial for creators without the direct offer', async () => {
-    const { stripeInfoInsert } = mockSupabase({ orgCustomerId: LOCAL_ID, userMetadata: { offer: 'other' } })
+    const { stripeInfoInsert } = mockSupabase({ orgCustomerId: LOCAL_ID, appMetadata: { offer: 'other' } })
 
     await createStripeCustomer(createContext(), createOrg(LOCAL_ID))
 
@@ -412,7 +417,7 @@ describe('createStripeCustomer', () => {
     })
 
     supabaseAdminMock.mockImplementation(() => ({
-      auth: { admin: { getUserById: async () => ({ data: { user: { user_metadata: {} } }, error: null }) } },
+      auth: { admin: { getUserById: async () => ({ data: { user: { app_metadata: {} } }, error: null }) } },
       from: (table: string) => {
         if (table === 'orgs') {
           return {

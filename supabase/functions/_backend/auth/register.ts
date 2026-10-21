@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { checkRegistrationEmail, getCaptchaSecret, isAuthRateLimitError, isCaptchaFailedError, provisionUserProfile } from '../utils/accountProvisioning.ts'
-import { DIRECT_OFFER, isDirectOfferMetadata } from '../utils/direct_offer.ts'
+import { isDirectOfferMetadata, persistDirectOffer } from '../utils/direct_offer.ts'
 import { parseBody, simpleErrorWithStatus, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { getPasswordPolicyValidationErrors } from '../utils/password_policy.ts'
@@ -137,8 +137,6 @@ app.post('/', async (c) => {
     if (body[key])
       userMetadata[key] = body[key]
   }
-  if (isDirectOfferMetadata({ offer: body.offer }))
-    userMetadata.offer = DIRECT_OFFER
   if (body.registration_device_type)
     userMetadata.registration_device_type = body.registration_device_type
   if (body.registration_os)
@@ -205,6 +203,24 @@ app.post('/', async (c) => {
     })
     await rollbackCreatedUser(c, userId)
     return simpleErrorWithStatus(c, 500, 'registration_failed', 'Registration failed')
+  }
+
+  // Paid-ads signups get no free trial. Store the offer in server-only app
+  // metadata (users can edit user_metadata) before the profile insert creates
+  // their first org, so the org trigger reads it.
+  if (isDirectOfferMetadata({ offer: body.offer })) {
+    try {
+      await persistDirectOffer(supabaseAdmin(c), userId)
+    }
+    catch (error) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'auth register direct offer persist failed',
+        error: serializeError(error),
+      })
+      await rollbackCreatedUser(c, userId)
+      return simpleErrorWithStatus(c, 500, 'registration_failed', 'Registration failed')
+    }
   }
 
   const { error: profileError } = await provisionUserProfile(c, {
