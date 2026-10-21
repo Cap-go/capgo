@@ -428,10 +428,18 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
           : row
         await route.fulfill({ response, json: Array.isArray(json) ? json.map(withOtaSuccess) : withOtaSuccess(json) })
       })
-      await page.route('**/private/stripe_billing/trial-plan', route => route.fulfill({ json: { card: null, plan: visualTrialPlan(false) } }))
+      let promptRequested = false
+      await page.route('**/private/stripe_billing/trial-plan', (route) => {
+        promptRequested = true
+        return route.fulfill({ json: { card: null, plan: visualTrialPlan(false) } })
+      })
       await page.reload()
-      // The base branch has no prompt: capture the plain dashboard there.
-      await page.locator('[data-test="trial-card-prompt-add"]').waitFor({ timeout: 15_000 }).catch(() => {})
+      const prompt = page.locator('[data-test="trial-card-prompt-add"]')
+      // The base branch never asks for the trial plan: capture the plain dashboard there.
+      // Once the head build asked, the prompt must render or the capture fails.
+      await prompt.waitFor({ timeout: 15_000 }).catch(() => {})
+      if (promptRequested)
+        await prompt.waitFor({ timeout: 5_000 })
     },
   },
   {

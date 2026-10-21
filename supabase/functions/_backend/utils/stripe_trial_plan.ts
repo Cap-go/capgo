@@ -80,9 +80,24 @@ async function loadTrialState(c: Context, ctx: InAppBillingContext): Promise<Tri
   return { planName: plan.name, priceId, startsAt }
 }
 
-export async function findPendingTrialPlanSchedule(stripe: Stripe, customerId: string) {
+async function listPendingTrialPlanSchedules(stripe: Stripe, customerId: string) {
   const schedules = await stripe.subscriptionSchedules.list({ customer: customerId, limit: 100 })
-  return schedules.data.find(schedule => schedule.status === 'not_started' && schedule.metadata?.[TRIAL_PLAN_SCHEDULE_METADATA_KEY] === 'true') ?? null
+  return schedules.data
+    .filter(schedule => schedule.status === 'not_started' && schedule.metadata?.[TRIAL_PLAN_SCHEDULE_METADATA_KEY] === 'true')
+    .sort((a, b) => a.created - b.created)
+}
+
+export async function findPendingTrialPlanSchedule(stripe: Stripe, customerId: string) {
+  return (await listPendingTrialPlanSchedules(stripe, customerId))[0] ?? null
+}
+
+// Keep the oldest pending schedule; concurrent requests may each have created one.
+export async function cancelDuplicateTrialPlanSchedules(c: Context, stripe: Stripe, customerId: string) {
+  const [, ...duplicates] = await listPendingTrialPlanSchedules(stripe, customerId)
+  for (const schedule of duplicates) {
+    await stripe.subscriptionSchedules.cancel(schedule.id)
+    cloudlog({ requestId: c.get('requestId'), message: 'duplicate trial plan schedule canceled', customerId, scheduleId: schedule.id })
+  }
 }
 
 export async function getTrialPlanSummary(c: Context, ctx: InAppBillingContext): Promise<TrialPlanSummary | null> {
@@ -139,9 +154,20 @@ async function ensureCustomerTaxAddress(ctx: InAppBillingContext) {
   })
 }
 
-async function hasDefaultPaymentMethod(ctx: InAppBillingContext) {
+// Older customers can have a card attached without a default; the schedule charges the
+// default, so promote that card instead of failing.
+async function ensureDefaultPaymentMethod(ctx: InAppBillingContext) {
   const customer = await ctx.stripe.customers.retrieve(ctx.customerId)
-  return !customer.deleted && !!customer.invoice_settings?.default_payment_method
+  if (customer.deleted)
+    return false
+  if (customer.invoice_settings?.default_payment_method)
+    return true
+  const cards = await ctx.stripe.paymentMethods.list({ customer: ctx.customerId, type: 'card', limit: 1 })
+  const card = cards.data[0]
+  if (!card)
+    return false
+  await ctx.stripe.customers.update(ctx.customerId, { invoice_settings: { default_payment_method: card.id } })
+  return true
 }
 
 async function getTrialPlanBentoEmails(c: Context, orgId: string, userId: string | undefined) {
@@ -181,7 +207,7 @@ export async function scheduleTrialPlan(c: Context, ctx: InAppBillingContext, or
   const state = await loadTrialState(c, ctx)
   if (!state)
     throw simpleError('trial_plan_unavailable', 'This organization is not on a free trial')
-  if (!await hasDefaultPaymentMethod(ctx))
+  if (!await ensureDefaultPaymentMethod(ctx))
     throw simpleError('missing_payment_method', 'Add a card before starting the plan')
 
   const existing = await findPendingTrialPlanSchedule(ctx.stripe, ctx.customerId)
@@ -198,10 +224,13 @@ export async function scheduleTrialPlan(c: Context, ctx: InAppBillingContext, or
         automatic_tax: { enabled: isAutomaticTaxEnabled(ctx.billingAccount) },
         collection_method: 'charge_automatically',
       },
-      phases: [{ items: [{ price: state.priceId, quantity: 1 }], metadata: { ...metadata, org_id: orgId } }],
+      // Phase metadata lands on the subscription so the webhook can recognize it.
+      phases: [{ items: [{ price: state.priceId, quantity: 1 }], metadata: { ...metadata, org_id: orgId, [TRIAL_PLAN_SCHEDULE_METADATA_KEY]: 'true' } }],
       metadata: { [TRIAL_PLAN_SCHEDULE_METADATA_KEY]: 'true', org_id: orgId },
-    }, { idempotencyKey: `trial-plan-${orgId}-${state.startsAt.getTime()}-${state.priceId}` })
+    })
     cloudlog({ requestId: c.get('requestId'), message: 'trial plan scheduled', orgId, scheduleId: schedule.id, startsAt: state.startsAt.toISOString() })
+    // No idempotency key (it would replay a canceled schedule): drop duplicates from double submits instead.
+    await cancelDuplicateTrialPlanSchedules(c, ctx.stripe, ctx.customerId)
   }
 
   const summary = await getTrialPlanSummary(c, ctx)
@@ -228,7 +257,7 @@ export async function cancelTrialPlan(c: Context, ctx: InAppBillingContext, orgI
 // A subscription bought through checkout replaces the scheduled trial plan: drop the schedule
 // so the customer is not billed twice when the trial ends.
 export async function cancelTrialPlanScheduleForSubscription(c: Context, stripe: Stripe, subscription: Stripe.Subscription) {
-  if (subscription.schedule)
+  if (subscription.schedule || isTrialPlanSubscription(subscription))
     return
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
   const schedule = await findPendingTrialPlanSchedule(stripe, customerId)
@@ -236,4 +265,33 @@ export async function cancelTrialPlanScheduleForSubscription(c: Context, stripe:
     return
   await stripe.subscriptionSchedules.cancel(schedule.id)
   cloudlog({ requestId: c.get('requestId'), message: 'trial plan schedule replaced by subscription', customerId, scheduleId: schedule.id, subscriptionId: subscription.id })
+}
+
+export function isTrialPlanSubscription(subscription: Stripe.Subscription) {
+  return subscription.metadata?.[TRIAL_PLAN_SCHEDULE_METADATA_KEY] === 'true'
+}
+
+// A schedule-born subscription is active before its first invoice is paid (Stripe finalizes it
+// about an hour later). Charge it now and only let the org convert once it is paid; on failure
+// the subscription goes past_due and the regular dunning flow takes over.
+export async function settleTrialPlanFirstInvoice(c: Context, stripe: Stripe, subscription: Stripe.Subscription): Promise<boolean> {
+  const invoiceId = typeof subscription.latest_invoice === 'string' ? subscription.latest_invoice : subscription.latest_invoice?.id
+  if (!invoiceId)
+    return false
+  let invoice = await stripe.invoices.retrieve(invoiceId)
+  // Renewals follow the normal subscription flow.
+  if (invoice.billing_reason !== 'subscription_create')
+    return true
+  try {
+    if (invoice.status === 'draft')
+      invoice = await stripe.invoices.finalizeInvoice(invoice.id)
+    if (invoice.status === 'open')
+      invoice = await stripe.invoices.pay(invoice.id, { off_session: true })
+  }
+  catch (error) {
+    // Card declined, authentication required, or another event already finalized/paid it.
+    cloudlog({ requestId: c.get('requestId'), message: 'trial plan first invoice not paid yet', subscriptionId: subscription.id, invoiceId, error })
+    invoice = await stripe.invoices.retrieve(invoiceId)
+  }
+  return invoice.status === 'paid'
 }

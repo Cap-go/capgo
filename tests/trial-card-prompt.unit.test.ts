@@ -7,7 +7,7 @@ import {
   readHandledTrialCardMilestones,
 } from '../src/utils/trialCardPrompt'
 
-function app(features: Record<string, { succeeded_at?: string | null }>) {
+function app(features: Record<string, { started_at?: string | null, succeeded_at?: string | null }>) {
   return { onboarding: { features } }
 }
 
@@ -18,7 +18,7 @@ describe('trial card prompt milestones', () => {
 
   it('ignores apps that only started a feature', () => {
     const reached = getReachedTrialCardMilestones([
-      app({ ota: { succeeded_at: null }, builder: {} }),
+      app({ ota: { started_at: '2026-10-01T00:00:00Z', succeeded_at: null }, builder: { started_at: '2026-10-02T00:00:00Z' } }),
       { onboarding: null },
       { onboarding: 'invalid' },
     ])

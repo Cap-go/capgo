@@ -32,7 +32,8 @@ const loadFailed = ref(false)
 const isPaying = ref(false)
 const isResuming = ref(false)
 const isUpdatingTrialPlan = ref(false)
-const showTrialPlanOffer = ref(false)
+// Org the post-card trial plan offer is for (pinned in case the user switches org).
+const trialPlanOfferOrgId = ref<string | null>(null)
 // Start the trial plan once the card form saves a card.
 let scheduleAfterCardSave = false
 const showCardModal = ref<'setup' | 'invoice' | null>(null)
@@ -181,19 +182,23 @@ async function resume() {
   }
 }
 
-async function startTrialPlan() {
-  if (!await requireUpdateBilling() || isUpdatingTrialPlan.value)
+// cardSaved: the card form just succeeded, so do not ask for a card again even if the
+// overview reload failed. id pins the org the user started from.
+async function startTrialPlan(options: { id?: string, cardSaved?: boolean } = {}) {
+  const id = options.id ?? orgId.value
+  if (!id || !await requireUpdateBilling() || isUpdatingTrialPlan.value)
     return
-  if (!card.value) {
+  if (!card.value && !options.cardSaved) {
     scheduleAfterCardSave = true
     showCardModal.value = 'setup'
     return
   }
   isUpdatingTrialPlan.value = true
   try {
-    await scheduleTrialPlan(orgId.value)
-    toast.success(t('trial-plan-scheduled', { plan: trialPlan.value?.planName ?? '', date: trialPlanDate.value }))
-    await loadOverview()
+    const { plan } = await scheduleTrialPlan(id)
+    toast.success(t('trial-plan-scheduled', { plan: plan.planName, date: formatLocalDate(plan.startsAt) }))
+    if (id === orgId.value)
+      await loadOverview()
   }
   catch (error) {
     console.error('Cannot schedule trial plan', error)
@@ -222,6 +227,13 @@ async function stopTrialPlan() {
   }
 }
 
+async function onTrialPlanOfferScheduled() {
+  const id = trialPlanOfferOrgId.value
+  trialPlanOfferOrgId.value = null
+  if (id === orgId.value)
+    await loadOverview()
+}
+
 function closeCardModal() {
   scheduleAfterCardSave = false
   showCardModal.value = null
@@ -229,15 +241,18 @@ function closeCardModal() {
 
 async function onCardSaved() {
   const mode = showCardModal.value
+  const id = orgId.value
+  const schedule = scheduleAfterCardSave
+  scheduleAfterCardSave = false
   showCardModal.value = null
-  await loadOverview()
-  if (scheduleAfterCardSave) {
-    scheduleAfterCardSave = false
-    await startTrialPlan()
+  if (schedule) {
+    await startTrialPlan({ id, cardSaved: true })
   }
-  // The user added a card on their own during the trial: offer to start the plan too.
-  else if (mode === 'setup' && trialPlan.value && !trialPlan.value.scheduled) {
-    showTrialPlanOffer.value = true
+  else {
+    await loadOverview()
+    // The user added a card on their own during the trial: offer to start the plan too.
+    if (mode === 'setup' && id === orgId.value && trialPlan.value && !trialPlan.value.scheduled)
+      trialPlanOfferOrgId.value = id
   }
   if (mode === 'invoice')
     await refreshOrganization()
@@ -252,6 +267,7 @@ async function onCanceled(sub: BillingSubscription | null) {
 
 watch(orgId, () => {
   permissionModal.value = null
+  trialPlanOfferOrgId.value = null
   void loadOverview()
 })
 
@@ -331,7 +347,7 @@ onMounted(async () => {
                 class="d-btn d-btn-sm d-btn-primary"
                 :disabled="isUpdatingTrialPlan"
                 data-test="billing-trial-plan-start"
-                @click="startTrialPlan"
+                @click="startTrialPlan()"
               >
                 <span v-if="isUpdatingTrialPlan" class="d-loading d-loading-spinner d-loading-xs" />
                 {{ t('trial-plan-start', { plan: trialPlan.planName }) }}
@@ -443,11 +459,11 @@ onMounted(async () => {
       @saved="onCardSaved"
     />
     <TrialPlanOfferModal
-      v-if="showTrialPlanOffer"
-      :org-id="orgId"
+      v-if="trialPlanOfferOrgId"
+      :org-id="trialPlanOfferOrgId"
       source="billing"
-      @close="showTrialPlanOffer = false"
-      @scheduled="showTrialPlanOffer = false; loadOverview()"
+      @close="trialPlanOfferOrgId = null"
+      @scheduled="onTrialPlanOfferScheduled"
     />
     <CancelPlanModal
       v-if="showCancelModal"

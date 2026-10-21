@@ -73,7 +73,10 @@ const isTrial = computed(() => {
 })
 const reachedMilestones = computed(() => orgId.value ? getReachedTrialCardMilestones(organizationStore.getAppsByOrgId(orgId.value)) : [])
 // Onboarding pages run their own success flow; ask once the user lands on the dashboard.
-const isOnboardingRoute = computed(() => route.path === '/onboarding' || route.path.startsWith('/onboarding/') || /^\/app\/new\/?$/.test(route.path))
+const isOnboardingRoute = computed(() => route.path === '/onboarding'
+  || route.path.startsWith('/onboarding/')
+  || /^\/app\/new\/?$/.test(route.path)
+  || /^\/app\/[^/]+\/getting-started\/?$/.test(route.path))
 const pendingMilestone = computed(() => {
   if (!orgId.value || !isTrial.value || isOnboardingRoute.value)
     return null
@@ -102,9 +105,8 @@ watch([orgId, pendingMilestone, () => !!stripeEnabled.value], async ([id, pendin
   try {
     trial = await getTrialPlan(id)
   }
-  catch (error) {
+  catch {
     // Billing unavailable for this org (no customer, region not configured): skip quietly.
-    console.error('Cannot check trial card on file', error)
     return
   }
   if (run !== lookupRun)
@@ -124,15 +126,18 @@ const planPrice = computed(() => prompt.value ? formatStripeAmount(prompt.value.
 const planDate = computed(() => prompt.value ? formatLocalDate(prompt.value.plan.startsAt) : '')
 const title = computed(() => prompt.value?.milestone === 'builder' ? t('trial-card-prompt-title-builder') : t('trial-card-prompt-title-ota'))
 
-function close(event: string) {
+// A failed schedule keeps the milestones pending so the prompt comes back next visit.
+function close(event: string, handled = true) {
   track(event)
-  if (prompt.value)
+  if (prompt.value && handled)
     markTrialCardMilestonesHandled(prompt.value.orgId, prompt.value.reached)
   step.value = null
   prompt.value = null
 }
 
 function dismiss() {
+  if (isScheduling.value)
+    return
   close(step.value === 'card' ? 'trial_card_prompt_card_closed' : 'trial_card_prompt_dismissed')
 }
 
@@ -149,7 +154,7 @@ async function startPlan() {
   catch (error) {
     console.error('Cannot schedule trial plan', error)
     toast.error(t('trial-plan-schedule-error'))
-    close('trial_card_prompt_schedule_failed')
+    close('trial_card_prompt_schedule_failed', false)
   }
   finally {
     isScheduling.value = false
@@ -174,6 +179,7 @@ function onCardSaved() {
   <BillingModal
     v-if="step === 'ask'"
     :title="title"
+    :busy="isScheduling"
     @close="dismiss"
   >
     <div v-if="prompt" class="flex items-start gap-3">
@@ -184,7 +190,7 @@ function onCardSaved() {
           {{ t('trial-card-prompt-plan', { plan: prompt.plan.planName, price: planPrice, date: planDate }) }}
         </p>
         <p class="text-slate-600 dark:text-slate-300">
-          {{ t('trial-card-prompt-no-charge', { days: prompt.trialDaysLeft }) }}
+          {{ t('trial-card-prompt-no-charge', { days: prompt.trialDaysLeft }, prompt.trialDaysLeft) }}
         </p>
       </div>
     </div>

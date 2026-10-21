@@ -23,7 +23,7 @@ import { getRetryablePostgrestStatus, isRetryablePostgrestError } from '../utils
 import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
 import { ensureCustomerMetadata, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
 import { buildTransferInvoiceFooter, getStripeCustomerEmailFromEvent, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
-import { cancelTrialPlanScheduleForSubscription } from '../utils/stripe_trial_plan.ts'
+import { cancelTrialPlanScheduleForSubscription, isTrialPlanSubscription, settleTrialPlanFirstInvoice } from '../utils/stripe_trial_plan.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { trackUsChargeRefunded, trackUsChargeSucceeded } from '../utils/us_revenue_tracking.ts'
@@ -1726,6 +1726,16 @@ async function handleCanceledSubscriptionStripeEvent(
   return null
 }
 
+// The trial plan subscription only converts the org once its first invoice is paid.
+async function isUnpaidTrialPlanSubscription(c: Context<MiddlewareKeyVariablesStripe>, stripeEvent: Stripe.Event) {
+  if (stripeEvent.type !== 'customer.subscription.created' && stripeEvent.type !== 'customer.subscription.updated')
+    return false
+  const subscription = stripeEvent.data.object
+  if (!isTrialPlanSubscription(subscription))
+    return false
+  return !await settleTrialPlanFirstInvoice(c, getStripe(c, getWebhookBillingAccount(c)), subscription)
+}
+
 async function handleSubscriptionStripeEvent(
   c: Context<MiddlewareKeyVariablesStripe>,
   stripeEvent: Stripe.Event,
@@ -1734,6 +1744,10 @@ async function handleSubscriptionStripeEvent(
   customer: StripeInfoRow,
 ) {
   if (isSubscriptionUpdateStatus(stripeData.data.status) && stripeData.data.price_id && stripeData.data.product_id) {
+    if (await isUnpaidTrialPlanSubscription(c, stripeEvent)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Trial plan subscription waits for its first payment', subscriptionId: stripeData.data.subscription_id })
+      return c.json(BRES)
+    }
     const response = await handleActiveSubscriptionUpdate(c, stripeEvent, stripeData, org, customer)
     if (response)
       return response
@@ -1797,12 +1811,9 @@ async function stripeEventHandler(c: Context<MiddlewareKeyVariablesStripe>) {
     return handleChargeSucceededStripeEvent(c, org, stripeData)
   }
 
-  if (stripeEvent.type === 'customer.subscription.created') {
-    const billingAccount = getWebhookBillingAccount(c)
-    await backgroundTask(c, cancelTrialPlanScheduleForSubscription(c, getStripe(c, billingAccount), stripeEvent.data.object).catch((error) => {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'cancel trial plan schedule failed', subscriptionId: stripeEvent.data.object.id, error })
-    }))
-  }
+  // Fails the webhook on error so Stripe retries: a leftover schedule would bill the customer twice.
+  if (stripeEvent.type === 'customer.subscription.created')
+    await cancelTrialPlanScheduleForSubscription(c, getStripe(c, getWebhookBillingAccount(c)), stripeEvent.data.object)
 
   const subscriptionResponse = await handleSubscriptionStripeEvent(c, stripeEvent, stripeData, org, customer)
   if (subscriptionResponse)
