@@ -26,7 +26,6 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconCopy from '~icons/ion/copy-outline'
-import IconArrowLeft from '~icons/lucide/arrow-left'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconCheck from '~icons/lucide/check'
 import IconChevronDown from '~icons/lucide/chevron-down'
@@ -53,11 +52,10 @@ import { buildCliAiSetupPrompt } from '~/services/cliAiPrompt'
 import { APP_ONBOARDING_READY_EVENT, sendOnboardingEvent } from '~/services/onboardingTracking'
 import { uploadOrgLogoFile } from '~/services/photos'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
-import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
+import { defaultApiHost, getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import {
-  MAX_USER_ONBOARDING_WRITE_ATTEMPTS,
   mergeUserOnboardingProgress,
-  replaceUserOnboardingIfUnchanged,
+  replaceUserOnboardingWithRetry,
   serializeUserOnboardingWrite,
 } from '~/services/userOnboardingWriteQueue'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
@@ -87,10 +85,12 @@ import {
 } from '~/utils/onboardingAppDraft'
 import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { withOnboardingChannelOrigin } from '~/utils/onboardingChannelAnalytics'
+import { canEditInitialOnboardingName, consumeProfileOnboardingHandoff, initialProfileOnboardingProgressSteps, initialProfileOnboardingSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY } from '~/utils/onboardingProfile'
 import {
   createOnboardingDetailsFieldDebouncer,
   createOnboardingProgressTracker,
   createOnboardingTelemetryIdentity,
+  PROFILE_ONBOARDING_ANALYTICS_VERSION,
   resolveOnboardingAppIconSource,
 } from '~/utils/onboardingProgressAnalytics'
 import { createOnboardingProgressPersistence, shouldInitializeOnboardingProgressTracking } from '~/utils/onboardingProgressPersistence'
@@ -101,6 +101,7 @@ import {
   ONBOARDING_SETUP_HANDOFF_STATE_KEY,
   readOnboardingSetupHandoff,
 } from '~/utils/onboardingRedirect'
+import { openOnboardingResumeDialog } from '~/utils/onboardingResumeDialog'
 import { slugifyOnboardingSegment } from '~/utils/onboardingSlug'
 import {
   buildUserOnboardingProgress,
@@ -114,6 +115,7 @@ import {
 import AppOnboardingBuilderChecklist from './AppOnboardingBuilderChecklist.vue'
 import AppOnboardingCliSteps from './AppOnboardingCliSteps.vue'
 import AppOnboardingDualChecklist from './AppOnboardingDualChecklist.vue'
+import AppOnboardingHeader from './AppOnboardingHeader.vue'
 import AppOnboardingIconInput from './AppOnboardingIconInput.vue'
 import AppOnboardingSetupChecklist from './AppOnboardingSetupChecklist.vue'
 import AppOnboardingWelcome from './AppOnboardingWelcome.vue'
@@ -180,7 +182,7 @@ type AppRow = Omit<Database['public']['Tables']['apps']['Row'], 'onboarding'> & 
 type StandardFlowStep = 'details' | 'channel' | 'setup'
 type PreOrgFlowStep = 'intent' | 'publish_app_question' | 'details' | 'organization' | 'channel' | 'setup'
 type OnboardingFlowStep = StandardFlowStep | PreOrgFlowStep
-type OnboardingProgressStepId = OnboardingFlowStep
+type OnboardingProgressStepId = OnboardingFlowStep | 'name'
 type AppDetailsStep = 'name' | 'icon'
 type AppDetailsAnalyticsStep = 'app_name' | 'app_icon'
 type SetupStage = UserOnboardingSetupStage
@@ -249,10 +251,18 @@ const selectedDevelopmentEnvironment = ref<OnboardingDevelopmentEnvironment | nu
 const skippedPublishAppQuestion = ref(false)
 const billingAccount = ref<'ee' | 'us' | undefined>()
 const selectedIntent = ref<OnboardingIntent | null>(null)
-const onboardingAnalyticsVersion = () => resolveOnboardingAnalyticsVersion(onboardingForABTests.value, selectedIntent.value)
+const initialProfileOnboarding = computed(() => props.preOrg && !props.newOrganization && !props.setupAppId)
+const canReturnToProfile = computed(() => initialProfileOnboarding.value && canEditInitialOnboardingName(main.user, organizationStore.hasOrganizations))
+const intentStepLabel = computed(() => t('unified-onboarding-step-intent'))
+function onboardingAnalyticsVersion() {
+  return props.preOrg && !props.newOrganization
+    ? PROFILE_ONBOARDING_ANALYTICS_VERSION
+    : resolveOnboardingAnalyticsVersion(onboardingForABTests.value, selectedIntent.value)
+}
 const setupHandoff = props.setupAppId ? consumeSetupHandoff(props.setupAppId) : null
+const profileHandoff = props.preOrg && !props.newOrganization ? consumeProfileOnboardingHandoff(window.history) : null
 const onboardingTelemetry = createOnboardingTelemetryIdentity({
-  continueFrom: setupHandoff,
+  continueFrom: setupHandoff ?? profileHandoff,
   flow: props.preOrg ? 'pre_org' : 'existing_org',
   onboardingVersion: onboardingAnalyticsVersion,
   supaHost: config.supaHost,
@@ -306,7 +316,7 @@ const startingOutUserCountStop: UserCountStop = {
 }
 const planNameOrder = ['Solo', 'Maker', 'Team', 'Enterprise'] as const
 
-const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
+const localCommand = isLocal(config.supaHost) ? ` --api-host ${defaultApiHost}` : ''
 // TODO(2027-03-19): Remove v3 compatibility after all existing OTA checklists have migrated.
 const usesOtaTodoList = computed(() => !!createdApp.value && hasSupportedOtaTodoList(parseAppOnboarding(createdApp.value.onboarding)))
 const usesDualTodoList = computed(() => !!createdApp.value && hasDualOnboardingChecklists(createdApp.value.onboarding))
@@ -465,7 +475,7 @@ const cliCommandArgs = computed(() => {
     args.push('-a', apiKey.value)
 
   if (isLocal(config.supaHost))
-    args.push('--supa-host', config.supaHost, '--supa-anon', config.supaKey)
+    args.push('--api-host', defaultApiHost)
 
   return args
 })
@@ -556,7 +566,7 @@ const appOnboardingSteps = computed<Array<{ id: OnboardingFlowStep, label: strin
     : []
   if (props.preOrg) {
     return [
-      { id: 'intent', label: t('unified-onboarding-step-intent') },
+      { id: 'intent', label: intentStepLabel.value },
       { id: 'details', label: t('app-onboarding-step-details') },
       { id: 'organization', label: t('unified-onboarding-step-organization') },
       ...channelStep,
@@ -570,10 +580,10 @@ const appOnboardingSteps = computed<Array<{ id: OnboardingFlowStep, label: strin
   ]
 })
 const stepperStepId = computed(() => flowStep.value === 'publish_app_question' ? 'intent' : flowStep.value)
-const onboardingProgressSteps = computed<Array<{ id: OnboardingProgressStepId, label: string }>>(() => appOnboardingSteps.value)
+const onboardingProgressSteps = computed<Array<{ id: OnboardingProgressStepId, label: string }>>(() => initialProfileOnboarding.value
+  ? initialProfileOnboardingProgressSteps(onboardingForABTests.value).map(step => ({ id: step.id, label: t(step.labelKey) }))
+  : appOnboardingSteps.value)
 const currentProgressStepId = computed<OnboardingProgressStepId>(() => stepperStepId.value)
-const currentStepIndex = computed(() => Math.max(0, onboardingProgressSteps.value.findIndex(entry => entry.id === currentProgressStepId.value)))
-const stepProgress = computed(() => `${((currentStepIndex.value + 1) / onboardingProgressSteps.value.length) * 100}%`)
 const userCountStops = computed<UserCountStop[]>(() => {
   const planStops = planNameOrder.map(planName => main.plans.find(plan => plan.name === planName)).flatMap((plan) => {
     if (!plan?.mau)
@@ -713,6 +723,8 @@ function initializeProgressTracking(resumed: boolean) {
   if (initialStep === 'welcome')
     trackedAnalyticsSteps.unshift('welcome')
   ensurePublishAppQuestionStepTracked()
+  if (props.preOrg && !props.newOrganization)
+    trackedAnalyticsSteps = initialProfileOnboardingSteps(onboardingForABTests.value, true)
 
   progressTracker = createOnboardingProgressTracker({
     flow: props.preOrg ? 'pre_org' : 'existing_org',
@@ -723,7 +735,7 @@ function initializeProgressTracking(resumed: boolean) {
     onboardingAttemptId: onboardingTelemetry.attemptId,
     onboardingRunId: onboardingTelemetry.runId,
   })
-  const handoffPreviousStep = setupHandoff?.previousStep
+  const handoffPreviousStep = setupHandoff?.previousStep ?? (profileHandoff ? 'name' : undefined)
   if (initialStep === 'setup' || initialStep === 'install')
     void viewFinalStepWhenRendered(initialStep, handoffPreviousStep)
   else
@@ -861,71 +873,37 @@ async function writeOnboardingProgress(
     if (main.user?.id !== userId)
       return 'skipped'
 
-    const progress = snapshotOnboardingProgress(status)
-    let persistableProgress = progress
+    let persistableProgress = snapshotOnboardingProgress(status)
+    if (options.clearProfileDraft) {
+      // A restart must stay pristine when the required name step remounts the wizard.
+      delete persistableProgress.existing_app
+      delete persistableProgress.existing_app_setup
+    }
     let usedConstraintFallback = false
-    let currentOnboarding = main.user.onboarding
-    let latestProfile = main.user
-
-    for (let attempt = 0; attempt < MAX_USER_ONBOARDING_WRITE_ATTEMPTS; attempt++) {
-      if (
-        onboardingUserId.value !== userId
-        || main.authGeneration !== authGeneration
-        || (onboardingFlowDisposed && !options.allowDisposed)
-      ) {
-        return 'skipped'
-      }
-
-      const current = parseUserOnboardingProgress(currentOnboarding)
-      if (current?.status === 'completed' && status !== 'completed')
-        return 'skipped'
-
-      const onboarding = mergeUserOnboardingProgress(
-        persistableProgress as unknown as Json,
-        currentOnboarding,
-        { clearIntent: options.clearIntent },
-      )
-      const { data, error } = await replaceUserOnboardingIfUnchanged(
-        userId,
-        currentOnboarding,
-        onboarding,
-      )
-
-      if (error) {
+    const result = await replaceUserOnboardingWithRetry(
+      userId,
+      main.user.onboarding,
+      current => mergeUserOnboardingProgress({ ...persistableProgress }, current, options),
+      current => onboardingUserId.value === userId
+        && main.authGeneration === authGeneration
+        && (!onboardingFlowDisposed || !!options.allowDisposed)
+        && !(parseUserOnboardingProgress(current)?.status === 'completed' && status !== 'completed'),
+      (error) => {
         if (!usedConstraintFallback && isUsersOnboardingCheckConstraintError(error) && persistableProgress.step === 'publish_app_question') {
           usedConstraintFallback = true
           persistableProgress = fallbackUsersOnboardingProgressForLegacyConstraint(persistableProgress)
-          continue
+          return true
         }
-        console.error('Failed to persist onboarding progress', error)
-        return 'retryable_failure'
-      }
-
-      if (data) {
-        if (main.user?.id === userId && main.authGeneration === authGeneration)
-          main.user = { ...data, image_url: main.user.image_url }
-        return 'persisted'
-      }
-
-      const { data: latest, error: latestError } = await supabase
-        .from('users')
-        .select()
-        .eq('id', userId)
-        .maybeSingle()
-      if (latestError) {
-        console.error('Failed to refresh onboarding progress snapshot', latestError)
-        return 'retryable_failure'
-      }
-      if (!latest)
-        return status === 'completed' ? 'skipped' : 'conflict'
-
-      latestProfile = latest
-      currentOnboarding = latest.onboarding
+        return false
+      },
+    )
+    if (result.status === 'persisted' && main.user?.id === userId && main.authGeneration === authGeneration)
+      main.user = { ...main.user, onboarding: result.onboarding }
+    if (result.status === 'error') {
+      console.error('Failed to persist onboarding progress', result.error)
+      return 'retryable_failure'
     }
-
-    if (main.user?.id === userId && main.authGeneration === authGeneration)
-      main.user = { ...latestProfile, image_url: main.user.image_url }
-    return 'conflict'
+    return result.status
   })
 }
 
@@ -958,13 +936,19 @@ async function resetOnboardingForm() {
   localIconPreview.value = ''
   iconStoreUrl.value = ''
   resetStoreImportState()
-  const resetPersistResult = await persistOnboardingProgress('in_progress', { clearIntent: true })
+  let resetPersistResult = await persistOnboardingProgress('in_progress', { clearIntent: true, clearProfileDraft: true })
   if (resetPersistResult === 'retryable_failure' && !onboardingFlowDisposed)
-    await persistOnboardingProgress('in_progress', { clearIntent: true })
+    resetPersistResult = await persistOnboardingProgress('in_progress', { clearIntent: true, clearProfileDraft: true })
+  if (resetPersistResult !== 'persisted') {
+    if (!onboardingFlowDisposed)
+      toast.error(t('account-error'))
+    return
+  }
+  await redirectToRequiredInitialName()
 }
 
 function showWelcomeOnDesktop() {
-  welcomePending.value = Boolean(props.preOrg && welcomeCanvasEligible.value)
+  welcomePending.value = Boolean(props.preOrg && welcomeCanvasEligible.value && !initialProfileOnboarding.value)
 }
 
 async function continueFromWelcome() {
@@ -1078,7 +1062,7 @@ async function maybeResumeSavedOnboarding() {
   const flow = props.preOrg ? 'pre_org' : 'existing_org'
   const saved = parseUserOnboardingProgress(main.user?.onboarding)
 
-  if (!shouldPromptOnboardingResume(saved, flow) || !saved) {
+  if (!shouldPromptOnboardingResume(saved, flow) || !saved || profileHandoff) {
     if (saved?.status === 'in_progress' && saved.flow === flow) {
       applyOnboardingProgress(saved)
     }
@@ -1108,17 +1092,9 @@ async function maybeResumeSavedOnboarding() {
     savedStep: resumableStep,
     steps: resumeCandidateSteps(resumableStep),
   })
-  dialogStore.openDialog({
-    title: t('onboarding-resume-title'),
-    description: t('onboarding-resume-description'),
-    preventAccidentalClose: true,
-    buttons: [
-      { text: t('onboarding-resume-restart'), id: 'onboarding-resume-restart', role: 'secondary' },
-      { text: t('onboarding-resume-continue'), id: 'onboarding-resume-continue', role: 'primary' },
-    ],
-  })
+  const dismissal = openOnboardingResumeDialog(dialogStore, t)
   onboardingTelemetry.recordResumeDialogViewed()
-  await dialogStore.onDialogDismiss()
+  await dismissal
 
   if (onboardingFlowDisposed)
     return null
@@ -1946,21 +1922,56 @@ function continueFromIntent() {
   })
 }
 
+async function backToProfile() {
+  if (!canReturnToProfile.value || flowStep.value !== 'intent' || isSubmitting.value)
+    return
+  isSubmitting.value = true
+  try {
+    if (await persistOnboardingProgress() !== 'persisted') {
+      toast.error(t('account-error'))
+      return
+    }
+    const failure = await router.push({
+      path: '/onboarding/name',
+      query: { edit: '1', to: '/onboarding/app' },
+      state: { [PROFILE_ONBOARDING_HANDOFF_KEY]: { attemptId: onboardingTelemetry.attemptId, runId: onboardingTelemetry.runId } },
+    })
+    if (failure)
+      throw failure
+  }
+  catch (error) {
+    console.warn('Cannot return to onboarding names', error)
+    toast.error(t('account-error'))
+  }
+  finally {
+    isSubmitting.value = false
+  }
+}
+
 async function continueFromGoal() {
+  if (isSubmitting.value)
+    return
+
   if (!selectedIntent.value) {
     toast.error(t('organization-onboarding-intent-required'))
     return
   }
-  await persistOnboardingProgress()
-  await waitForOnboardingABTests({ force: true })
-  if (webNativeDevelopmentEnvironmentTreatment.value) {
-    ensurePublishAppQuestionStepTracked()
-    completeAndViewStep('publish_app_question', {
-      intent: selectedIntent.value,
-    })
-    return
+  isSubmitting.value = true
+  try {
+    await persistOnboardingProgress()
+    await waitForOnboardingABTests({ force: true })
+    if (webNativeDevelopmentEnvironmentTreatment.value) {
+      ensurePublishAppQuestionStepTracked()
+      completeAndViewStep('publish_app_question', {
+        intent: selectedIntent.value,
+      })
+      return
+    }
+    continueFromIntent()
   }
-  continueFromIntent()
+  finally {
+    isSubmitting.value = false
+  }
 }
 
 function continueFromDevelopmentEnvironment() {
@@ -2051,6 +2062,12 @@ function continuePreOrgDetails() {
 }
 
 async function createOrganizationAndApp() {
+  if (await redirectToRequiredInitialName())
+    return
+
+  if (isSubmitting.value)
+    return
+
   if (!selectedIntent.value) {
     toast.error(t('organization-onboarding-intent-required'))
     return
@@ -2619,6 +2636,43 @@ async function leaveUnavailableSetupApp() {
     await router.replace(`/app/${encodeURIComponent(props.setupAppId)}`)
 }
 
+let nameRedirectPending = false
+const nameRedirectFailed = ref(false)
+async function redirectToRequiredInitialName(retry = false): Promise<boolean> {
+  if (!props.preOrg || props.newOrganization || !needsInitialOnboardingName(main.user, organizationStore.hasOrganizations)) {
+    // This mount yielded progress ownership before navigation failed. Rehydrate
+    // from the server if names were saved elsewhere rather than revive its stale writer.
+    if (retry && nameRedirectFailed.value)
+      window.location.reload()
+    return false
+  }
+  if (nameRedirectFailed.value && !retry) {
+    isLoading.value = false
+    return true
+  }
+  if (!nameRedirectPending) {
+    nameRedirectPending = true
+    isLoading.value = true
+    clearScheduledOnboardingProgress()
+    // The name page owns progress from here; never flush stale wizard state over it.
+    onboardingProgressPersistence.abort()
+    try {
+      const failure = await router.replace({ path: '/onboarding/name', query: { to: '/onboarding/app' } })
+      if (failure)
+        throw failure
+    }
+    catch (error) {
+      console.error('Failed to open required onboarding names', error)
+      nameRedirectFailed.value = true
+      isLoading.value = false
+    }
+    finally {
+      nameRedirectPending = false
+    }
+  }
+  return true
+}
+
 function trackDashboardExplored() {
   if (!progressTracker) {
     pendingDashboardExplored = true
@@ -2638,6 +2692,8 @@ onMounted(async () => {
   try {
     if (props.preOrg) {
       void refreshOnboardingABTests()
+      if (await redirectToRequiredInitialName())
+        return
       if (resumeAppId.value) {
         await organizationStore.awaitInitialLoad()
         await waitForOnboardingABTests()
@@ -2812,8 +2868,16 @@ defineExpose({
 </script>
 
 <template>
+  <div v-if="nameRedirectFailed" class="mx-auto flex w-full max-w-md flex-col gap-4 px-4 py-20">
+    <p role="alert" class="text-sm text-slate-600 dark:text-slate-300">
+      {{ t('account-error') }}
+    </p>
+    <button type="button" class="d-btn d-btn-primary" :disabled="isLoading" data-test="onboarding-name-redirect-retry" @click="redirectToRequiredInitialName(true)">
+      {{ t('retry') }}
+    </button>
+  </div>
   <AppOnboardingWelcome
-    v-if="showPreOrgWelcome && !isLoading"
+    v-else-if="showPreOrgWelcome && !isLoading"
     @continue="continueFromWelcome"
   />
 
@@ -2835,72 +2899,22 @@ defineExpose({
       </div>
 
       <div v-else class="onboarding-flow-content space-y-6">
-        <header v-if="!showDualChecklist && !showSetupChecklist && !showBuilderChecklist && (!props.setupAppId || showSetupBackButton)" class="onboarding-flow-header">
-          <div class="flex items-center gap-2">
-            <button
-              v-if="showSetupBackButton"
-              type="button"
-              class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:-translate-x-0.5 hover:border-slate-300 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-300 dark:hover:border-white/30 dark:hover:text-white"
-              data-test="onboarding-setup-back"
-              :aria-label="t('button-back')"
-              :title="t('button-back')"
-              @click="goBackFromSetupStage"
-            >
-              <IconArrowLeft class="h-4 w-4" aria-hidden="true" />
-            </button>
-            <div v-if="!props.setupAppId" class="onboarding-flow-badge inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm dark:border-white/15 dark:bg-slate-900/95 dark:text-slate-200">
-              <IconSparkles class="h-4 w-4" />
-              {{ t('app-onboarding-badge') }}
-            </div>
-          </div>
-          <template v-if="!props.setupAppId">
-            <h1 class="onboarding-flow-title mt-4 text-2xl font-semibold text-slate-950 sm:text-3xl dark:text-white">
-              {{ props.onboarding
-                ? t('app-onboarding-title-first')
-                : t('app-onboarding-title-return') }}
-            </h1>
-
-            <nav class="mt-6" :aria-label="t('app-onboarding-step-details')">
-              <ol class="flex items-center gap-2">
-                <li
-                  v-for="(entry, index) in onboardingProgressSteps"
-                  :key="entry.id"
-                  class="flex min-w-0 flex-1 items-center gap-2"
-                  :aria-current="currentProgressStepId === entry.id ? 'step' : undefined"
-                >
-                  <span
-                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                    :class="index < currentStepIndex ? 'bg-emerald-500 text-white' : currentProgressStepId === entry.id ? 'bg-primary-500 text-white' : 'bg-slate-200 text-slate-500 dark:bg-slate-800 dark:text-slate-400'"
-                  >
-                    <IconCheck v-if="index < currentStepIndex" class="h-3.5 w-3.5" />
-                    <span v-else>{{ index + 1 }}</span>
-                  </span>
-                  <span
-                    class="hidden truncate text-sm font-medium sm:block"
-                    :class="currentProgressStepId === entry.id ? 'text-slate-950 dark:text-white' : index < currentStepIndex ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400 dark:text-slate-500'"
-                  >
-                    {{ entry.label }}
-                  </span>
-                  <span
-                    v-if="index < onboardingProgressSteps.length - 1"
-                    class="mx-1 hidden h-px flex-1 bg-slate-200 sm:block dark:bg-white/15"
-                    aria-hidden="true"
-                  />
-                </li>
-              </ol>
-              <div class="mt-3 h-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" aria-hidden="true">
-                <div class="h-full rounded-full bg-primary-500 transition-all duration-300" :style="{ width: stepProgress }" />
-              </div>
-            </nav>
-          </template>
-        </header>
+        <AppOnboardingHeader
+          v-if="!showDualChecklist && !showSetupChecklist && !showBuilderChecklist && (!props.setupAppId || showSetupBackButton)"
+          :title="initialProfileOnboarding ? t('onboarding-welcome-title') : props.onboarding ? t('app-onboarding-title-first') : t('app-onboarding-title-return')"
+          :steps="onboardingProgressSteps"
+          :current-step-id="currentProgressStepId"
+          :show-intro="!props.setupAppId"
+          :show-back="showSetupBackButton"
+          @back="goBackFromSetupStage"
+        />
 
         <div v-if="props.preOrg && (flowStep === 'intent' || flowStep === 'publish_app_question')" class="onboarding-intent-card rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6 dark:border-white/15 dark:bg-slate-900/95">
           <div class="onboarding-intent-card-content space-y-6">
             <template v-if="showDevelopmentEnvironmentQuestion">
               <div class="onboarding-intent-heading">
                 <p class="onboarding-intent-eyebrow text-sm font-semibold text-primary-500 dark:text-slate-300">
-                  {{ t('unified-onboarding-step-intent') }}
+                  {{ intentStepLabel }}
                 </p>
                 <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
                   {{ t('organization-onboarding-development-environment-question') }}
@@ -2927,16 +2941,14 @@ defineExpose({
 
             <template v-else>
               <div>
-                <p class="onboarding-intent-eyebrow text-sm font-semibold text-primary-500 dark:text-slate-300">
-                  {{ t('unified-onboarding-step-intent') }}
-                </p>
-                <h2 class="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
-                  {{ t('organization-onboarding-intent-question') }}
-                </h2>
+                <h3 class="text-xl font-semibold text-slate-950 dark:text-white">
+                  {{ t('unified-onboarding-profile-goal-question') }}
+                </h3>
                 <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
                   {{ t('organization-onboarding-intent-hint') }}
                 </p>
               </div>
+
               <div class="onboarding-intent-options grid gap-3 sm:grid-cols-2">
                 <button v-for="option in intentOptions" :key="option.value" type="button" class="d-btn onboarding-intent-option group h-auto min-h-20 w-full items-center justify-start gap-3 whitespace-normal rounded-xl border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900" :class="[whiteCardToggleButtonClass(selectedIntent === option.value), { 'sm:col-span-2': option.value === 'publish' }]" :data-test="`onboarding-intent-${option.value}`" @click="selectedIntent = option.value">
                   <!-- I am a human. I am doing manual handling for the "publish" (webnativeapp) intent. Fuck every AI reviewer who doesnt like my code -->
@@ -2951,8 +2963,11 @@ defineExpose({
                   </span>
                 </button>
               </div>
-              <div class="onboarding-intent-actions flex justify-end border-t border-slate-200 pt-6 dark:border-white/15">
-                <button type="button" class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" data-test="app-onboarding-continue-intent" :disabled="!selectedIntent" @click="continueFromGoal()">
+              <div class="onboarding-intent-actions flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-end dark:border-white/15">
+                <button v-if="canReturnToProfile" type="button" class="d-btn min-h-12 sm:mr-auto" :class="whiteCardSecondaryButtonClass()" data-test="app-onboarding-back-profile" :disabled="isSubmitting" @click="backToProfile">
+                  {{ t('button-back') }}
+                </button>
+                <button type="button" class="d-btn min-h-12" :class="whiteCardPrimaryButtonClass()" data-test="app-onboarding-continue-intent" :disabled="!selectedIntent || isSubmitting" @click="continueFromGoal()">
                   {{ t('unified-onboarding-continue-intent') }}<IconArrowRight class="h-4 w-4" />
                 </button>
               </div>

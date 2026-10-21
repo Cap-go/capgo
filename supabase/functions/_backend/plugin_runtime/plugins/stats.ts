@@ -10,14 +10,14 @@ import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hon
 import { invalidIpInfo } from '../utils/invalids_ip.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
-import { closeClient, createLazyPgClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getEffectiveDeviceChannelNamePostgres, getLazyPgQueryCount, getPgClient } from '../utils/pg.ts'
+import { closeClient, createLazyPgClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getEffectiveDeviceChannelNamePostgres, getLazyPgQueryCount, getPgClient, getReadReplicaBinding } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/plugin_stats.ts'
 import { statsRequestSchema } from '../utils/plugin_validation.ts'
 import { getAppOwnerWithEdgeCache, getAppVersionWithEdgeCache } from '../utils/pluginEdgeCacheReads.ts'
 import { getClientIP } from '../utils/rate_limit.ts'
 import { onPremiseAppResponse } from '../utils/rateLimitInfo.ts'
-import { getSnippetEdgeAnswerBps, setSnippetStatsFill } from '../utils/snippetEdgeAnswer.ts'
+import { getSnippetEdgeAnswerBps, getSnippetEdgeReplay, setSnippetStatsFill } from '../utils/snippetEdgeAnswer.ts'
 import { planValidUntilMs, shouldUseUpdatesEdgeCache } from '../utils/updatesEdgeCache.ts'
 import { backgroundTask, INVALID_STRING_APP_ID, isInternalVersionName, isLimited, MISSING_STRING_APP_ID, reverseDomainRegex } from '../utils/utils.ts'
 import { isRunningVersionAction } from './stats_actions.ts'
@@ -29,7 +29,8 @@ const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6 = parse('6.14.25')
 type AppStatusResult = Awaited<ReturnType<typeof getAppStatus>>
 
 async function blockProviderInfrastructure(c: Context, shouldBlockProviderInfrastructure = true) {
-  if (!shouldBlockProviderInfrastructure)
+  // The snippet answered only devices outside the provider networks.
+  if (!shouldBlockProviderInfrastructure || getSnippetEdgeReplay(c))
     return null
 
   const requestIp = getClientIP(c)
@@ -412,7 +413,7 @@ async function processStatsEvents(
     }
     if (result.success) {
       if (result.snippetFill)
-        setSnippetStatsFill(c, bodyParsed.app_id, result.snippetFill)
+        await setSnippetStatsFill(c, bodyParsed.app_id, { ...result.snippetFill, replicaSource: getReadReplicaBinding(c) })
       return c.json(BRES)
     }
     if (result.error === 'need_plan_upgrade') {
@@ -486,8 +487,9 @@ async function processStatsEvents(
   const firstAppId = (events[0] as AppStats | undefined)?.app_id
   if (firstAppId && results.length > 0 && snippetFill
     && events.every(event => (event as AppStats | undefined)?.app_id === firstAppId)
-    && results.every(result => result.status === 'ok'))
-    setSnippetStatsFill(c, firstAppId, snippetFill)
+    && results.every(result => result.status === 'ok')) {
+    await setSnippetStatsFill(c, firstAppId, { ...snippetFill, replicaSource: getReadReplicaBinding(c) })
+  }
   return c.json({ status: 'ok', results })
 }
 

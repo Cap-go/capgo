@@ -15,7 +15,7 @@ const preload = fileURLToPath(new URL('./fixtures/todo-api-preload.mjs', import.
 function run(args = [], scenario, alias = 'todo') {
   const child = spawnSync('node', [
     '--import', preload, cli, 'app', alias, appId,
-    '--apikey', 'example-todo-key', '--supa-host', 'https://todo.fixture.invalid', '--supa-anon', 'example-anon-key', ...args,
+    '--apikey', 'example-todo-key', '--api-host', 'https://todo.fixture.invalid', ...args,
   ], {
     cwd, encoding: 'utf8', timeout: 15_000,
     env: { ...process.env, CI: '1', CAPGO_TODO_FIXTURE_SCENARIO: scenario, CAPGO_DISABLE_TELEMETRY: '1', CAPGO_DISABLE_POSTHOG: '1' },

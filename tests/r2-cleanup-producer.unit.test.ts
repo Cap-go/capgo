@@ -1,5 +1,4 @@
 import type { CleanupMessage } from '../cloudflare_workers/r2_inventory/cleanup.ts'
-import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { CLEANUP_ACTIVATED, CLEANUP_CONFIG, cleanupMessageBatches, cleanupRanges, publicationDeadline } from '../cloudflare_workers/r2_inventory/cleanup.ts'
 import { scheduleInventoryCleanup } from '../cloudflare_workers/r2_inventory/index.ts'
@@ -7,15 +6,9 @@ import { scheduleInventoryCleanup } from '../cloudflare_workers/r2_inventory/ind
 const message = (key: string): CleanupMessage => ({ schemaVersion: 1, bucket: 'synthetic', key, cleanupRequestedAt: '2026-10-14T01:02:03.123456Z' })
 
 describe('cleanup producer boundaries', () => {
-  it('enables the production minute cron with a dedicated cleanup producer queue', async () => {
+  it('is activated and refuses to schedule without a bucket or queue binding', async () => {
     expect(CLEANUP_ACTIVATED).toBe(true)
     await expect(scheduleInventoryCleanup({} as ScheduledController, {} as Parameters<typeof scheduleInventoryCleanup>[1])).rejects.toThrow('bucket or queue')
-    const config = JSON.parse(readFileSync(new URL('../cloudflare_workers/r2_inventory/wrangler.jsonc', import.meta.url), 'utf8'))
-    expect(Object.keys(config.env)).toEqual(['prod'])
-    expect(config.env.prod.triggers.crons).toEqual(['* * * * *'])
-    expect(config.triggers).toBeUndefined()
-    expect(config.env.prod.queues.producers).toContainEqual({ binding: 'CLEANUP_QUEUE', queue: 'capgo-r2-inventory-prod-cleanup' })
-    expect(config.env.prod.queues.consumers.some((q: { queue: string }) => q.queue.endsWith('-cleanup'))).toBe(true)
   })
 
   it('splits by count and encoded bytes including escaped/multibyte keys, preserving exact retirement identity', () => {

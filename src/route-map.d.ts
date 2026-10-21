@@ -360,6 +360,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/onboarding/name': RouteRecordInfo<
+      '/onboarding/name',
+      '/onboarding/name',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/onboarding/organization': RouteRecordInfo<
       '/onboarding/organization',
       '/onboarding/organization',
@@ -475,6 +482,13 @@ declare module 'vue-router/auto-routes' {
     '/settings/organization/AuditLogs': RouteRecordInfo<
       '/settings/organization/AuditLogs',
       '/settings/organization/AuditLogs',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/settings/organization/Billing': RouteRecordInfo<
+      '/settings/organization/Billing',
+      '/settings/organization/Billing',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -958,6 +972,14 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | never
     }
+    'src/pages/onboarding/name.vue': {
+      routes:
+        | '/onboarding/name'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
     'src/pages/onboarding/organization.vue': {
       routes:
         | '/onboarding/organization'
@@ -1089,6 +1111,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/settings/organization/AuditLogs.vue': {
       routes:
         | '/settings/organization/AuditLogs'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/settings/organization/Billing.vue': {
+      routes:
+        | '/settings/organization/Billing'
       views:
         | never
       pathParamNames:

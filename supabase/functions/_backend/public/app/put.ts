@@ -22,6 +22,7 @@ import { trackPosthogEvent } from '../../utils/posthog.ts'
 import { checkPermission, checkPermissionPg } from '../../utils/rbac.ts'
 import { createSignedImageUrl, getStorageAllowedOrigins, resolveWritableImageValue } from '../../utils/storage.ts'
 import { supabaseAdmin, supabaseApikey, supabaseWithAuth } from '../../utils/supabase.ts'
+import { MAX_BUILD_TIMEOUT_SECONDS, MIN_BUILD_TIMEOUT_SECONDS, normalizeBuildTimeoutSeconds } from '../../utils/build_timeout.ts'
 import { backgroundTask, isValidAppId } from '../../utils/utils.ts'
 
 interface UpdateApp {
@@ -30,20 +31,17 @@ interface UpdateApp {
   retention?: number
   expose_metadata?: boolean
   allow_device_custom_id?: boolean
-  need_onboarding?: boolean
-  existing_app?: boolean
-  block_provider_infra_requests?: boolean
   allow_preview?: boolean
   build_timeout_seconds?: number
   default_upload_channel?: string
+  need_onboarding?: boolean
+  existing_app?: boolean
+  block_provider_infra_requests?: boolean
   device_data_collection?: unknown
   ios_store_url?: string | null
   android_store_url?: string | null
   onboarding?: unknown
 }
-
-export const MIN_BUILD_TIMEOUT_SECONDS = 300
-export const MAX_BUILD_TIMEOUT_SECONDS = 21600
 
 type AppSettings = Pick<Database['public']['Tables']['apps']['Update'], 'name' | 'icon_url' | 'retention' | 'expose_metadata' | 'allow_device_custom_id'
   | 'need_onboarding' | 'existing_app' | 'block_provider_infra_requests' | 'device_data_collection'
@@ -211,12 +209,18 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   }
   if (body.allow_preview !== undefined && typeof body.allow_preview !== 'boolean')
     throw quickError(400, 'invalid_allow_preview', 'allow_preview must be a boolean', { allow_preview: body.allow_preview })
-  if (body.build_timeout_seconds !== undefined
-    && (!Number.isInteger(body.build_timeout_seconds) || body.build_timeout_seconds < MIN_BUILD_TIMEOUT_SECONDS || body.build_timeout_seconds > MAX_BUILD_TIMEOUT_SECONDS)) {
-    throw quickError(400, 'invalid_build_timeout', `build_timeout_seconds must be an integer between ${MIN_BUILD_TIMEOUT_SECONDS} and ${MAX_BUILD_TIMEOUT_SECONDS}`, { build_timeout_seconds: body.build_timeout_seconds })
-  }
   if (body.default_upload_channel !== undefined && (typeof body.default_upload_channel !== 'string' || body.default_upload_channel.trim() === ''))
     throw quickError(400, 'invalid_default_upload_channel', 'default_upload_channel must be a channel name', { default_upload_channel: body.default_upload_channel })
+
+  if (body.build_timeout_seconds !== undefined) {
+    // Validate the raw value: normalizeBuildTimeoutSeconds clamps, so checking after it never fails.
+    const rawTimeout: unknown = body.build_timeout_seconds
+    if (typeof rawTimeout !== 'number' || !Number.isFinite(rawTimeout)
+      || rawTimeout < MIN_BUILD_TIMEOUT_SECONDS || rawTimeout > MAX_BUILD_TIMEOUT_SECONDS) {
+      throw quickError(400, 'invalid_build_timeout_seconds', 'Build timeout must be between 5 and 360 minutes', { build_timeout_seconds: body.build_timeout_seconds })
+    }
+    body.build_timeout_seconds = normalizeBuildTimeoutSeconds(rawTimeout)
+  }
 
   const onboardingPatch = parseAppOnboardingPatch(body.onboarding)
   const canUpdateSettings = await checkPermission(c, 'app.update_settings', { appId })
@@ -263,6 +267,9 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     body.retention,
     body.expose_metadata,
     body.allow_device_custom_id,
+    body.allow_preview,
+    body.build_timeout_seconds,
+    body.default_upload_channel,
     body.existing_app,
     body.block_provider_infra_requests,
     body.allow_preview,
@@ -324,12 +331,12 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     retention: body.retention,
     expose_metadata: body.expose_metadata,
     allow_device_custom_id: body.allow_device_custom_id,
-    need_onboarding: body.need_onboarding,
-    existing_app: body.existing_app,
-    block_provider_infra_requests: body.block_provider_infra_requests,
     allow_preview: body.allow_preview,
     build_timeout_seconds: body.build_timeout_seconds,
     default_upload_channel: body.default_upload_channel,
+    need_onboarding: body.need_onboarding,
+    existing_app: body.existing_app,
+    block_provider_infra_requests: body.block_provider_infra_requests,
     device_data_collection: deviceDataCollection,
     ios_store_url: body.ios_store_url,
     android_store_url: body.android_store_url,

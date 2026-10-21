@@ -3,7 +3,7 @@ import { log } from '@clack/prompts'
 import { getBuilderOnlyChecklist } from '../app/builder-checklist'
 import { formatCapgoCliInvokeError, getCapgoCliHttpStatus, formatError, invokeCapgoCliApi } from '../utils'
 
-type SetupOptions = { apikey: string } & Pick<OnboardingBuilderOptions, 'supaHost' | 'supaAnon' | 'analytics'>
+type SetupOptions = { apikey: string } & Pick<OnboardingBuilderOptions, 'apiHost' | 'analytics'>
 
 export async function readBuilderOnlyAssignment(appId: string, options: SetupOptions, request = invokeCapgoCliApi) {
   const { data, error } = await request<{ app_id: string, onboarding?: unknown }>(`app/${encodeURIComponent(appId)}`, {

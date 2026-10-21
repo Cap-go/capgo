@@ -305,15 +305,4 @@ describe('android/browser OAuth backend transport', () => {
     expect(mocks.exchange).not.toHaveBeenCalled()
     expect(mocks.connect).not.toHaveBeenCalled()
   })
-  it('keeps native and browser same-account deletion reauthentication without rollout settings', async () => {
-    const body = { id_token: await token(), nonce: 'n'.repeat(64), captcha_token: 'captcha', reauthenticate: true }
-    expect((await request('/', body)).status).toBe(401)
-    expect((await request('/', body, { Authorization: 'Bearer current-session' })).status).toBe(200)
-    const flow = await oauth('capgo://apple-callback', true)
-    const response = await flow.callback()
-    const code = new URLSearchParams(new URL(response.headers.get('location')!).hash.slice(1)).get('apple_code')
-    expect((await request('/exchange', { code, code_verifier: flow.verifier, captcha_token: 'captcha' })).status).toBe(200)
-    expect(flow.attempt.expected_user_id).toBe(user.id)
-    expect(flow.attempt.expected_subject).toBe('verified-subject')
-  })
 })

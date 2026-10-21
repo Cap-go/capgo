@@ -21,7 +21,7 @@ import OnboardingShell from './ui/shell.js'
 import { BuilderProjectDiscoveryApp } from './ui/project-discovery.js'
 import type { BuilderProjectDecision } from './ui/project-discovery.js'
 import { checkForCliUpdate, manualUpdateHint, runUpdateAndReexec } from './self-update.js'
-import { resolveSupabaseReplayUrl, startInitReplay } from '../../init/replay.js'
+import { resolveCapgoReplayUrl, startInitReplay } from '../../init/replay.js'
 import { discoverCapacitorProjects, hasCapacitorConfig } from './project-discovery.js'
 import { selectCapacitorProject } from './project-selection.js'
 import type { BuilderProjectPrompts } from './project-selection.js'
@@ -34,12 +34,10 @@ export interface OnboardingBuilderOptions {
   appId?: string
   apikey?: string
   platform?: string
-  // Capgo API gateway override (--supa-host) — threaded to the wizard so its
+  // Capgo API gateway override (--api-host), threaded to the wizard so its
   // build request AND AI analysis hit the same host as the plain CLI flow
-  // (preprod/self-hosted testing). Defaults to prod when omitted.
-  supaHost?: string
-  /** Custom Supabase anon key for self-hosting (--supa-anon). */
-  supaAnon?: string
+  /** Capgo API override (--api-host); Capgo cloud when omitted. */
+  apiHost?: string
   /**
    * Offer the self-update prompt as the first wizard screen. ONLY the genuine
    * `build init` / `onboarding` entrypoint sets this. Other callers that reach
@@ -287,7 +285,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   // this, getInternalLogPath() is null and all appendInternalLog calls no-op —
   // which is why the bundle's "Internal log" section used to be empty for build init.
   startInternalLog(appId)
-  appendInternalLog(`build init: started for ${appId} (platform ${options.platform ?? 'auto'}, host ${options.supaHost ?? 'prod'})`)
+  appendInternalLog(`build init: started for ${appId} (platform ${options.platform ?? 'auto'}, host ${options.apiHost ?? 'prod'})`)
   // If config.appId is missing (very rare — CapacitorConfig.appId is required
   // for `cap sync` to produce a working iOS project), fall back to the
   // resolved Capgo lookup key. Mismatch detection will still surface the
@@ -349,11 +347,11 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
   // leaving self-update disabled so it cannot re-execute the wrapping init.
   const analyticsEnabled = (options.enableSelfUpdate === true || options.appId !== undefined) && options.analytics !== false
   const candidateApiKey = resolveBuilderCandidateKey(options.apikey)
-  const loginServices = createBuilderLoginServices({ supaHost: options.supaHost, supaAnon: options.supaAnon })
-  const appSelectionServices = createBuilderAppSelectionServices({ supaHost: options.supaHost, supaAnon: options.supaAnon })
+  const loginServices = createBuilderLoginServices({ apiHost: options.apiHost })
+  const appSelectionServices = createBuilderAppSelectionServices({ apiHost: options.apiHost })
   let authenticatedApiKey: string | undefined
   const replayApikey = candidateApiKey
-  const buildReplayUrl = resolveSupabaseReplayUrl(options.supaHost)
+  const buildReplayUrl = options.apiHost ? resolveCapgoReplayUrl(options.apiHost) : undefined
   const buildReplay = startInitReplay({
     analyticsEnabled,
     apikey: replayApikey,
@@ -361,7 +359,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     currentUrl: 'capgo-cli://build-onboarding',
     replayUrl: buildReplayUrl,
     sessionPrefix: 'build-onboarding',
-    supaHost: options.supaHost,
+    apiHost: options.apiHost,
   })
   let buildReplayFinished = false
   const finishBuildReplay = async (): Promise<void> => {
@@ -392,8 +390,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
       androidDir,
       apikey: candidateApiKey,
       loginServices,
-      supaHost: options.supaHost,
-      supaAnon: options.supaAnon,
+      apiHost: options.apiHost,
       journeyId,
       initialPlatform,
       resolveChecklistPlatform: async (key: string, selectedId: string) => {
@@ -430,8 +427,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
         startSetupStep = firstSetupStep
         startSetupLookupInFlight = true
         const resolveOwner = () => resolveOwnerOrgId(apikey, selectedAppId, {
-          supaHost: options.supaHost,
-          supaAnon: options.supaAnon,
+          apiHost: options.apiHost,
         })
         void resolveOwner().then(async orgId => orgId ?? resolveOwner()).then((orgId) => {
           if (!orgId)
@@ -566,8 +562,7 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
           await Promise.race([
             (async () => {
               const orgId = await resolveOwnerOrgId(apikey, appId, {
-                supaHost: options.supaHost,
-                supaAnon: options.supaAnon,
+                apiHost: options.apiHost,
               }, controller.signal)
               await trackBuilderOnboardingCancelled({
                 apikey,

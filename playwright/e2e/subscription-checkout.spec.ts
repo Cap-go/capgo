@@ -193,22 +193,12 @@ test.describe('Subscription Checkout', () => {
     await expect(planCard.getByRole('button', { name: 'Upgrade' })).toBeEnabled()
     await planCard.locator('[data-test="plan-action-button"]').click()
 
-    // Web checkout opens a confirm dialog with a real target=_blank link.
-    const confirmLink = page.getByRole('link', { name: 'Confirm' })
-    await expect(confirmLink).toBeVisible()
-
+    // Production mounts embedded Checkout in Capgo; the emulator only serves hosted pages, opened in the same tab.
     const escapedStripeOrigin = STRIPE_EMULATOR_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const checkoutUrlPattern = new RegExp(`${escapedStripeOrigin}/checkout/`)
+    await expect(page).toHaveURL(new RegExp(`${escapedStripeOrigin}/checkout/`))
+    await page.getByRole('button', { name: /^Pay / }).click()
 
-    const [checkoutPage] = await Promise.all([
-      page.waitForEvent('popup'),
-      confirmLink.click(),
-    ])
-    await checkoutPage.waitForLoadState('domcontentloaded')
-    await expect(checkoutPage).toHaveURL(checkoutUrlPattern)
-    await checkoutPage.getByRole('button', { name: /^Pay / }).click()
-
-    await checkoutPage.waitForURL(/\/settings\/organization\/plans\?success=1/)
-    await expect(checkoutPage.getByRole('heading', { name: 'Thank You for subscribing to Capgo' })).toBeVisible()
+    await page.waitForURL(/\/settings\/organization\/plans\?success=1/)
+    await expect(page.getByRole('heading', { name: 'Thank You for subscribing to Capgo' })).toBeVisible()
   })
 })

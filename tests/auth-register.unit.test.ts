@@ -93,14 +93,18 @@ describe('pOST /auth/register unit', () => {
     vi.clearAllMocks()
   })
 
-  it('requires captcha when CAPTCHA_SECRET_KEY is configured', async () => {
+  it.each([
+    { label: 'names supplied', names: {} },
+    { label: 'both names omitted', names: { first_name: undefined, last_name: undefined } },
+  ])('requires captcha when CAPTCHA_SECRET_KEY is configured ($label)', async ({ names }) => {
     const response = await postRegister({
       ...validBody,
+      ...names,
       captcha_token: undefined,
     })
     expect(response.status).toBe(422)
-    const body = await response.json() as { error: string }
-    expect(body.error).toBe('captcha_failed')
+    expect(await response.json()).toMatchObject({ error: 'captcha_failed' })
+    expect(rpcMock).not.toHaveBeenCalled()
     expect(signUpMock).not.toHaveBeenCalled()
   })
 
@@ -172,19 +176,6 @@ describe('pOST /auth/register unit', () => {
     expect(rpcMock).not.toHaveBeenCalled()
     expect(signUpMock).not.toHaveBeenCalled()
     expect(usersUpsertMock).not.toHaveBeenCalled()
-  })
-
-  it('still requires captcha when both names are omitted', async () => {
-    const response = await postRegister({
-      ...validBody,
-      first_name: undefined,
-      last_name: undefined,
-      captcha_token: undefined,
-    })
-    expect(response.status).toBe(422)
-    expect(await response.json()).toMatchObject({ error: 'captcha_failed' })
-    expect(rpcMock).not.toHaveBeenCalled()
-    expect(signUpMock).not.toHaveBeenCalled()
   })
 
   it.each(['password', 'Password!', 'Password123', 'PASSWORD123!', ''])('still rejects weak passwords without names: %j', async (password) => {

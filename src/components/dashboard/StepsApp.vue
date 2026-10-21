@@ -10,7 +10,7 @@ import TechnicalTeammateInviteCard from '~/components/dashboard/TechnicalTeammat
 import { createDefaultApiKey, findUsablePlainApiKey } from '~/services/apikeys'
 import { invokeCapgoApi } from '~/services/capgoApi'
 import { sendOnboardingEvent } from '~/services/onboardingTracking'
-import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
+import { defaultApiHost, getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -44,7 +44,7 @@ interface Step {
 
 const config = getLocalConfig()
 
-const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``
+const localCommand = isLocal(config.supaHost) ? ` --api-host ${defaultApiHost}` : ``
 const apiKey = ref<string | null>(null)
 // keep NPX for better support of our customers env, everyone has npx but not everyone has bunx, and bunx has some issues with pnpm
 const commandTemplate = `npx @capgo/cli@latest i [APIKEY]${localCommand}`

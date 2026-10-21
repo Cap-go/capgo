@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { CreditPricingStep } from '~/services/creditPricing'
 import type { Database } from '~/types/supabase.types'
-import { Capacitor } from '@capacitor/core'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -9,11 +8,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconCheckCircle from '~icons/lucide/check-circle'
+import CancelPlanModal from '~/components/billing/CancelPlanModal.vue'
+import EmbeddedCheckoutModal from '~/components/billing/EmbeddedCheckoutModal.vue'
 import CreditsCta from '~/components/CreditsCta.vue'
 import CreditsOnlyTip from '~/components/CreditsOnlyTip.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { useBillingPaidAt } from '~/composables/useBillingPaidAt'
-import { invokeCapgoApi } from '~/services/capgoApi'
 import { ENTERPRISE_MAU_STOPS, formatMau, getOrgExtraMau, quoteEnterpriseScale } from '~/services/enterpriseScale'
 import { formatNumber, formatNumberValue } from '~/services/formatLocale'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
@@ -21,8 +21,8 @@ import { shouldShowExpiredTrialPlansState, shouldShowPlanFailureBanner } from '~
 import { checkPermissions } from '~/services/permissions'
 import { createPlansVisitTracker } from '~/services/plansVisitTracking'
 import { getSignupAttributionEventTags } from '~/services/signupAttribution'
-import { getAffonsoReferral, getDatafastAttribution, openCheckout, openPortal } from '~/services/stripe'
-import { getCreditPricingSteps, getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
+import { startSubscriptionCheckout } from '~/services/stripe'
+import { getCreditPricingSteps, getCurrentPlanNameOrg } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -51,6 +51,8 @@ const isMobile = isNativeAppStoreContext()
 
 // Modal state for non-admin access
 const showAdminModal = ref(false)
+const showCancelModal = ref(false)
+const embeddedCheckout = ref<{ clientSecret: string, publishableKey: string, planName: string } | null>(null)
 
 const { currentOrganization } = storeToRefs(organizationStore)
 const billingOrgId = computed(() => currentOrganization.value?.gid)
@@ -205,44 +207,20 @@ async function loadEnterpriseScale(orgId: string) {
     enterpriseMauIndex.value = index
 }
 
-async function prefetchStripeCheckoutUrl(plan: Database['public']['Tables']['plans']['Row'], isYear: boolean) {
+async function startPlanCheckout(plan: Database['public']['Tables']['plans']['Row'], isYear: boolean) {
   if (!plan.stripe_id)
-    return
-  const supabase = useSupabase()
-  const session = await supabase.auth.getSession()
-  if (!session)
-    return
-
-  const successUrl = `${window.location.href}?success=1`
-  const cancelUrl = `${window.location.href}?cancel=1`
-  const datafastAttribution = await getDatafastAttribution()
-  const affonsoReferral = await getAffonsoReferral()
-  try {
-    const resp = await invokeCapgoApi('private/stripe_checkout', {
-      body: JSON.stringify({
-        priceId: plan.stripe_id,
-        successUrl,
-        cancelUrl,
-        recurrence: isYear ? 'year' : 'month',
-        orgId: currentOrganization.value?.gid ?? '',
-        attributionId: datafastAttribution.visitorId,
-        datafastVisitorId: datafastAttribution.visitorId,
-        datafastSessionId: datafastAttribution.sessionId,
-        affonsoReferral,
-        // Enterprise only: MAU added to the plan quota, billed on the same subscription.
-        ...(isEnterprisePlan(plan) && enterpriseQuote.value?.extraMau
-          ? { extraMau: enterpriseQuote.value.extraMau }
-          : {}),
-      }),
-    })
-
-    if (!resp.error && resp.data?.url)
-      return resp.data.url as string
-    return undefined
-  }
-  catch {
-    return undefined
-  }
+    return null
+  // Strip a previous ?success/?cancel so Stripe returns to a clean plans URL.
+  const returnUrl = `${globalThis.location.origin}${route.path}`
+  return await startSubscriptionCheckout({
+    priceId: plan.stripe_id,
+    successUrl: `${returnUrl}?success=1`,
+    cancelUrl: `${returnUrl}?cancel=1`,
+    isYear,
+    orgId: currentOrganization.value?.gid ?? '',
+    // Enterprise only: MAU added to the plan quota, billed on the same subscription.
+    extraMau: isEnterprisePlan(plan) ? enterpriseQuote.value?.extraMau : undefined,
+  })
 }
 
 function trackPlanCheckoutStarted(plan: Database['public']['Tables']['plans']['Row'], isYear: boolean, checkoutSource: string) {
@@ -269,39 +247,6 @@ function trackPlanCheckoutStarted(plan: Database['public']['Tables']['plans']['R
   }).catch()
 }
 
-async function openWebStripeCheckout(plan: Database['public']['Tables']['plans']['Row'], isYear: boolean) {
-  const url = await prefetchStripeCheckoutUrl(plan, isYear)
-  if (!url) {
-    toast.error('Cannot get your checkout')
-    return false
-  }
-
-  // Confirm dialog with a real <a href> so checkout opens under a fresh user gesture.
-  // Avoids popup blockers after the async Stripe session create.
-  dialogStore.openDialog({
-    title: t('open-in-new-tab'),
-    description: t('stripe-checkout-will-be-opened-in-a-new-tab'),
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-confirm'),
-        id: 'confirm-button',
-        role: 'primary',
-        href: url,
-        target: '_blank',
-        rel: 'noopener noreferrer',
-        handler: () => trackPlanCheckoutStarted(plan, isYear, 'web_confirm'),
-      },
-    ],
-  })
-
-  const dismissedByCancel = await dialogStore.onDialogDismiss()
-  return !dismissedByCancel
-}
-
 const canCancelPlan = computed(() => !!currentOrganization.value?.paying && !isCreditsOnly.value)
 
 async function openCancelPlan() {
@@ -310,7 +255,24 @@ async function openCancelPlan() {
     showAdminModal.value = true
     return
   }
-  await openPortal(orgId, t, 'cancel_subscription')
+  showCancelModal.value = true
+}
+
+async function onPlanCanceled() {
+  showCancelModal.value = false
+  const orgId = currentOrganization.value?.gid
+  await organizationStore.fetchOrganizations()
+  if (orgId)
+    organizationStore.setCurrentOrganization(orgId)
+}
+
+async function onCheckoutComplete() {
+  embeddedCheckout.value = null
+  thankYouPage.value = true
+  const orgId = currentOrganization.value?.gid
+  await organizationStore.fetchOrganizations()
+  if (orgId)
+    organizationStore.setCurrentOrganization(orgId)
 }
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
@@ -329,17 +291,18 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id) {
     const checkoutIsYearly = hasYearlyDiscount(plan) ? isYearly.value : false
-    if (Capacitor.getPlatform() === 'web') {
-      const shouldContinue = await openWebStripeCheckout(plan, checkoutIsYearly)
-      if (!shouldContinue) {
-        isSubscribeLoading.value[index] = false
-        return
-      }
+    const session = await startPlanCheckout(plan, checkoutIsYearly)
+    if (!session) {
+      toast.error(t('billing-checkout-error'))
+    }
+    else if (session.kind === 'embedded') {
+      embeddedCheckout.value = { ...session, planName: plan.name }
+      trackPlanCheckoutStarted(plan, checkoutIsYearly, 'embedded')
     }
     else {
-      const didOpenCheckout = await openCheckout(plan.stripe_id, `${globalThis.location.href}?success=1`, `${globalThis.location.href}?cancel=1`, checkoutIsYearly, currentOrganization?.value?.gid ?? '')
-      if (didOpenCheckout)
-        trackPlanCheckoutStarted(plan, checkoutIsYearly, 'direct')
+      // Local Stripe emulator only serves hosted pages.
+      trackPlanCheckoutStarted(plan, checkoutIsYearly, 'hosted')
+      globalThis.location.href = session.url
     }
   }
   isSubscribeLoading.value[index] = false
@@ -870,6 +833,21 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       </section>
     </div>
 
+    <EmbeddedCheckoutModal
+      v-if="embeddedCheckout"
+      :title="t('billing-checkout-title', { plan: embeddedCheckout.planName })"
+      :client-secret="embeddedCheckout.clientSecret"
+      :publishable-key="embeddedCheckout.publishableKey"
+      @close="embeddedCheckout = null"
+      @complete="onCheckoutComplete"
+    />
+    <CancelPlanModal
+      v-if="showCancelModal && currentOrganization?.gid"
+      :org-id="currentOrganization.gid"
+      :plan-name="currentPlan?.name"
+      @close="showCancelModal = false"
+      @canceled="onPlanCanceled"
+    />
     <!-- Permission modal shown when the user can't manage billing -->
     <RbacPermissionOnlyModal
       v-if="showAdminModal"
