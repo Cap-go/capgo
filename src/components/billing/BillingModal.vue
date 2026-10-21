@@ -1,0 +1,129 @@
+<script lang="ts">
+// Shared across instances so a nested billing modal does not re-enable the app early.
+</script>
+
+<script setup lang="ts">
+import { nextTick, onBeforeUnmount, onMounted, ref, useId } from 'vue'
+import { useI18n } from 'vue-i18n'
+import IconX from '~icons/heroicons/x-mark'
+
+const props = withDefaults(defineProps<{
+  title: string
+  description?: string
+  size?: 'md' | 'lg' | 'xl'
+  // Block Escape/backdrop while a payment is being confirmed.
+  busy?: boolean
+}>(), {
+  size: 'md',
+  busy: false,
+})
+
+const emit = defineEmits<{
+  close: []
+}>()
+
+let openModalCount = 0
+
+const { t } = useI18n()
+const titleId = useId()
+const box = ref<HTMLElement | null>(null)
+let previouslyFocused: HTMLElement | null = null
+
+const sizeClass = {
+  md: 'max-w-lg',
+  lg: 'max-w-2xl',
+  xl: 'max-w-4xl',
+}
+
+function requestClose() {
+  if (!props.busy)
+    emit('close')
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape')
+    return
+  event.preventDefault()
+  event.stopPropagation()
+  requestClose()
+}
+
+// Escape while focus has left the dialog (e.g. on <body>); keys inside Stripe iframes never bubble.
+function onWindowKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape')
+    requestClose()
+}
+
+// Make the app behind the dialog inert instead of using showModal(): the browser top layer
+// would cover Stripe's 3DS challenge and toasts, which are appended outside this dialog.
+function setAppInert(inert: boolean) {
+  const app = document.getElementById('app')
+  if (!app)
+    return
+  openModalCount = Math.max(0, openModalCount + (inert ? 1 : -1))
+  app.inert = openModalCount > 0
+}
+
+onMounted(async () => {
+  previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  setAppInert(true)
+  window.addEventListener('keydown', onWindowKeydown)
+  await nextTick()
+  box.value?.focus()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onWindowKeydown)
+  setAppInert(false)
+  // Return focus to the control that opened the dialog.
+  previouslyFocused?.focus?.()
+})
+</script>
+
+<template>
+  <Teleport to="body">
+    <dialog
+      open
+      class="d-modal d-modal-open"
+      aria-modal="true"
+      :aria-labelledby="titleId"
+      @click.self="requestClose"
+      @keydown="onKeydown"
+      @cancel.prevent="requestClose"
+    >
+      <div
+        ref="box"
+        tabindex="-1"
+        class="d-modal-box outline-none w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        :class="sizeClass[props.size]"
+      >
+        <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
+          <div class="min-w-0">
+            <h2 :id="titleId" class="text-lg font-semibold leading-7 text-slate-950 dark:text-white">
+              {{ props.title }}
+            </h2>
+            <p v-if="props.description" class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              {{ props.description }}
+            </p>
+          </div>
+          <button
+            type="button"
+            class="d-btn d-btn-ghost d-btn-sm d-btn-square shrink-0"
+            :aria-label="t('button-cancel')"
+            :disabled="props.busy"
+            data-test="billing-modal-close"
+            @click="requestClose"
+          >
+            <IconX class="h-5 w-5" />
+          </button>
+        </div>
+        <div class="px-5 py-5 sm:px-6">
+          <slot />
+        </div>
+        <div v-if="$slots.footer" class="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
+          <slot name="footer" />
+        </div>
+      </div>
+    </dialog>
+  </Teleport>
+</template>

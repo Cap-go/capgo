@@ -53,6 +53,7 @@ import { app as sso_sp_metadata } from '../../supabase/functions/_backend/privat
 import { app as sso_verify_dns } from '../../supabase/functions/_backend/private/sso/verify-dns.ts'
 import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
 import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
+import { app as stripe_billing } from '../../supabase/functions/_backend/private/stripe_billing.ts'
 import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
 import { app as stripe_past_due } from '../../supabase/functions/_backend/private/stripe_past_due.ts'
 import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
@@ -192,6 +193,7 @@ appPrivate.route('/update_delivery_stats', update_delivery_stats)
 appPrivate.route('/bundle_install_stats', bundle_install_stats)
 appPrivate.route('/release_live', release_live)
 appPrivate.route('/stripe_checkout', stripe_checkout)
+appPrivate.route('/stripe_billing', stripe_billing)
 appPrivate.route('/stripe_portal', stripe_portal)
 appPrivate.route('/stripe_past_due', stripe_past_due)
 appPrivate.route('/verify_email_otp', verify_email_otp)

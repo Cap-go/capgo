@@ -21,6 +21,8 @@ interface CheckoutData {
   orgId: string
   // Enterprise MAU slider: MAU bought on top of the plan allowance.
   extraMau?: number
+  // Request an in-app embedded Checkout session instead of a hosted page URL.
+  embedded?: boolean
 }
 
 function parseExtraMau(value: unknown) {
@@ -86,9 +88,16 @@ app.post('/', middlewareAuth, async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'user', org })
   const planId = body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B'
   const extraMauCheckout = await getExtraMauCheckout(c, planId, extraMau)
-  const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', planId, body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId, {
-    visitorId: body.datafastVisitorId,
-    sessionId: body.datafastSessionId,
-  }, body.affonsoReferral, extraMauCheckout)
-  return c.json({ url: checkout.url })
+  const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', planId, body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, {
+    clientReferenceId: body.clientReferenceId,
+    attributionId: body.attributionId,
+    datafastAttribution: {
+      visitorId: body.datafastVisitorId,
+      sessionId: body.datafastSessionId,
+    },
+    affonsoReferral: body.affonsoReferral,
+    extraMau: extraMauCheckout,
+    embedded: body.embedded === true,
+  })
+  return c.json(checkout)
 })
