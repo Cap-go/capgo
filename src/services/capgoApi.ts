@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ConsoleClient } from '~/services/consoleClient'
 import type { Database } from '~/types/supabase.types'
 import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js'
 import { getLocalConfig, useSupabase } from './supabase'
@@ -10,7 +10,7 @@ export interface CapgoApiInvokeOptions {
   /** Use the anon key when there is no user session (public bootstrap endpoints). */
   allowAnonymous?: boolean
   /** Prefer caller-provided client for session/auth context. */
-  client?: SupabaseClient<Database>
+  client?: ConsoleClient<Database>
   /**
    * Number of automatic retries for transient failures (network drops, edge
    * timeouts, and 5xx/429 responses from a stressed backend). Defaults to 2 for

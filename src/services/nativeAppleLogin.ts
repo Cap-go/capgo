@@ -1,4 +1,5 @@
-import type { SupabaseClient, User } from '@supabase/supabase-js'
+import type { User } from '@supabase/supabase-js'
+import type { ConsoleClient } from '~/services/consoleClient'
 import { Capacitor } from '@capacitor/core'
 import { defaultApiHost } from './supabase'
 
@@ -9,7 +10,7 @@ export function isNativeAppleLoginAvailable(reauthenticate = false) {
     && Capacitor.isPluginAvailable('SocialLogin')
 }
 
-export async function signInWithApple(supabase: SupabaseClient, captchaToken?: string, options: { reauthenticate?: boolean } = {}) {
+export async function signInWithApple(supabase: ConsoleClient, captchaToken?: string, options: { reauthenticate?: boolean } = {}) {
   if (!isNativeAppleLoginAvailable(options.reauthenticate))
     throw new Error('Apple login requires the native iOS SocialLogin plugin')
 

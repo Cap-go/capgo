@@ -1,4 +1,5 @@
-import type { SupabaseClient, User } from '@supabase/supabase-js'
+import type { User } from '@supabase/supabase-js'
+import type { ConsoleClient } from '~/services/consoleClient'
 import { Capacitor } from '@capacitor/core'
 import { base64url } from 'jose'
 import { parseSignupAttributionRecord } from '../../supabase/functions/shared/signup-attribution'
@@ -106,7 +107,7 @@ export function hasPendingAppleOAuth() {
   return !!pendingCompletion?.code && Date.now() - pendingCompletion.created < 600_000
 }
 
-export async function completeAppleOAuth(supabase: SupabaseClient, captchaToken?: string) {
+export async function completeAppleOAuth(supabase: ConsoleClient, captchaToken?: string) {
   const attempt = pendingCompletion
   pendingCompletion = null
   if (!attempt?.code)

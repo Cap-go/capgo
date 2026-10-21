@@ -1,5 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
+import type { ConsoleClient } from '~/services/consoleClient'
 import type { UserModule } from '~/types'
 import { ADMIN_DASHBOARD_URL } from '~/constants/adminDashboard'
 import { clearChartDataCache } from '~/services/chartDataService'
@@ -23,7 +23,7 @@ import { getPlans } from './../services/supabase'
 
 async function updateUser(
   main: ReturnType<typeof useMainStore>,
-  supabase: SupabaseClient,
+  supabase: ConsoleClient,
 ) {
   const config = getLocalConfig()
   // console.log('set auth', auth)
@@ -31,7 +31,7 @@ async function updateUser(
     const { data, error } = await supabase
       .from('users')
       .select()
-      .eq('id', main.auth?.id)
+      .eq('id', main.auth?.id ?? '')
       .maybeSingle()
 
     let userRecord = data ?? null
@@ -69,7 +69,7 @@ async function updateUser(
       const { error: updateError } = await supabase
         .from('users')
         .update({ email: main.auth?.email })
-        .eq('id', main.auth?.id)
+        .eq('id', main.auth?.id ?? '')
       if (updateError)
         console.error('update error', updateError)
       userRecord.email = main.auth?.email
@@ -121,8 +121,8 @@ async function updateUser(
 }
 
 async function maybeProvisionSsoMembership(
-  supabase: SupabaseClient,
-  session: Awaited<ReturnType<SupabaseClient['auth']['getSession']>>['data']['session'] | null,
+  supabase: ConsoleClient,
+  session: Awaited<ReturnType<ConsoleClient['auth']['getSession']>>['data']['session'] | null,
 ): Promise<'continue' | 'redirect_login' | 'abort_navigation'> {
   if (!session || !isSsoUser(session.user))
     return 'continue'
@@ -147,7 +147,7 @@ async function maybeProvisionSsoMembership(
   return 'continue'
 }
 
-async function isDisabledAccount(supabase: SupabaseClient, userId: string | null | undefined) {
+async function isDisabledAccount(supabase: ConsoleClient, userId: string | null | undefined) {
   if (!userId)
     return false
 

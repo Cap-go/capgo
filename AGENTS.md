@@ -892,6 +892,19 @@ Also applies to dialog/Teleport content, admin filters, and hidden utility input
 (e.g. file pickers): they still need `aria-label` or an associated label.
 
 
+## Console Data Access
+
+- The console never queries Supabase directly. `useSupabase()` returns a
+  console client (`src/services/consoleClient.ts`) whose `from`/`rpc`,
+  storage, realtime and `functions.invoke` calls go to the Capgo API
+  (`/private/console/*`, `supabase/functions/_backend/private/console_data.ts`),
+  which replays them with the caller's own JWT so RLS still applies.
+- Any new table or RPC used from `src/` must be added to
+  `supabase/functions/_backend/utils/console_query_allowlist.ts`;
+  `tests/console-query-allowlist.unit.test.ts` enforces this.
+- Only `auth` still talks to Supabase Auth; swapping it is the remaining step
+  to leave Supabase on the console side.
+
 ## Auth Redirect Guardrails
 
 - We intentionally route auth email links through `/confirm-signup` to avoid

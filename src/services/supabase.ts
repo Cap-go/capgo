@@ -1,14 +1,15 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { CreditMetricType, CreditPricingStep } from './creditPricing'
+import type { ConsoleClient } from '~/services/consoleClient'
 import type { Database } from '~/types/supabase.types'
 import { createClient } from '@supabase/supabase-js'
 import subset from 'semver/ranges/subset'
 import { ref } from 'vue'
 import { invokeCapgoApi } from '~/services/capgoApi'
+import { createConsoleClient } from '~/services/consoleClient'
 import { sortCreditPricingSteps } from './creditPricing'
 
-let supaClient: SupabaseClient<Database> = null as any
+let supaClient: ConsoleClient<Database> = null as any
 
 export const defaultApiHost = import.meta.env.VITE_API_HOST as string
 
@@ -197,7 +198,9 @@ export function useSupabase() {
   if (supaClient)
     return supaClient
 
-  supaClient = createClient<Database>(getSupabaseHost(), config.supaKey, options)
+  // Supabase Auth stays for now; every data, storage, realtime and function call
+  // goes through the Capgo API (see consoleClient.ts).
+  supaClient = createConsoleClient(createClient<Database>(getSupabaseHost(), config.supaKey, options))
   return supaClient
 }
 

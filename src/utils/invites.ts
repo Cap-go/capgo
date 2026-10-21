@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ConsoleClient } from '~/services/consoleClient'
 import type { Database } from '~/types/supabase.types'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { invokeCapgoApi } from '~/services/capgoApi'
@@ -40,7 +40,7 @@ export async function resolveInviteNewUserErrorMessage(
 }
 
 export async function notifyExistingUserInvite(
-  supabase: SupabaseClient<Database>,
+  supabase: ConsoleClient<Database>,
   email: string,
   orgId: string,
 ): Promise<boolean> {

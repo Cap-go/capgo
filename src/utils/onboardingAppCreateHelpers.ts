@@ -1,4 +1,4 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
+import type { ConsoleClient } from '~/services/consoleClient'
 import type { Database } from '~/types/supabase.types'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { invokeCapgoApi } from '~/services/capgoApi'
@@ -110,7 +110,7 @@ export async function readOnboardingAppFunctionError(
 }
 
 export async function createOnboardingAppWithFallbackIds(
-  supabase: SupabaseClient<Database>,
+  supabase: ConsoleClient<Database>,
   input: OnboardingAppCreateInput,
   messages?: OnboardingAppFunctionErrorMessages,
 ): Promise<OnboardingAppCreateResult> {
