@@ -261,7 +261,23 @@ async function mockReleaseLive(page: Page) {
  * Add routes here when a PR touches a new screen reviewers should compare.
  */
 function visualTrialPlan(scheduled: boolean) {
-  return { planName: 'Solo', amount: 1400, currency: 'usd', interval: 'month', startsAt: '2026-10-30T00:00:00.000Z', scheduled }
+  return {
+    planName: 'Solo',
+    productId: 'prod_LQIregjtNduh4q',
+    amount: 1400,
+    currency: 'usd',
+    interval: 'month',
+    startsAt: '2026-10-30T00:00:00.000Z',
+    scheduled,
+  }
+}
+
+function visualTrialPlanOptions() {
+  return [
+    { productId: 'prod_LQIregjtNduh4q', planName: 'Solo', amount: 1400, currency: 'usd' },
+    { productId: 'prod_LQIs1Yucml9ChU', planName: 'Maker', amount: 3900, currency: 'usd' },
+    { productId: 'prod_LQIugvJcPrxhda', planName: 'Team', amount: 9900, currency: 'usd' },
+  ]
 }
 
 export const visualDiffRoutes: VisualDiffRoute[] = [
@@ -463,7 +479,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       let promptRequested = false
       await page.route('**/private/stripe_billing/trial-plan', (route) => {
         promptRequested = true
-        return route.fulfill({ json: { card: null, plan: visualTrialPlan(false) } })
+        return route.fulfill({ json: { card: null, plan: visualTrialPlan(false), plans: visualTrialPlanOptions() } })
       })
       await page.reload()
       const prompt = page.locator('[data-test="trial-card-prompt-add"]')
@@ -744,6 +760,19 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       const appOnlyScope = page.locator('[data-test="create-key-app-only-scope"]')
       if (await appOnlyScope.count())
         await appOnlyScope.check()
+    },
+  },
+  {
+    slug: 'api-keys-secure-column',
+    path: '/apikeys',
+    auth: true,
+    prepare: async (page) => {
+      const createKey = page.locator('[data-test="create-key"]')
+      await createKey.waitFor({ state: 'visible', timeout: 30_000 })
+      // Seed includes hashed + plain keys for test@capgo.app — wait for the table body.
+      await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 30_000 })
+      const hashed = page.getByLabel('Secure key (hidden)').or(page.getByText('Secure key (hidden)'))
+      await hashed.first().waitFor({ state: 'visible', timeout: 30_000 })
     },
   },
 ]

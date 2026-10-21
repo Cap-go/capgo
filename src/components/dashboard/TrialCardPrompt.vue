@@ -5,7 +5,8 @@
  * Asks trial organizations to save a card right after an activation milestone:
  * the first device that installed an update, or the first successful native build.
  * The card schedules the plan picked during onboarding to start when the trial ends;
- * nothing is charged before then and the trial keeps running.
+ * nothing is charged before then and the trial keeps running. The user can switch
+ * Solo / Maker / Team before confirming.
  *
  * Visibility conditions:
  * - Stripe billing is enabled and external purchase flows are allowed
@@ -15,7 +16,7 @@
  * - The org has an onboarding plan to start and it is not scheduled yet
  */
 
-import type { TrialPlan } from '~/services/stripe'
+import type { TrialPlan, TrialPlanOption } from '~/services/stripe'
 import type { TrialCardMilestone } from '~/utils/trialCardPrompt'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -25,6 +26,7 @@ import IconCheckCircle from '~icons/heroicons/check-circle'
 import IconLock from '~icons/heroicons/lock-closed'
 import BillingModal from '~/components/billing/BillingModal.vue'
 import CardFormModal from '~/components/billing/CardFormModal.vue'
+import TrialPlanPicker from '~/components/billing/TrialPlanPicker.vue'
 import { getLocalConfig, stripeEnabled } from '~/services/console'
 import { formatLocalDate } from '~/services/date'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
@@ -52,11 +54,13 @@ interface ActivePrompt {
   reached: TrialCardMilestone[]
   trialDaysLeft: number
   plan: TrialPlan
+  plans: TrialPlanOption[]
   hasCard: boolean
 }
 
 const prompt = ref<ActivePrompt | null>(null)
 const step = ref<'ask' | 'card' | null>(null)
+const selectedProductId = ref('')
 const isScheduling = ref(false)
 let lookupRun = 0
 
@@ -83,6 +87,22 @@ const pendingMilestone = computed(() => {
   return pickTrialCardMilestone(reachedMilestones.value, readHandledTrialCardMilestones(orgId.value))
 })
 
+const selectedOption = computed(() => {
+  const options = prompt.value?.plans ?? []
+  return options.find(option => option.productId === selectedProductId.value)
+    ?? options.find(option => option.planName === prompt.value?.plan.planName)
+    ?? null
+})
+const selectedPlanName = computed(() => selectedOption.value?.planName ?? prompt.value?.plan.planName ?? '')
+const planPrice = computed(() => {
+  if (selectedOption.value)
+    return formatStripeAmount(selectedOption.value.amount, selectedOption.value.currency)
+  return prompt.value ? formatStripeAmount(prompt.value.plan.amount, prompt.value.plan.currency) : ''
+})
+const planDate = computed(() => prompt.value ? formatLocalDate(prompt.value.plan.startsAt) : '')
+const title = computed(() => prompt.value?.milestone === 'builder' ? t('trial-card-prompt-title-builder') : t('trial-card-prompt-title-ota'))
+const showPicker = computed(() => (prompt.value?.plans.length ?? 0) > 1)
+
 function track(event: string) {
   if (!prompt.value)
     return
@@ -90,6 +110,7 @@ function track(event: string) {
     org_id: prompt.value.orgId,
     milestone: prompt.value.milestone,
     trial_days_left: prompt.value.trialDaysLeft,
+    plan: selectedPlanName.value,
   })
 }
 
@@ -117,14 +138,23 @@ watch([orgId, pendingMilestone, () => !!stripeEnabled.value], async ([id, pendin
     markTrialCardMilestonesHandled(id, reached)
     return
   }
-  prompt.value = { orgId: id, milestone: pending, reached, trialDaysLeft: currentOrg.value?.trial_left ?? 0, plan: trial.plan, hasCard: !!trial.card }
+  const plans = trial.plans ?? []
+  prompt.value = {
+    orgId: id,
+    milestone: pending,
+    reached,
+    trialDaysLeft: currentOrg.value?.trial_left ?? 0,
+    plan: trial.plan,
+    plans,
+    hasCard: !!trial.card,
+  }
+  selectedProductId.value = trial.plan.productId
+    || plans.find(option => option.planName === trial.plan!.planName)?.productId
+    || plans[0]?.productId
+    || ''
   step.value = 'ask'
   track('trial_card_prompt_shown')
 }, { immediate: true })
-
-const planPrice = computed(() => prompt.value ? formatStripeAmount(prompt.value.plan.amount, prompt.value.plan.currency) : '')
-const planDate = computed(() => prompt.value ? formatLocalDate(prompt.value.plan.startsAt) : '')
-const title = computed(() => prompt.value?.milestone === 'builder' ? t('trial-card-prompt-title-builder') : t('trial-card-prompt-title-ota'))
 
 // A failed schedule keeps the milestones pending so the prompt comes back next visit.
 function close(event: string, handled = true) {
@@ -133,6 +163,7 @@ function close(event: string, handled = true) {
     markTrialCardMilestonesHandled(prompt.value.orgId, prompt.value.reached)
   step.value = null
   prompt.value = null
+  selectedProductId.value = ''
 }
 
 function dismiss() {
@@ -147,7 +178,7 @@ async function startPlan() {
     return
   isScheduling.value = true
   try {
-    const { plan } = await scheduleTrialPlan(current.orgId)
+    const { plan } = await scheduleTrialPlan(current.orgId, selectedProductId.value || undefined)
     toast.success(t('trial-plan-scheduled', { plan: plan.planName, date: formatLocalDate(plan.startsAt) }))
     close('trial_card_prompt_plan_scheduled')
   }
@@ -187,13 +218,19 @@ function onCardSaved() {
       <div class="space-y-2 text-sm leading-6 text-slate-700 dark:text-slate-200">
         <p>{{ t('trial-card-prompt-message') }}</p>
         <p class="font-medium">
-          {{ t('trial-card-prompt-plan', { plan: prompt.plan.planName, price: planPrice, date: planDate }) }}
+          {{ t('trial-card-prompt-plan', { plan: selectedPlanName, price: planPrice, date: planDate }) }}
         </p>
         <p class="text-slate-600 dark:text-slate-300">
           {{ t('trial-card-prompt-no-charge', { days: prompt.trialDaysLeft }, prompt.trialDaysLeft) }}
         </p>
       </div>
     </div>
+    <TrialPlanPicker
+      v-if="prompt && showPicker"
+      v-model="selectedProductId"
+      :options="prompt.plans"
+      :disabled="isScheduling"
+    />
     <p class="mt-4 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
       <IconLock class="h-4 w-4 shrink-0" />
       {{ t('billing-card-secure') }}
@@ -204,7 +241,7 @@ function onCardSaved() {
       </button>
       <button type="button" class="d-btn d-btn-primary" :disabled="isScheduling" data-test="trial-card-prompt-add" @click="accept">
         <span v-if="isScheduling" class="d-loading d-loading-spinner d-loading-sm" />
-        {{ prompt?.hasCard ? t('trial-plan-start', { plan: prompt.plan.planName }) : t('trial-card-prompt-add') }}
+        {{ prompt?.hasCard ? t('trial-plan-start', { plan: selectedPlanName }) : t('trial-card-prompt-add') }}
       </button>
     </div>
   </BillingModal>

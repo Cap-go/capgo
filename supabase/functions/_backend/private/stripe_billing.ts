@@ -23,7 +23,7 @@ import {
   savePaymentMethodFromIntent,
   scheduleSubscriptionCancel,
 } from '../utils/stripe_in_app.ts'
-import { cancelTrialPlan, getTrialPlanSummary, scheduleTrialPlan } from '../utils/stripe_trial_plan.ts'
+import { cancelTrialPlan, getTrialPlanSummary, listSchedulableTrialPlans, scheduleTrialPlan } from '../utils/stripe_trial_plan.ts'
 import { supabaseClient } from '../utils/supabase.ts'
 
 // In-app billing: replaces the Stripe billing portal and hosted invoice page.
@@ -45,6 +45,8 @@ interface TrialPlanBody extends OrgBody {
   affonsoReferral?: unknown
   datafastVisitorId?: unknown
   datafastSessionId?: unknown
+  // Optional Stripe product id; when set, updates the onboarding plan before scheduling.
+  productId?: unknown
 }
 
 interface CancelBody extends OrgBody {
@@ -101,8 +103,12 @@ app.post('/overview', middlewareAuth, async (c) => {
 app.post('/trial-plan', middlewareAuth, async (c) => {
   const body = await parseBody<OrgBody>(c)
   const ctx = await resolveBillingContext(c, body.orgId, 'org.update_billing')
-  const [cards, plan] = await Promise.all([getSavedCards(c, ctx), getTrialPlanSummary(c, ctx)])
-  return c.json({ card: cards.card, plan })
+  const [cards, plan, plans] = await Promise.all([
+    getSavedCards(c, ctx),
+    getTrialPlanSummary(c, ctx),
+    listSchedulableTrialPlans(c, ctx.billingAccount),
+  ])
+  return c.json({ card: cards.card, plan, plans })
 })
 
 function optionalString(value: unknown) {
@@ -116,7 +122,7 @@ app.post('/trial-plan/schedule', middlewareAuth, async (c) => {
     affonsoReferral: optionalString(body.affonsoReferral),
     datafastVisitorId: optionalString(body.datafastVisitorId),
     datafastSessionId: optionalString(body.datafastSessionId),
-  })
+  }, optionalString(body.productId))
   return c.json({ plan })
 })
 
