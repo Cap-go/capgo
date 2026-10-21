@@ -507,7 +507,9 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PgClien
 // Transactions must run on one checked-out connection: BEGIN/COMMIT issued on
 // the Pool itself can land on different connections and leave one idle in
 // transaction, holding row locks until the server kills it.
-export async function beginWriteTransaction(client: Pick<PgQueryClient, 'query'>): Promise<void> {
+// Structural typing: Pool/Client query overloads and local transaction client
+// interfaces are not assignable to Pick<PgQueryClient, 'query'>.
+export async function beginWriteTransaction(client: { query: (queryText: string, values?: unknown[]) => Promise<unknown> }): Promise<void> {
   await client.query(BEGIN_WRITE_TRANSACTION_SQL)
 }
 
