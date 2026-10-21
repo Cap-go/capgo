@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import process from 'node:process'
 import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../src/services/appOnboarding'
 import { BUILDER_STEP_IDS } from '../src/services/builderOnboardingChecklist'
 
@@ -254,6 +255,10 @@ async function mockReleaseLive(page: Page) {
  * Console pages captured for before/after visual diffs.
  * Add routes here when a PR touches a new screen reviewers should compare.
  */
+function visualTrialPlan(scheduled: boolean) {
+  return { planName: 'Solo', amount: 1400, currency: 'usd', interval: 'month', startsAt: '2026-10-30T00:00:00.000Z', scheduled }
+}
+
 export const visualDiffRoutes: VisualDiffRoute[] = [
   ...[
     { slug: 'onboarding-dual-goals', progress: null },
@@ -294,7 +299,44 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.goto('/app/com.demo.app/getting-started')
       await page.locator('[data-test="dual-onboarding-checklists"], [data-test="builder-checklist"]').first().waitFor()
       if (progress === 'builder')
-        await page.locator('[data-test="builder-step-start_setup"][data-status="done"]').waitFor()
+        await page.locator('[data-test="builder-step-start_setup"][data-status="done"]').waitFor({ state: 'attached' })
+    },
+  })),
+  // Out-of-order setup: a later step is done while an earlier one is still open.
+  ...[
+    { slug: 'onboarding-ota-passed-over-step', path: 'ota' as const },
+    { slug: 'onboarding-builder-passed-over-step', path: 'builder' as const },
+  ].map(({ slug, path }): VisualDiffRoute => ({
+    slug,
+    path: '/apps',
+    auth: true,
+    prepare: async (page) => {
+      const onboarding = { setup: {
+        todo_list_version: 4,
+        ...(path === 'ota' ? { ota_todo_list_version: '1' } : { builder_todo_list_version: '1', selected_builder_platform: 'android' }),
+        paths: [path],
+        selected_path: path,
+        source: 'manual',
+        outcome: 'in_progress',
+        steps: path === 'ota'
+          ? { ota: Object.fromEntries(APP_ONBOARDING_OTA_V1_STEP_IDS.map(id => [id, { status: id === 'add_channel' ? 'done' : 'pending' }])) }
+          : { builder: Object.fromEntries((['ios', 'android'] as const).map(platform => [platform, Object.fromEntries(BUILDER_STEP_IDS[platform].map(id => [id, { status: platform === 'android' && id === 'prepare_keystore' ? 'done' : 'pending' }]))])) },
+      } }
+      await page.route('**/rest/v1/apps?*', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json().catch(() => null)
+        const matchesApp = new URL(route.request().url()).searchParams.get('app_id') === 'eq.com.demo.app'
+        const override = (row: any) => row?.app_id === 'com.demo.app' || (matchesApp && row?.onboarding !== undefined)
+          ? { ...row, need_onboarding: true, onboarding }
+          : row
+        await route.fulfill({ response, json: Array.isArray(json) ? json.map(override) : override(json) })
+      })
+      await page.route('**/rpc/verify_getting_started', route => route.fulfill({ json: onboarding }))
+      await page.route('**/private/onboarding_progress', route => route.fulfill({ json: { onboarding, hasChannel: path === 'ota', checkErrors: [] } }))
+      // Tall viewport so the passed-over banner + task panel + Skip button fit in one frame.
+      await page.setViewportSize({ width: 1280, height: 1500 })
+      await page.goto('/app/com.demo.app/getting-started')
+      await page.locator(path === 'ota' ? '[data-test="onboarding-setup-cli"]' : '[data-test="builder-step-prepare_keystore"][data-status="done"]').first().waitFor({ state: 'attached' })
     },
   })),
   { slug: 'login', path: '/login/', auth: false },
@@ -403,6 +445,79 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     },
   },
   { slug: 'dashboard', path: '/dashboard', auth: true },
+  {
+    slug: 'dashboard-trial-card-prompt',
+    path: '/dashboard',
+    auth: true,
+    prepare: async (page) => {
+      // Trial org whose first device just installed an update, with no card on file yet.
+      await page.route('**/private/config', route => route.fulfill({ json: { stripeEnabled: true } }))
+      await page.route('**/rest/v1/rpc/get_orgs_v7', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json().catch(() => null)
+        const rows = Array.isArray(json) ? json.map(org => ({ ...org, paying: false, trial_left: 9 })) : json
+        await route.fulfill({ response, json: rows })
+      })
+      await page.route('**/rest/v1/apps?*', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json().catch(() => null)
+        const withOtaSuccess = (row: any) => row?.app_id === 'com.demo.app' && row?.onboarding !== undefined
+          ? { ...row, onboarding: { ...row.onboarding, features: { ...row.onboarding?.features, ota: { started_at: '2026-10-20T09:00:00.000Z', succeeded_at: '2026-10-20T10:00:00.000Z' } } } }
+          : row
+        await route.fulfill({ response, json: Array.isArray(json) ? json.map(withOtaSuccess) : withOtaSuccess(json) })
+      })
+      let promptRequested = false
+      await page.route('**/private/stripe_billing/trial-plan', (route) => {
+        promptRequested = true
+        return route.fulfill({ json: { card: null, plan: visualTrialPlan(false) } })
+      })
+      await page.reload()
+      const prompt = page.locator('[data-test="trial-card-prompt-add"]')
+      // The base branch has no prompt: capture the plain dashboard there. The head (after)
+      // capture, or any build that asked for the trial plan, must render it or fail.
+      if (process.env.VISUAL_DIFF_PHASE === 'after') {
+        await prompt.waitFor({ timeout: 15_000 })
+        return
+      }
+      await prompt.waitFor({ timeout: 15_000 }).catch(() => {})
+      if (promptRequested)
+        await prompt.waitFor({ timeout: 5_000 })
+    },
+  },
+  {
+    slug: 'org-billing-trial-plan-offer',
+    path: '/settings/organization/billing',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/private/stripe_billing/overview', route => route.fulfill({ json: {
+        publishableKey: '',
+        card: { id: 'pm_visual', brand: 'visa', last4: '4242', expMonth: 12, expYear: 2030 },
+        subscription: null,
+        invoices: [],
+        openInvoice: null,
+        trialPlan: visualTrialPlan(false),
+      } }))
+      await page.reload()
+      await page.locator('[data-test="billing-subscription"]').waitFor()
+    },
+  },
+  {
+    slug: 'org-billing-trial-plan-scheduled',
+    path: '/settings/organization/billing',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/private/stripe_billing/overview', route => route.fulfill({ json: {
+        publishableKey: '',
+        card: { id: 'pm_visual', brand: 'visa', last4: '4242', expMonth: 12, expYear: 2030 },
+        subscription: null,
+        invoices: [],
+        openInvoice: null,
+        trialPlan: visualTrialPlan(true),
+      } }))
+      await page.reload()
+      await page.locator('[data-test="billing-subscription"]').waitFor()
+    },
+  },
   { slug: 'account-settings', path: '/settings/account', auth: true },
   {
     slug: 'email-verification-send',

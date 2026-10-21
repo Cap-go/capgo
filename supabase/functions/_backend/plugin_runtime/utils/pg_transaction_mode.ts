@@ -10,6 +10,10 @@ const accessModes = new WeakMap<object, AccessMode>()
 // Hyperdrive origin connection indefinitely.
 export const TRANSACTION_IDLE_TIMEOUT_MS = 15000
 
+// One simple query so an abandoned request after BEGIN cannot leave a Hyperdrive
+// origin connection idle in transaction with no timeout (postgres role has none).
+export const BEGIN_WRITE_TRANSACTION_SQL = `BEGIN READ WRITE; SET LOCAL idle_in_transaction_session_timeout = ${TRANSACTION_IDLE_TIMEOUT_MS}`
+
 function isDedicatedReadReplica(source: string) {
   return source.startsWith('HYPERDRIVE_CAPGO_READ_') || source === 'local_read_replica'
 }
