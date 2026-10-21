@@ -20,6 +20,13 @@ function mockActiveSubscription(subscriptionId: string | null, known = true) {
   mocks.lookupActiveSubscriptionId.mockResolvedValue({ subscriptionId, known })
 }
 
+async function expectSubscriptionLookupUnknown(promise: Promise<unknown>) {
+  await expect(promise).rejects.toMatchObject({
+    message: 'Subscription payment method is temporarily unknown',
+    cause: { error: 'subscription_lookup_unknown' },
+  })
+}
+
 const {
   createCardSetupIntent,
   getSavedCards,
@@ -368,22 +375,22 @@ describe('backup card', () => {
     expect(cards.card?.id).toBe('pm_main')
     expect(cards.backupCard).toBeNull()
 
-    await expect(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_back')).rejects.toThrow('Subscription payment method is temporarily unknown')
+    await expectSubscriptionLookupUnknown(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_back'))
     expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
   })
 
-  it('does not detach spare cards when stripe_info lookup fails', async () => {
+  it('refuses backup saves when the subscription lookup is unknown', async () => {
     const stripe = createStripe()
-    const customerDefault = card('pm_cust', 'fp_cust')
-    // Subscription card A is not the customer default; a failed DB lookup must not treat A as spare.
-    mockSavedCards(stripe, customerDefault, [card('pm_back', 'fp_back'), customerDefault, card('pm_sub', 'fp_sub')])
+    // No customer default: a guessed first card must not be pinned while lookup is unknown.
+    stripe.customers.retrieve.mockResolvedValue({ invoice_settings: { default_payment_method: null } })
+    stripe.paymentMethods.list.mockResolvedValue({ data: [card('pm_guess', 'fp_guess'), card('pm_sub', 'fp_sub')] })
     mockActiveSubscription(null, false)
-    stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_back' })
-    stripe.paymentMethods.retrieve.mockResolvedValue(card('pm_back', 'fp_back'))
+    stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_new' })
+    stripe.paymentMethods.retrieve.mockResolvedValue(card('pm_new', 'fp_new'))
 
-    await savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup')
-
-    expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
+    await expectSubscriptionLookupUnknown(savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup'))
+    expect(stripe.customers.update).not.toHaveBeenCalled()
+    expect(stripe.paymentMethods.detach).toHaveBeenCalledWith('pm_new')
   })
 
   it('refuses to remove a card that could be the subscription default while lookup is unknown', async () => {
@@ -394,7 +401,7 @@ describe('backup card', () => {
 
     const cards = await getSavedCards(createContext(), createBillingContext(stripe))
     expect(cards.backupCard).toBeNull()
-    await expect(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_sub')).rejects.toThrow('Subscription payment method is temporarily unknown')
+    await expectSubscriptionLookupUnknown(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_sub'))
     expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
   })
 
@@ -404,7 +411,7 @@ describe('backup card', () => {
     mockSavedCards(stripe, main, [main, card('pm_back', 'fp_back')])
     mockActiveSubscription(null, false)
 
-    await expect(payInvoiceWithBackupCard(createContext(), stripe as any, 'cus_123', 'in_123', { chargeId: 'ch_1' })).rejects.toThrow('Subscription payment method is temporarily unknown')
+    await expectSubscriptionLookupUnknown(payInvoiceWithBackupCard(createContext(), stripe as any, 'cus_123', 'in_123', { chargeId: 'ch_1' }))
     expect(stripe.invoices.pay).not.toHaveBeenCalled()
   })
 })
@@ -509,7 +516,7 @@ describe('payOpenInvoice', () => {
       payment_method: 'pm_main',
     }))
 
-    await expect(payOpenInvoice(createContext(), createBillingContext(stripe))).rejects.toThrow('Subscription payment method is temporarily unknown')
+    await expectSubscriptionLookupUnknown(payOpenInvoice(createContext(), createBillingContext(stripe)))
     expect(stripe.invoices.pay).toHaveBeenCalledTimes(1)
   })
 })

@@ -279,7 +279,12 @@ export async function savePaymentMethodFromIntent(c: Context, ctx: InAppBillingC
   if (paymentMethod.customer !== ctx.customerId)
     await ctx.stripe.paymentMethods.attach(paymentMethodId, { customer: ctx.customerId })
   if (role === 'backup') {
-    const { defaultPaymentMethod, isCustomerDefault, spareCards } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId, paymentMethodId)
+    const { defaultPaymentMethod, isCustomerDefault, spareCards, subscriptionKnown } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId, paymentMethodId)
+    // Unknown subscription default: a guessed primary must not be pinned as customer default.
+    if (!subscriptionKnown) {
+      await ctx.stripe.paymentMethods.detach(paymentMethodId)
+      throw simpleError('subscription_lookup_unknown', 'Subscription payment method is temporarily unknown')
+    }
     if (defaultPaymentMethod && defaultPaymentMethod.id !== paymentMethodId) {
       const fingerprint = paymentMethod.card?.fingerprint
       if (fingerprint && fingerprint === defaultPaymentMethod.card?.fingerprint) {
