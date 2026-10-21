@@ -66,6 +66,9 @@ describe('pooled PostgreSQL transaction access modes', () => {
       await getDrizzleClient(reader, { logger: false }).transaction(async (tx) => {
         expect((await tx.execute(sql`SHOW transaction_read_only`)).rows[0]).toMatchObject({ transaction_read_only: 'on' })
       })
+      const upgrade = vi.fn(async () => undefined)
+      await expect(getDrizzleClient(reader, { logger: false }).transaction(upgrade, { accessMode: 'read write' })).rejects.toThrow('read-only client')
+      expect(upgrade).not.toHaveBeenCalled()
       const client = await checkoutPgClient(reader)
       expect((await client.query('SELECT now() = statement_timestamp() AS autocommit')).rows[0].autocommit).toBe(true)
       releasePgClient(reader, client)
@@ -120,6 +123,26 @@ describe('pooled PostgreSQL transaction access modes', () => {
     }
     finally {
       await client.end()
+    }
+  })
+
+  it('rejects instead of crashing when the server kills a checked-out transaction client', async () => {
+    const c = context()
+    const pool = await getPgClient(c, false)
+    const admin = new Client({ connectionString })
+    await admin.connect()
+    try {
+      await expect(getDrizzleClient(pool, { logger: false }).transaction(async (tx) => {
+        const { pid } = (await tx.execute(sql`SELECT pg_backend_pid() AS pid`)).rows[0] as { pid: number }
+        await admin.query('SELECT pg_terminate_backend($1)', [pid])
+        // Let the socket close while the transaction is idle, as the idle timeout would.
+        await new Promise(resolve => setTimeout(resolve, 200))
+        await tx.execute(sql`SELECT 1`)
+      })).rejects.toThrow()
+    }
+    finally {
+      await admin.end()
+      await closeClient(c, pool)
     }
   })
 

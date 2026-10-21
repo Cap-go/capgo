@@ -466,6 +466,15 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PgClien
     cloudlogErr({ requestId, message: 'PG Pool Error', databaseSource: dbName, error: serializePostgresError(err) })
   })
 
+  // pg-pool drops its idle error listener while a client is checked out. Keep a
+  // permanent one so a server-side kill (e.g. idle_in_transaction_session_timeout)
+  // during a transaction rejects the next query instead of crashing the worker.
+  pool.on('connect', (client) => {
+    client.on('error', (err: Error) => {
+      cloudlogErr({ requestId, message: 'PG Client Error', databaseSource: dbName, error: serializePostgresError(err) })
+    })
+  })
+
   return setPgAccessMode(pool, readOnly)
 }
 
