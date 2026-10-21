@@ -19,8 +19,14 @@ describe('cron_sync_sub resilience', () => {
     }))
     vi.doMock('../supabase/functions/_backend/utils/pg.ts', () => ({
       closeClient: vi.fn(),
-      getDrizzleClient: vi.fn(() => ({ drizzle: true })),
-      getPgClient: vi.fn(() => ({ pg: true })),
+      getDrizzleClient: vi.fn((client: { readOnly: boolean }) => ({
+        execute: vi.fn(async () => {
+          if (client.readOnly)
+            throw Object.assign(new Error('cannot execute UPDATE in a read-only transaction'), { code: '25006' })
+          return { rows: [] }
+        }),
+      })),
+      getPgClient: vi.fn((_c: unknown, readOnly = false) => ({ readOnly })),
     }))
     vi.doMock('../supabase/functions/_backend/utils/plans.ts', () => ({
       syncSubscriptionAndEvents,
@@ -45,6 +51,19 @@ describe('cron_sync_sub resilience', () => {
   afterEach(() => {
     mockedModules.forEach(path => vi.doUnmock(path))
     vi.resetModules()
+  })
+
+  it('allows subscription sync to write billing state without a primary read-only transaction', async () => {
+    const syncSubscriptionAndEvents = vi.fn(async (_c: unknown, _orgId: string, db: { execute: (query: string) => Promise<unknown> }) => {
+      await db.execute('UPDATE public.stripe_info SET is_good_plan = true WHERE customer_id = $1')
+    })
+    const response = await runCronSyncSub(syncSubscriptionAndEvents, 'org-writer')
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ status: 'ok' })
+    expect(syncSubscriptionAndEvents).toHaveBeenCalledTimes(1)
+    const { closeClient } = await import('../supabase/functions/_backend/utils/pg.ts')
+    expect(closeClient).toHaveBeenCalledOnce()
   })
 
   it('retries transient cron_sync_sub failures and succeeds', async () => {
