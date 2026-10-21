@@ -136,6 +136,7 @@
         "@formkit/vue": "2.1.0",
         "@hono/standard-validator": "^0.3.0",
         "@std/semver": "npm:@jsr/std__semver@1.0.8",
+        "@stripe/stripe-js": "^10.1.0",
         "@supabase/supabase-js": "2.110.8",
         "@vuepic/vue-datepicker": "^14.0.0",
         "@vueuse/core": "^14.3.0",
@@ -235,7 +236,7 @@
     },
     "cli": {
       "name": "@capgo/cli",
-      "version": "8.89.0",
+      "version": "8.90.0",
       "bin": {
         "capgo": "dist/index.js",
       },
@@ -271,7 +272,6 @@
         "@sauber/table": "npm:@jsr/sauber__table",
         "@sinonjs/fake-timers": "15.4.0",
         "@std/semver": "npm:@jsr/std__semver@1.0.8",
-        "@supabase/supabase-js": "^2.110.8",
         "@tanstack/intent": "^0.3.6",
         "@types/adm-zip": "^0.5.8",
         "@types/jsonwebtoken": "^9.0.10",
@@ -1274,6 +1274,8 @@
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
     "@std/semver": ["@jsr/std__semver@1.0.8", "https://npm.jsr.io/~/11/@jsr/std__semver/1.0.8.tgz", {}, "sha512-YhkykPU2Majz66e+rQbP0okYc7kKv+U32aguLPCXZZAL+vEVmBA+khHjPHhLBpWR073gzU3WHqGRgB7a/aXCjg=="],
+
+    "@stripe/stripe-js": ["@stripe/stripe-js@10.1.0", "", {}, "sha512-sLRPukMKMxvRVrgV3Za8LM0Yd2azrixQjfaiuzS8Fivlu/Gt7VbBuRiRZJIvfL3XxAw+FdfdmhHSvjAfLG3lkA=="],
 
     "@stylistic/eslint-plugin": ["@stylistic/eslint-plugin@5.10.0", "", { "dependencies": { "@eslint-community/eslint-utils": "^4.9.1", "@typescript-eslint/types": "^8.56.0", "eslint-visitor-keys": "^4.2.1", "espree": "^10.4.0", "estraverse": "^5.3.0", "picomatch": "^4.0.3" }, "peerDependencies": { "eslint": "^9.0.0 || ^10.0.0" } }, "sha512-nPK52ZHvot8Ju/0A4ucSX1dcPV2/1clx0kLcH5wDmrE4naKso7TUC/voUyU1O9OTKTrR6MYip6LP0ogEMQ9jPQ=="],
 

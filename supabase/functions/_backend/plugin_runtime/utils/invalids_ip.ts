@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
+import { APPLE_PROVIDER_ASNS, GOOGLE_PROVIDER_ASNS } from './providerAsns.ts'
 
 interface IpApiResponse {
   status: 'success' | 'fail'
@@ -25,9 +26,9 @@ const PROVIDER_IP_CACHE_TTL_SECONDS = 60 * 60 * 24 // 24h
 const PROVIDER_IP_FALLBACK_TTL_SECONDS = 60 * 60 * 24 // 24h after unresolved/failure
 const PROVIDER_IP_MEMORY_CACHE_MAX_ENTRIES = 10_000
 const GOOGLE_KEYWORDS = ['google cloud', 'google llc', 'google infrastructure', 'google data center']
-const GOOGLE_ASNS = new Set(['AS15169', 'AS16591'])
+const GOOGLE_ASNS = new Set(GOOGLE_PROVIDER_ASNS.map(asn => `AS${asn}`))
 const APPLE_KEYWORDS = ['apple inc', 'apple computer', 'apple cloud', 'apple data', 'apple internet']
-const APPLE_ASNS = new Set(['AS714'])
+const APPLE_ASNS = new Set(APPLE_PROVIDER_ASNS.map(asn => `AS${asn}`))
 
 type CacheableInvalidIpInfo = InvalidIpInfo & {
   cachedUntil: number
@@ -175,11 +176,12 @@ function setCachedInMemory(ip: string, info: InvalidIpInfo, ttlSeconds = PROVIDE
 
 async function cachedInvalidIpInfo(context: Context | undefined, ip: string) {
   const memoryCached = getCachedFromMemory(ip)
-  if (memoryCached)
+  if (memoryCached) {
     return {
       blocked: memoryCached.blocked,
       provider: memoryCached.provider,
     }
+  }
 
   if (!context)
     return null

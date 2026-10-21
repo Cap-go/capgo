@@ -486,6 +486,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/settings/organization/Billing': RouteRecordInfo<
+      '/settings/organization/Billing',
+      '/settings/organization/Billing',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/settings/organization/Credits': RouteRecordInfo<
       '/settings/organization/Credits',
       '/settings/organization/Credits',
@@ -1104,6 +1111,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/settings/organization/AuditLogs.vue': {
       routes:
         | '/settings/organization/AuditLogs'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/settings/organization/Billing.vue': {
+      routes:
+        | '/settings/organization/Billing'
       views:
         | never
       pathParamNames:

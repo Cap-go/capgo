@@ -13,7 +13,6 @@ interface BackgroundOnboardingCheck {
 export interface PreparedOnboardingCheck {
   project: OnboardingScanProject
   apiHost: string
-  anonKey?: string
   webHost?: string
   apikey: string
   command: string
@@ -21,7 +20,7 @@ export interface PreparedOnboardingCheck {
 }
 
 export async function runOnboardingCheck(prepared: PreparedOnboardingCheck, check: BackgroundOnboardingCheck): Promise<void> {
-  const { project, apiHost, anonKey, apikey, command, attemptId } = prepared
+  const { project, apiHost, apikey, command, attemptId } = prepared
   setCurrentCliCommand(command)
   const trackScan = async (event: 'scan_started' | 'scan_ended', timestamp: number, tags: Record<string, string | number> = {}) => {
     const started = Date.now()
@@ -34,7 +33,7 @@ export async function runOnboardingCheck(prepared: PreparedOnboardingCheck, chec
         timestamp: new Date(timestamp),
         tags: { app_id: project.appId },
         nonPersonTags: { attempt_id: attemptId, command_path: command, ...tags },
-      }, false, AbortSignal.timeout(500), apiHost, 'error')
+      }, false, AbortSignal.timeout(2_000), apiHost, 'error')
     }
     catch (error) {
       setupDebug('scan telemetry failed', { scan: check.step, error: setupError(error) })
@@ -66,7 +65,7 @@ export async function runOnboardingCheck(prepared: PreparedOnboardingCheck, chec
       method: 'PUT',
       headers: buildCliRequestHeaders({
         'Content-Type': 'application/json',
-        'Authorization': apiHost.includes('/functions/v1') && anonKey ? `Bearer ${anonKey}` : apikey,
+        'Authorization': apikey,
         'capgkey': apikey,
       }),
       // Preserve source, outcome, and all unrelated onboarding steps.

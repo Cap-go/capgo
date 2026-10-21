@@ -52,7 +52,7 @@ import { buildCliAiSetupPrompt } from '~/services/cliAiPrompt'
 import { APP_ONBOARDING_READY_EVENT, sendOnboardingEvent } from '~/services/onboardingTracking'
 import { uploadOrgLogoFile } from '~/services/photos'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
-import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
+import { defaultApiHost, getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import {
   mergeUserOnboardingProgress,
   replaceUserOnboardingWithRetry,
@@ -316,7 +316,7 @@ const startingOutUserCountStop: UserCountStop = {
 }
 const planNameOrder = ['Solo', 'Maker', 'Team', 'Enterprise'] as const
 
-const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
+const localCommand = isLocal(config.supaHost) ? ` --api-host ${defaultApiHost}` : ''
 // TODO(2027-03-19): Remove v3 compatibility after all existing OTA checklists have migrated.
 const usesOtaTodoList = computed(() => !!createdApp.value && hasSupportedOtaTodoList(parseAppOnboarding(createdApp.value.onboarding)))
 const usesDualTodoList = computed(() => !!createdApp.value && hasDualOnboardingChecklists(createdApp.value.onboarding))
@@ -475,7 +475,7 @@ const cliCommandArgs = computed(() => {
     args.push('-a', apiKey.value)
 
   if (isLocal(config.supaHost))
-    args.push('--supa-host', config.supaHost, '--supa-anon', config.supaKey)
+    args.push('--api-host', defaultApiHost)
 
   return args
 })
