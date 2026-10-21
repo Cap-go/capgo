@@ -1,3 +1,4 @@
+import type { Context } from 'hono'
 import type { GoTrueSendEmailEvent } from '../../../supabase/functions/_backend/utils/auth_email.ts'
 import type { MiddlewareKeyVariables } from '../../../supabase/functions/_backend/utils/hono.ts'
 import { getRuntimeKey } from 'hono/adapter'
@@ -18,20 +19,23 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 const orgInvitationBentoSyncSchema = z.object({ email: z.string().trim().min(1).max(320) })
 
+async function handleOrgInvitationBentoSync(c: Context<MiddlewareKeyVariables>, payload: unknown) {
+  const recipient = orgInvitationBentoSyncSchema.safeParse(payload)
+  if (!recipient.success)
+    throw simpleError('invalid_payload', 'Invalid organization invitation Bento sync payload')
+  try {
+    await syncOrgInvitationBentoField(c, recipient.data.email)
+  }
+  catch (error) {
+    quickError(500, 'org_invitation_bento_sync_failed', 'Organization invitation Bento sync failed', {}, error)
+  }
+  return c.json(BRES)
+}
+
 app.post('/', middlewareAPISecret, async (c) => {
   const body = await parseBody<GoTrueSendEmailEvent & { org_invitation_id?: unknown, org_invitation_bento_sync?: unknown }>(c)
-  if (body && typeof body === 'object' && Object.hasOwn(body, 'org_invitation_bento_sync')) {
-    const recipient = orgInvitationBentoSyncSchema.safeParse(body.org_invitation_bento_sync)
-    if (!recipient.success)
-      throw simpleError('invalid_payload', 'Invalid organization invitation Bento sync payload')
-    try {
-      await syncOrgInvitationBentoField(c, recipient.data.email)
-    }
-    catch (error) {
-      quickError(500, 'org_invitation_bento_sync_failed', 'Organization invitation Bento sync failed', {}, error)
-    }
-    return c.json(BRES)
-  }
+  if (body && typeof body === 'object' && Object.hasOwn(body, 'org_invitation_bento_sync'))
+    return handleOrgInvitationBentoSync(c, body.org_invitation_bento_sync)
 
   const emailBinding = c.env?.AUTH_EMAIL
   if (!emailBinding)

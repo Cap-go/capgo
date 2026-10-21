@@ -77,7 +77,7 @@ export async function startOrgInvitationBentoFlow(c: Context<MiddlewareKeyVariab
     // needs reconciliation. Retries keep this identity after email changes.
     const prepared = await withPgTransaction(pgPool, async (client) => {
       const invitation = await selectOrgInvitationForUpdate(client, invitationId)
-      if (!invitation || !invitation.sent_at || invitation.bento_synced_at || !invitation.is_pending)
+      if (!invitation?.sent_at || invitation.bento_synced_at || !invitation.is_pending)
         return false
       const email = (invitation.bento_email ?? invitation.email).trim().toLowerCase()
       await client.query('UPDATE public.org_invitation_email_requests SET bento_email = $2 WHERE id = $1', [invitationId, email])
@@ -89,7 +89,7 @@ export async function startOrgInvitationBentoFlow(c: Context<MiddlewareKeyVariab
       // Same lock and timeout budget as the email sender; serializes retries.
       await client.query('SET LOCAL idle_in_transaction_session_timeout = 60000')
       const invitation = await selectOrgInvitationForUpdate(client, invitationId)
-      if (!invitation || !invitation.sent_at || invitation.bento_synced_at || !invitation.is_pending) {
+      if (!invitation?.sent_at || invitation.bento_synced_at || !invitation.is_pending) {
         cloudlog({ requestId: c.get('requestId'), message: 'organization invitation Bento flow skipped', invitationId })
         return
       }
