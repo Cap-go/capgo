@@ -194,15 +194,15 @@ window.fetch = async (input, init) => {
     events.push('getting-started-verified')
     return new Response(JSON.stringify(previewOnboarding()), { headers: { 'Content-Type': 'application/json' } })
   }
-  if (url.pathname.endsWith('/rpc/enable_builder_onboarding')) {
-    state.builderActivationRequests.push(JSON.parse(String(init?.body)))
+  if (url.pathname.endsWith(`/app/${previewAppId}/onboarding/builder`)) {
+    state.builderActivationRequests.push({ method: init?.method, appId: previewAppId })
     if (state.builderActivationDelayMs)
       await new Promise(resolve => setTimeout(resolve, state.builderActivationDelayMs))
     if (state.builderActivationError)
       return new Response(JSON.stringify({ message: 'Activation unavailable' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
     state.builderActivated = true
     state.outcome = 'in_progress'
-    return new Response(JSON.stringify(previewOnboarding()), { headers: { 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ onboarding: previewOnboarding() }), { headers: { 'Content-Type': 'application/json' } })
   }
   if (url.pathname.includes('/rpc/')) {
     return new Response(JSON.stringify(state.channelPermissions), { headers: { 'Content-Type': 'application/json' } })

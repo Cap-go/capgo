@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import type { Json } from '~/types/supabase.types'
 import { onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { useSupabase } from '~/services/supabase'
+import { invokeCapgoApi } from '~/services/capgoApi'
 import { useOrganizationStore } from '~/stores/organization'
 import { getAppGettingStartedPath } from '~/utils/onboardingRedirect'
 import BuilderPresentationModal from './BuilderPresentationModal.vue'
@@ -14,7 +15,6 @@ const props = defineProps<{
 
 const { t } = useI18n()
 const router = useRouter()
-const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
 const starting = ref(false)
 const failed = ref(false)
@@ -28,12 +28,12 @@ async function startBuilder() {
   starting.value = true
   failed.value = false
   try {
-    const { data, error } = await supabase.rpc('enable_builder_onboarding', { p_app_id: appId })
-    if (error || data === null)
+    const { data, error } = await invokeCapgoApi<{ onboarding: Json }>(`app/${encodeURIComponent(appId)}/onboarding/builder`, { method: 'POST' })
+    if (error || !data?.onboarding)
       throw error ?? new Error('Missing Builder checklist')
     if (disposed)
       return
-    organizationStore.updateAppOnboarding(appId, data)
+    organizationStore.updateAppOnboarding(appId, data.onboarding)
     await router.push(`${getAppGettingStartedPath(appId)}?path=builder`)
   }
   catch {

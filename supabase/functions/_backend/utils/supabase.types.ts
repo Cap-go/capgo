@@ -4271,10 +4271,6 @@ export type Database = {
       }
       delete_user: { Args: never; Returns: undefined }
       dismiss_getting_started: { Args: { p_app_id: string }; Returns: Json }
-      enable_builder_onboarding: {
-        Args: { p_app_id: string }
-        Returns: Json
-      }
       enqueue_app_onboarding_refreshes: {
         Args: { p_limit?: number }
         Returns: number

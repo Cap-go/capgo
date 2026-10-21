@@ -3,6 +3,8 @@ import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { shouldShowGettingStartedNav, shouldSkipOnboardingResume } from '../src/utils/appOnboardingProgress'
+import { app } from '../supabase/functions/_backend/public/app/index.ts'
+import { POSTGRES_URL } from './test-utils.ts'
 
 const options = { auth: { persistSession: false, autoRefreshToken: false } }
 const admin = createClient(env.SUPABASE_URL!, env.SUPABASE_SERVICE_KEY!, options)
@@ -47,9 +49,20 @@ async function fixture(onboarding: object, needOnboarding = false) {
   return appId
 }
 
+async function requestActivation(appId: string, client = owner) {
+  const { data: { session } } = await client.auth.getSession()
+  // Exercise the registered backend route with real JWT verification, RBAC and
+  // PostgreSQL transactions; no edge-worker deployment is needed for this test.
+  return app.request(`http://local/${encodeURIComponent(appId)}/onboarding/builder`, {
+    method: 'POST',
+    headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+  }, { SUPABASE_URL: env.SUPABASE_URL!, SUPABASE_ANON_KEY: env.SUPABASE_ANON_KEY!, SUPABASE_DB_URL: POSTGRES_URL })
+}
+
 async function activate(appId: string) {
-  const { data, error } = await owner.rpc('enable_builder_onboarding', { p_app_id: appId })
-  expect(error).toBeNull()
+  const response = await requestActivation(appId)
+  expect(response.status).toBe(200)
+  const { onboarding: data } = await response.json() as any
   expect(data.setup).toMatchObject({ todo_list_version: 4, builder_todo_list_version: '1', selected_path: 'builder', outcome: 'in_progress' })
   expect(data).not.toHaveProperty('getting_started_dismissed_at')
   expect(data.setup).not.toHaveProperty('completed_at')
@@ -93,8 +106,10 @@ describe('explicit Builder checklist activation', () => {
     if (path !== 'ota')
       expect(data.setup.steps.builder).toMatchObject(builderSteps)
     expect(data.setup.selected_builder_platform).toBe('android')
+    const beforeRepeat = await admin.from('apps').select('updated_at').eq('app_id', appId).single()
     expect(await activate(appId)).toEqual(data)
-    expect((await admin.from('apps').select('need_onboarding').eq('app_id', appId).single()).data!.need_onboarding).toBe(false)
+    const afterRepeat = await admin.from('apps').select('need_onboarding, updated_at').eq('app_id', appId).single()
+    expect(afterRepeat.data).toEqual({ need_onboarding: false, updated_at: beforeRepeat.data!.updated_at })
   })
 
   it.concurrent('initializes an app with no checklist', async () => {
@@ -102,22 +117,30 @@ describe('explicit Builder checklist activation', () => {
     expect((await activate(appId)).setup.paths).toEqual(['builder'])
   })
 
+  it.concurrent('serializes simultaneous activation without losing the existing OTA history', async () => {
+    const appId = await fixture({ setup: { todo_list_version: 3, steps: otaSteps } })
+    const [first, second] = await Promise.all([activate(appId), activate(appId)])
+    expect(first).toEqual(second)
+    expect(first.setup.steps.ota).toMatchObject(otaSteps)
+    expect((await admin.from('apps').select('onboarding').eq('app_id', appId).single()).data!.onboarding).toEqual(first)
+  })
+
   it.concurrent.each([{ todo_list_version: 5 }, { todo_list_version: 4, builder_todo_list_version: '2' }, { todo_list_version: 4, ota_todo_list_version: '2', paths: ['ota'] }])('rejects unsupported versions without changing the app: %j', async (setup) => {
     const original = { setup }
     const appId = await fixture(original)
-    expect((await owner.rpc('enable_builder_onboarding', { p_app_id: appId })).error).not.toBeNull()
+    expect((await requestActivation(appId)).status).toBe(409)
     expect((await admin.from('apps').select('onboarding').eq('app_id', appId).single()).data!.onboarding).toEqual(original)
   })
 
   it.concurrent('rejects anonymous callers, unrelated users and app readers', async () => {
     const original = { setup: { todo_list_version: 3, steps: otaSteps } }
     const appId = await fixture(original)
-    for (const client of [anonymous, outsider])
-      expect((await client.rpc('enable_builder_onboarding', { p_app_id: appId })).error).not.toBeNull()
+    expect((await requestActivation(appId, anonymous)).status).toBe(401)
+    expect((await requestActivation(appId, outsider)).status).toBe(403)
     const { data: role } = await admin.from('roles').select('id').eq('name', 'app_reader').eq('scope_type', 'app').single()
     const { data: app } = await admin.from('apps').select('id').eq('app_id', appId).single()
     expect((await admin.from('role_bindings').insert({ principal_type: 'user', principal_id: users[1], role_id: role!.id, scope_type: 'app', org_id: orgId, app_id: app!.id, granted_by: users[0], reason: 'Builder activation reader test', is_direct: true })).error).toBeNull()
-    expect((await outsider.rpc('enable_builder_onboarding', { p_app_id: appId })).error).not.toBeNull()
+    expect((await requestActivation(appId, outsider)).status).toBe(403)
     expect((await admin.from('apps').select('onboarding').eq('app_id', appId).single()).data!.onboarding).toEqual(original)
   })
 })

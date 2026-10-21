@@ -22,7 +22,7 @@ test('adds Builder only on the final click and opens Builder over existing OTA p
   await expect(cta).toBeDisabled()
   await expect(page).toHaveURL(/\/app\/com.example.onboarding-preview\/getting-started\?path=builder$/)
   await expect(page.getByRole('tab', { name: 'Builder', exact: true })).toHaveAttribute('aria-selected', 'true')
-  expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.builderActivationRequests)).toEqual([{ p_app_id: 'com.example.onboarding-preview' }])
+  expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.builderActivationRequests)).toEqual([{ method: 'POST', appId: 'com.example.onboarding-preview' }])
   await page.getByRole('tab', { name: 'Live Updates', exact: true }).click()
   await expect(page.locator('[data-test="app-onboarding-cli-step-login_cli_mcp"]')).toHaveAttribute('data-status', 'done')
 })
