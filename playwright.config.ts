@@ -31,7 +31,7 @@ const localStripeApiBaseUrl = getPlaywrightStripeApiBaseUrl(env)
 
 if (!env.SKIP_STRIPE_EMULATOR_START) {
   webServer.push({
-    command: `STRIPE_EMULATOR_PORT=${localStripeEmulatorPort} bun run stripe:emulator`,
+    command: `STRIPE_EMULATOR_HOSTNAME=0.0.0.0 STRIPE_EMULATOR_PORT=${localStripeEmulatorPort} bun run stripe:emulator`,
     port: localStripeEmulatorPort,
     timeout: 60_000,
     reuseExistingServer,

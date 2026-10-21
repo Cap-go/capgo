@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process'
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { createHash } from 'node:crypto'
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { dirname, relative, resolve } from 'node:path'
 import { getSupabaseWorktreeConfig } from './supabase-worktree-config'
 
 type SupabaseCmd = { cmd: string, argsPrefix: string[] }
@@ -105,27 +106,93 @@ function isSameDirCopy(destPath: string, sourcePath: string): boolean {
 }
 
 /**
- * Make `destPath` a real copy of the `sourcePath` directory.
- *
- * Supabase CLI resolves `content_path` through symlinks and rejects files that end up outside
- * the workdir, so email templates must be real files inside the per-worktree workdir.
- * Several worktree commands can run at once (e.g. Playwright's db reset and backend start), so
- * build the copy in a private temp dir and rename it into place instead of copying in place.
+ * Hash every file under `dir` (relative path + bytes) so identical template sets share a snapshot.
  */
-function ensureCopiedDir(destPath: string, sourcePath: string): void {
-  if (isSameDirCopy(destPath, sourcePath))
-    return
-  const tmpPath = `${destPath}.tmp-${process.pid}-${Date.now()}`
-  mkdirSync(dirname(destPath), { recursive: true })
-  cpSync(sourcePath, tmpPath, { recursive: true, dereference: true })
-  rmSync(destPath, { force: true, recursive: true })
+function hashDirContents(dir: string): string {
+  const hash = createHash('sha256')
+  const walk = (current: string): void => {
+    for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const full = resolve(current, entry.name)
+      if (entry.isDirectory()) {
+        walk(full)
+        continue
+      }
+      hash.update(relative(dir, full))
+      hash.update('\0')
+      hash.update(readFileSync(full))
+      hash.update('\0')
+    }
+  }
+  walk(dir)
+  return hash.digest('hex').slice(0, 16)
+}
+
+/**
+ * Atomically point `linkPath` at `targetPath` with a relative symlink.
+ *
+ * `rename` replaces an existing symlink in one step, so concurrent readers always see either the
+ * previous snapshot or the new one, never a missing path.
+ */
+function publishSymlink(linkPath: string, targetPath: string): void {
+  const target = relative(dirname(linkPath), targetPath)
   try {
-    renameSync(tmpPath, destPath)
+    if (lstatSync(linkPath).isSymbolicLink() && readlinkSync(linkPath) === target)
+      return
   }
   catch {
-    // A concurrent run already placed its copy; keep that one.
-    rmSync(tmpPath, { force: true, recursive: true })
+    // Missing link: publish below.
   }
+
+  mkdirSync(dirname(linkPath), { recursive: true })
+  const tmpLink = `${linkPath}.tmp-${process.pid}-${Date.now()}`
+  symlinkSync(target, tmpLink)
+  try {
+    renameSync(tmpLink, linkPath)
+  }
+  catch (error) {
+    // Workdirs created before snapshots hold a real directory here, which rename cannot replace.
+    let isLegacyDir = false
+    try {
+      isLegacyDir = lstatSync(linkPath).isDirectory()
+    }
+    catch {}
+    if (!isLegacyDir) {
+      rmSync(tmpLink, { force: true })
+      throw error
+    }
+    rmSync(linkPath, { force: true, recursive: true })
+    renameSync(tmpLink, linkPath)
+  }
+}
+
+/**
+ * Publish a real copy of `sourcePath` inside `workdir` and expose it at every `linkPaths` entry.
+ *
+ * Supabase CLI resolves `content_path` through symlinks and rejects files that end up outside
+ * the workdir, so the templates are copied into a content-addressed snapshot under the workdir.
+ * Several worktree commands can run at once (e.g. Playwright's db reset and backend start): the
+ * snapshot is built in a private temp dir and renamed into place, and the links are swapped
+ * atomically, so no command ever sees a missing or half-written template directory.
+ */
+function publishTemplateSnapshot(workdir: string, sourcePath: string, linkPaths: string[]): void {
+  const snapshotPath = resolve(workdir, '.templates', hashDirContents(sourcePath))
+  if (!isSameDirCopy(snapshotPath, sourcePath)) {
+    const tmpPath = `${snapshotPath}.tmp-${process.pid}-${Date.now()}`
+    mkdirSync(dirname(snapshotPath), { recursive: true })
+    cpSync(sourcePath, tmpPath, { recursive: true, dereference: true })
+    try {
+      renameSync(tmpPath, snapshotPath)
+    }
+    catch (error) {
+      rmSync(tmpPath, { force: true, recursive: true })
+      // Only a concurrent run that installed the same snapshot counts as success.
+      if (!isSameDirCopy(snapshotPath, sourcePath))
+        throw error
+    }
+  }
+
+  for (const linkPath of linkPaths)
+    publishSymlink(linkPath, snapshotPath)
 }
 
 /**
@@ -215,7 +282,7 @@ function ensureFunctionsEnvFile(repoRoot: string, workdir: string, cfg: ReturnTy
  * Create (or update) the per-worktree Supabase workdir under `.context/`.
  *
  * The resulting directory is suitable to pass to `supabase --workdir`, and contains a rewritten
- * `supabase/config.toml`, copied email templates, and symlinks to the project's other Supabase assets.
+ * `supabase/config.toml`, a snapshot of the email templates, and symlinks to the project's other Supabase assets.
  */
 function ensureWorktreeSupabaseDir(repoRoot: string): { workdir: string, cfg: ReturnType<typeof getSupabaseWorktreeConfig> } {
   const cfg = getSupabaseWorktreeConfig(repoRoot)
@@ -236,8 +303,7 @@ function ensureWorktreeSupabaseDir(repoRoot: string): { workdir: string, cfg: Re
   }
 
   if (existsSync(repoTemplatesDir)) {
-    ensureCopiedDir(resolve(workdir, 'templates'), repoTemplatesDir)
-    ensureCopiedDir(resolve(supaDir, 'templates'), repoTemplatesDir)
+    publishTemplateSnapshot(workdir, repoTemplatesDir, [resolve(workdir, 'templates'), resolve(supaDir, 'templates')])
   }
 
   const baseConfig = readFileSync(resolve(repoSupaDir, 'config.toml'), 'utf8')
