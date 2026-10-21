@@ -7,7 +7,7 @@
  */
 
 import type { TrialPlan } from '~/services/stripe'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconCalendar from '~icons/heroicons/calendar-days'
@@ -30,18 +30,27 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const config = getLocalConfig()
 const plan = ref<TrialPlan | null>(null)
+// The offer belongs to the org it was loaded for; an org change closes it.
+const offerOrgId = props.orgId
 const isScheduling = ref(false)
 
 const price = computed(() => plan.value ? formatStripeAmount(plan.value.amount, plan.value.currency) : '')
 const date = computed(() => plan.value ? formatLocalDate(plan.value.startsAt) : '')
 
 function track(event: string) {
-  pushEvent(event, config.supaHost, { org_id: props.orgId, source: props.source, plan: plan.value?.planName ?? '' })
+  pushEvent(event, config.supaHost, { org_id: offerOrgId, source: props.source, plan: plan.value?.planName ?? '' })
 }
+
+watch(() => props.orgId, (id) => {
+  if (id !== offerOrgId)
+    emit('close')
+})
 
 onMounted(async () => {
   try {
-    const result = await getTrialPlan(props.orgId)
+    const result = await getTrialPlan(offerOrgId)
+    if (props.orgId !== offerOrgId)
+      return
     if (!result.plan || result.plan.scheduled || !result.card) {
       emit('close')
       return
@@ -67,7 +76,7 @@ async function accept() {
     return
   isScheduling.value = true
   try {
-    const result = await scheduleTrialPlan(props.orgId)
+    const result = await scheduleTrialPlan(offerOrgId)
     track('trial_plan_offer_accepted')
     toast.success(t('trial-plan-scheduled', { plan: result.plan.planName, date: formatLocalDate(result.plan.startsAt) }))
     emit('scheduled', result.plan)
