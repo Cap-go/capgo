@@ -16,7 +16,7 @@ import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { getOrgAdminMemberEmailsForTags } from '../utils/org_email_notifications.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { beginWriteTransaction, closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { getRetryablePostgrestStatus, isRetryablePostgrestError } from '../utils/retry.ts'
@@ -676,7 +676,7 @@ async function persistStripeInfoAndRevenueMovement(
   const pgClient = await getPgClient(c, false)
 
   try {
-    await pgClient.query('BEGIN')
+    await beginWriteTransaction(pgClient)
 
     // Lock the row so concurrent retries serialize before we classify
     // the event as missing/stale/duplicate. The admin dashboard derives revenue
