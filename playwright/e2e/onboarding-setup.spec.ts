@@ -734,7 +734,13 @@ test('asks to finish or explicitly skip a step passed over by out-of-order setup
   await expect(page.locator('[data-test="app-onboarding-command-copy"]')).toBeVisible()
 
   await page.locator('[data-test="setup-checklist-skip-step"]').click()
+  const confirm = page.locator('[data-test="setup-checklist-skip-confirm"]')
+  await expect(page.getByLabel('Why are you skipping this step?')).toBeFocused()
+  await expect(confirm).toBeDisabled()
+  await page.locator('[data-test="setup-checklist-skip-reason"]').fill('  My AI agent set it up  ')
+  await confirm.click()
   await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.skips)).toEqual(['ota.login_cli_mcp'])
+  expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.skipReasons)).toEqual(['My AI agent set it up'])
   await expect(missed).toBeHidden()
   await expect(page.locator(instructions)).toContainText('Current task · 3 of 7')
   await expect(page.locator('[data-test="setup-checklist-progress"]')).toContainText('2 of 7 complete')

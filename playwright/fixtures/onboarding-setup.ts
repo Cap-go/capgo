@@ -53,6 +53,7 @@ const state = {
   setupWrites: [] as Array<{ method: string, body: unknown }>,
   userWrites: [] as unknown[],
   skips: [] as string[],
+  skipReasons: [] as string[],
 }
 if (params.get('checklistState') === 'completed') {
   for (const id of ['login_cli_mcp', 'add_updater', 'add_code', 'add_channel', 'run_device', 'upload_bundle', 'test_update'])
@@ -164,8 +165,9 @@ window.fetch = async (input, init) => {
     })
   }
   if (url.pathname.endsWith('/onboarding_progress/skip_step')) {
-    const { step } = JSON.parse(String(init?.body)) as { step: string }
+    const { step, reason } = JSON.parse(String(init?.body)) as { step: string, reason: string }
     state.skips.push(step)
+    state.skipReasons.push(reason)
     const [path, first, second] = step.split('.')
     if (path === 'ota')
       state.steps[first!] = { status: 'skipped' }

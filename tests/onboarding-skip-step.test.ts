@@ -10,11 +10,11 @@ const keys: Awaited<ReturnType<typeof createDirectApiKeyWithBindings>>[] = []
 let writerKey: string
 let readerKey: string
 
-async function skip(key: string, step: string) {
+async function skip(key: string, step: string, reason: string | null = 'Set up by my AI agent') {
   return fetchTestRequest(getEndpointUrl('/private/onboarding_progress/skip_step'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': key },
-    body: JSON.stringify({ appId, step }),
+    body: JSON.stringify({ appId, step, reason }),
   })
 }
 
@@ -60,9 +60,11 @@ afterAll(async () => {
 })
 
 describe('onboarding skip step', () => {
-  it('rejects malformed step ids', async () => {
-    const response = await skip(writerKey, 'ota.login_cli_mcp; drop')
-    expect(response.status).toBe(400)
+  it('rejects malformed step ids and missing or blank reasons', async () => {
+    expect((await skip(writerKey, 'ota.login_cli_mcp; drop')).status).toBe(400)
+    expect((await skip(writerKey, 'ota.login_cli_mcp', null)).status).toBe(400)
+    expect((await skip(writerKey, 'ota.login_cli_mcp', '   ')).status).toBe(400)
+    expect((await skip(writerKey, 'ota.login_cli_mcp', 'x'.repeat(501))).status).toBe(400)
   })
 
   it('refuses steps that were not passed over, including the final step', async () => {

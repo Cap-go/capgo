@@ -29,6 +29,7 @@ declare module 'vue' {
     AppOnboardingMissedSteps: typeof import('./components/dashboard/AppOnboardingMissedSteps.vue')['default']
     AppOnboardingPageFrame: typeof import('./components/dashboard/AppOnboardingPageFrame.vue')['default']
     AppOnboardingSetupChecklist: typeof import('./components/dashboard/AppOnboardingSetupChecklist.vue')['default']
+    AppOnboardingSkipStep: typeof import('./components/dashboard/AppOnboardingSkipStep.vue')['default']
     AppOnboardingWelcome: typeof import('./components/dashboard/AppOnboardingWelcome.vue')['default']
     AppOverviewSummary: typeof import('./components/dashboard/AppOverviewSummary.vue')['default']
     AppPageFrame: typeof import('./components/dashboard/AppPageFrame.vue')['default']

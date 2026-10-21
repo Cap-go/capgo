@@ -132,6 +132,8 @@ test('asks to finish or explicitly skip a Builder step passed over by out-of-ord
   await expect(page.locator('[data-test="builder-checklist-instructions"]')).toContainText('Passed over · 1 of 4')
 
   await page.locator('[data-test="builder-checklist-skip-step"]').click()
+  await page.locator('[data-test="builder-checklist-skip-reason"]').fill('Keystore came from our old CI')
+  await page.locator('[data-test="builder-checklist-skip-confirm"]').click()
   await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.skips)).toEqual(['builder.android.start_setup'])
   await expect(missed).toBeHidden()
   await expect(page.locator('[data-test="builder-checklist-instructions"]')).toContainText('Current task · 3 of 4')

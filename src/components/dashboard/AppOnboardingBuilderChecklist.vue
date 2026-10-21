@@ -22,6 +22,7 @@ import { resolveDualChecklistResume } from '~/utils/dualOnboardingChecklists'
 import { skipOnboardingStep } from '~/utils/onboardingSkipStep'
 import AppOnboardingAiAgentCard from './AppOnboardingAiAgentCard.vue'
 import AppOnboardingMissedSteps from './AppOnboardingMissedSteps.vue'
+import AppOnboardingSkipStep from './AppOnboardingSkipStep.vue'
 
 const props = withDefaults(defineProps<{
   appId: string
@@ -169,7 +170,7 @@ function selectStep(id: string) {
   checklistOpen.value = false
 }
 
-async function skipSelectedStep() {
+async function skipSelectedStep(reason: string) {
   const platform = viewedPlatform.value
   const step = selectedStep.value
   if (!platform || !step)
@@ -177,7 +178,7 @@ async function skipSelectedStep() {
   const appId = props.appId
   skipping.value = true
   try {
-    const value = await skipOnboardingStep(appId, `builder.${platform}.${step.id}`)
+    const value = await skipOnboardingStep(appId, `builder.${platform}.${step.id}`, reason)
     if (appId !== props.appId)
       return
     if (value !== undefined) {
@@ -335,16 +336,7 @@ function statusLabel(status: BuilderStepStatus) {
               {{ selectedStep.description }}
             </p>
 
-            <div v-if="isSelectedMissed" class="mt-5 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-400/30 dark:bg-amber-500/10" data-test="builder-checklist-missed-step">
-              <p class="flex items-start gap-3 text-sm leading-6 text-slate-700 dark:text-slate-300">
-                <IconAlertTriangle class="mt-1 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-                {{ t('setup-checklist-missed-step-note') }}
-              </p>
-              <button type="button" class="d-btn h-auto min-h-11 shrink-0 self-start border-slate-300 bg-white px-4 text-slate-700 hover:border-slate-400 hover:bg-slate-50 sm:self-center dark:border-white/20 dark:bg-slate-900 dark:text-slate-200" data-test="builder-checklist-skip-step" :disabled="skipping" @click="skipSelectedStep">
-                <IconLoader v-if="skipping" class="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
-                {{ t('setup-checklist-skip-step') }}
-              </button>
-            </div>
+            <AppOnboardingSkipStep v-if="isSelectedMissed" :key="`${viewedPlatform}-${selectedStep.id}`" test-id="builder-checklist" :skipping="skipping" @skip="skipSelectedStep" />
 
             <template v-if="isFirstStep">
               <p class="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">

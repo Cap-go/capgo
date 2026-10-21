@@ -18,7 +18,12 @@ import { readDevices, readStats } from '../utils/stats.ts'
 import { supabaseWithAuth } from '../utils/supabase.ts'
 
 const bodySchema = z.object({ appId: appIdSchema, N: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER), initial: z.boolean().optional(), includeBilling: z.boolean().optional() })
-const skipStepBodySchema = z.object({ appId: appIdSchema, step: z.string().regex(/^(?:ota\.[a-z_]+|builder\.(?:ios|android)\.[a-z_]+)$/) })
+const skipStepBodySchema = z.object({
+  appId: appIdSchema,
+  step: z.string().regex(/^(?:ota\.[a-z_]+|builder\.(?:ios|android)\.[a-z_]+)$/),
+  // Asked on every explicit skip so the team can review why steps get skipped.
+  reason: z.string().trim().min(3).max(500),
+})
 type Observations = Partial<Record<'login_cli_mcp' | 'add_channel' | 'run_device' | 'upload_bundle' | 'test_update', boolean>>
 type AuthenticatedClient = ReturnType<typeof supabaseWithAuth>
 type BillingSummary = { status: 'available', orgId: string, trialEndsAt: string | null, isPaying: boolean, hasCredits: boolean } | { status: 'unavailable' }
@@ -206,7 +211,7 @@ app.post('/skip_step', middlewareAuth({ preferApiKey: true }), async (c) => {
   const parsed = skipStepBodySchema.safeParse(await parseBody(c))
   if (!parsed.success)
     throw quickError(400, 'invalid_body', 'Invalid body')
-  const { appId, step } = parsed.data
+  const { appId, step, reason } = parsed.data
   if (!(await checkPermission(c, 'app.read', { appId })))
     throw quickError(403, 'app_access_denied', 'You cannot access this app')
   const result = await persistAuthorizedOnboardingMutation(c, appId, {
@@ -218,7 +223,7 @@ app.post('/skip_step', middlewareAuth({ preferApiKey: true }), async (c) => {
   })
   if (!result)
     throw quickError(409, 'step_not_skippable', 'This onboarding step cannot be skipped')
-  await emitCommittedAppOnboardingHistory(c, [result])
+  await emitCommittedAppOnboardingHistory(c, [result], { skipReason: reason })
   c.header('Cache-Control', 'no-store')
   return c.json({ onboarding: result.onboarding })
 })
