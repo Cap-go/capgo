@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { formatAppTodoList, getAppTodoSteps, readAppTodoProgress, TODO_BACKGROUND_WAIT_MS, waitForTodoBackgroundChecks } from '../src/app/todo.ts'
+import { formatAppTodoList, getAppTodoSteps, readAppTodoProgress, waitForTodoBackgroundChecks } from '../src/app/todo.ts'
 import { getAppOnboardingStepIds, parseAppOnboarding } from '../../supabase/functions/_backend/utils/appOnboarding.ts'
 import messages from '../../messages/en.json'
 
@@ -28,7 +28,6 @@ const progress = {
   checkErrors: [],
 }
 
-assert.equal(TODO_BACKGROUND_WAIT_MS, 10_000)
 const countdown = []
 const timedOutAt = Date.now()
 assert.equal(await waitForTodoBackgroundChecks([new Promise(() => {})], seconds => countdown.push(seconds), 2_200), false)

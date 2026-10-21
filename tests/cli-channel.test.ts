@@ -2,8 +2,8 @@ import type { Database } from '../src/types/supabase.types'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createTestSDK } from './cli-sdk-utils'
 import { getCanonicalAppVersionR2Path } from '../supabase/functions/_backend/utils/app_version_r2_path.ts'
+import { createTestSDK } from './cli-sdk-utils'
 import { BASE_URL, createAppVersions, createDirectApiKeyWithBindings, createIsolatedSeedAppOptions, getSupabaseClient, resetAndSeedAppData, resetAppData, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID } from './test-utils'
 
 const seedOptions = createIsolatedSeedAppOptions()
@@ -531,43 +531,34 @@ describe('tests CLI channel commands', () => {
     })
   })
 
-  describe.concurrent('channel state operations', () => {
-    it.concurrent('should set channel state to default', async () => {
+  describe.concurrent('channel setting updates', () => {
+    it.concurrent.each([
+      { name: 'state default makes the channel public', options: { state: 'default' }, expected: { public: true } },
+      { name: 'state normal keeps the channel private', options: { state: 'normal' }, expected: { public: false } },
+      { name: 'downgrade policy', options: { downgrade: true }, expected: { disable_auto_update_under_native: false } },
+      { name: 'ios platform', options: { ios: true }, expected: { ios: true } },
+      { name: 'android platform', options: { android: true }, expected: { android: true } },
+      { name: 'both platforms', options: { ios: true, android: true }, expected: { ios: true, android: true } },
+      { name: 'self-assign', options: { selfAssign: true }, expected: { allow_device_self_set: true } },
+      { name: 'disable auto update strategy', options: { disableAutoUpdate: 'minor' }, expected: { disable_auto_update: 'minor' } },
+      { name: 'dev environment', options: { dev: true }, expected: { allow_dev: true } },
+      { name: 'emulator environment', options: { emulator: true }, expected: { allow_emulator: true } },
+      { name: 'multiple properties in a single command', options: { state: 'default', downgrade: true, ios: true }, expected: { public: true, disable_auto_update_under_native: false, ios: true } },
+    ])('should set $name', async ({ options, expected }) => {
       const channelName = generateChannelName()
       await createChannel(channelName, APPNAME)
 
-      const result = await createTestSDK().updateChannel({ channelId: channelName, appId: APPNAME, bundle: undefined, ...{ state: 'default' } })
+      const result = await createTestSDK().updateChannel({ channelId: channelName, appId: APPNAME, ...options })
       expect(result.success).toBe(true)
 
-      // Verify in database
-      const { data, error } = await getSupabaseClient()
+      const { data } = await getSupabaseClient()
         .from('channels')
         .select('*')
         .eq('name', channelName)
         .eq('app_id', APPNAME)
         .single()
         .throwOnError()
-      expect(error).toBeNull()
-      expect(data?.public).toBe(true)
-    })
-
-    it.concurrent('should set channel state to public', async () => {
-      const channelName = generateChannelName()
-      await createChannel(channelName, APPNAME)
-
-      const result = await createTestSDK().updateChannel({ channelId: channelName, appId: APPNAME, bundle: undefined, ...{ state: 'normal' } })
-      expect(result.success).toBe(true)
-
-      // Verify in database
-      const { data, error } = await getSupabaseClient()
-        .from('channels')
-        .select('*')
-        .eq('name', channelName)
-        .eq('app_id', APPNAME)
-        .single()
-        .throwOnError()
-      expect(error).toBeNull()
-      expect(data?.public).toBe(false)
+      expect(data).toMatchObject(expected)
     })
 
     it.concurrent('should fail to set invalid state', async () => {
@@ -578,127 +569,6 @@ describe('tests CLI channel commands', () => {
       expect(result.success).toBe(false)
       expect(result.error).toContain('Unknown state')
     })
-  })
-
-  describe.concurrent('channel policy operations', () => {
-    it.concurrent('should set channel downgrade policy', async () => {
-      const testChannelName = generateChannelName()
-      await createChannel(testChannelName, APPNAME)
-
-      const result = await createTestSDK().updateChannel({ channelId: testChannelName, appId: APPNAME, bundle: undefined, ...{ downgrade: true } })
-      expect(result.success).toBe(true)
-
-      // Verify in database
-      const { data, error } = await getSupabaseClient()
-        .from('channels')
-        .select('*')
-        .eq('name', testChannelName)
-        .eq('app_id', APPNAME)
-        .single()
-        .throwOnError()
-      expect(error).toBeNull()
-      expect(data?.disable_auto_update_under_native).toBe(false)
-    })
-  })
-
-  describe.concurrent('channel platform operations', () => {
-    it.concurrent('should set channel platform to ios', async () => {
-      const testChannelName = generateChannelName()
-      await createChannel(testChannelName, APPNAME)
-
-      const result = await createTestSDK().updateChannel({ channelId: testChannelName, appId: APPNAME, bundle: undefined, ...{ ios: true } })
-      expect(result.success).toBe(true)
-
-      // Verify in database
-      const { data, error } = await getSupabaseClient()
-        .from('channels')
-        .select('*')
-        .eq('name', testChannelName)
-        .eq('app_id', APPNAME)
-        .single()
-        .throwOnError()
-      expect(error).toBeNull()
-      expect(data?.ios).toBe(true)
-    })
-
-    it.concurrent('should set channel platform to android', async () => {
-      const testChannelName = generateChannelName()
-      await createChannel(testChannelName, APPNAME)
-
-      const result = await createTestSDK().updateChannel({ channelId: testChannelName, appId: APPNAME, bundle: undefined, ...{ android: true } })
-      expect(result.success).toBe(true)
-
-      // Verify in database
-      const { data, error } = await getSupabaseClient()
-        .from('channels')
-        .select('*')
-        .eq('name', testChannelName)
-        .eq('app_id', APPNAME)
-        .single()
-        .throwOnError()
-      expect(error).toBeNull()
-      expect(data?.android).toBe(true)
-    })
-
-    it.concurrent('should set both platforms simultaneously', async () => {
-      const testChannelName = generateChannelName()
-      await createChannel(testChannelName, APPNAME)
-
-      const result = await createTestSDK().updateChannel({ channelId: testChannelName, appId: APPNAME, bundle: undefined, ...{ ios: true, android: true } })
-      expect(result.success).toBe(true)
-
-      // Verify in database
-      const { data, error } = await getSupabaseClient()
-        .from('channels')
-        .select('*')
-        .eq('name', testChannelName)
-        .eq('app_id', APPNAME)
-        .single()
-        .throwOnError()
-      expect(error).toBeNull()
-      expect(data?.ios).toBe(true)
-      expect(data?.android).toBe(true)
-    })
-  })
-
-  describe.concurrent('channel self-assign operations', () => {
-    it.concurrent('should set channel self-assign', async () => {
-      const testChannelName = generateChannelName()
-      await createChannel(testChannelName, APPNAME)
-
-      const result = await createTestSDK().updateChannel({ channelId: testChannelName, appId: APPNAME, bundle: undefined, ...{ selfAssign: true } })
-      expect(result.success).toBe(true)
-
-      // Verify in database
-      const { data, error } = await getSupabaseClient()
-        .from('channels')
-        .select('*')
-        .eq('name', testChannelName)
-        .eq('app_id', APPNAME)
-        .single()
-        .throwOnError()
-      expect(error).toBeNull()
-      expect(data?.allow_device_self_set).toBe(true)
-    })
-  })
-
-  it.concurrent('should disable auto update for channel', async () => {
-    const testChannelName = generateChannelName()
-    await createChannel(testChannelName, APPNAME)
-
-    const result = await createTestSDK().updateChannel({ channelId: testChannelName, appId: APPNAME, bundle: undefined, ...{ disableAutoUpdate: 'major' } })
-    expect(result.success).toBe(true)
-
-    // Verify in database
-    const { data, error } = await getSupabaseClient()
-      .from('channels')
-      .select('*')
-      .eq('name', testChannelName)
-      .eq('app_id', APPNAME)
-      .single()
-      .throwOnError()
-    expect(error).toBeNull()
-    expect(data?.disable_auto_update).toBe('major')
   })
 
   it.concurrent('should set channel update package', async () => {
@@ -804,44 +674,6 @@ describe('tests CLI channel commands', () => {
     expect(result.error).toContain('no zip')
   })
 
-  it.concurrent('should set channel for dev environment', async () => {
-    const testChannelName = generateChannelName()
-    await createChannel(testChannelName, APPNAME)
-
-    const result = await createTestSDK().updateChannel({ channelId: testChannelName, appId: APPNAME, bundle: undefined, ...{ dev: true } })
-    expect(result.success).toBe(true)
-
-    // Verify in database
-    const { data, error } = await getSupabaseClient()
-      .from('channels')
-      .select('*')
-      .eq('name', testChannelName)
-      .eq('app_id', APPNAME)
-      .single()
-      .throwOnError()
-    expect(error).toBeNull()
-    expect(data?.allow_dev).toBe(true)
-  })
-
-  it.concurrent('should set channel for emulator environment', async () => {
-    const testChannelName = generateChannelName()
-    await createChannel(testChannelName, APPNAME)
-
-    const result = await createTestSDK().updateChannel({ channelId: testChannelName, appId: APPNAME, bundle: undefined, ...{ emulator: true } })
-    expect(result.success).toBe(true)
-
-    // Verify in database
-    const { data, error } = await getSupabaseClient()
-      .from('channels')
-      .select('*')
-      .eq('name', testChannelName)
-      .eq('app_id', APPNAME)
-      .single()
-      .throwOnError()
-    expect(error).toBeNull()
-    expect(data?.allow_emulator).toBe(true)
-  })
-
   describe.concurrent('channel info operations', () => {
     it.concurrent('should get current bundle of channel', async () => {
       const channelName = generateChannelName()
@@ -873,35 +705,6 @@ describe('tests CLI channel commands', () => {
 
       expect(result.success).toBe(false)
       expect(result.error).toBeDefined()
-    })
-  })
-
-  describe.concurrent('combined operations', () => {
-    it.concurrent('should set multiple properties in a single command', async () => {
-      const testChannelName = generateChannelName()
-      await createChannel(testChannelName, APPNAME)
-
-      const result = await createTestSDK().updateChannel({
-        channelId: testChannelName,
-        appId: APPNAME,
-        state: 'default',
-        downgrade: true,
-        ios: true,
-      })
-      expect(result.success).toBe(true)
-
-      // Verify in database
-      const { data, error } = await getSupabaseClient()
-        .from('channels')
-        .select('*')
-        .eq('name', testChannelName)
-        .eq('app_id', APPNAME)
-        .single()
-        .throwOnError()
-      expect(error).toBeNull()
-      expect(data?.public).toBe(true)
-      expect(data?.disable_auto_update_under_native).toBe(false)
-      expect(data?.ios).toBe(true)
     })
   })
 

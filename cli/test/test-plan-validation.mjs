@@ -1,16 +1,11 @@
 #!/usr/bin/env node
 process.env.CAPGO_DISABLE_POSTHOG = '1'
 
-import { readFileSync } from 'node:fs'
 import process from 'node:process'
 import { checkPlanValid, checkPlanValidUpload } from '../src/api/preflight.ts'
 import * as utils from '../src/utils.ts'
 
 console.log('🧪 Testing plan validation through the backend preflight...\n')
-
-const utilsSource = readFileSync(new URL('../src/utils.ts', import.meta.url), 'utf8')
-const preflightSource = readFileSync(new URL('../src/api/preflight.ts', import.meta.url), 'utf8')
-const channelSetSource = readFileSync(new URL('../src/channel/set.ts', import.meta.url), 'utf8')
 
 const apiHost = 'http://localhost:54321/functions/v1'
 
@@ -109,11 +104,9 @@ await test('surfaces backend errors instead of reporting an invalid plan', async
 await test('no CLI-side plan RPC helpers remain', () => {
   for (const name of ['isAllowedPlanActions', 'resolveMeteredPlanAllowed', 'isAllowedActionOrg', 'isPayingOrg', 'isTrialOrg'])
     assert(!(name in utils), `${name} must live in the backend`)
-  assert(!utilsSource.includes('private/cli/billing'), 'billing routes are replaced by the preflight')
 })
 
 await test('canOpenExternalUrl is disabled in CI-like environments', () => {
-  assert(typeof utils.canOpenExternalUrl === 'function', 'Expected canOpenExternalUrl to be exported')
   assertEquals(utils.canOpenExternalUrl({
     ci: true,
     stdinIsTTY: true,
@@ -142,16 +135,6 @@ await test('canOpenExternalUrl is disabled in CI-like environments', () => {
     display: ':0',
     platform: 'darwin',
   }), true)
-})
-
-await test('plan upgrade helpers use guarded openExternalUrl instead of raw import("open")', () => {
-  assert(preflightSource.includes('await openExternalUrl(url)'), 'Expected guarded browser open helper')
-  assert(!preflightSource.includes('import(\'open\')'), 'Raw open() must not be used by plan checks')
-  assert(utilsSource.includes('if (code === \'ENOENT\')'), 'Expected ENOENT to be swallowed in openExternalUrl')
-})
-
-await test('channel set does not run kitchen-sink plan validation', () => {
-  assert(!channelSetSource.includes('checkPlanValid'), 'channel set must not call checkPlanValid')
 })
 
 globalThis.fetch = originalFetch

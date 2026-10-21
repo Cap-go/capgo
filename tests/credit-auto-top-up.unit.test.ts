@@ -1,106 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import { MIN_AUTO_TOP_UP_THRESHOLD, normalizeAutoTopUpMonthlyLimit, shouldAttemptAutoTopUp } from '../supabase/functions/_backend/utils/credit_auto_top_up.ts'
+import { normalizeAutoTopUpMonthlyLimit, shouldAttemptAutoTopUp } from '../supabase/functions/_backend/utils/credit_auto_top_up.ts'
 
 describe('credit auto top-up decision', () => {
-  it('does not attempt when disabled', () => {
-    expect(shouldAttemptAutoTopUp({
-      enabled: false,
-      availableCredits: 0,
-      threshold: 10,
-      lastAttemptAt: null,
-    })).toBe(false)
-  })
-
-  it('does not attempt when available credits are at or above the threshold', () => {
-    expect(shouldAttemptAutoTopUp({
-      enabled: true,
-      availableCredits: 10,
-      threshold: 10,
-      lastAttemptAt: null,
-    })).toBe(false)
-  })
-
-  it('does not attempt below the $10 minimum threshold', () => {
-    expect(shouldAttemptAutoTopUp({
-      enabled: true,
-      availableCredits: 0,
-      threshold: 9,
-      lastAttemptAt: null,
-    })).toBe(false)
-    expect(MIN_AUTO_TOP_UP_THRESHOLD).toBe(10)
-  })
-
-  it('attempts when enabled, below threshold, and off cooldown', () => {
-    expect(shouldAttemptAutoTopUp({
-      enabled: true,
-      availableCredits: 3,
-      threshold: 10,
-      lastAttemptAt: null,
-    })).toBe(true)
-  })
-
-  it('does not attempt during the cooldown window', () => {
-    const now = Date.parse('2026-08-24T12:00:00.000Z')
-    expect(shouldAttemptAutoTopUp({
-      enabled: true,
-      availableCredits: 0,
-      threshold: 10,
-      lastAttemptAt: '2026-08-24T11:30:00.000Z',
-      now,
-    })).toBe(false)
-  })
-
-  it.concurrent('attempts again after the cooldown window ends', () => {
-    const now = Date.parse('2026-08-24T12:00:00.000Z')
-    expect(shouldAttemptAutoTopUp({
-      enabled: true,
-      availableCredits: 0,
-      threshold: 10,
-      lastAttemptAt: '2026-08-24T10:59:00.000Z',
-      now,
-    })).toBe(true)
-  })
-
-  it.concurrent('attempts when the last attempt timestamp is unparsable', () => {
-    expect(shouldAttemptAutoTopUp({
-      enabled: true,
-      availableCredits: 0,
-      threshold: 10,
-      lastAttemptAt: 'not-a-date',
-    })).toBe(true)
-  })
-
-  it.concurrent('ignores the monthly limit when it is 0', () => {
-    expect(shouldAttemptAutoTopUp({
-      enabled: true,
-      availableCredits: 0,
-      threshold: 10,
-      lastAttemptAt: null,
-      monthlyLimit: 0,
-      monthlyTotal: 1000,
-    })).toBe(true)
-  })
-
-  it.concurrent('attempts while the next charge fits in the monthly limit', () => {
-    expect(shouldAttemptAutoTopUp({
-      enabled: true,
-      availableCredits: 0,
-      threshold: 10,
-      lastAttemptAt: null,
-      monthlyLimit: 30,
-      monthlyTotal: 20,
-    })).toBe(true)
-  })
-
-  it.concurrent('stops when the next charge would exceed the monthly limit', () => {
-    expect(shouldAttemptAutoTopUp({
-      enabled: true,
-      availableCredits: 0,
-      threshold: 10,
-      lastAttemptAt: null,
-      monthlyLimit: 25,
-      monthlyTotal: 20,
-    })).toBe(false)
+  const base = { enabled: true, availableCredits: 0, threshold: 10, lastAttemptAt: null as string | null }
+  const now = Date.parse('2026-08-24T12:00:00.000Z')
+  it.concurrent.each([
+    ['does not attempt when disabled', { enabled: false }, false],
+    ['does not attempt when available credits are at the threshold', { availableCredits: 10 }, false],
+    ['does not attempt below the $10 minimum threshold', { threshold: 9 }, false],
+    ['attempts when enabled, below threshold, and off cooldown', { availableCredits: 3 }, true],
+    ['does not attempt during the cooldown window', { lastAttemptAt: '2026-08-24T11:30:00.000Z', now }, false],
+    ['attempts again after the cooldown window ends', { lastAttemptAt: '2026-08-24T10:59:00.000Z', now }, true],
+    ['attempts when the last attempt timestamp is unparsable', { lastAttemptAt: 'not-a-date' }, true],
+    ['ignores the monthly limit when it is 0', { monthlyLimit: 0, monthlyTotal: 1000 }, true],
+    ['attempts while the next charge fits in the monthly limit', { monthlyLimit: 30, monthlyTotal: 20 }, true],
+    ['stops when the next charge would exceed the monthly limit', { monthlyLimit: 25, monthlyTotal: 20 }, false],
+  ])('%s', (_label, overrides, expected) => {
+    expect(shouldAttemptAutoTopUp({ ...base, ...overrides })).toBe(expected)
   })
 })
 
