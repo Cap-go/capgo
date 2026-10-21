@@ -5,7 +5,7 @@ import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { BRES, quickError, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
-import { checkoutPgClient, closeClient, getDrizzleClient, getPgClient, releasePgClient } from '../../../utils/pg.ts'
+import { beginWriteTransaction, checkoutPgClient, closeClient, getDrizzleClient, getPgClient, releasePgClient } from '../../../utils/pg.ts'
 import { checkPermission, checkPermissionPg } from '../../../utils/rbac.ts'
 import { safeParseSchema } from '../../../utils/schema_validation.ts'
 import { supabaseAdmin } from '../../../utils/supabase.ts'
@@ -225,7 +225,7 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
   cloudlog({ requestId: c.get('requestId'), message: 'body.orgId', data: body.orgId })
   try {
     dbClient = await checkoutPgClient(pgPool) as unknown as PinnedPgClient
-    await dbClient.query('BEGIN')
+    await beginWriteTransaction(dbClient)
     transactionOpen = true
     await dbClient.query('SELECT public.lock_rbac_orgs($1::uuid)', [body.orgId])
     await assertMemberRemovalAuthorizedAfterLock(c, auth, body, targetUserId, dbClient)
