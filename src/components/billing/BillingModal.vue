@@ -13,9 +13,12 @@ const props = withDefaults(defineProps<{
   size?: 'md' | 'lg' | 'xl' | 'checkout'
   // Block Escape/backdrop while a payment is being confirmed.
   busy?: boolean
+  // Drop body padding so embedded content (e.g. Stripe Checkout iframe) fills the modal edge to edge.
+  flush?: boolean
 }>(), {
   size: 'md',
   busy: false,
+  flush: false,
 })
 
 const emit = defineEmits<{
@@ -119,7 +122,7 @@ onBeforeUnmount(() => {
             <IconX class="h-5 w-5" />
           </button>
         </div>
-        <div class="px-5 py-5 sm:px-6">
+        <div :class="props.flush ? '' : 'px-5 py-5 sm:px-6'">
           <slot />
         </div>
         <div v-if="$slots.footer" class="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-4 dark:border-slate-800 sm:px-6">
