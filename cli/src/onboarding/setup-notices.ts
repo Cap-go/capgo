@@ -50,8 +50,10 @@ function readBilling(value: unknown, webHost: string): Billing | undefined {
       return
     plansUrl.searchParams.set('oid', data.orgId)
     const trialEndsAt = data.trialEndsAt as string | null
-    // `orgCreatedAt` is optional: older servers omit it and keep the trial copy.
-    const trialSkipped = typeof data.orgCreatedAt === 'string' && isZeroLengthTrial(data.orgCreatedAt, trialEndsAt)
+    // `orgCreatedAt`/`hasPaid` are optional: older servers omit them and keep the
+    // trial copy. Only never-paid orgs qualify: a churned org must not see
+    // "choose a plan to start".
+    const trialSkipped = data.hasPaid === false && typeof data.orgCreatedAt === 'string' && isZeroLengthTrial(data.orgCreatedAt, trialEndsAt)
     return { orgId: data.orgId, trialEndsAt, ...(trialSkipped ? { trialSkipped } : {}), plansUrl: plansUrl.href }
   }
   catch {

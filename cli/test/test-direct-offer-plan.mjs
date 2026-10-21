@@ -16,7 +16,7 @@ const createdAt = '2026-10-20T10:00:00.000Z'
 const DAY = 24 * 60 * 60 * 1000
 const at = offsetMs => new Date(Date.parse(createdAt) + offsetMs).toISOString()
 
-const billing = trialEndsAt => ({ status: 'available', orgId, orgCreatedAt: createdAt, trialEndsAt, isPaying: false, hasCredits: false })
+const billing = trialEndsAt => ({ status: 'available', orgId, orgCreatedAt: createdAt, trialEndsAt, hasPaid: false, isPaying: false, hasCredits: false })
 
 // What the backend returns for each kind of org when the CLI checks the plan.
 const orgs = {
@@ -91,6 +91,7 @@ describe('isZeroLengthTrial', () => {
   test('15-day trial is a normal trial', () => {
     assert.equal(isZeroLengthTrial(createdAt, at(15 * DAY)), false)
     assert.equal(isZeroLengthTrial(createdAt, at(DAY + 1)), false)
+    assert.equal(isZeroLengthTrial(createdAt, at(-DAY - 1)), false)
   })
   test('missing, null or invalid dates fall back to the normal copy', () => {
     assert.equal(isZeroLengthTrial(null, createdAt), false)
@@ -118,6 +119,13 @@ describe('isDirectOfferApp', () => {
     org = { ...orgs.directOffer, billing: { ...orgs.directOffer.billing, orgCreatedAt: null } }
     assert.equal(await isDirectOfferApp(client, appId), false)
     const { orgCreatedAt: _omit, ...withoutField } = orgs.directOffer.billing
+    org = { ...orgs.directOffer, billing: withoutField }
+    assert.equal(await isDirectOfferApp(client, appId), false)
+  })
+  test('a churned direct-offer org (paid before) or a server without hasPaid keeps the normal copy', async () => {
+    org = { ...orgs.directOffer, billing: { ...orgs.directOffer.billing, hasPaid: true } }
+    assert.equal(await isDirectOfferApp(client, appId), false)
+    const { hasPaid: _omit, ...withoutField } = orgs.directOffer.billing
     org = { ...orgs.directOffer, billing: withoutField }
     assert.equal(await isDirectOfferApp(client, appId), false)
   })

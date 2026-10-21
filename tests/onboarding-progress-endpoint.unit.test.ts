@@ -158,12 +158,12 @@ describe('onboarding progress endpoint', () => {
     ['canceled', true, false],
     [null, false, false],
   ])('returns CLI billing fields for status %s', async (status, hasCredits, isPaying) => {
-    mocks.billing = { created_at: '2026-10-01T09:00:00Z', has_usage_credits: hasCredits, stripe_info: { status, trial_at: '2026-11-01T12:34:56Z' } }
+    mocks.billing = { created_at: '2026-10-01T09:00:00Z', has_usage_credits: hasCredits, stripe_info: { status, trial_at: '2026-11-01T12:34:56Z', paid_at: isPaying ? '2026-10-02T00:00:00Z' : null } }
     const response = await request(4, false, undefined, true)
     expect(response.headers.get('Cache-Control')).toBe('no-store')
-    expect((await response.json() as any).billing).toEqual({ status: 'available', orgId: mocks.row.owner_org, orgCreatedAt: '2026-10-01T09:00:00Z', trialEndsAt: '2026-11-01T12:34:56Z', isPaying, hasCredits })
+    expect((await response.json() as any).billing).toEqual({ status: 'available', orgId: mocks.row.owner_org, orgCreatedAt: '2026-10-01T09:00:00Z', trialEndsAt: '2026-11-01T12:34:56Z', hasPaid: isPaying, isPaying, hasCredits })
     expect(mocks.permission).toHaveBeenCalledWith(expect.anything(), 'org.read_billing', { orgId: mocks.row.owner_org })
-    expect(mocks.queries.at(-1)).toEqual({ table: 'orgs', calls: [['select', 'created_at, has_usage_credits, stripe_info(status, trial_at)'], ['eq', 'id', mocks.row.owner_org]] })
+    expect(mocks.queries.at(-1)).toEqual({ table: 'orgs', calls: [['select', 'created_at, has_usage_credits, stripe_info(status, trial_at, paid_at)'], ['eq', 'id', mocks.row.owner_org]] })
     expect(mocks.transaction).not.toHaveBeenCalled()
   })
   it('returns no trial explicitly instead of inventing an expiry', async () => {

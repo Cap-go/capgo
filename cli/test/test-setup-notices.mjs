@@ -244,10 +244,24 @@ test('orgs created without a trial (direct offer) never see trial wording', () =
   const progress = finish(fixture(['ota']), 'ota')
   progress.billing.trialEndsAt = '2025-12-01T00:00:05Z'
   progress.billing.orgCreatedAt = '2025-12-01T00:00:00Z'
+  progress.billing.hasPaid = false
   const text = message(progress)
   assert.ok(text.includes('Choose a plan to start using Capgo. 14-day money-back guarantee. Cancel anytime.'), text)
   assert.doesNotMatch(text, /trial/i)
   assert.ok(text.includes('View plans: https://console.example.com/settings/organization/plans?oid='))
+})
+
+test('a churned direct-offer org (paid before) or an older server without hasPaid keeps the trial wording', () => {
+  for (const hasPaid of [true, undefined]) {
+    const progress = finish(fixture(['ota']), 'ota')
+    progress.billing.trialEndsAt = '2025-12-01T00:00:05Z'
+    progress.billing.orgCreatedAt = '2025-12-01T00:00:00Z'
+    if (hasPaid !== undefined)
+      progress.billing.hasPaid = hasPaid
+    const text = message(progress)
+    assert.ok(text.includes('Your trial has ended.'), text)
+    assert.ok(!text.includes('money-back'), text)
+  }
 })
 
 test('a null orgCreatedAt (as returned by the server when unknown) keeps the trial wording', () => {

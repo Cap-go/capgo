@@ -5,7 +5,7 @@ import { invokeCliHttpFromClient } from '../utils'
 const DIRECT_OFFER_LOOKUP_TIMEOUT_MS = 5_000
 
 interface BillingProgress {
-  billing?: { status?: string, orgCreatedAt?: unknown, trialEndsAt?: unknown }
+  billing?: { status?: string, orgCreatedAt?: unknown, trialEndsAt?: unknown, hasPaid?: unknown }
 }
 
 /**
@@ -14,7 +14,8 @@ interface BillingProgress {
  * creation time and trial end from the existing `private/onboarding_progress`
  * billing summary (needs app.read + org.read_billing). `N: 4` without `initial`
  * runs none of the periodic onboarding checks. Any error, timeout, older server
- * without `orgCreatedAt`, or `null` value keeps the normal plan copy.
+ * without `orgCreatedAt`/`hasPaid`, `null` value, or an org that paid before
+ * (churned) keeps the normal plan copy.
  */
 export async function isDirectOfferApp(client: CapgoApiTarget, appId: string | undefined): Promise<boolean> {
   if (!appId)
@@ -28,7 +29,7 @@ export async function isDirectOfferApp(client: CapgoApiTarget, appId: string | u
     const billing = data?.billing
     if (error || billing?.status !== 'available')
       return false
-    if (typeof billing.orgCreatedAt !== 'string' || typeof billing.trialEndsAt !== 'string')
+    if (billing.hasPaid !== false || typeof billing.orgCreatedAt !== 'string' || typeof billing.trialEndsAt !== 'string')
       return false
     return isZeroLengthTrial(billing.orgCreatedAt, billing.trialEndsAt)
   }

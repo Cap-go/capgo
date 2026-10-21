@@ -14,7 +14,7 @@ export function isZeroLengthTrial(orgCreatedAt: string | null | undefined, trial
   const trialEnd = Date.parse(trialAt)
   if (Number.isNaN(created) || Number.isNaN(trialEnd))
     return false
-  return trialEnd - created <= ZERO_LENGTH_TRIAL_MAX_MS
+  return Math.abs(trialEnd - created) <= ZERO_LENGTH_TRIAL_MAX_MS
 }
 
 /** Copy shown when a metered action is blocked because the org has no usable plan. */
