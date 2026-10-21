@@ -685,6 +685,7 @@ async function prepareBundleFile(path: string, options: OptionsUpload, apikey: s
         tags: {
           'app-id': appid,
           'size_mb': mbSize,
+          'recommended_size_mb': Math.floor(alertUploadSize / 1024 / 1024),
         },
       }, options.verbose)
 

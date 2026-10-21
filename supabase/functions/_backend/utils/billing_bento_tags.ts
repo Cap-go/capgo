@@ -1,3 +1,6 @@
+// Trial org that saved a card: its onboarding plan starts when the trial ends.
+export const TRIAL_CARD_BENTO_TAG = 'trial-card-on-file'
+
 export type BillingPlanBentoState = 'none' | 'paying' | 'trial'
 
 export function buildBillingPlanBentoTags(
@@ -21,6 +24,6 @@ export function buildBillingPlanBentoTags(
     trialPlanNames = [planName]
   return {
     segments: planName ? [`plan:${planName}`] : [],
-    deleteSegments: Array.from(new Set(trialPlanNames.map(name => `trial-plan:${name}`))),
+    deleteSegments: [...new Set(trialPlanNames.map(name => `trial-plan:${name}`)), TRIAL_CARD_BENTO_TAG],
   }
 }

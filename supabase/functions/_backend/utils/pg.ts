@@ -7,7 +7,8 @@ import { alias } from 'drizzle-orm/pg-core'
 import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
 import { Client, Pool } from 'pg'
-import { closePrimaryReadClient, configureTransactionAccessMode, getPgAccessMode, inheritPgAccessMode, isPrimaryReadSession, readOnlyStartupOptions, restrictPrimaryReadClient } from '../plugin_runtime/utils/pg_transaction_mode.ts'
+import { BEGIN_WRITE_TRANSACTION_SQL, configureTransactionAccessMode, getPgAccessMode, inheritPgAccessMode, readOnlyStartupOptions, setPgAccessMode, TRANSACTION_IDLE_TIMEOUT_MS } from '../plugin_runtime/utils/pg_transaction_mode.ts'
+export { BEGIN_WRITE_TRANSACTION_SQL, TRANSACTION_IDLE_TIMEOUT_MS } from '../plugin_runtime/utils/pg_transaction_mode.ts'
 import { serializePostgresError } from '../plugin_runtime/utils/postgres_error.ts'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
@@ -33,7 +34,7 @@ export type PgQueryClient = PoolClient | Client
 const skipEndClients = new WeakSet<object>()
 
 export async function checkoutPgClient(pg: PgClient): Promise<PgQueryClient> {
-  if (skipEndClients.has(pg) || isPrimaryReadSession(pg))
+  if (skipEndClients.has(pg))
     return pg as Client
   const client = await (pg as Pool).connect()
   inheritPgAccessMode(pg, client)
@@ -41,7 +42,7 @@ export async function checkoutPgClient(pg: PgClient): Promise<PgQueryClient> {
 }
 
 export function releasePgClient(pg: PgClient | null | undefined, client: object | null | undefined, error?: boolean | Error): void {
-  if (!pg || !client || skipEndClients.has(pg) || isPrimaryReadSession(pg))
+  if (!pg || !client || skipEndClients.has(pg))
     return
   if ('release' in client && typeof client.release === 'function')
     client.release(error)
@@ -198,18 +199,37 @@ function toReplicationLagSeconds(value: unknown): number | null {
 }
 
 /**
- * Query replication lag from the REPLICA database using pg_stat_subscription.
- * Uses the existing pool - no new connections.
+ * Replica lag SQL: logical subscriber (pg_stat_subscription) or physical
+ * standby (replay position / timestamp). Same query as
+ * plugin_runtime/utils/replicaFreshness.ts, duplicated on purpose (runtime
+ * isolation, see plugin_runtime/README.md): keep both in sync.
+ */
+const REPLICA_LAG_QUERY = `
+  SELECT CASE
+    WHEN pg_is_in_recovery() THEN
+      CASE
+        WHEN pg_last_wal_receive_lsn() IS NOT NULL
+          AND pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn()
+          AND EXISTS (SELECT 1 FROM pg_stat_wal_receiver WHERE pid IS NOT NULL AND (status IS NULL OR status = 'streaming'))
+          THEN 0
+        ELSE EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))
+      END
+    ELSE (
+      SELECT MAX(EXTRACT(EPOCH FROM (now() - last_msg_receipt_time)))
+      FROM pg_stat_subscription
+      WHERE last_msg_receipt_time IS NOT NULL
+    )
+  END AS lag_seconds
+`
+
+/**
+ * Query replication lag from the REPLICA database (see REPLICA_LAG_QUERY:
+ * logical subscriber and physical standbys). Uses the existing pool - no new
+ * connections.
  */
 async function queryReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagStatus> {
   try {
-    const query = `
-      SELECT MAX(EXTRACT(EPOCH FROM (now() - last_msg_receipt_time))) AS lag_seconds
-      FROM pg_stat_subscription
-      WHERE last_msg_receipt_time IS NOT NULL
-    `
-
-    const result = await pool.query(query)
+    const result = await pool.query(REPLICA_LAG_QUERY)
     const lagSeconds = toReplicationLagSeconds(result.rows[0]?.lag_seconds)
 
     let status: ReplicationStatus = 'unknown'
@@ -444,7 +464,7 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PgClien
     })
     await client.connect()
     skipEndClients.add(client)
-    return restrictPrimaryReadClient(client, dbName, readOnly, true)
+    return setPgAccessMode(client, readOnly)
   }
 
   const pool = new Pool({
@@ -466,21 +486,41 @@ export async function getPgClient(c: Context, readOnly = false): Promise<PgClien
     cloudlogErr({ requestId, message: 'PG Pool Error', databaseSource: dbName, error: serializePostgresError(err) })
   })
 
-  return restrictPrimaryReadClient(pool, dbName, readOnly, false)
+  // pg-pool drops its idle error listener while a client is checked out. Keep a
+  // permanent one so a server-side kill (e.g. idle_in_transaction_session_timeout)
+  // during a transaction rejects the next query instead of crashing the worker.
+  // Idle-client errors are already logged as 'PG Pool Error', so only log here
+  // while the client is checked out.
+  const checkedOut = new WeakSet<object>()
+  pool.on('acquire', client => checkedOut.add(client))
+  pool.on('release', (_err, client) => checkedOut.delete(client))
+  pool.on('connect', (client) => {
+    client.on('error', (err: Error) => {
+      if (checkedOut.has(client))
+        cloudlogErr({ requestId, message: 'PG Client Error', databaseSource: dbName, error: serializePostgresError(err) })
+    })
+  })
+
+  return setPgAccessMode(pool, readOnly)
 }
 
 // Transactions must run on one checked-out connection: BEGIN/COMMIT issued on
 // the Pool itself can land on different connections and leave one idle in
 // transaction, holding row locks until the server kills it.
+// Structural typing: Pool/Client query overloads and local transaction client
+// interfaces are not assignable to Pick<PgQueryClient, 'query'>.
+export async function beginWriteTransaction(client: { query: (queryText: string, values?: unknown[]) => Promise<unknown> }): Promise<void> {
+  await client.query(BEGIN_WRITE_TRANSACTION_SQL)
+}
+
 export async function withPgTransaction<T>(pgPool: PgClient, run: (client: PgQueryClient) => Promise<T>): Promise<T> {
-  if (isPrimaryReadSession(pgPool))
-    throw new Error('Cannot start a root transaction inside a primary read session')
   const client = await checkoutPgClient(pgPool)
   try {
-    await client.query(getPgAccessMode(pgPool) === 'read only' ? 'BEGIN READ ONLY' : 'BEGIN READ WRITE')
+    // Bound the transaction on the same round trip as BEGIN so an abandoned
+    // request cannot pin the Hyperdrive origin connection with no timeout.
+    const begin = getPgAccessMode(pgPool) === 'read only' ? 'BEGIN READ ONLY' : 'BEGIN READ WRITE'
+    await client.query(`${begin}; SET LOCAL statement_timeout = 10000; SET LOCAL idle_in_transaction_session_timeout = ${TRANSACTION_IDLE_TIMEOUT_MS}`)
     try {
-      await client.query('SET LOCAL statement_timeout = 10000')
-      await client.query('SET LOCAL idle_in_transaction_session_timeout = 15000')
       const result = await run(client)
       await client.query('COMMIT')
       return result
@@ -515,13 +555,6 @@ export function logPgError(c: Context, functionName: string, error: unknown) {
 }
 
 export function closeClient(c: Context, db: PgClient) {
-  const closingRead = closePrimaryReadClient(db)
-  if (closingRead) {
-    return backgroundTask(c, closingRead.catch((error: unknown) => {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'PG read transaction cleanup failed', error: serializePostgresError(error) })
-    }))
-  }
-
   // Hyperdrive: do not end() — connection-lifecycle docs say GC cleans the edge hop.
   // https://developers.cloudflare.com/hyperdrive/concepts/connection-lifecycle/
   if (skipEndClients.has(db))

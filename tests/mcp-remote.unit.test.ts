@@ -56,6 +56,12 @@ describe('hosted MCP discovery', () => {
     })
   })
 
+  it.concurrent('exposes the same metadata at /mcp/oauth/metadata', async () => {
+    const response = await apiWorker.fetch(new Request('https://api.capgo.app/mcp/oauth/metadata'))
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ issuer: 'https://api.capgo.app' })
+  })
+
   it.concurrent('allows browser-based MCP clients through CORS', async () => {
     const response = await apiWorker.fetch(new Request('https://api.capgo.app/mcp', {
       method: 'OPTIONS',

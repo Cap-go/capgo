@@ -35,17 +35,32 @@ export const MCP_PATH = '/mcp'
 export const MCP_OAUTH_PATH = '/mcp/oauth'
 export const CONSENT_PAGE_PATH = '/oauth/authorize'
 
-/** Public origin of this API (issuer + resource). Uses the request origin so local workers work too. */
-export function getIssuer(c: Context): string {
+function getRequestOrigin(c: Context): string {
   return new URL(c.req.url).origin
 }
 
+/**
+ * Canonical origin of the OAuth endpoints and the MCP resource. Production sets MCP_OAUTH_API_ORIGIN=https://api.capgo.app
+ * so every hostname routed to this worker advertises the same resource; unset, the request origin is used (local workers).
+ */
+export function getApiOrigin(c: Context): string {
+  return getEnv(c, 'MCP_OAUTH_API_ORIGIN').trim().replace(/\/+$/, '') || getRequestOrigin(c)
+}
+
+/**
+ * OAuth issuer identifier (RFC 8414). Production sets MCP_OAUTH_ISSUER=https://capgo.app, which serves this
+ * metadata at its own /.well-known/oauth-authorization-server; the endpoints stay on the API origin.
+ */
+export function getIssuer(c: Context): string {
+  return getEnv(c, 'MCP_OAUTH_ISSUER').trim().replace(/\/+$/, '') || getApiOrigin(c)
+}
+
 export function getResourceUrl(c: Context): string {
-  return `${getIssuer(c)}${MCP_PATH}`
+  return `${getApiOrigin(c)}${MCP_PATH}`
 }
 
 export function getProtectedResourceMetadataUrl(c: Context): string {
-  return `${getIssuer(c)}/.well-known/oauth-protected-resource${MCP_PATH}`
+  return `${getApiOrigin(c)}/.well-known/oauth-protected-resource${MCP_PATH}`
 }
 
 /** RFC 6749 §5.2 / RFC 7591 §3.2.2 error body. These shapes are mandated by the OAuth specs. */
@@ -55,13 +70,13 @@ function oauthError(c: McpContext, status: 400 | 401 | 403 | 404 | 429 | 500 | 5
 }
 
 function authorizationServerMetadata(c: Context) {
-  const issuer = getIssuer(c)
+  const apiOrigin = getApiOrigin(c)
   return {
-    issuer,
-    authorization_endpoint: `${issuer}${MCP_OAUTH_PATH}/authorize`,
-    token_endpoint: `${issuer}${MCP_OAUTH_PATH}/token`,
-    registration_endpoint: `${issuer}${MCP_OAUTH_PATH}/register`,
-    revocation_endpoint: `${issuer}${MCP_OAUTH_PATH}/revoke`,
+    issuer: getIssuer(c),
+    authorization_endpoint: `${apiOrigin}${MCP_OAUTH_PATH}/authorize`,
+    token_endpoint: `${apiOrigin}${MCP_OAUTH_PATH}/token`,
+    registration_endpoint: `${apiOrigin}${MCP_OAUTH_PATH}/register`,
+    revocation_endpoint: `${apiOrigin}${MCP_OAUTH_PATH}/revoke`,
     scopes_supported: [MCP_OAUTH_SCOPE],
     response_types_supported: ['code'],
     response_modes_supported: ['query'],
@@ -243,8 +258,20 @@ export const app = new Hono<MiddlewareKeyVariables>()
 // ---------------------------------------------------------------------------
 app.get('/.well-known/oauth-protected-resource', c => c.json(protectedResourceMetadata(c)))
 app.get(`/.well-known/oauth-protected-resource${MCP_PATH}`, c => c.json(protectedResourceMetadata(c)))
-app.get('/.well-known/oauth-authorization-server', c => c.json(authorizationServerMetadata(c)))
-app.get(`/.well-known/oauth-authorization-server${MCP_PATH}`, c => c.json(authorizationServerMetadata(c)))
+
+/**
+ * RFC 8414 §3.3: metadata is only valid at the issuer's own well-known URL. When the issuer is another origin
+ * (production: https://capgo.app), that origin serves it and this API answers 404 here.
+ */
+function wellKnownAuthorizationServerMetadata(c: McpContext) {
+  if (getIssuer(c) !== getRequestOrigin(c))
+    return oauthError(c, 404, 'not_found', `Authorization server metadata is published by the issuer: ${getIssuer(c)}/.well-known/oauth-authorization-server`)
+  return c.json(authorizationServerMetadata(c))
+}
+app.get('/.well-known/oauth-authorization-server', wellKnownAuthorizationServerMetadata)
+app.get(`/.well-known/oauth-authorization-server${MCP_PATH}`, wellKnownAuthorizationServerMetadata)
+// Source the issuer origin (capgo.app) serves at its own /.well-known/oauth-authorization-server.
+app.get(`${MCP_OAUTH_PATH}/metadata`, c => c.json(authorizationServerMetadata(c)))
 
 // OpenAI plugin domain verification: the dashboard issues a token that must be served verbatim
 // (plain text, no JSON) from the MCP hostname before the server can be connected.
