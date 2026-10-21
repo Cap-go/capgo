@@ -88,7 +88,11 @@ export function createConsoleClient(authClient: Pick<SupabaseClient<Database>, '
           }
         }
         return (...operationArgs: unknown[]) => {
-          request.operations.push({ method, args: operationArgs })
+          // JSON turns undefined into null, which would defeat SDK default parameters on the server.
+          const args = [...operationArgs]
+          while (args.length && args[args.length - 1] === undefined)
+            args.pop()
+          request.operations.push({ method, args })
           return builder
         }
       },

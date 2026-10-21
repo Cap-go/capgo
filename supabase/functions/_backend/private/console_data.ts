@@ -47,16 +47,21 @@ app.post('/query', async (c) => {
   let query: any = request.kind === 'table'
     ? client.from(request.name as any)
     : client.rpc(request.name as any, ...request.args as [any, any])
-  for (const operation of request.operations)
+  for (const operation of request.operations) {
+    // The console client applies throwOnError itself; replaying it here would turn PostgREST errors into a 500.
+    if (operation.method === 'throwOnError')
+      continue
     query = query[operation.method](...operation.args)
+  }
   const { data, error, count, status } = await query
   return c.json({ data, error, count, status })
 })
 
 app.post('/images/upload', middlewareAuth, async (c) => {
-  const path = c.req.header('x-image-path')
-  if (!path || path.length > 1024)
+  const parsedPath = imagePathSchema.safeParse(c.req.header('x-image-path'))
+  if (!parsedPath.success)
     return quickError(400, 'invalid_path', 'Invalid image path')
+  const path = parsedPath.data
   const file = await c.req.arrayBuffer()
   if (file.byteLength > 5 * 1024 * 1024)
     return quickError(413, 'image_too_large', 'Image must be smaller than 5 MB')

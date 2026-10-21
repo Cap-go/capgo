@@ -54,6 +54,16 @@ describe('console image proxy', () => {
     expect(options.redirect).toBe('error')
   })
 
+  it('rejects traversal in upload paths before touching storage', async () => {
+    const response = await app.request('https://api.example.com/images/upload', {
+      method: 'POST',
+      headers: { 'x-image-path': '../other-bucket/x', 'content-type': 'image/png' },
+      body: 'bytes',
+    })
+    expect(response.status).toBe(400)
+    expect(mocks.client).not.toHaveBeenCalled()
+  })
+
   it('rejects traversal before making a storage request', async () => {
     const response = await app.request('https://api.example.com/images/read?path=..%2Fother-bucket%2Fsecret&token=fixture-capability')
     expect(response.status).toBe(400)

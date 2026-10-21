@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getAuthHeaders, getEndpointUrl, USER_ID } from './test-utils'
+import { getAuthHeaders, getEndpointUrl, USER_ID, USER_ID_NONMEMBER } from './test-utils'
 
 interface QueryResponse {
   data: unknown
@@ -38,19 +38,31 @@ describe('[POST] /private/console/query', () => {
     expect(typeof body.data).toBe('boolean')
   })
 
-  it('keeps RLS: another user\'s private rows are not returned', async () => {
+  it('keeps RLS: a user outside the caller\'s organizations is not visible', async () => {
     const response = await query({
       kind: 'table',
       name: 'users',
       args: [],
-      operations: [{ method: 'select', args: ['id'] }, { method: 'neq', args: ['id', USER_ID] }],
+      operations: [{ method: 'select', args: ['id'] }, { method: 'eq', args: ['id', USER_ID_NONMEMBER] }],
     }, await getAuthHeaders())
     expect(response.status).toBe(200)
     const body = await response.json() as QueryResponse
     expect(body.error).toBeNull()
-    // RLS limits users rows to the caller and members of their organizations, never every account.
-    expect(Array.isArray(body.data)).toBe(true)
-    expect((body.data as { id: string }[]).some(row => row.id === USER_ID)).toBe(false)
+    // The row exists, but RLS hides users who share no organization with the caller.
+    expect(body.data).toEqual([])
+  })
+
+  it('returns PostgREST errors in the body even when throwOnError was recorded', async () => {
+    const response = await query({
+      kind: 'table',
+      name: 'users',
+      args: [],
+      operations: [{ method: 'select', args: ['id'] }, { method: 'eq', args: ['id', USER_ID_NONMEMBER] }, { method: 'single', args: [] }, { method: 'throwOnError', args: [] }],
+    }, await getAuthHeaders())
+    expect(response.status).toBe(200)
+    const body = await response.json() as QueryResponse
+    expect(body.data).toBeNull()
+    expect(body.error?.code).toBe('PGRST116')
   })
 
   it('rejects tables outside the allowlist', async () => {

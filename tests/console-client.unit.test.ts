@@ -46,6 +46,17 @@ describe('console client transport', () => {
     })
   })
 
+  it('drops trailing undefined arguments so server defaults still apply', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ data: [], error: null, count: null, status: 200 }))
+    await client().from('apps').select('id', undefined as any).order('name', undefined as any).range(0, 9)
+    const [, init] = fetchMock.mock.calls[0]
+    expect(JSON.parse(init.body).operations).toEqual([
+      { method: 'select', args: ['id'] },
+      { method: 'order', args: ['name'] },
+      { method: 'range', args: [0, 9] },
+    ])
+  })
+
   it('sends rpc arguments and forwards the abort signal', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ data: true, error: null, count: null, status: 200 }))
     const controller = new AbortController()

@@ -18,22 +18,25 @@ export async function broadcastCLIEvent(
   payload: CLIActivityPayload,
 ): Promise<void> {
   // The console subscribes through /private/console/events (server-sent events).
+  // Both fan-outs start together so neither delays the other.
   const consoleEvents = c.env?.CONSOLE_EVENTS
-  if (consoleEvents) {
-    await consoleEvents.get(consoleEvents.idFromName(payload.org_id)).fetch('https://console-events/broadcast', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    }).catch(() => {})
-  }
+  const consoleBroadcast = consoleEvents
+    ? consoleEvents.get(consoleEvents.idFromName(payload.org_id)).fetch('https://console-events/broadcast', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }).catch(() => {})
+    : Promise.resolve()
 
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')
   const serviceRoleKey = getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')
-  if (!supabaseUrl || !serviceRoleKey)
+  if (!supabaseUrl || !serviceRoleKey) {
+    await consoleBroadcast
     return
+  }
 
   const channelName = `cli-events:org:${payload.org_id}`
 
-  await fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
+  const supabaseBroadcast = fetch(`${supabaseUrl}/realtime/v1/api/broadcast`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -50,4 +53,6 @@ export async function broadcastCLIEvent(
   }).catch(() => {
     // Silently ignore broadcast failures - this is non-critical
   })
+
+  await Promise.all([consoleBroadcast, supabaseBroadcast])
 }
