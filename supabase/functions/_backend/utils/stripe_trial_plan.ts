@@ -199,6 +199,19 @@ async function cancelAllPendingTrialPlanSchedules(c: Context, stripe: Stripe, cu
   return schedules.length
 }
 
+async function cancelPendingTrialPlanSchedulesExcept(
+  c: Context,
+  stripe: Stripe,
+  customerId: string,
+  keepScheduleId: string,
+  message: string,
+) {
+  const schedules = (await listPendingTrialPlanSchedules(stripe, customerId))
+    .filter(schedule => schedule.id !== keepScheduleId)
+  await cancelSchedules(c, stripe, customerId, schedules, message)
+  return schedules.length
+}
+
 // Describes the pending schedule as Stripe will bill it, whether or not the org would be
 // eligible to schedule a new one, so Billing always shows (and can cancel) a pending charge.
 async function summarizePendingSchedule(c: Context, ctx: InAppBillingContext, schedule: Stripe.SubscriptionSchedule): Promise<TrialPlanSummary | null> {
@@ -337,21 +350,19 @@ export async function scheduleTrialPlan(
   if (!await ensureDefaultPaymentMethod(ctx))
     throw simpleError('missing_payment_method', 'Add a card before starting the plan')
 
-  let existing: Stripe.SubscriptionSchedule | null = await findPendingTrialPlanSchedule(ctx.stripe, ctx.customerId)
-  if (existing) {
-    const phasePrice = existing.phases[0]?.items[0]?.price
-    const scheduledPriceId = typeof phasePrice === 'string' ? phasePrice : phasePrice?.id
-    // A different product means replace the pending schedule so the card starts the chosen plan.
-    if (scheduledPriceId && scheduledPriceId !== state.priceId) {
-      await cancelAllPendingTrialPlanSchedules(c, ctx.stripe, ctx.customerId, 'trial plan schedule replaced by plan change')
-      existing = null
-    }
-  }
-  if (!existing) {
+  const existing = await findPendingTrialPlanSchedule(ctx.stripe, ctx.customerId)
+  const existingPrice = existing?.phases[0]?.items[0]?.price
+  const existingPriceId = typeof existingPrice === 'string' ? existingPrice : existingPrice?.id
+  const needsReplacement = !!existing && !!existingPriceId && existingPriceId !== state.priceId
+  let notifiedNewSchedule = false
+
+  if (!existing || needsReplacement) {
     await ensureCustomerTaxAddress(ctx)
     const metadata = attributionMetadata(attribution)
     if (Object.keys(metadata).length)
       await ctx.stripe.customers.update(ctx.customerId, { metadata })
+    // Create the replacement before canceling any pending schedule so a Stripe failure
+    // leaves the previously confirmed automatic start intact.
     const schedule = await ctx.stripe.subscriptionSchedules.create({
       customer: ctx.customerId,
       start_date: Math.floor(state.startsAt.getTime() / 1000),
@@ -365,6 +376,16 @@ export async function scheduleTrialPlan(
       metadata: { [TRIAL_PLAN_SCHEDULE_METADATA_KEY]: 'true', org_id: orgId },
     })
     cloudlog({ requestId: c.get('requestId'), message: 'trial plan scheduled', orgId, scheduleId: schedule.id, startsAt: state.startsAt.toISOString(), productId: state.productId })
+    if (needsReplacement) {
+      await cancelPendingTrialPlanSchedulesExcept(
+        c,
+        ctx.stripe,
+        ctx.customerId,
+        schedule.id,
+        'trial plan schedule replaced by plan change',
+      )
+    }
+    notifiedNewSchedule = true
   }
   // No idempotency key (it would replay a canceled schedule): drop duplicates from concurrent
   // submits instead, on every call so a retry repairs a cleanup that failed earlier.
@@ -373,7 +394,7 @@ export async function scheduleTrialPlan(
   const summary = await getTrialPlanSummary(c, ctx)
   if (!summary)
     throw simpleError('trial_plan_unavailable', 'This organization is not on a free trial')
-  if (!existing)
+  if (notifiedNewSchedule)
     await notifyBento(c, orgId, c.get('auth')?.userId, true, summary)
   return summary
 }
