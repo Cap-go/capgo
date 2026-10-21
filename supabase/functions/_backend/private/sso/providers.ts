@@ -777,12 +777,15 @@ app.get('/:orgId/managed', async (c) => {
   const appId = c.req.query('app_id')
 
   const result = await withPgPool(c, async (pool) => {
+    // Set for app-scoped callers: the response is then limited to that app.
+    let scopedAppUuid: string | null = null
     if (!await checkPermission(c, 'org.read_members', { orgId })) {
       const ownedApp = appId
-        ? await pool.query('select 1 from public.apps where app_id = $1 and owner_org = $2', [appId, orgId])
+        ? await pool.query<{ id: string }>('select id from public.apps where app_id = $1 and owner_org = $2', [appId, orgId])
         : null
       if (!ownedApp?.rowCount || !await checkPermission(c, 'app.update_user_roles', { appId }))
         quickError(403, 'not_authorized', 'Not authorized')
+      scopedAppUuid = ownedApp!.rows[0].id
     }
 
     const { rows } = await pool.query<{ provider_id: string, role_mapping: unknown }>(
@@ -821,6 +824,11 @@ app.get('/:orgId/managed', async (c) => {
     )
     for (const { user_id, provider } of identities.rows) {
       const targets = targetsByProvider.get(provider)!
+      if (scopedAppUuid) {
+        if (targets.appIds.has(scopedAppUuid))
+          users[user_id] = { app_ids: [scopedAppUuid], group_ids: [] }
+        continue
+      }
       const user = users[user_id] ??= { app_ids: [], group_ids: [] }
       user.app_ids = [...new Set([...user.app_ids, ...targets.appIds])]
       user.group_ids = [...new Set([...user.group_ids, ...targets.groupIds])]
