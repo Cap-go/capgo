@@ -38,7 +38,7 @@ const price = computed(() => plan.value ? formatStripeAmount(plan.value.amount, 
 const date = computed(() => plan.value ? formatLocalDate(plan.value.startsAt) : '')
 
 function track(event: string) {
-  pushEvent(event, config.supaHost, { org_id: offerOrgId, source: props.source, plan: plan.value?.planName ?? '' })
+  pushEvent(event, config.apiHost, { org_id: offerOrgId, source: props.source, plan: plan.value?.planName ?? '' })
 }
 
 watch(() => props.orgId, (id) => {

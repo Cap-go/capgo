@@ -86,7 +86,7 @@ const pendingMilestone = computed(() => {
 function track(event: string) {
   if (!prompt.value)
     return
-  pushEvent(event, config.supaHost, {
+  pushEvent(event, config.apiHost, {
     org_id: prompt.value.orgId,
     milestone: prompt.value.milestone,
     trial_days_left: prompt.value.trialDaysLeft,
