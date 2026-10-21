@@ -368,7 +368,7 @@ describe('backup card', () => {
     expect(cards.card?.id).toBe('pm_main')
     expect(cards.backupCard).toBeNull()
 
-    await expect(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_back')).rejects.toThrow()
+    await expect(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_back')).rejects.toThrow('Subscription payment method is temporarily unknown')
     expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
   })
 
@@ -394,7 +394,7 @@ describe('backup card', () => {
 
     const cards = await getSavedCards(createContext(), createBillingContext(stripe))
     expect(cards.backupCard).toBeNull()
-    await expect(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_sub')).rejects.toThrow()
+    await expect(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_sub')).rejects.toThrow('Subscription payment method is temporarily unknown')
     expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
   })
 
@@ -404,7 +404,7 @@ describe('backup card', () => {
     mockSavedCards(stripe, main, [main, card('pm_back', 'fp_back')])
     mockActiveSubscription(null, false)
 
-    await expect(payInvoiceWithBackupCard(createContext(), stripe as any, 'cus_123', 'in_123', { chargeId: 'ch_1' })).rejects.toThrow()
+    await expect(payInvoiceWithBackupCard(createContext(), stripe as any, 'cus_123', 'in_123', { chargeId: 'ch_1' })).rejects.toThrow('Subscription payment method is temporarily unknown')
     expect(stripe.invoices.pay).not.toHaveBeenCalled()
   })
 })

@@ -322,7 +322,9 @@ export function parsePaymentMethodRole(value: unknown): PaymentMethodRole {
 export async function removeBackupCard(c: Context, ctx: InAppBillingContext, paymentMethodId: string) {
   const { backupPaymentMethod, spareCards, customerDefaultId, subscriptionKnown } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId)
   // Refuse until the subscription default is verified: an unknown lookup can mislabel it as backup.
-  if (!subscriptionKnown || !backupPaymentMethod || backupPaymentMethod.id !== paymentMethodId || paymentMethodId === customerDefaultId)
+  if (!subscriptionKnown)
+    throw simpleError('subscription_lookup_unknown', 'Subscription payment method is temporarily unknown')
+  if (!backupPaymentMethod || backupPaymentMethod.id !== paymentMethodId || paymentMethodId === customerDefaultId)
     throw simpleError('invalid_payment_method', 'This card is not the backup card')
   await ctx.stripe.paymentMethods.detach(paymentMethodId)
   // Older spare cards would otherwise become the next backup and keep fallback charging on.
