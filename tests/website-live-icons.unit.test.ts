@@ -87,9 +87,11 @@ describe('website live icons', () => {
 
     const fg = decode(set.androidForeground432)
     expect(pixel(fg, 10, 10)[3]).toBe(0)
-    // Icon lives in 72..360; the red square is its middle half: 144..288.
+    // Icon lives in the 264px safe zone 84..348; the red square is its middle half: 150..282.
     expect(pixel(fg, 216, 216)).toEqual([255, 0, 0, 255])
     expect(pixel(fg, 100, 100)[3]).toBe(0)
+    expect(pixel(fg, 147, 147)[3]).toBe(0)
+    expect(pixel(fg, 153, 153)).toEqual([255, 0, 0, 255])
 
     const preview = decode(set.preview256)
     expect(pixel(preview, 128, 128)).toEqual([255, 0, 0, 255])

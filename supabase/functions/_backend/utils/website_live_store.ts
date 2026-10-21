@@ -19,7 +19,7 @@ import {
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv } from './utils.ts'
 import { fetchPublicWebsite, isBlockedWebsiteHost } from './website_live_check.ts'
-import { generateWebsiteLiveIconSet } from './website_live_icons.ts'
+import { assertPng, generateWebsiteLiveIconSet, WEBSITE_LIVE_ICON_MIN_DIMENSION } from './website_live_icons.ts'
 
 export type StorePlatform = 'ios' | 'android'
 
@@ -362,9 +362,13 @@ async function findReusableIosCertificate(c: Context, ownerOrg: string, appId: s
 // Store key intake
 // ---------------------------------------------------------------------------
 
-export function assertStoreBundleId(appId: string): string {
+export function assertStoreBundleId(appId: string, platform: StorePlatform): string {
   if (!BUNDLE_ID_PATTERN.test(appId) || appId.length > 155) {
     throw simpleError('invalid_bundle_id', 'This app ID cannot be used as a store bundle ID. Use a reverse-domain ID such as com.company.app, with letters, digits and underscores only.', { app_id: appId })
+  }
+  // Android package names allow underscores; Apple bundle IDs only allow letters, digits, hyphens and dots.
+  if (platform === 'ios' && appId.includes('_')) {
+    throw simpleError('invalid_bundle_id', 'Apple bundle IDs cannot contain underscores. Use an app ID with letters and digits only, such as com.company.app, to publish on iOS.', { app_id: appId, platform })
   }
   return appId
 }
@@ -380,7 +384,7 @@ export async function saveIosCredentials(c: Context, input: {
   certificatePassword?: string
   provisioningProfileBase64?: string
 }): Promise<StoreCredentialSummary> {
-  const bundleId = assertStoreBundleId(input.app.app_id)
+  const bundleId = assertStoreBundleId(input.app.app_id, 'ios')
   const ascCreds = { keyId: input.ascKeyId, issuerId: input.ascIssuerId, privateKeyP8: input.ascPrivateKey }
   const verified = await verifyAscKey(ascCreds)
   if (!verified.ok)
@@ -491,7 +495,7 @@ export async function saveAndroidCredentials(c: Context, input: {
   storePassword?: string
   playServiceAccountJson?: string
 }): Promise<{ summary: StoreCredentialSummary, generatedKeystore: { keystoreBase64: string, keyAlias: string, password: string } | null }> {
-  assertStoreBundleId(input.app.app_id)
+  assertStoreBundleId(input.app.app_id, 'android')
   const existing = await getStoreSecret<AndroidStoreSecret>(c, input.app.app_id, 'android')
   let play: { clientEmail: string, projectId: string } | null = null
   if (input.playServiceAccountJson)
@@ -500,6 +504,7 @@ export async function saveAndroidCredentials(c: Context, input: {
   let secret: AndroidStoreSecret
   let fingerprints: { sha1: string | null, sha256: string | null } = { sha1: null, sha256: null }
   let generatedKeystore: { keystoreBase64: string, keyAlias: string, password: string } | null = null
+  let keepsExistingKey = false
 
   if (input.generateKeystore) {
     if (existing)
@@ -531,6 +536,7 @@ export async function saveAndroidCredentials(c: Context, input: {
   else if (existing) {
     // Only the Play service account changes; keep the signing key.
     secret = { ...existing, playServiceAccountJson: input.playServiceAccountJson ?? existing.playServiceAccountJson }
+    keepsExistingKey = true
     if (existing.playServiceAccountJson && !play)
       play = validatePlayServiceAccountJson(existing.playServiceAccountJson)
   }
@@ -547,12 +553,12 @@ export async function saveAndroidCredentials(c: Context, input: {
     metadata: {
       key_alias: secret.keyAlias,
       generated: secret.generated,
-      sha1: fingerprints.sha1 ?? (secret === existing ? existingSummary?.metadata.sha1 ?? null : null),
-      sha256: fingerprints.sha256 ?? (secret === existing ? existingSummary?.metadata.sha256 ?? null : null),
+      sha1: fingerprints.sha1 ?? (keepsExistingKey ? existingSummary?.metadata.sha1 ?? null : null),
+      sha256: fingerprints.sha256 ?? (keepsExistingKey ? existingSummary?.metadata.sha256 ?? null : null),
       play_client_email: play?.clientEmail ?? null,
       play_project_id: play?.projectId ?? null,
       // The console reminds users to download a generated key until they do.
-      exported_at: secret === existing ? existingSummary?.metadata.exported_at ?? null : null,
+      exported_at: keepsExistingKey ? existingSummary?.metadata.exported_at ?? null : null,
     },
   })
   return { summary, generatedKeystore }
@@ -626,14 +632,47 @@ export async function getIconPreviewUrl(c: Context, prefix: string | null): Prom
   return data.signedUrl
 }
 
+/** Read at most maxBytes, cancelling the stream as soon as a chunked body goes over the limit. */
 async function readLimited(response: Response, maxBytes: number): Promise<Uint8Array> {
   const declared = Number(response.headers.get('content-length') ?? '0')
-  if (declared > maxBytes)
-    throw simpleError('website_icon_too_large', 'The website icon is too large')
-  const body = new Uint8Array(await response.arrayBuffer())
-  if (body.byteLength > maxBytes)
-    throw simpleError('website_icon_too_large', 'The website icon is too large')
+  if (declared > maxBytes) {
+    await response.body?.cancel()
+    throw simpleError('website_file_too_large', 'The website file is too large')
+  }
+  if (!response.body)
+    return new Uint8Array(0)
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done)
+      break
+    total += value.byteLength
+    if (total > maxBytes) {
+      await reader.cancel()
+      throw simpleError('website_file_too_large', 'The website file is too large')
+    }
+    chunks.push(value)
+  }
+  const body = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
   return body
+}
+
+/** Usable icon candidate: a structurally valid PNG whose shorter side meets the icon minimum. */
+function isUsableIconPng(bytes: Uint8Array): boolean {
+  try {
+    const { width, height } = assertPng(bytes)
+    return Math.min(width, height) >= WEBSITE_LIVE_ICON_MIN_DIMENSION
+  }
+  catch {
+    return false
+  }
 }
 
 function sameOriginUrl(base: URL, href: string | null | undefined): URL | null {
@@ -671,7 +710,8 @@ export async function fetchWebsiteIcon(websiteUrl: string): Promise<Uint8Array> 
   const base = new URL(websiteUrl)
   if (base.protocol !== 'https:')
     throw simpleError('invalid_website_url', 'The website must use HTTPS')
-  const html = await fetchSameOrigin(base, base, MAX_WEBSITE_HTML_BYTES)
+  // A homepage that fails or is too large still leaves the /apple-touch-icon.png fallback.
+  const html = await fetchSameOrigin(base, base, MAX_WEBSITE_HTML_BYTES).catch(() => null)
   const candidates: { url: URL, size: number }[] = []
   if (html) {
     const text = new TextDecoder().decode(html)
@@ -708,7 +748,7 @@ export async function fetchWebsiteIcon(websiteUrl: string): Promise<Uint8Array> 
   candidates.sort((a, b) => b.size - a.size)
   for (const candidate of candidates) {
     const bytes = await fetchSameOrigin(base, candidate.url, MAX_WEBSITE_ICON_BYTES).catch(() => null)
-    if (bytes && bytes.length > 8 && bytes[0] === 0x89 && bytes[1] === 0x50)
+    if (bytes && isUsableIconPng(bytes))
       return bytes
   }
   throw simpleError('website_icon_not_found', 'No PNG icon of at least 512x512 was found on the website. Upload one instead.')
@@ -800,6 +840,32 @@ export function androidBuilderCredentials(secret: AndroidStoreSecret): Record<st
     KEYSTORE_STORE_PASSWORD: secret.storePassword,
     ...(secret.playServiceAccountJson ? { PLAY_CONFIG_JSON: bytesToBase64(textEncoder.encode(secret.playServiceAccountJson)) } : {}),
   }
+}
+
+/**
+ * Next store build number (Android versionCode / iOS CURRENT_PROJECT_VERSION).
+ * The stores reject a build number they already received, so each publish uses
+ * one more than the highest number recorded on previous Web2App builds for the
+ * platform. The build count covers older rows that did not record a number.
+ */
+export function nextWebsiteLiveVersionCode(previousBuildCount: number, lastVersionCode: unknown): number {
+  const last = Number(lastVersionCode)
+  return Math.max(previousBuildCount, Number.isSafeInteger(last) && last > 0 ? last : 0) + 1
+}
+
+export async function getNextWebsiteLiveVersionCode(c: Context, appId: string, platform: StorePlatform): Promise<number> {
+  return withDb(c, async (db) => {
+    const result = await db.execute(sql`
+      SELECT count(*)::integer AS build_count,
+        max(CASE WHEN build_config->>'version_code' ~ '^[0-9]{1,10}$' THEN (build_config->>'version_code')::bigint END) AS last_version_code
+      FROM public.build_requests
+      WHERE app_id = ${appId}
+        AND platform = ${platform}
+        AND build_config->>'source' = ${WEBSITE_LIVE_BUILD_SOURCE}
+    `)
+    const row = result.rows[0] as { build_count?: number | string, last_version_code?: number | string | null } | undefined
+    return nextWebsiteLiveVersionCode(Number(row?.build_count ?? 0), row?.last_version_code)
+  })
 }
 
 export function websiteLiveBuildOptions(platform: StorePlatform, submitForReview: boolean, hasPlayAccess: boolean) {

@@ -419,9 +419,9 @@ export function generateWebsiteLiveIconSet(source: Uint8Array, opts: WebsiteLive
   const androidLegacy192 = encodeRgb(compositeOpaque(premul192, 192 * 192, bg), 192)
   const androidRound192 = encodeRgba(circleMasked(premul192, 192, bg), 192)
 
-  // Adaptive icon foreground: 108dp canvas, 72dp (66%) safe zone -> 288px centered in 432px.
+  // Adaptive icon foreground: 108dp canvas, 66dp safe zone that no launcher mask clips -> 264px centered in 432px.
   const foreground = new Uint8ClampedArray(432 * 432 * 4)
-  unpremultiplyInto(resample(288), 288, foreground, 432, 72, 72)
+  unpremultiplyInto(resample(264), 264, foreground, 432, 84, 84)
   const androidForeground432 = encodeRgba(foreground, 432)
 
   const preview = new Uint8ClampedArray(256 * 256 * 4)

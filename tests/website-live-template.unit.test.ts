@@ -205,6 +205,14 @@ describe('website live template patching', () => {
     expect(modes.get('android/app/build.gradle')?.mode).toBe(0o100644)
   })
 
+  it('keeps $ replacement patterns in user values literal', () => {
+    const files = unzipSync(patchWebsiteLiveTemplate(buildTemplate(), input({ appName: 'Pay $& $$ $\' Go', websiteUrl: 'https://shop.example.org/?q=$&r=$$' })))
+    const text = (path: string) => strFromU8(files[path])
+    expect(text('ios/App/App/Info.plist')).toContain('<string>Pay $&amp; $$ $&apos; Go</string>')
+    expect(text('ios/App/App/public/index.html')).toContain('content="https://shop.example.org/?q=$&amp;r=$$"')
+    expect(text('capacitor.config.ts')).toContain('appName: \'Pay $& $$ $\\\' Go\'')
+  })
+
   it('copies untouched entries as raw compressed bytes', () => {
     const template = buildTemplate()
     const before = rawEntries(template)

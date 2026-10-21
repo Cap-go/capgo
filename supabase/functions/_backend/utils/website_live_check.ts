@@ -35,13 +35,35 @@ const MAX_HTML_BYTES = 2 * 1024 * 1024
 const MAX_REDIRECTS = 5
 const BLOCKED_HOST_SUFFIXES = ['.localhost', '.local', '.internal', '.lan', '.home.arpa']
 
-/** Hostnames the API must never fetch, even when they look like public domains. */
+/**
+ * Hostnames the API must never fetch, even when they look like public domains.
+ * IP literals are always refused: a Web2App website is a public domain with an
+ * HTTPS certificate, and refusing every IP literal also covers loopback,
+ * private, link-local, CGNAT and cloud metadata addresses (169.254.169.254,
+ * fd00:ec2::254) without a range table. WHATWG URL parsing already normalizes
+ * shorthand forms such as `https://2130706433/` or `https://0x7f.1/` to dotted
+ * IPv4, so they are caught here too. Single-label hosts (`metadata`, `kubernetes`)
+ * only resolve on internal networks and are refused as well.
+ */
 export function isBlockedWebsiteHost(hostname: string): boolean {
   const host = hostname.toLowerCase().replace(/\.$/, '')
+  if (!host || !host.includes('.') || host.includes(':') || host.startsWith('['))
+    return true
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host))
+    return true
   return host === 'localhost' || BLOCKED_HOST_SUFFIXES.some(suffix => host.endsWith(suffix))
 }
 
-/** Fetch with a timeout and manual redirects, rejecting redirects to blocked hosts or non-HTTPS URLs. */
+/**
+ * Fetch with a timeout and manual redirects. Every hop, including the first,
+ * must be HTTPS to a non-blocked host name without credentials, and at most
+ * MAX_REDIRECTS hops are followed.
+ *
+ * Limit: Workers and Supabase edge `fetch` resolve DNS themselves and do not
+ * expose the resolved address, so a public name that resolves to a private
+ * address (DNS rebinding) cannot be detected here. That case relies on the
+ * runtime's egress isolation from internal networks.
+ */
 export async function fetchPublicWebsite(url: string, init: { accept: string, timeoutMs?: number }, fetchImpl: FetchLike = fetch) {
   const signal = AbortSignal.timeout(init.timeoutMs ?? TIMEOUT_MS)
   let current = new URL(url)
@@ -93,10 +115,17 @@ function getAttribute(tag: string, name: string): string {
   return (match?.[1] ?? match?.[2] ?? match?.[3] ?? '').trim()
 }
 
+/** Invalid numeric entities (out of range or surrogates) decode to U+FFFD instead of throwing. */
+function fromCodePoint(point: number): string {
+  return Number.isInteger(point) && point >= 0 && point <= 0x10FFFF && (point < 0xD800 || point > 0xDFFF)
+    ? String.fromCodePoint(point)
+    : '\uFFFD'
+}
+
 function decodeHtml(value: string): string {
   return value
-    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
-    .replace(/&#x([\da-f]+);/gi, (_, code: string) => String.fromCodePoint(Number.parseInt(code, 16)))
+    .replace(/&#(\d+);/g, (_, code: string) => fromCodePoint(Number(code)))
+    .replace(/&#x([\da-f]+);/gi, (_, code: string) => fromCodePoint(Number.parseInt(code, 16)))
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, '\'')
     .replace(/&lt;/gi, '<')
@@ -118,7 +147,7 @@ function getSetCookieNames(headers: Headers): string[] {
   return values.map(value => value.split('=', 1)[0]?.trim() ?? '').filter(Boolean)
 }
 
-const SESSION_COOKIE = /^(?:phpsessid|jsessionid|asp\.net_sessionid|connect\.sid|sessionid|rack\.session|.*_session)$/i
+const SESSION_COOKIE = /^(?:phpsessid|jsessionid|asp\.net_sessionid|connect\.sid|sessionid|session|sid|rack\.session|.*_session)$/i
 
 function detectServerRendering(html: string, headers: Headers): string[] {
   const lower = html.toLowerCase()
@@ -130,7 +159,11 @@ function detectServerRendering(html: string, headers: Headers): string[] {
   const nextData = /<script\b[^>]*\sid=["']__NEXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i.exec(html)?.[1]
   if (nextData && /"(?:gssp|gip|appGip)"\s*:\s*true/.test(nextData))
     reasons.push('Next.js getServerSideProps data')
-  if (lower.includes('data-server-rendered') || lower.includes('__nuxt__'))
+  // `nuxt generate` output carries the same markers, plus a prerender/static payload
+  // flag; client-only Nuxt builds mark the payload as not server-rendered.
+  const nuxtStatic = lower.includes('prerenderedat') || lower.includes('staticassetsbase')
+    || /\bdata-ssr=["']false["']/.test(lower) || /\bserverrendered["']?\s*:\s*(?:false|!1)\b/.test(lower)
+  if ((lower.includes('data-server-rendered') || lower.includes('__nuxt__')) && !nuxtStatic)
     reasons.push('Nuxt server-rendered payload')
   if (lower.includes('__remix_context'))
     reasons.push('Remix server context')
@@ -216,7 +249,7 @@ export async function checkWebsiteLive(websiteUrl: string, fetchImpl: FetchLike 
       return result(root.href, finalUrl, 'unknown', [item('public_html', 'fail', true, `The website answered HTTP ${response.status}.`)])
     }
     const contentType = response.headers.get('content-type') ?? ''
-    if (!contentType.includes('text/html')) {
+    if (!/^\s*(?:text\/html|application\/xhtml\+xml)\s*(?:;|$)/i.test(contentType)) {
       await response.body?.cancel()
       return result(root.href, finalUrl, 'unknown', [item('public_html', 'fail', true, `The website did not return HTML (Content-Type: ${contentType || 'missing'}).`)])
     }
