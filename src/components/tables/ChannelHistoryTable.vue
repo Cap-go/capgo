@@ -445,7 +445,6 @@ watch([search, page], () => {
     :element-list="historyEntries"
     @update:search="search = $event"
     @update:current-page="page = $event"
-    @update:columns="columns = $event"
     @reload="fetchHistory"
   />
 

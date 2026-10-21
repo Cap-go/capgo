@@ -12,6 +12,9 @@ export default defineConfig(({ mode }) => ({
     },
   },
   test: {
+    // Vitest 5 defaults clearMocks to true; keep the v4 behavior so mock calls
+    // recorded while a test module is imported stay visible to its tests.
+    clearMocks: false,
     include: ['tests/*.test.ts'],
     // These raw PostgreSQL DDL/RBAC and direct PostgREST tests belong to the backend suite, not concurrent Worker integration tests.
     exclude: [

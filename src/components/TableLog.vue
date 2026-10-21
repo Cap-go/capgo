@@ -2,7 +2,7 @@
 import type { TableColumn } from './comp_def'
 import type { DateRangePreset } from '~/services/dateRange'
 import { FormKit } from '@formkit/vue'
-import { useDebounceFn, useNow } from '@vueuse/core'
+import { useDebounceFn, useIntervalFn, useNow } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconFastBackward from '~icons/ic/round-keyboard-double-arrow-left'
@@ -99,7 +99,7 @@ const filterButtonLabel = computed(() => {
 })
 const preciseDates = ref<[Date, Date] | null>(null)
 const rangeMode = ref<DateRangePreset>(TABLE_DATE_RANGE_DEFAULT)
-const now = useNow({ interval: 60_000 })
+const now = useNow({ scheduler: cb => useIntervalFn(cb, 60_000) })
 const logsMinDate = computed(() => new Date(now.value.getTime() - 30 * 24 * 60 * 60 * 1000))
 
 function clampLogsRange(start: Date, end: Date): [Date, Date] {

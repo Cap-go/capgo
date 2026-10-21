@@ -12,6 +12,9 @@ export default defineConfig(({ mode }) => ({
     },
   },
   test: {
+    // Vitest 5 defaults clearMocks to true; keep the v4 behavior so mock calls
+    // recorded while a test module is imported stay visible to its tests.
+    clearMocks: false,
     include: ['tests/*.test.ts'],
     environment: 'node',
     watch: false,

@@ -575,7 +575,7 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /stats', () => {
   // Run after the concurrent action matrix: Vitest schedules describe.concurrent /
   // it.concurrent cases while earlier sequential tests are still running, which
   // can exhaust the local edge isolate and surface Kong 502s with no /stats log line.
-  describe.sequential('version_usage channel attribution', () => {
+  describe('version_usage channel attribution', { concurrent: false }, () => {
     it('attributes version usage stats to the channel device override', async () => {
       const shortId = randomUUID().split('-')[0]
       const appId = `${APP_NAME}.stats.override.${shortId}`

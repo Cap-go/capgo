@@ -495,7 +495,6 @@ watch([() => props.channelId, () => props.bundleId, () => props.appId], () => {
     :element-list="deployHistory"
     @update:search="search = $event"
     @update:current-page="page = $event"
-    @update:columns="columns = $event"
     @reload="fetchDeployHistory"
   />
 </template>

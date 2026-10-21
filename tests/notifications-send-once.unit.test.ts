@@ -103,7 +103,7 @@ function createSendWriteClient() {
   }
 }
 
-describe.sequential('sendNotifOrgOnce', () => {
+describe('sendNotifOrgOnce', { concurrent: false }, () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.resetModules()
@@ -162,7 +162,7 @@ describe.sequential('sendNotifOrgOnce', () => {
   })
 })
 
-describe.sequential('sendNotifOrg', () => {
+describe('sendNotifOrg', { concurrent: false }, () => {
   beforeEach(() => {
     vi.resetAllMocks()
     vi.resetModules()
