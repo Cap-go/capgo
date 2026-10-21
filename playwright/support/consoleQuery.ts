@@ -79,6 +79,8 @@ export async function routeConsoleQuery(page: Page, name: string, handler: (rout
 export async function forwardConsoleQuery(route: Route, override: (row: any) => any) {
   const response = await route.fetch()
   const json = await response.json().catch(() => null) as { data?: unknown } | null
-  const data = json?.data
+  if (!json)
+    return route.fulfill({ response })
+  const data = json.data
   await route.fulfill({ response, json: { ...json, data: Array.isArray(data) ? data.map(override) : data == null ? data : override(data) } })
 }

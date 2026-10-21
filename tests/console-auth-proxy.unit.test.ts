@@ -72,6 +72,8 @@ describe('console auth relay', () => {
   it('rejects oversized bodies before contacting the auth provider', async () => {
     const response = await app.request('https://api.example.com/private/console/auth/signup', { method: 'POST', body: 'x'.repeat(70 * 1024) })
     expect(response.status).toBe(413)
+    const declared = await app.request('https://api.example.com/private/console/auth/signup', { method: 'POST', headers: { 'content-length': String(80 * 1024) }, body: '{}' })
+    expect(declared.status).toBe(413)
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

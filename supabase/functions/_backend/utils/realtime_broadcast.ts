@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import { cloudlog } from './logging.ts'
 import { getEnv } from './utils.ts'
 
 export interface CLIActivityPayload {
@@ -24,7 +25,7 @@ export async function broadcastCLIEvent(
     ? consoleEvents.get(consoleEvents.idFromName(payload.org_id)).fetch('https://console-events/broadcast', {
         method: 'POST',
         body: JSON.stringify(payload),
-      }).catch(() => {})
+      }).catch((error: unknown) => cloudlog({ requestId: c.get('requestId'), message: 'console events broadcast failed', org_id: payload.org_id, error: error instanceof Error ? error.message : String(error) }))
     : Promise.resolve()
 
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')

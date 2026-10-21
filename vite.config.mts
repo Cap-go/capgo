@@ -194,8 +194,8 @@ export default defineConfig({
       apply: 'build',
       generateBundle() {
         for (const id of this.getModuleIds()) {
-          if (/node_modules\/.*@supabase[+/]/.test(id))
-            this.error('The console must use the Capgo API instead of a Supabase SDK')
+          if (/node_modules[\\/].*@supabase[+\\/]/.test(id))
+            this.error(`The console must use the Capgo API instead of a Supabase SDK (imported via ${id})`)
         }
       },
     },

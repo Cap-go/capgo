@@ -31,11 +31,18 @@ const MOUNT = '/console/auth/'
 const RELAYED_REQUEST_HEADERS = ['accept', 'accept-language', 'content-type', 'user-agent', 'x-client-info', 'x-supabase-api-version']
 const RELAYED_RESPONSE_HEADERS = ['content-type', 'location', 'x-sb-error-code', 'retry-after']
 
+function trimTrailingSlashes(value: string) {
+  let end = value.length
+  while (end > 0 && value[end - 1] === '/')
+    end--
+  return value.slice(0, end)
+}
+
 export function consoleAuthPath(requestPath: string): string | null {
   const index = requestPath.indexOf(MOUNT)
   if (index < 0)
     return null
-  const path = requestPath.slice(index + MOUNT.length).replace(/\/+$/, '')
+  const path = trimTrailingSlashes(requestPath.slice(index + MOUNT.length))
   return ALLOWED_PATHS.some(pattern => pattern.test(path)) ? path : null
 }
 
@@ -48,7 +55,7 @@ app.all('/*', async (c) => {
     return quickError(404, 'unsupported_auth_endpoint', 'Unsupported auth endpoint')
 
   const anonKey = getEnv(c, 'SUPABASE_ANON_KEY')
-  const upstream = new URL(`${getEnv(c, 'SUPABASE_URL').replace(/\/+$/, '')}/auth/v1/${path}`)
+  const upstream = new URL(`${trimTrailingSlashes(getEnv(c, 'SUPABASE_URL'))}/auth/v1/${path}`)
   upstream.search = new URL(c.req.url).search
 
   const headers = new Headers()
@@ -72,6 +79,9 @@ app.all('/*', async (c) => {
 
   let body: ArrayBuffer | undefined
   if (c.req.method !== 'GET' && c.req.method !== 'HEAD') {
+    // Refuse declared oversize bodies before buffering anything; the read below bounds the rest.
+    if (Number(c.req.header('content-length') ?? 0) > MAX_BODY_BYTES)
+      return quickError(413, 'auth_request_too_large', 'Auth request too large')
     body = await c.req.arrayBuffer()
     if (body.byteLength > MAX_BODY_BYTES)
       return quickError(413, 'auth_request_too_large', 'Auth request too large')

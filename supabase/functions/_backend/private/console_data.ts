@@ -65,8 +65,9 @@ app.post('/images/upload', middlewareAuth, async (c) => {
     return quickError(400, 'invalid_path', 'Invalid image path')
   const path = parsedPath.data
   const file = await c.req.arrayBuffer()
-  if (file.byteLength > 5 * 1024 * 1024)
-    return quickError(413, 'image_too_large', 'Image must be smaller than 5 MB')
+  // Same ceiling the storage bucket applied before uploads went through the API.
+  if (file.byteLength > 50 * 1024 * 1024)
+    return quickError(413, 'image_too_large', 'Image must be smaller than 50 MB')
   const client = supabaseClient(c, c.get('authorization')!)
   const result = await client.storage.from('images').upload(path, file, {
     contentType: c.req.header('content-type') ?? 'application/octet-stream',
@@ -103,8 +104,14 @@ app.get('/images/read', async (c) => {
   const upstream = new URL(`/storage/v1/object/sign/images/${path}`, getEnv(c, 'SUPABASE_URL'))
   upstream.searchParams.set('token', query.data.token)
   const response = await fetch(upstream, { redirect: 'error', signal: AbortSignal.timeout(10000) })
-  if (!response.ok)
-    return quickError(response.status >= 500 ? 502 : response.status === 404 ? 404 : 403, 'image_unavailable', 'Image is unavailable')
+  if (!response.ok) {
+    let status = 403
+    if (response.status >= 500)
+      status = 502
+    else if (response.status === 404)
+      status = 404
+    return quickError(status, 'image_unavailable', 'Image is unavailable')
+  }
   return new Response(response.body as unknown as ReadableStream, {
     headers: {
       'Content-Type': response.headers.get('content-type') ?? 'application/octet-stream',

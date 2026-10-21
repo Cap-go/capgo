@@ -1,9 +1,6 @@
-import type { DurableObjectState } from '@cloudflare/workers-types'
-
 /** Ephemeral org-scoped CLI events fanned out as server-sent events; nothing is persisted. */
 export class ConsoleEvents {
-  private subscribers = new Map<ReadableStreamDefaultController<Uint8Array>, () => void>()
-  constructor(_state: DurableObjectState) {}
+  private readonly subscribers = new Map<ReadableStreamDefaultController<Uint8Array>, () => void>()
 
   async fetch(request: Request) {
     const encoder = new TextEncoder()
@@ -36,10 +33,12 @@ export class ConsoleEvents {
         controller.enqueue(encoder.encode(': connected\n\n'))
         heartbeat = setInterval(() => controller.enqueue(encoder.encode(': heartbeat\n\n')), 10000)
         // Every reconnect revalidates session revocation and organization access.
+        // Five minutes keeps that bound while making the reconnect gap, during which
+        // nothing is buffered, rare.
         timeout = setTimeout(() => {
           cleanup()
           controller.close()
-        }, 30000)
+        }, 5 * 60 * 1000)
       },
       cancel: cleanup,
     })

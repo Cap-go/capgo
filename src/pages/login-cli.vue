@@ -101,12 +101,16 @@ async function complete(): Promise<void> {
 function subscribe(orgIds: string[], session: string): Promise<boolean[]> {
   return Promise.all(orgIds.map(orgId => new Promise<boolean>((resolve) => {
     let settled = false
+    // The event stream may hang before reporting a status; never leave the page preparing forever.
+    let timer: ReturnType<typeof setTimeout> | undefined
     const finish = (connected: boolean) => {
       if (settled)
         return
       settled = true
+      clearTimeout(timer)
       resolve(connected)
     }
+    timer = setTimeout(() => finish(false), 15_000)
     const channel = capgo.channel(`cli-events:org:${orgId}`)
       .on('broadcast', { event: 'cli-activity' }, (message) => {
         if (isMatchingCliLoginEvent(message.payload, session))

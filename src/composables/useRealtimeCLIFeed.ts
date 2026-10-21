@@ -89,7 +89,7 @@ export function useRealtimeCLIFeed() {
 
   function unsubscribe() {
     if (currentChannel) {
-      capgo.removeChannel(currentChannel)
+      void capgo.removeChannel(currentChannel)
       currentChannel = null
       isConnected.value = false
     }

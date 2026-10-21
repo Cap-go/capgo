@@ -70,7 +70,7 @@ export function decodeJwtPayload(jwt: string): Record<string, any> | null {
   try {
     const base64 = payload.replace(/-/g, '+').replace(/_/g, '/')
     const text = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))
-    return JSON.parse(decodeURIComponent(Array.from(text, char => `%${char.charCodeAt(0).toString(16).padStart(2, '0')}`).join('')))
+    return JSON.parse(decodeURIComponent(Array.from(text, char => `%${(char.codePointAt(0) ?? 0).toString(16).padStart(2, '0')}`).join('')))
   }
   catch {
     return null
@@ -114,7 +114,10 @@ function captcha(token?: string) {
 }
 
 function withRedirect(path: string, redirectTo?: string) {
-  return redirectTo ? `${path}${path.includes('?') ? '&' : '?'}redirect_to=${encodeURIComponent(redirectTo)}` : path
+  if (!redirectTo)
+    return path
+  const separator = path.includes('?') ? '&' : '?'
+  return `${path}${separator}redirect_to=${encodeURIComponent(redirectTo)}`
 }
 
 export function createConsoleAuthClient(options: ConsoleAuthOptions) {
@@ -263,7 +266,7 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
     return (await getSession()).data.session?.access_token ?? null
   }
 
-  async function installSession(response: TokenResponse, event: AuthChangeEvent) {
+  function installSession(response: TokenResponse, event: AuthChangeEvent) {
     const session = toSession(response)
     save(session)
     emit(event, session)
@@ -335,7 +338,7 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
       })
       if (result.error || !result.data)
         return { data: null, error: result.error ?? sessionMissing() }
-      await installSession(result.data, 'MFA_CHALLENGE_VERIFIED')
+      installSession(result.data, 'MFA_CHALLENGE_VERIFIED')
       return { data: result.data, error: null }
     },
     async unenroll(params: { factorId: string }) {
@@ -389,6 +392,9 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
       const claims = decodeJwtPayload(token)
       if (!claims)
         return { data: null, error: new ConsoleAuthError('Invalid session token', 400, 'bad_jwt') }
+      // A session kept through a transient refresh failure must not count as signed in once its token expired.
+      if (typeof claims.exp === 'number' && claims.exp <= Date.now() / 1000)
+        return { data: null, error: new ConsoleAuthError('JWT has expired', 401, 'bad_jwt', 'AuthInvalidJwtError') }
       return { data: { claims, header: decodeJwtHeader(token) ?? {}, signature: token.split('.')[2] ?? '' }, error: null }
     },
     onAuthStateChange(callback: Listener) {
@@ -406,7 +412,7 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
       })
       if (result.error || !result.data)
         return { data: { user: null, session: null }, error: result.error ?? new ConsoleAuthError('Empty auth response', 500) }
-      const session = await installSession(result.data, 'SIGNED_IN')
+      const session = installSession(result.data, 'SIGNED_IN')
       return { data: { user: session.user, session, weakPassword: result.data.weak_password }, error: null }
     },
     async signUp(credentials: { email: string, password: string, options?: { captchaToken?: string, data?: Record<string, unknown>, emailRedirectTo?: string } }) {
@@ -416,7 +422,7 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
       if (result.error || !result.data)
         return { data: { user: null, session: null }, error: result.error ?? new ConsoleAuthError('Empty auth response', 500) }
       if ('access_token' in result.data) {
-        const session = await installSession(result.data, 'SIGNED_IN')
+        const session = installSession(result.data, 'SIGNED_IN')
         return { data: { user: session.user, session }, error: null }
       }
       return { data: { user: result.data, session: null }, error: null }
@@ -448,7 +454,7 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
       const { data, error } = await getUser(tokens.access_token)
       if (error || !data.user)
         return { data: { user: null, session: null }, error: error ?? sessionMissing() }
-      const session = await installSession({ ...tokens, user: data.user, expires_in: typeof exp === 'number' ? Math.max(0, Math.floor(exp - Date.now() / 1000)) : undefined, expires_at: typeof exp === 'number' ? exp : undefined }, 'SIGNED_IN')
+      const session = installSession({ ...tokens, user: data.user, expires_in: typeof exp === 'number' ? Math.max(0, Math.floor(exp - Date.now() / 1000)) : undefined, expires_at: typeof exp === 'number' ? exp : undefined }, 'SIGNED_IN')
       return { data: { user: session.user, session }, error: null }
     },
     async refreshSession(tokens?: { refresh_token: string }) {
@@ -465,7 +471,7 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
       store?.removeItem(CODE_VERIFIER_STORAGE_KEY)
       if (result.error || !result.data)
         return { data: { user: null, session: null }, error: result.error ?? new ConsoleAuthError('Empty auth response', 500) }
-      const session = await installSession(result.data, 'SIGNED_IN')
+      const session = installSession(result.data, 'SIGNED_IN')
       return { data: { user: session.user, session }, error: null }
     },
     async updateUser(attributes: { email?: string, password?: string, current_password?: string, data?: Record<string, unknown>, nonce?: string }, options: { emailRedirectTo?: string } = {}) {

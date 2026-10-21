@@ -25,10 +25,11 @@ export const install: UserModule = () => {
 
   useConsole().auth.onAuthStateChange((event, session) => {
     // Never bind an admin's device to the customer they are logged in as.
-    const previousUserId = userId
-    userId = session?.user?.id && !isSpoofed() ? session.user.id : null
-    // Defer: calling the auth client from inside its own callback must not re-enter it.
+    // Defer: calling the auth client from inside its own callback must not re-enter it,
+    // and the spoof marker is written only after setSession resolves.
     setTimeout(() => {
+      const previousUserId = userId
+      userId = session?.user?.id && !isSpoofed() ? session.user.id : null
       if (event === 'SIGNED_OUT' || (previousUserId && previousUserId !== userId))
         void unregisterNativeNotifications(event === 'SIGNED_OUT').then(() => registerWhenActive())
       else

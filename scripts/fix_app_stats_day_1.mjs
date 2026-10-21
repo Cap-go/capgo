@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = 'https://sb.capgo.app'
 const supabaseAnonKey = '***'
 
-export function useConsole() {
+export function useSupabase() {
   const options = {
     // const options: SupabaseClientOptions = {
     autoRefreshToken: true,
@@ -15,7 +15,7 @@ export function useConsole() {
 }
 
 async function updateOrAppStats(increment, date_id, user_id) {
-  const supabase = useConsole()
+  const supabase = useSupabase()
   const { data: dataAppStats } = await supabase
     .from('app_stats')
     .select()
@@ -42,7 +42,7 @@ async function updateOrAppStats(increment, date_id, user_id) {
 }
 
 async function fix_apps() {
-  const supabase = useConsole()
+  const supabase = useSupabase()
 
   const { data } = await supabase
     .from('apps')

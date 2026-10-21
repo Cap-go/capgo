@@ -109,6 +109,13 @@ describe('console client transport', () => {
     const write = await client().from('apps').update({ name: 'x' } as any).eq('id', 'app-1')
     expect(write.error).toBeInstanceOf(FunctionsHttpError)
     expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    // An RPC that mutates is never replayed either, whatever its arguments.
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'booting' }, 503))
+    const rpcWrite = await client().rpc('transfer_app', { p_app_id: 'app-1' } as any)
+    expect(rpcWrite.error).toBeInstanceOf(FunctionsHttpError)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('omits the bearer when there is no session', async () => {

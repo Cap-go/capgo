@@ -1,8 +1,8 @@
-import type { AuthChangeEvent, AuthError, ConsoleDataClient, ConsoleQuery, Factor, FunctionInvokeOptions, RealtimeChannel, Session, User } from '../../supabase/functions/_backend/utils/console_contract'
+import type { ConsoleDataClient, ConsoleQuery, FunctionInvokeOptions, RealtimeChannel } from '../../supabase/functions/_backend/utils/console_contract'
 import type { Database } from '~/types/database.types'
 import { createConsoleAuthClient, resolveConsoleApiBase } from '~/services/consoleAuth'
 
-export type { AuthChangeEvent, AuthError, Factor, RealtimeChannel, Session, User }
+export type { AuthChangeEvent, AuthError, Factor, RealtimeChannel, Session, User } from '../../supabase/functions/_backend/utils/console_contract'
 
 /**
  * Console transport to the Capgo API (VITE_API_HOST).
@@ -39,6 +39,8 @@ function resolveBaseURL() {
 const EVENTS_MAX_BACKOFF_MS = 30_000
 const QUERY_RETRIES = 2
 const MUTATIONS = new Set(['insert', 'update', 'upsert', 'delete'])
+// RPCs are replayed on transient failures only when their name says they read.
+const READ_RPC = /^(?:get|is|check|count|find|verify|rbac_check)_/
 
 // A request that never reached the API (network drop) or hit a booting/overloaded
 // edge (503) can be replayed safely for reads; mutations are never replayed.
@@ -50,6 +52,29 @@ function isTransientQueryFailure(error: Error): boolean {
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function readEventStream(body: ReadableStream<Uint8Array>, onEvent: (payload: unknown) => void) {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  try {
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done)
+        break
+      buffer += decoder.decode(value, { stream: true })
+      for (let end = buffer.indexOf('\n\n'); end >= 0; end = buffer.indexOf('\n\n')) {
+        const event = buffer.slice(0, end)
+        buffer = buffer.slice(end + 2)
+        if (event.startsWith('data: '))
+          onEvent(JSON.parse(event.slice(6)))
+      }
+    }
+  }
+  finally {
+    reader.releaseLock()
+  }
 }
 
 export function createConsoleClient(options: { persistSession?: boolean } = {}) {
@@ -68,13 +93,16 @@ export function createConsoleClient(options: { persistSession?: boolean } = {}) 
       if (token && !headers.has('Authorization'))
         headers.set('Authorization', `Bearer ${token}`)
       const binary = opts.body instanceof Blob || opts.body instanceof FormData || opts.body instanceof ArrayBuffer
+      let body: BodyInit | undefined
+      if (opts.body != null)
+        body = binary || typeof opts.body === 'string' ? opts.body as BodyInit : JSON.stringify(opts.body)
       if (opts.body != null && !binary && !headers.has('Content-Type'))
         headers.set('Content-Type', 'application/json')
       const response = await fetch(`${baseURL}/${path.replace(/^\//, '')}`, {
         method: opts.method ?? 'POST',
         headers,
         signal: opts.signal,
-        body: opts.body == null ? undefined : binary || typeof opts.body === 'string' ? opts.body as BodyInit : JSON.stringify(opts.body),
+        body,
       })
       if (!response.ok)
         return { data: null, error: new FunctionsHttpError(response) }
@@ -96,7 +124,8 @@ export function createConsoleClient(options: { persistSession?: boolean } = {}) 
       get(_target, method: string) {
         if (method === 'then') {
           execution ??= (async () => {
-            const retries = request.operations.some(operation => MUTATIONS.has(operation.method)) ? 0 : QUERY_RETRIES
+            const mutates = request.kind === 'rpc' ? !READ_RPC.test(request.name) : request.operations.some(operation => MUTATIONS.has(operation.method))
+            const retries = mutates ? 0 : QUERY_RETRIES
             let result = await invoke<any>('private/console/query', { body: request, signal })
             for (let attempt = 0; attempt < retries; attempt++) {
               if (!result.error || !isTransientQueryFailure(result.error) || signal?.aborted)
@@ -129,7 +158,7 @@ export function createConsoleClient(options: { persistSession?: boolean } = {}) 
         return (...operationArgs: unknown[]) => {
           // JSON turns undefined into null, which would defeat SDK default parameters on the server.
           const args = [...operationArgs]
-          while (args.length && args[args.length - 1] === undefined)
+          while (args.length && args.at(-1) === undefined)
             args.pop()
           request.operations.push({ method, args })
           return builder
@@ -137,29 +166,6 @@ export function createConsoleClient(options: { persistSession?: boolean } = {}) 
       },
     })
     return builder
-  }
-
-  async function readEventStream(body: ReadableStream<Uint8Array>, onEvent: (payload: unknown) => void) {
-    const reader = body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    try {
-      for (;;) {
-        const { value, done } = await reader.read()
-        if (done)
-          break
-        buffer += decoder.decode(value, { stream: true })
-        for (let end = buffer.indexOf('\n\n'); end >= 0; end = buffer.indexOf('\n\n')) {
-          const event = buffer.slice(0, end)
-          buffer = buffer.slice(end + 2)
-          if (event.startsWith('data: '))
-            onEvent(JSON.parse(event.slice(6)))
-        }
-      }
-    }
-    finally {
-      reader.releaseLock()
-    }
   }
 
   // One subscription attempt: 'ok' when the server closed a healthy stream,

@@ -911,7 +911,9 @@ Also applies to dialog/Teleport content, admin filters, and hidden utility input
   import, `sb.capgo.app`/`*.supabase.co` host, anon key, or `/rest/v1`,
   `/auth/v1`, `/storage/v1` URL may appear under `src/`; the word "Supabase"
   must not appear there either. `tests/console-no-supabase.unit.test.ts` and
-  the `console-api-only` Vite build plugin enforce this.
+  the `console-api-only` Vite build plugin enforce this (the only allowed
+  exception is `src/utils/safeRedirect.ts`, which names the legacy
+  `/auth/v1/verify` path to rewrite email links onto the API relay).
 - `useConsole()` (`src/services/console.ts`) returns the console client
   (`src/services/consoleClient.ts`). Its `from`/`rpc`, storage, realtime and
   `functions.invoke` calls go to `/private/console/*`
