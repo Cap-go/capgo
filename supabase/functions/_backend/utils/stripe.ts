@@ -360,7 +360,8 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 
     if (subscriptionData) {
       if (subscriptionData.status === 'canceled') {
-        if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date())
+        // Paid access runs to period end, but a never-paid trial plan grants none.
+        if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date() && !subscriptionData.trialPlanFirstInvoiceUnpaid)
           dbStatus = 'succeeded'
       }
       else if (subscriptionData.trialPlanFirstInvoiceUnpaid) {

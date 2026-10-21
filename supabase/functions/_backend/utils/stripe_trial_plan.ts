@@ -58,8 +58,10 @@ async function loadTrialState(c: Context, ctx: InAppBillingContext): Promise<Tri
     .maybeSingle()
   if (error)
     throw error
-  // Orgs that already subscribed manage their plan through checkout, not this flow.
-  if (!info?.product_id || info.status === 'succeeded')
+  // Orgs that already subscribed manage their plan through checkout, not this flow. A linked
+  // subscription counts even when a failed charge left the status at failed.
+  const hasLiveSubscription = !!info?.subscription_id && info.status !== 'canceled' && info.status !== 'deleted'
+  if (!info?.product_id || info.status === 'succeeded' || hasLiveSubscription)
     return null
   const startsAt = getTrialPlanStartDate(info.trial_at)
   if (!startsAt)
@@ -269,6 +271,19 @@ export async function cancelTrialPlanScheduleForSubscription(c: Context, stripe:
     return
   await stripe.subscriptionSchedules.cancel(schedule.id)
   cloudlog({ requestId: c.get('requestId'), message: 'trial plan schedule replaced by subscription', customerId, scheduleId: schedule.id, subscriptionId: subscription.id })
+}
+
+// A trial plan subscription whose first invoice never got paid (e.g. Stripe gave up on it).
+export async function isTrialPlanFirstInvoiceUnpaid(stripe: Stripe, subscription: Stripe.Subscription) {
+  if (!isTrialPlanSubscription(subscription))
+    return false
+  const invoiceId = typeof subscription.latest_invoice === 'string' ? subscription.latest_invoice : subscription.latest_invoice?.id
+  if (!invoiceId)
+    return true
+  const invoice = typeof subscription.latest_invoice === 'object' && subscription.latest_invoice
+    ? subscription.latest_invoice
+    : await stripe.invoices.retrieve(invoiceId)
+  return invoice.billing_reason === 'subscription_create' && invoice.status !== 'paid'
 }
 
 export function isTrialPlanSubscription(subscription: Stripe.Subscription) {

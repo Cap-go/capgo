@@ -24,7 +24,7 @@ import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
 import { ensureCustomerMetadata, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionCharge, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
 import { buildTransferInvoiceFooter, getStripeCustomerEmailFromEvent, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
 import type { TrialPlanFirstInvoiceState } from '../utils/stripe_trial_plan.ts'
-import { cancelTrialPlanScheduleForSubscription, isTrialPlanSubscription, settleTrialPlanFirstInvoice } from '../utils/stripe_trial_plan.ts'
+import { cancelTrialPlanScheduleForSubscription, isTrialPlanFirstInvoiceUnpaid, isTrialPlanSubscription, settleTrialPlanFirstInvoice } from '../utils/stripe_trial_plan.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { trackUsChargeRefunded, trackUsChargeSucceeded } from '../utils/us_revenue_tracking.ts'
@@ -1685,7 +1685,10 @@ async function handleCanceledSubscriptionStripeEvent(
     return null
   }
 
-  if (stripeData.data.subscription_anchor_end && new Date(stripeData.data.subscription_anchor_end) > new Date()) {
+  // Paid access runs to period end, but a never-paid trial plan grants none.
+  const neverPaidTrialPlan = (stripeEvent.type === 'customer.subscription.deleted' || stripeEvent.type === 'customer.subscription.updated')
+    && await isTrialPlanFirstInvoiceUnpaid(getStripe(c, getWebhookBillingAccount(c)), stripeEvent.data.object)
+  if (!neverPaidTrialPlan && stripeData.data.subscription_anchor_end && new Date(stripeData.data.subscription_anchor_end) > new Date()) {
     stripeData.data.status = 'succeeded'
   }
   const updateData = toStripeInfoUpdate(stripeData.data)

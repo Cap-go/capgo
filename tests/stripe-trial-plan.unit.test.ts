@@ -2,6 +2,7 @@ import type Stripe from 'stripe'
 import { describe, expect, it, vi } from 'vitest'
 import {
   cancelDuplicateTrialPlanSchedules,
+  isTrialPlanFirstInvoiceUnpaid,
   releaseTrialPlanSchedule,
   cancelTrialPlanScheduleForSubscription,
   findPendingTrialPlanSchedule,
@@ -153,16 +154,48 @@ describe('trial plan schedule release', () => {
 
   it('treats a schedule released concurrently as done', async () => {
     let released = false
+    const release = vi.fn(async () => {
+      released = true
+      throw new Error('schedule already released')
+    })
     const stripe = {
       subscriptions: { retrieve: vi.fn(async (id: string) => ({ id, schedule: 'sub_sched_1' })) },
       subscriptionSchedules: {
         retrieve: vi.fn(async (id: string) => ({ id, status: released ? 'released' : 'active', metadata: { capgo_trial_plan: 'true' } })),
-        release: vi.fn(async () => {
-          released = true
-          throw new Error('schedule already released')
-        }),
+        release,
       },
     } as unknown as Stripe
     await expect(releaseTrialPlanSchedule(context, stripe, 'sub_1')).resolves.toBeUndefined()
+    expect(release).toHaveBeenCalledWith('sub_sched_1')
+  })
+
+  it('still fails when the schedule is active after a failed release', async () => {
+    const stripe = {
+      subscriptions: { retrieve: vi.fn(async (id: string) => ({ id, schedule: 'sub_sched_1' })) },
+      subscriptionSchedules: {
+        retrieve: vi.fn(async (id: string) => ({ id, status: 'active', metadata: { capgo_trial_plan: 'true' } })),
+        release: vi.fn(async () => {
+          throw new Error('stripe down')
+        }),
+      },
+    } as unknown as Stripe
+    await expect(releaseTrialPlanSchedule(context, stripe, 'sub_1')).rejects.toThrow('stripe down')
+  })
+})
+
+describe('never-paid trial plan', () => {
+  function stripeWithInvoice(invoice: Partial<Stripe.Invoice>) {
+    return { invoices: { retrieve: vi.fn(async () => invoice) } } as unknown as Stripe
+  }
+
+  it('flags a trial plan whose first invoice was never paid', async () => {
+    expect(await isTrialPlanFirstInvoiceUnpaid(stripeWithInvoice({ billing_reason: 'subscription_create', status: 'uncollectible' }), trialSubscription)).toBe(true)
+  })
+
+  it('does not flag a paid first invoice, a renewal, or another subscription', async () => {
+    expect(await isTrialPlanFirstInvoiceUnpaid(stripeWithInvoice({ billing_reason: 'subscription_create', status: 'paid' }), trialSubscription)).toBe(false)
+    expect(await isTrialPlanFirstInvoiceUnpaid(stripeWithInvoice({ billing_reason: 'subscription_cycle', status: 'open' }), trialSubscription)).toBe(false)
+    const other = { id: 'sub_2', latest_invoice: 'in_2', metadata: {} } as unknown as Stripe.Subscription
+    expect(await isTrialPlanFirstInvoiceUnpaid(stripeWithInvoice({ billing_reason: 'subscription_create', status: 'open' }), other)).toBe(false)
   })
 })
