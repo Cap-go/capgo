@@ -198,18 +198,37 @@ function toReplicationLagSeconds(value: unknown): number | null {
 }
 
 /**
- * Query replication lag from the REPLICA database using pg_stat_subscription.
- * Uses the existing pool - no new connections.
+ * Replica lag SQL: logical subscriber (pg_stat_subscription) or physical
+ * standby (replay position / timestamp). Same query as
+ * plugin_runtime/utils/replicaFreshness.ts, duplicated on purpose (runtime
+ * isolation, see plugin_runtime/README.md): keep both in sync.
+ */
+const REPLICA_LAG_QUERY = `
+  SELECT CASE
+    WHEN pg_is_in_recovery() THEN
+      CASE
+        WHEN pg_last_wal_receive_lsn() IS NOT NULL
+          AND pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn()
+          AND EXISTS (SELECT 1 FROM pg_stat_wal_receiver WHERE pid IS NOT NULL AND (status IS NULL OR status = 'streaming'))
+          THEN 0
+        ELSE EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))
+      END
+    ELSE (
+      SELECT MAX(EXTRACT(EPOCH FROM (now() - last_msg_receipt_time)))
+      FROM pg_stat_subscription
+      WHERE last_msg_receipt_time IS NOT NULL
+    )
+  END AS lag_seconds
+`
+
+/**
+ * Query replication lag from the REPLICA database (see REPLICA_LAG_QUERY:
+ * logical subscriber and physical standbys). Uses the existing pool - no new
+ * connections.
  */
 async function queryReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagStatus> {
   try {
-    const query = `
-      SELECT MAX(EXTRACT(EPOCH FROM (now() - last_msg_receipt_time))) AS lag_seconds
-      FROM pg_stat_subscription
-      WHERE last_msg_receipt_time IS NOT NULL
-    `
-
-    const result = await pool.query(query)
+    const result = await pool.query(REPLICA_LAG_QUERY)
     const lagSeconds = toReplicationLagSeconds(result.rows[0]?.lag_seconds)
 
     let status: ReplicationStatus = 'unknown'
