@@ -150,7 +150,9 @@ function publishSymlink(linkPath: string, targetPath: string): void {
     renameSync(tmpLink, linkPath)
   }
   catch (error) {
-    // Workdirs created before snapshots hold a real directory here, which rename cannot replace.
+    // Workdirs created by pre-snapshot builds of this script hold a real directory here, which
+    // rename cannot replace. Move it aside in one rename (readers never see a half-deleted copy),
+    // publish the link, and only then delete the old copy.
     let isLegacyDir = false
     try {
       isLegacyDir = lstatSync(linkPath).isDirectory()
@@ -160,8 +162,18 @@ function publishSymlink(linkPath: string, targetPath: string): void {
       rmSync(tmpLink, { force: true })
       throw error
     }
-    rmSync(linkPath, { force: true, recursive: true })
-    renameSync(tmpLink, linkPath)
+    const legacyPath = `${linkPath}.legacy-${process.pid}-${Date.now()}`
+    try {
+      renameSync(linkPath, legacyPath)
+      renameSync(tmpLink, linkPath)
+    }
+    catch (migrationError) {
+      rmSync(tmpLink, { force: true })
+      // A concurrent run may have migrated first; accept it only if it published the same link.
+      if (!(lstatSync(linkPath, { throwIfNoEntry: false })?.isSymbolicLink() && readlinkSync(linkPath) === target))
+        throw migrationError
+    }
+    rmSync(legacyPath, { force: true, recursive: true })
   }
 }
 
