@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import { ALLOWED_STATS_ACTIONS } from '../plugins/stats_actions.ts'
 import { PROVIDER_INFRA_ASNS } from './providerAsns.ts'
+import { capEdgeCacheTtlForReplicaLag } from './replicaFreshness.ts'
 import { updatesAppCacheTag, updatesVersionsCacheTag } from './updatesCacheTag.ts'
 import { hasUpdatesPurgeTarget, parseEdgeShareBps } from './updatesEdgeCache.ts'
 import { getEnv, isListedLimitedApp } from './utils.ts'
@@ -132,11 +133,13 @@ function fillBase(c: Context, appId: string, blockProviderInfraRequests: boolean
   if (bps <= 0)
     return null
   // A trial ends at midnight UTC without a write, so without a purge.
-  const ttl = planValidUntil === null
+  const planTtl = planValidUntil === null
     ? getSnippetEdgeAnswerTtlSeconds(c)
     : Math.min(getSnippetEdgeAnswerTtlSeconds(c), Math.floor((planValidUntil - Date.now()) / 1000))
-  if (ttl < 1)
+  if (planTtl < 1)
     return null
+  // The answer was read from the local replica: same lag rule as the worker cache.
+  const ttl = capEdgeCacheTtlForReplicaLag(c, planTtl)
   const base: SnippetFillBase = {
     v: 2,
     bps,

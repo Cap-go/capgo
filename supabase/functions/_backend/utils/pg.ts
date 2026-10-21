@@ -8,6 +8,7 @@ import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
 import { Client, Pool } from 'pg'
 import { closePrimaryReadClient, configureTransactionAccessMode, getPgAccessMode, inheritPgAccessMode, isPrimaryReadSession, readOnlyStartupOptions, restrictPrimaryReadClient } from '../plugin_runtime/utils/pg_transaction_mode.ts'
+import { REPLICA_LAG_QUERY } from '../plugin_runtime/utils/replicaFreshness.ts'
 import { serializePostgresError } from '../plugin_runtime/utils/postgres_error.ts'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
@@ -198,18 +199,13 @@ function toReplicationLagSeconds(value: unknown): number | null {
 }
 
 /**
- * Query replication lag from the REPLICA database using pg_stat_subscription.
- * Uses the existing pool - no new connections.
+ * Query replication lag from the REPLICA database (see REPLICA_LAG_QUERY:
+ * logical subscriber and physical standbys). Uses the existing pool - no new
+ * connections.
  */
 async function queryReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagStatus> {
   try {
-    const query = `
-      SELECT MAX(EXTRACT(EPOCH FROM (now() - last_msg_receipt_time))) AS lag_seconds
-      FROM pg_stat_subscription
-      WHERE last_msg_receipt_time IS NOT NULL
-    `
-
-    const result = await pool.query(query)
+    const result = await pool.query(REPLICA_LAG_QUERY)
     const lagSeconds = toReplicationLagSeconds(result.rows[0]?.lag_seconds)
 
     let status: ReplicationStatus = 'unknown'

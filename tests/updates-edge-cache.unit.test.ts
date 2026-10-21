@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { purgeLocalTaggedKeys } from '../supabase/functions/_backend/plugin_runtime/utils/cache.ts'
 import { createLazyPgClient, getDrizzleClient, getEffectiveDeviceChannelNamePostgres, getLazyPgQueryCount, isLazyPgConnectError } from '../supabase/functions/_backend/plugin_runtime/utils/pg.ts'
 import { getAppOwnerWithEdgeCache, getAppVersionWithEdgeCache, getChannelByNameWithEdgeCache, getCompatibleChannelsWithEdgeCache } from '../supabase/functions/_backend/plugin_runtime/utils/pluginEdgeCacheReads.ts'
+import { resetReplicationLagMemory, setReplicationLagMemoryEntry } from '../supabase/functions/_backend/plugin_runtime/utils/replicaFreshness.ts'
 import { updatesCacheTagForScope } from '../supabase/functions/_backend/plugin_runtime/utils/updatesCacheTag.ts'
 import { getCachedAppOwner, getCachedAppVersion, getCachedChannelLookup, getCachedDefaultChannel, getUpdatesEdgeCacheBps, getUpdatesEdgeCacheTtlSeconds, isUpdatesEdgeCacheEnabled, planValidityTtlCapSeconds, shouldUseUpdatesEdgeCache, updatesAppCacheTag, updatesCacheTags, updatesEdgeCacheBucket, updatesVersionsCacheTag } from '../supabase/functions/_backend/plugin_runtime/utils/updatesEdgeCache.ts'
 import { chunk, drainUpdatesCachePurge, purgeUpdatesCacheTags, resetPurgeZoneCache, shouldForwardPurge } from '../supabase/functions/_backend/triggers/updates_cache_purge.ts'
@@ -155,6 +156,31 @@ describe('updates edge cache', () => {
     const [stored] = [...store.values()]
     expect(stored.headers.get('Cache-Tag')).toBe('capgo-updates-com.example.app')
     expect(stored.headers.get('Cache-Control')).toBe('public, s-maxage=3600')
+  })
+
+  it('caches a refill from a lagging or unmeasured replica for 30s only', async () => {
+    const { store } = stubCaches()
+    const base = makeContext()
+    const c = { ...base, get: (key: string) => key === 'databaseSource' ? 'HYPERDRIVE_CAPGO_READ_OC' : base.get(key) }
+    const ttlOf = async (appId: string) => {
+      await getCachedAppOwner(c, appId, 'mau', vi.fn().mockResolvedValue({ owner_org: 'org-1', plan_valid: true }))
+      return [...store.values()].at(-1)!.headers.get('Cache-Control')
+    }
+    try {
+      // No lag figure in this isolate yet.
+      await expect(ttlOf('com.example.unmeasured')).resolves.toBe('public, s-maxage=30')
+      // The OC incident: the replica is minutes behind after the last re-purge.
+      setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_OC', { status: 'lagging', max_lag_seconds: 2400 })
+      await expect(ttlOf('com.example.lagging')).resolves.toBe('public, s-maxage=30')
+      // Within the 180s 'ok' threshold but past the edge cache bound.
+      setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_OC', { status: 'ok', max_lag_seconds: 90 })
+      await expect(ttlOf('com.example.slow')).resolves.toBe('public, s-maxage=30')
+      setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_OC', { status: 'ok', max_lag_seconds: 2 })
+      await expect(ttlOf('com.example.fresh')).resolves.toBe('public, s-maxage=3600')
+    }
+    finally {
+      resetReplicationLagMemory()
+    }
   })
 
   it('caches a missing app for a shorter time', async () => {

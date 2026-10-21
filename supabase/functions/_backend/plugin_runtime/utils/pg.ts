@@ -18,6 +18,8 @@ import { serializePostgresError, serializePostgresLogValue } from './postgres_er
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
 import { resolveRolloutDecision } from './rollout.ts'
+import type { ReplicationLagStatus, ReplicationStatus } from './replicaFreshness.ts'
+import { getFreshReplicationLagMemoryEntry, getReplicationLagCacheKey, REPLICA_LAG_QUERY, REPLICATION_LAG_CACHE_TTL_SECONDS, setReplicationLagMemoryEntry } from './replicaFreshness.ts'
 import { shouldRequireReadReplica, shouldSkipDirectHyperdriveFallback } from './supabase_write_guard.ts'
 import { getCachedChannelLookup, updatesCacheTags } from './updatesEdgeCache.ts'
 
@@ -34,10 +36,6 @@ export type PluginPgClient = Client | Pool
 const skipEndClients = new WeakSet<object>()
 
 const REPLICATION_LAG_THRESHOLD_SECONDS = 180
-const REPLICATION_LAG_CACHE_TTL_SECONDS = 60
-const REPLICATION_LAG_CACHE_TTL_MS = REPLICATION_LAG_CACHE_TTL_SECONDS * 1000
-
-type ReplicationStatus = 'ok' | 'lagging' | 'unknown'
 export interface ChannelLookupResult { id: number, name: string, allow_device_self_set: boolean, public: boolean, owner_org: string }
 export type PlanAction = 'mau' | 'storage' | 'bandwidth'
 type ReadReplicaHyperdriveBinding
@@ -51,16 +49,6 @@ type ReadReplicaHyperdriveBinding
     | 'HYPERDRIVE_CAPGO_READ_AF'
     | 'HYPERDRIVE_CAPGO_READ_HK'
 
-interface ReplicationLagStatus {
-  status: ReplicationStatus
-  max_lag_seconds: number | null
-}
-
-interface ReplicationLagCacheEntry extends ReplicationLagStatus {
-  expiresAt: number
-}
-
-const replicationLagMemoryCache = new Map<string, ReplicationLagCacheEntry>()
 // Scoped per request: awaiting a lag probe started by another request can
 // hang once that request's I/O context ends.
 const replicationLagInflightByRequest = new WeakMap<Context, Map<string, Promise<ReplicationLagStatus>>>()
@@ -151,31 +139,6 @@ function fixSupabaseHost(host: string): string {
   return host
 }
 
-function getReplicationLagCacheKey(c: Context): string {
-  return String(c.get('databaseSource') ?? c.res.headers.get('X-Database-Source') ?? 'unknown')
-}
-
-function getFreshReplicationLagMemoryEntry(cacheKey: string, now = Date.now()): ReplicationLagStatus | null {
-  const cached = replicationLagMemoryCache.get(cacheKey)
-  if (!cached)
-    return null
-  if (cached.expiresAt <= now) {
-    replicationLagMemoryCache.delete(cacheKey)
-    return null
-  }
-  return {
-    status: cached.status,
-    max_lag_seconds: cached.max_lag_seconds,
-  }
-}
-
-function setReplicationLagMemoryEntry(cacheKey: string, status: ReplicationLagStatus, expiresAt = Date.now() + REPLICATION_LAG_CACHE_TTL_MS) {
-  replicationLagMemoryCache.set(cacheKey, {
-    ...status,
-    expiresAt,
-  })
-}
-
 function toReplicationLagSeconds(value: unknown): number | null {
   if (value === null || value === undefined)
     return null
@@ -184,18 +147,12 @@ function toReplicationLagSeconds(value: unknown): number | null {
 }
 
 /**
- * Query replication lag from the REPLICA database using pg_stat_subscription.
+ * Query replication lag from the REPLICA database (see REPLICA_LAG_QUERY).
  * Uses the existing pool - no new connections.
  */
 async function queryReplicaLag(c: Context, pool: PluginPgClient): Promise<ReplicationLagStatus> {
   try {
-    const query = `
-      SELECT MAX(EXTRACT(EPOCH FROM (now() - last_msg_receipt_time))) AS lag_seconds
-      FROM pg_stat_subscription
-      WHERE last_msg_receipt_time IS NOT NULL
-    `
-
-    const result = await pool.query(query)
+    const result = await pool.query(REPLICA_LAG_QUERY)
     const lagSeconds = toReplicationLagSeconds(result.rows[0]?.lag_seconds)
 
     let status: ReplicationStatus = 'unknown'
@@ -232,7 +189,7 @@ async function getCachedReplicaLag(c: Context, pool: PluginPgClient): Promise<Re
 
   const cacheHelper = new CacheHelper(c)
   const cacheRequest = cacheHelper.buildRequest('/cache/replication-lag', { source: cacheKey })
-  const cachedEntry = await cacheHelper.matchJson<ReplicationLagCacheEntry>(cacheRequest)
+  const cachedEntry = await cacheHelper.matchJson<ReplicationLagStatus & { expiresAt: number }>(cacheRequest)
 
   if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
     const cachedStatus = {
@@ -249,7 +206,7 @@ async function getCachedReplicaLag(c: Context, pool: PluginPgClient): Promise<Re
 
   const query = queryReplicaLag(c, pool)
     .then(async (status) => {
-      const expiresAt = Date.now() + REPLICATION_LAG_CACHE_TTL_MS
+      const expiresAt = Date.now() + REPLICATION_LAG_CACHE_TTL_SECONDS * 1000
       setReplicationLagMemoryEntry(cacheKey, status, expiresAt)
       await cacheHelper.putJson(cacheRequest, { ...status, expiresAt }, REPLICATION_LAG_CACHE_TTL_SECONDS)
       return status
