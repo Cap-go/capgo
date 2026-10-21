@@ -6,9 +6,12 @@ import { translationStyleGuide } from './style_guides.ts'
 const CACHE_TTL_SECONDS = 5 * 60
 const PENDING_TRANSLATION_STORE_TTL_SECONDS = 60 * 60
 const READY_TRANSLATION_STORE_TTL_SECONDS = 7 * 24 * 60 * 60
-// Picked from a French benchmark against Workers AI models: best quality per cost and
-// fast with thinking disabled. See the PR introducing it for the before/after table.
-const DEFAULT_TRANSLATION_MODEL = '@cf/deepseek-ai/deepseek-v4.1-flash-1017'
+// Picked from a French benchmark against Workers AI models (see the PR introducing it):
+// Gemma 4 drafts with thinking disabled, then gpt-oss-120b reviews against the style
+// guide. Both stay on the default 300 requests/minute tier; paid-plan models such as
+// DeepSeek V4 are capped at 20, too low for re-translating 14 locales at once.
+const DEFAULT_TRANSLATION_MODEL = '@cf/google/gemma-4-26b-a4b-it'
+const DEFAULT_TRANSLATION_REVIEW_MODEL = '@cf/openai/gpt-oss-120b'
 // Bump when the prompt, style guides or default models change so every locale is
 // translated again instead of serving catalogs made by the previous pipeline.
 const TRANSLATION_PIPELINE_VERSION = 2
@@ -256,8 +259,10 @@ function getTranslationModel(env: TranslationWorkerBindings) {
   return env.TRANSLATION_MODEL || DEFAULT_TRANSLATION_MODEL
 }
 
+// TRANSLATION_REVIEW_MODEL overrides the reviewer; "none" skips the review pass.
 function getTranslationReviewModel(env: TranslationWorkerBindings) {
-  return env.TRANSLATION_REVIEW_MODEL?.trim() || null
+  const reviewModel = env.TRANSLATION_REVIEW_MODEL?.trim() || DEFAULT_TRANSLATION_REVIEW_MODEL
+  return reviewModel === 'none' ? null : reviewModel
 }
 
 function modelRequestOptions(model: string) {
@@ -451,8 +456,14 @@ function parseTranslationObject(value: unknown): Record<string, string> | null {
   return null
 }
 
+// Some models emit typographic hyphens and spaces (U+2011, U+202F) that break search and copy-paste.
+function normalizeTranslatedText(text: string) {
+  return text.replace(/\u2011/g, '-').replace(/\u202F/g, '\u00A0')
+}
+
 function keepTranslation(source: string, translated: unknown) {
-  const candidate = unwrapTranslatedMessage(translated)
+  const unwrapped = unwrapTranslatedMessage(translated)
+  const candidate = unwrapped ? normalizeTranslatedText(unwrapped) : null
   if (!candidate)
     return source
 
@@ -628,8 +639,8 @@ async function runTranslationRequest(ai: AiBinding, model: string, request: unkn
   throw lastError ?? new Error('Message translation failed')
 }
 
-// Optional second pass (TRANSLATION_REVIEW_MODEL): a reviewer model fixes the draft
-// against the same style guide. A failed review keeps the draft instead of failing the batch.
+// Second pass: a reviewer model fixes the draft against the same style guide.
+// A failed review keeps the draft instead of failing the batch.
 async function reviewTranslatedBatch(ai: AiBinding, reviewModel: string, targetLanguage: string, batch: MessageEntry[], drafts: Record<string, string>) {
   try {
     const reviewed = await runTranslationRequest(ai, reviewModel, reviewRequest(targetLanguage, batch, drafts), batch, {
@@ -1517,6 +1528,7 @@ export const __translationWorkerTestUtils__ = {
   buildBatches,
   claimedTranslationBatchIndex,
   escapeVueI18nAtSigns,
+  getTranslationReviewModel,
   isReadyTranslationFresh,
   isTranslationBatchLeaseExpired,
   keepTranslation,

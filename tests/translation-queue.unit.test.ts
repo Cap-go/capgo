@@ -113,6 +113,16 @@ describe('translation queue helpers', () => {
       .toEqual({ channel: 'Canal', save: 'Enregistrer' })
   })
 
+  it.concurrent('reviews with gpt-oss by default and lets env override or disable it', () => {
+    expect(__translationWorkerTestUtils__.getTranslationReviewModel({})).toBe('@cf/openai/gpt-oss-120b')
+    expect(__translationWorkerTestUtils__.getTranslationReviewModel({ TRANSLATION_REVIEW_MODEL: '@cf/custom/model' })).toBe('@cf/custom/model')
+    expect(__translationWorkerTestUtils__.getTranslationReviewModel({ TRANSLATION_REVIEW_MODEL: 'none' })).toBeNull()
+  })
+
+  it.concurrent('replaces typographic non-breaking hyphens in translations', () => {
+    expect(__translationWorkerTestUtils__.keepTranslation('Are you sure?', 'Êtes\u2011vous sûr ?')).toBe('Êtes-vous sûr ?')
+  })
+
   it.concurrent('keeps source text when translation drops a placeholder', () => {
     expect(__translationWorkerTestUtils__.keepTranslation('Used {count} times', 'Utilise plusieurs fois')).toBe('Used {count} times')
   })
