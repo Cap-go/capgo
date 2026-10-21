@@ -282,10 +282,29 @@ export async function scheduleTrialPlan(c: Context, ctx: InAppBillingContext, or
 }
 
 export async function cancelTrialPlan(c: Context, ctx: InAppBillingContext, orgId: string) {
-  const summary = await getTrialPlanSummary(c, ctx)
+  // Cancel before enriching the summary so a temporary Stripe/price error cannot leave the charge active.
+  const schedule = await findPendingTrialPlanSchedule(ctx.stripe, ctx.customerId)
   const canceled = await cancelAllPendingTrialPlanSchedules(c, ctx.stripe, ctx.customerId, 'trial plan schedule canceled')
   if (!canceled)
-    return summary
+    return getTrialPlanSummary(c, ctx)
+  let summary: TrialPlanSummary | null = null
+  if (schedule) {
+    try {
+      summary = await summarizePendingSchedule(c, ctx, schedule)
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'trial plan cancel summary enrichment failed', orgId, error })
+      const phase = schedule.phases[0]
+      summary = {
+        planName: '',
+        amount: 0,
+        currency: 'usd',
+        interval: 'month',
+        startsAt: phase ? new Date(phase.start_date * 1000).toISOString() : new Date().toISOString(),
+        scheduled: true,
+      }
+    }
+  }
   const next = summary ? { ...summary, scheduled: false } : null
   if (next)
     await notifyBento(c, orgId, c.get('auth')?.userId, false, next)

@@ -2,6 +2,7 @@ import type Stripe from 'stripe'
 import { describe, expect, it, vi } from 'vitest'
 import {
   cancelDuplicateTrialPlanSchedules,
+  cancelTrialPlan,
   isTrialPlanFirstInvoiceUnpaid,
   releaseTrialPlanSchedule,
   cancelTrialPlanScheduleForSubscription,
@@ -220,5 +221,39 @@ describe('pending schedule pagination', () => {
     const stripe = { subscriptionSchedules: { list, cancel } } as unknown as Stripe
     expect((await findPendingTrialPlanSchedule(stripe, 'cus_1'))?.id).toBe('sub_sched_late')
     expect(list).toHaveBeenNthCalledWith(2, { customer: 'cus_1', limit: 100, starting_after: 'sub_sched_other' })
+  })
+})
+
+describe('cancel trial plan', () => {
+  it('cancels the schedule even when price enrichment fails', async () => {
+    const schedule = {
+      id: 'sub_sched_trial',
+      status: 'not_started',
+      created: 1,
+      metadata: { capgo_trial_plan: 'true' },
+      phases: [{ start_date: 1_735_689_600, items: [{ price: 'price_1' }] }],
+    }
+    const cancel = vi.fn(async (id: string) => ({ id }))
+    const list = vi.fn(async () => ({ data: [schedule], has_more: false }))
+    const retrieve = vi.fn(async () => {
+      throw new Error('stripe price unavailable')
+    })
+    const stripe = {
+      subscriptionSchedules: { list, cancel },
+      prices: { retrieve },
+    } as unknown as Stripe
+    const ctx = { stripe, customerId: 'cus_1' } as any
+    const result = await cancelTrialPlan(context, ctx, 'org_1')
+    expect(cancel).toHaveBeenCalledWith('sub_sched_trial')
+    expect(retrieve).toHaveBeenCalled()
+    expect(cancel.mock.invocationCallOrder[0]).toBeLessThan(retrieve.mock.invocationCallOrder[0])
+    expect(result).toEqual({
+      planName: '',
+      amount: 0,
+      currency: 'usd',
+      interval: 'month',
+      startsAt: '2025-01-01T00:00:00.000Z',
+      scheduled: false,
+    })
   })
 })
