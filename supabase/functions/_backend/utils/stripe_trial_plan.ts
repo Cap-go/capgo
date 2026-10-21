@@ -275,17 +275,20 @@ export function isTrialPlanSubscription(subscription: Stripe.Subscription) {
   return subscription.metadata?.[TRIAL_PLAN_SCHEDULE_METADATA_KEY] === 'true'
 }
 
+// first_paid: the first invoice is paid (convert). unpaid: still waiting for it.
+// renewal: a later invoice, handled by the normal subscription flow.
+export type TrialPlanFirstInvoiceState = 'first_paid' | 'unpaid' | 'renewal'
+
 // A schedule-born subscription is active before its first invoice is paid (Stripe finalizes it
 // about an hour later). Charge it now and only let the org convert once it is paid; on failure
 // the subscription goes past_due and the regular dunning flow takes over.
-export async function settleTrialPlanFirstInvoice(c: Context, stripe: Stripe, subscription: Stripe.Subscription): Promise<boolean> {
+export async function settleTrialPlanFirstInvoice(c: Context, stripe: Stripe, subscription: Stripe.Subscription): Promise<TrialPlanFirstInvoiceState> {
   const invoiceId = typeof subscription.latest_invoice === 'string' ? subscription.latest_invoice : subscription.latest_invoice?.id
   if (!invoiceId)
-    return false
+    return 'unpaid'
   let invoice = await stripe.invoices.retrieve(invoiceId)
-  // Renewals follow the normal subscription flow.
   if (invoice.billing_reason !== 'subscription_create')
-    return true
+    return 'renewal'
   try {
     if (invoice.status === 'draft')
       invoice = await stripe.invoices.finalizeInvoice(invoice.id)
@@ -298,12 +301,12 @@ export async function settleTrialPlanFirstInvoice(c: Context, stripe: Stripe, su
     invoice = await stripe.invoices.retrieve(invoiceId)
   }
   if (invoice.status !== 'paid')
-    return false
+    return 'unpaid'
   // The schedule only existed to start the plan: release it so plan changes and
   // cancellation work like any other subscription.
   if (subscription.schedule)
     await releaseTrialPlanSchedule(c, stripe, subscription.id)
-  return true
+  return 'first_paid'
 }
 
 // Stripe rejects direct updates to a subscription a schedule still manages. Release the
@@ -317,6 +320,15 @@ export async function releaseTrialPlanSchedule(c: Context, stripe: Stripe, subsc
   const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId)
   if (schedule.metadata?.[TRIAL_PLAN_SCHEDULE_METADATA_KEY] !== 'true' || (schedule.status !== 'active' && schedule.status !== 'not_started'))
     return
-  await stripe.subscriptionSchedules.release(scheduleId)
+  try {
+    await stripe.subscriptionSchedules.release(scheduleId)
+  }
+  catch (error) {
+    // A concurrent caller (webhook settlement vs. in-app cancel) may have released it first.
+    const latest = await stripe.subscriptionSchedules.retrieve(scheduleId)
+    if (latest.status === 'active' || latest.status === 'not_started')
+      throw error
+    return
+  }
   cloudlog({ requestId: c.get('requestId'), message: 'trial plan schedule released', subscriptionId, scheduleId })
 }

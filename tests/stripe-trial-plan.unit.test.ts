@@ -104,27 +104,27 @@ describe('trial plan schedules', () => {
 describe('trial plan first invoice', () => {
   it('charges the draft first invoice and converts once it is paid', async () => {
     const { stripe, finalizeInvoice, pay } = fakeInvoiceStripe({ id: 'in_1', status: 'draft', billing_reason: 'subscription_create' }, 'paid')
-    expect(await settleTrialPlanFirstInvoice(context, stripe, trialSubscription)).toBe(true)
+    expect(await settleTrialPlanFirstInvoice(context, stripe, trialSubscription)).toBe('first_paid')
     expect(finalizeInvoice).toHaveBeenCalledWith('in_1')
     expect(pay).toHaveBeenCalledWith('in_1', { off_session: true })
   })
 
   it('does not convert while the first invoice is unpaid', async () => {
     const { stripe, release } = fakeInvoiceStripe({ id: 'in_1', status: 'draft', billing_reason: 'subscription_create' }, 'declined')
-    expect(await settleTrialPlanFirstInvoice(context, stripe, trialSubscription)).toBe(false)
+    expect(await settleTrialPlanFirstInvoice(context, stripe, trialSubscription)).toBe('unpaid')
     expect(release).not.toHaveBeenCalled()
   })
 
   it('releases the schedule once paid so the subscription can be canceled normally', async () => {
     const { stripe, release } = fakeInvoiceStripe({ id: 'in_1', status: 'draft', billing_reason: 'subscription_create' }, 'paid')
     const scheduled = { ...trialSubscription, schedule: 'sub_sched_trial' } as unknown as Stripe.Subscription
-    expect(await settleTrialPlanFirstInvoice(context, stripe, scheduled)).toBe(true)
+    expect(await settleTrialPlanFirstInvoice(context, stripe, scheduled)).toBe('first_paid')
     expect(release).toHaveBeenCalledWith('sub_sched_trial')
   })
 
   it('leaves renewals to the normal subscription flow', async () => {
     const { stripe, pay } = fakeInvoiceStripe({ id: 'in_1', status: 'open', billing_reason: 'subscription_cycle' }, 'declined')
-    expect(await settleTrialPlanFirstInvoice(context, stripe, trialSubscription)).toBe(true)
+    expect(await settleTrialPlanFirstInvoice(context, stripe, trialSubscription)).toBe('renewal')
     expect(pay).not.toHaveBeenCalled()
   })
 })
@@ -149,5 +149,20 @@ describe('trial plan schedule release', () => {
     const { stripe, release } = stripeWithSchedule({})
     await releaseTrialPlanSchedule(context, stripe, 'sub_1')
     expect(release).not.toHaveBeenCalled()
+  })
+
+  it('treats a schedule released concurrently as done', async () => {
+    let released = false
+    const stripe = {
+      subscriptions: { retrieve: vi.fn(async (id: string) => ({ id, schedule: 'sub_sched_1' })) },
+      subscriptionSchedules: {
+        retrieve: vi.fn(async (id: string) => ({ id, status: released ? 'released' : 'active', metadata: { capgo_trial_plan: 'true' } })),
+        release: vi.fn(async () => {
+          released = true
+          throw new Error('schedule already released')
+        }),
+      },
+    } as unknown as Stripe
+    await expect(releaseTrialPlanSchedule(context, stripe, 'sub_1')).resolves.toBeUndefined()
   })
 })
