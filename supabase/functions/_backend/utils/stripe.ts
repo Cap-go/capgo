@@ -14,6 +14,7 @@ import {
   isStripeConfiguredForAccount,
   planProductIdOrFilter,
   resolveCheckoutPlanProductId,
+  TRIAL_PLAN_SCHEDULE_METADATA_KEY,
 } from './stripe_billing.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv, isStripeConfigured, trimTrailingSlashes } from './utils.ts'
@@ -264,7 +265,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
 
     // Retrieve the specific subscription from Stripe
     const subscription = await stripeContext.stripe.subscriptions.retrieve(subscriptionId, {
-      expand: ['items.data.price'], // Correct expand path for retrieve
+      expand: ['items.data.price', 'latest_invoice'], // Correct expand path for retrieve
     })
 
     cloudlog({
@@ -281,10 +282,17 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
     const cycleEnd = stripeTimestampToIso(currentItem?.current_period_end)
     const canceledAt = getSubscriptionEndDate(subscription, currentItem)
 
+    // A trial plan subscription only converts once its first invoice is paid (see stripe_trial_plan.ts).
+    const latestInvoice = typeof subscription.latest_invoice === 'object' ? subscription.latest_invoice : null
+    const trialPlanFirstInvoiceUnpaid = subscription.metadata?.[TRIAL_PLAN_SCHEDULE_METADATA_KEY] === 'true'
+      && latestInvoice?.billing_reason === 'subscription_create'
+      && latestInvoice.status !== 'paid'
+
     return {
       productId,
       extraMau: getExtraMau(subscription.items.data),
       status: subscription.status,
+      trialPlanFirstInvoiceUnpaid,
       cycleStart,
       cycleEnd,
       canceledAt,
@@ -352,8 +360,13 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 
     if (subscriptionData) {
       if (subscriptionData.status === 'canceled') {
-        if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date())
+        // Paid access runs to period end, but a never-paid trial plan grants none.
+        if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date() && !subscriptionData.trialPlanFirstInvoiceUnpaid)
           dbStatus = 'succeeded'
+      }
+      else if (subscriptionData.trialPlanFirstInvoiceUnpaid) {
+        // Live in Stripe but never paid: keep the org non-paying, as the webhook does.
+        dbStatus = 'failed'
       }
       else if (subscriptionData.status === 'active' || subscriptionData.status === 'trialing' || subscriptionData.status === 'past_due') {
         dbStatus = 'succeeded'

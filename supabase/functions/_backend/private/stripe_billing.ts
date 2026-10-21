@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Permission } from '../utils/rbac.ts'
 import { Hono } from 'hono/tiny'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { cloudlogErr } from '../utils/logging.ts'
 import { middlewareAuth } from '../utils/hono_jwt.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import {
@@ -22,6 +23,7 @@ import {
   savePaymentMethodFromIntent,
   scheduleSubscriptionCancel,
 } from '../utils/stripe_in_app.ts'
+import { cancelTrialPlan, getTrialPlanSummary, scheduleTrialPlan } from '../utils/stripe_trial_plan.ts'
 import { supabaseClient } from '../utils/supabase.ts'
 
 // In-app billing: replaces the Stripe billing portal and hosted invoice page.
@@ -37,6 +39,12 @@ interface PaymentMethodBody extends OrgBody {
 
 interface RemovePaymentMethodBody extends OrgBody {
   paymentMethodId?: string
+}
+
+interface TrialPlanBody extends OrgBody {
+  affonsoReferral?: unknown
+  datafastVisitorId?: unknown
+  datafastSessionId?: unknown
 }
 
 interface CancelBody extends OrgBody {
@@ -76,13 +84,46 @@ app.use('*', useCors)
 app.post('/overview', middlewareAuth, async (c) => {
   const body = await parseBody<OrgBody>(c)
   const ctx = await resolveBillingContext(c, body.orgId, 'org.read_billing')
-  const [{ card, backupCard }, subscription, invoices, openInvoice] = await Promise.all([
+  const [{ card, backupCard }, subscription, invoices, openInvoice, trialPlan] = await Promise.all([
     getSavedCards(c, ctx),
     getSubscriptionSummary(c, ctx),
     listInvoices(ctx),
     getOpenInvoiceSummary(c, ctx),
+    getTrialPlanSummary(c, ctx).catch((error) => {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'overview trial plan failed', orgId: body.orgId, error })
+      return null
+    }),
   ])
-  return c.json({ publishableKey: ctx.publishableKey, card, backupCard, subscription, invoices, openInvoice })
+  return c.json({ publishableKey: ctx.publishableKey, card, backupCard, subscription, invoices, openInvoice, trialPlan })
+})
+
+// Trial card prompt: card on file and the onboarding plan that starts when the trial ends.
+app.post('/trial-plan', middlewareAuth, async (c) => {
+  const body = await parseBody<OrgBody>(c)
+  const ctx = await resolveBillingContext(c, body.orgId, 'org.update_billing')
+  const [cards, plan] = await Promise.all([getSavedCards(c, ctx), getTrialPlanSummary(c, ctx)])
+  return c.json({ card: cards.card, plan })
+})
+
+function optionalString(value: unknown) {
+  return typeof value === 'string' ? value : undefined
+}
+
+app.post('/trial-plan/schedule', middlewareAuth, async (c) => {
+  const body = await parseBody<TrialPlanBody>(c)
+  const ctx = await resolveBillingContext(c, body.orgId, 'org.update_billing')
+  const plan = await scheduleTrialPlan(c, ctx, body.orgId!, {
+    affonsoReferral: optionalString(body.affonsoReferral),
+    datafastVisitorId: optionalString(body.datafastVisitorId),
+    datafastSessionId: optionalString(body.datafastSessionId),
+  })
+  return c.json({ plan })
+})
+
+app.post('/trial-plan/cancel', middlewareAuth, async (c) => {
+  const body = await parseBody<OrgBody>(c)
+  const ctx = await resolveBillingContext(c, body.orgId, 'org.update_billing')
+  return c.json({ plan: await cancelTrialPlan(c, ctx, body.orgId!) })
 })
 
 app.post('/setup-intent', middlewareAuth, async (c) => {

@@ -11,11 +11,12 @@ import IconExclamationTriangle from '~icons/heroicons/exclamation-triangle'
 import IconShieldCheck from '~icons/heroicons/shield-check'
 import CancelPlanModal from '~/components/billing/CancelPlanModal.vue'
 import CardFormModal from '~/components/billing/CardFormModal.vue'
+import TrialPlanOfferModal from '~/components/billing/TrialPlanOfferModal.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { formatLocalDate } from '~/services/date'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
-import { formatStripeAmount, getBillingOverview, payOpenInvoice, removeBackupCard, resumeSubscription } from '~/services/stripe'
+import { cancelTrialPlan, formatStripeAmount, getBillingOverview, payOpenInvoice, removeBackupCard, resumeSubscription, scheduleTrialPlan } from '~/services/stripe'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -32,6 +33,11 @@ const loadFailed = ref(false)
 const isPaying = ref(false)
 const isResuming = ref(false)
 const isRemovingBackup = ref(false)
+const isUpdatingTrialPlan = ref(false)
+// Org the post-card trial plan offer is for (pinned in case the user switches org).
+const trialPlanOfferOrgId = ref<string | null>(null)
+// Start the trial plan once the card form saves a card.
+let scheduleAfterCardSave = false
 const showCardModal = ref<'setup' | 'backup' | 'invoice' | null>(null)
 const showCancelModal = ref(false)
 const permissionModal = ref<'org.read_billing' | 'org.update_billing' | null>(null)
@@ -45,6 +51,13 @@ const canEnterCard = computed(() => !!overview.value?.publishableKey)
 const subscription = computed(() => overview.value?.subscription ?? null)
 const openInvoice = computed(() => overview.value?.openInvoice ?? null)
 const invoices = computed(() => overview.value?.invoices ?? [])
+// A scheduled plan always shows (Stripe will charge it); the offer only without a subscription.
+const trialPlan = computed(() => {
+  const plan = overview.value?.trialPlan ?? null
+  return plan && (plan.scheduled || !subscription.value) ? plan : null
+})
+const trialPlanPrice = computed(() => trialPlan.value ? formatStripeAmount(trialPlan.value.amount, trialPlan.value.currency) : '')
+const trialPlanDate = computed(() => trialPlan.value ? formatLocalDate(trialPlan.value.startsAt) : '')
 const openInvoiceAmount = computed(() => openInvoice.value ? formatStripeAmount(openInvoice.value.amountDue, openInvoice.value.currency) : '')
 
 const subscriptionLine = computed(() => {
@@ -207,10 +220,78 @@ async function resume() {
   }
 }
 
+// cardSaved: the card form just succeeded, so do not ask for a card again even if the
+// overview reload failed. id pins the org the user started from.
+async function startTrialPlan(options: { id?: string, cardSaved?: boolean } = {}) {
+  const id = options.id ?? orgId.value
+  if (!id || !await requireUpdateBilling() || isUpdatingTrialPlan.value)
+    return
+  if (!card.value && !options.cardSaved) {
+    scheduleAfterCardSave = true
+    showCardModal.value = 'setup'
+    return
+  }
+  isUpdatingTrialPlan.value = true
+  try {
+    const { plan } = await scheduleTrialPlan(id)
+    toast.success(t('trial-plan-scheduled', { plan: plan.planName, date: formatLocalDate(plan.startsAt) }))
+    if (id === orgId.value)
+      await loadOverview()
+  }
+  catch (error) {
+    console.error('Cannot schedule trial plan', error)
+    toast.error(t('trial-plan-schedule-error'))
+  }
+  finally {
+    isUpdatingTrialPlan.value = false
+  }
+}
+
+async function stopTrialPlan() {
+  if (!await requireUpdateBilling() || isUpdatingTrialPlan.value)
+    return
+  isUpdatingTrialPlan.value = true
+  try {
+    await cancelTrialPlan(orgId.value)
+    toast.success(t('trial-plan-canceled'))
+    await loadOverview()
+  }
+  catch (error) {
+    console.error('Cannot cancel trial plan', error)
+    toast.error(t('trial-plan-cancel-error'))
+  }
+  finally {
+    isUpdatingTrialPlan.value = false
+  }
+}
+
+async function onTrialPlanOfferScheduled() {
+  const id = trialPlanOfferOrgId.value
+  trialPlanOfferOrgId.value = null
+  if (id === orgId.value)
+    await loadOverview()
+}
+
+function closeCardModal() {
+  scheduleAfterCardSave = false
+  showCardModal.value = null
+}
+
 async function onCardSaved() {
   const mode = showCardModal.value
+  const id = orgId.value
+  const schedule = scheduleAfterCardSave
+  scheduleAfterCardSave = false
   showCardModal.value = null
-  await loadOverview()
+  if (schedule) {
+    await startTrialPlan({ id, cardSaved: true })
+  }
+  else {
+    await loadOverview()
+    // The user added a card on their own during the trial: offer to start the plan too.
+    if (mode === 'setup' && id === orgId.value && trialPlan.value && !trialPlan.value.scheduled)
+      trialPlanOfferOrgId.value = id
+  }
   if (mode === 'invoice')
     await refreshOrganization()
 }
@@ -224,6 +305,7 @@ async function onCanceled(sub: BillingSubscription | null) {
 
 watch(orgId, () => {
   permissionModal.value = null
+  trialPlanOfferOrgId.value = null
   void loadOverview()
 })
 
@@ -291,10 +373,41 @@ onMounted(async () => {
             <p class="mt-3 text-base font-medium text-slate-900 dark:text-white">
               {{ subscriptionLine }}
             </p>
+            <p v-if="trialPlan" class="mt-2 text-sm text-slate-600 dark:text-slate-300" data-test="billing-trial-plan">
+              {{ trialPlan.scheduled
+                ? t('trial-plan-scheduled-line', { plan: trialPlan.planName, price: trialPlanPrice, date: trialPlanDate })
+                : t('trial-plan-offer-line', { plan: trialPlan.planName, price: trialPlanPrice, date: trialPlanDate }) }}
+            </p>
             <div class="mt-4 flex flex-wrap gap-2">
-              <router-link to="/settings/organization/plans" class="d-btn d-btn-sm d-btn-primary">
+              <button
+                v-if="trialPlan && !trialPlan.scheduled && (card || canEnterCard)"
+                type="button"
+                class="d-btn d-btn-sm d-btn-primary"
+                :disabled="isUpdatingTrialPlan"
+                data-test="billing-trial-plan-start"
+                @click="startTrialPlan()"
+              >
+                <span v-if="isUpdatingTrialPlan" class="d-loading d-loading-spinner d-loading-xs" />
+                {{ t('trial-plan-start', { plan: trialPlan.planName }) }}
+              </button>
+              <router-link
+                to="/settings/organization/plans"
+                class="d-btn d-btn-sm"
+                :class="trialPlan && !trialPlan.scheduled ? 'd-btn-outline' : 'd-btn-primary'"
+              >
                 {{ subscription ? t('billing-change-plan') : t('billing-choose-plan') }}
               </router-link>
+              <button
+                v-if="trialPlan?.scheduled"
+                type="button"
+                class="d-btn d-btn-sm d-btn-ghost text-slate-600 hover:text-red-600 dark:text-slate-300 dark:hover:text-red-400"
+                :disabled="isUpdatingTrialPlan"
+                data-test="billing-trial-plan-cancel"
+                @click="stopTrialPlan"
+              >
+                <span v-if="isUpdatingTrialPlan" class="d-loading d-loading-spinner d-loading-xs" />
+                {{ t('trial-plan-cancel') }}
+              </button>
               <button
                 v-if="subscription && (subscription.cancelAtPeriodEnd || subscription.cancelAt)"
                 type="button"
@@ -432,8 +545,15 @@ onMounted(async () => {
       :org-id="orgId"
       :mode="showCardModal"
       :amount-label="openInvoiceAmount"
-      @close="showCardModal = null"
+      @close="closeCardModal"
       @saved="onCardSaved"
+    />
+    <TrialPlanOfferModal
+      v-if="trialPlanOfferOrgId"
+      :org-id="trialPlanOfferOrgId"
+      source="billing"
+      @close="trialPlanOfferOrgId = null"
+      @scheduled="onTrialPlanOfferScheduled"
     />
     <CancelPlanModal
       v-if="showCancelModal"
