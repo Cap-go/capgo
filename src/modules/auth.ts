@@ -16,6 +16,7 @@ import { clearWebsitePaidUserCookie } from '~/services/websiteAuthCookie'
 import { useMainStore } from '~/stores/main'
 import { isPendingOrganizationInvite, useOrganizationStore } from '~/stores/organization'
 import { shouldSkipOnboardingResume } from '~/utils/appOnboardingProgress'
+import { needsInitialOnboardingName } from '~/utils/onboardingProfile'
 import { getOnboardingResumeRedirect, isNewOnboardingUser } from '~/utils/onboardingRedirect'
 import { hasPendingInviteSkip } from '~/utils/pendingInviteSkip'
 import { validateRedirectPath } from '~/utils/safeRedirect'
@@ -36,8 +37,10 @@ async function updateUser(
 
     let userRecord = data ?? null
 
-    if (error && error.code !== 'PGRST116')
+    if (error && error.code !== 'PGRST116') {
       console.error('Failed to fetch public user profile', error)
+      return
+    }
 
     if (!userRecord && main.auth) {
       const { data: inserted, error: insertError } = await supabase
@@ -229,8 +232,27 @@ async function guard(
     }
   }
 
+  function requiredNameRedirect(organizationsLoaded: boolean) {
+    // CLI and MCP authorization must finish before any onboarding detour.
+    if (isCliLoginRoute)
+      return null
+    // An unknown profile cannot establish whether names are required. Offer a
+    // retry without letting the user bypass required names or stranding navigation.
+    if (!main.user)
+      return { path: '/login', query: { profile_unavailable: '1', to: to.fullPath } }
+    // Scope is unknown after an org fetch failure. Never force an established
+    // member into initial onboarding; the onboarding wizard re-checks names.
+    if (!organizationsLoaded || !needsInitialOnboardingName(main.user))
+      return null
+    if (to.path === '/onboarding/name' || organizationStore.hasOrganizations)
+      return null
+    return { path: '/onboarding/name', query: { to: to.fullPath } }
+  }
+
   function shouldRedirectToOrgOnboarding() {
     if (isCliLoginRoute)
+      return false
+    if (to.path === '/onboarding/name')
       return false
     if (to.path.startsWith('/onboarding/app'))
       return false
@@ -250,7 +272,7 @@ async function guard(
       return false
     if (isNativeAppStoreContext())
       return false
-    if (to.path.startsWith('/onboarding/invitation'))
+    if (to.path === '/onboarding/name' || to.path.startsWith('/onboarding/invitation'))
       return false
     if (hasPendingInviteSkip(sessionUser?.id ?? main.auth?.id))
       return false
@@ -258,6 +280,8 @@ async function guard(
   }
 
   async function getPendingOnboardingRedirect(organizationsLoaded: boolean) {
+    if (to.path === '/onboarding/name')
+      return null
     if (isCliLoginRoute)
       return null
     // Creating another organization must not bounce back to pending setup.
@@ -345,7 +369,7 @@ async function guard(
       return next('/login?message=sso_account_linked')
     }
     if (provisioningResult === 'abort_navigation') {
-      hideLoader()
+      await hideLoader()
       return next(false)
     }
 
@@ -362,6 +386,11 @@ async function guard(
     await loadPlansIfNeeded()
 
     const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations(organizationFetchOptions))
+    const nameRedirect = requiredNameRedirect(organizationsLoaded)
+    if (nameRedirect) {
+      await hideLoader()
+      return next(nameRedirect)
+    }
     if (shouldRedirectToPendingInviteOnboarding(organizationsLoaded)) {
       return next({
         path: '/onboarding/invitation',
@@ -409,6 +438,8 @@ async function guard(
       return next(getPostRestorePath(to))
     }
 
+    if (!main.user)
+      await updateUser(main, supabase)
     await loadPlansIfNeeded()
 
     let organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations(organizationFetchOptions))
@@ -434,6 +465,13 @@ async function guard(
       organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations(organizationFetchOptions))
     }
 
+    // Check names after SSO provisioning so enterprise members are not sent to self-signup onboarding.
+    const nameRedirect = requiredNameRedirect(organizationsLoaded)
+    if (nameRedirect) {
+      await hideLoader()
+      return next(nameRedirect)
+    }
+
     await resolvePlatformAdminStatus()
 
     if (organizationsLoaded && !organizationStore.hasOrganizations && !main.isAdmin && shouldRedirectToOrgOnboarding()) {
@@ -449,11 +487,11 @@ async function guard(
     if (onboardingRedirect)
       return next(onboardingRedirect)
 
-    hideLoader()
+    await hideLoader()
     next()
   }
   else {
-    hideLoader()
+    await hideLoader()
     next()
   }
 }

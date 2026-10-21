@@ -90,6 +90,10 @@ vi.mock('../supabase/functions/_backend/utils/user_preferences.ts', () => ({
   syncUserPreferenceTags: syncUserPreferenceTagsMock,
 }))
 
+// Model the Edge Runtime binding while executing trigger handlers under Node.
+beforeEach(() => vi.stubGlobal('EdgeRuntime', undefined))
+afterEach(() => vi.unstubAllGlobals())
+
 const { app: onUserCreateApp } = await import('../supabase/functions/_backend/triggers/on_user_create.ts')
 const bentoFirstOrgLifecycle = await import('../supabase/functions/_backend/utils/bento_first_org.ts')
 

@@ -186,7 +186,7 @@ export async function invokeCapgoApi<T = any>(
   const method = (options.method ?? 'POST').toUpperCase()
   const retries = options.retries ?? defaultRetriesForMethod(method)
   const headers: Record<string, string> = {
-    ...(options.headers ?? {}),
+    ...options.headers,
   }
 
   const hasAuthHeader = Object.keys(headers).some(key => key.toLowerCase() === 'authorization')

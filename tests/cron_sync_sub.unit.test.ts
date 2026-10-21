@@ -27,6 +27,16 @@ describe('cron_sync_sub resilience', () => {
     }))
   }
 
+  async function runCronSyncSub(syncSubscriptionAndEvents: ReturnType<typeof vi.fn>, orgId: string) {
+    setupCommonMocks(syncSubscriptionAndEvents)
+    const { app: cronSyncSub } = await import('../supabase/functions/_backend/triggers/cron_sync_sub.ts')
+    return cronSyncSub.request('http://localhost/', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ orgId }),
+    })
+  }
+
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
@@ -41,16 +51,7 @@ describe('cron_sync_sub resilience', () => {
     const syncSubscriptionAndEvents = vi.fn()
       .mockRejectedValueOnce({ status: 502, message: 'error code: 502' })
       .mockResolvedValueOnce(undefined)
-
-    setupCommonMocks(syncSubscriptionAndEvents)
-
-    const { app: cronSyncSub } = await import('../supabase/functions/_backend/triggers/cron_sync_sub.ts')
-
-    const response = await cronSyncSub.request('http://localhost/', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ orgId: 'org-retry' }),
-    })
+    const response = await runCronSyncSub(syncSubscriptionAndEvents, 'org-retry')
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ status: 'ok' })
@@ -61,16 +62,7 @@ describe('cron_sync_sub resilience', () => {
     const syncSubscriptionAndEvents = vi.fn().mockRejectedValue(
       new HTTPException(404, { message: 'Org not found', cause: { error: 'org_not_found' } }),
     )
-
-    setupCommonMocks(syncSubscriptionAndEvents)
-
-    const { app: cronSyncSub } = await import('../supabase/functions/_backend/triggers/cron_sync_sub.ts')
-
-    const response = await cronSyncSub.request('http://localhost/', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ orgId: 'org-missing' }),
-    })
+    const response = await runCronSyncSub(syncSubscriptionAndEvents, 'org-missing')
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ status: 'skipped', reason: 'org_not_found' })

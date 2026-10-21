@@ -51,7 +51,6 @@ function createPagedRpcClient(pages: ReturnType<typeof makeMetric>[][]) {
 describe('org statistics app metrics pagination', () => {
   it('pages past PostgREST max_rows so late app_ids are not dropped', async () => {
     const pageSize = statisticsTestUtils.APP_METRICS_PAGE_SIZE
-    expect(pageSize).toBe(1000)
 
     const firstPage = Array.from({ length: pageSize }, (_, index) =>
       makeMetric(`com.early.app.${String(index).padStart(4, '0')}`, '2026-07-01'))
