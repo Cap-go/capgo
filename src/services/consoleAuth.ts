@@ -128,8 +128,9 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
   let refreshTimer: ReturnType<typeof setInterval> | undefined
   // Access token last confirmed by the provider; claims are only trusted after that check.
   let verifiedToken: string | null = null
+  type ClaimsPayload = { claims: Record<string, any>, header: Record<string, any>, signature: string }
   // One in-flight /user check per token so concurrent getClaims share the round trip.
-  let verifying: Promise<Result<{ claims: Record<string, any>, header: Record<string, any>, signature: string }>> | null = null
+  let verifying: Promise<Result<ClaimsPayload | null>> | null = null
   let verifyingToken: string | null = null
 
   function emit(event: AuthChangeEvent, session: Session | null) {
@@ -286,14 +287,14 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
     return session
   }
 
-  async function verifyAccessToken(token: string, claims: Record<string, any>): Promise<Result<{ claims: Record<string, any>, header: Record<string, any>, signature: string }>> {
-    const payload = { claims, header: decodeJwtHeader(token) ?? {}, signature: token.split('.')[2] ?? '' }
+  async function verifyAccessToken(token: string, claims: Record<string, any>): Promise<Result<ClaimsPayload | null>> {
+    const payload: ClaimsPayload = { claims, header: decodeJwtHeader(token) ?? {}, signature: token.split('.')[2] ?? '' }
     if (verifiedToken === token)
       return { data: payload, error: null }
     if (verifying && verifyingToken === token)
       return verifying
     verifyingToken = token
-    verifying = (async () => {
+    const pending = (async (): Promise<Result<ClaimsPayload | null>> => {
       const { error: userError } = await getUser(token)
       if (userError) {
         // AuthApiError means the provider rejected the token. Transient outages
@@ -310,7 +311,8 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
         verifyingToken = null
       }
     })
-    return verifying
+    verifying = pending
+    return pending
   }
 
   async function getUser(jwt?: string): Promise<Result<{ user: User | null }>> {
