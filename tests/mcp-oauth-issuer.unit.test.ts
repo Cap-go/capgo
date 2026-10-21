@@ -4,6 +4,7 @@ import apiWorker from '../cloudflare_workers/api/index.ts'
 describe('hosted MCP OAuth issuer', () => {
   beforeEach(() => {
     vi.stubEnv('MCP_OAUTH_ISSUER', 'https://capgo.app/')
+    vi.stubEnv('MCP_OAUTH_API_ORIGIN', 'https://api.capgo.app')
   })
 
   afterEach(() => {
@@ -45,5 +46,21 @@ describe('hosted MCP OAuth issuer', () => {
     }))
     expect(response.status).toBe(401)
     expect(response.headers.get('www-authenticate')).toContain('resource_metadata="https://api.capgo.app/.well-known/oauth-protected-resource/mcp"')
+  })
+
+  it('advertises only api.capgo.app when reached through another hostname', async () => {
+    const prm = await apiWorker.fetch(new Request('https://api.usecapgo.com/.well-known/oauth-protected-resource/mcp'))
+    await expect(prm.json()).resolves.toMatchObject({
+      resource: 'https://api.capgo.app/mcp',
+      authorization_servers: ['https://capgo.app'],
+    })
+    const challenge = await apiWorker.fetch(new Request('https://api.usecapgo.com/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'accept': 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
+    }))
+    expect(challenge.headers.get('www-authenticate')).toContain('resource_metadata="https://api.capgo.app/.well-known/oauth-protected-resource/mcp"')
+    const metadata = await apiWorker.fetch(new Request('https://api.usecapgo.com/mcp/oauth/metadata'))
+    await expect(metadata.json()).resolves.toMatchObject({ authorization_endpoint: 'https://api.capgo.app/mcp/oauth/authorize' })
   })
 })

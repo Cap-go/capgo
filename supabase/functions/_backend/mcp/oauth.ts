@@ -35,9 +35,16 @@ export const MCP_PATH = '/mcp'
 export const MCP_OAUTH_PATH = '/mcp/oauth'
 export const CONSENT_PAGE_PATH = '/oauth/authorize'
 
-/** Public origin of this API (endpoints + resource). Uses the request origin so local workers work too. */
-export function getApiOrigin(c: Context): string {
+function getRequestOrigin(c: Context): string {
   return new URL(c.req.url).origin
+}
+
+/**
+ * Canonical origin of the OAuth endpoints and the MCP resource. Production sets MCP_OAUTH_API_ORIGIN=https://api.capgo.app
+ * so every hostname routed to this worker advertises the same resource; unset, the request origin is used (local workers).
+ */
+export function getApiOrigin(c: Context): string {
+  return getEnv(c, 'MCP_OAUTH_API_ORIGIN').trim().replace(/\/+$/, '') || getRequestOrigin(c)
 }
 
 /**
@@ -257,7 +264,7 @@ app.get(`/.well-known/oauth-protected-resource${MCP_PATH}`, c => c.json(protecte
  * (production: https://capgo.app), that origin serves it and this API answers 404 here.
  */
 function wellKnownAuthorizationServerMetadata(c: McpContext) {
-  if (getIssuer(c) !== getApiOrigin(c))
+  if (getIssuer(c) !== getRequestOrigin(c))
     return oauthError(c, 404, 'not_found', `Authorization server metadata is published by the issuer: ${getIssuer(c)}/.well-known/oauth-authorization-server`)
   return c.json(authorizationServerMetadata(c))
 }

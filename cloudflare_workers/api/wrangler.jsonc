@@ -30,7 +30,8 @@
       },
       "vars": {
         "ENV_NAME": "capgo_api-prod",
-        "MCP_OAUTH_ISSUER": "https://capgo.app"
+        "MCP_OAUTH_ISSUER": "https://capgo.app",
+        "MCP_OAUTH_API_ORIGIN": "https://api.capgo.app"
       },
       "routes": [
         {
