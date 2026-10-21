@@ -27,10 +27,13 @@ function fakeInvoiceStripe(invoice: Partial<Stripe.Invoice>, payResult: 'paid' |
       throw new Error('card_declined')
     return Object.assign(state, { status: 'paid' })
   })
+  const release = vi.fn(async (id: string) => ({ id, status: 'released' }))
   const stripe = {
     invoices: { retrieve: vi.fn(async () => ({ ...state })), finalizeInvoice, pay },
+    subscriptions: { retrieve: vi.fn(async (id: string) => ({ id, schedule: 'sub_sched_trial' })) },
+    subscriptionSchedules: { release },
   } as unknown as Stripe
-  return { stripe, finalizeInvoice, pay }
+  return { stripe, finalizeInvoice, pay, release }
 }
 
 const trialSubscription = { id: 'sub_1', latest_invoice: 'in_1', metadata: { capgo_trial_plan: 'true' } } as unknown as Stripe.Subscription
@@ -75,14 +78,21 @@ describe('trial plan schedules', () => {
 
   it('cancels the pending trial plan when checkout creates another subscription', async () => {
     const { stripe, cancel, list } = fakeStripe([{ id: 'sub_sched_trial', status: 'not_started', metadata: { capgo_trial_plan: 'true' } }])
-    await cancelTrialPlanScheduleForSubscription(context, stripe, { id: 'sub_1', customer: 'cus_1', schedule: null } as unknown as Stripe.Subscription)
+    await cancelTrialPlanScheduleForSubscription(context, stripe, { id: 'sub_1', customer: 'cus_1', schedule: null, status: 'active' } as unknown as Stripe.Subscription)
     expect(list).toHaveBeenCalledWith({ customer: 'cus_1', limit: 100 })
     expect(cancel).toHaveBeenCalledWith('sub_sched_trial')
   })
 
+  it('keeps the schedule while the checkout subscription is still incomplete', async () => {
+    const { stripe, cancel, list } = fakeStripe([{ id: 'sub_sched_trial', status: 'not_started', metadata: { capgo_trial_plan: 'true' } }])
+    await cancelTrialPlanScheduleForSubscription(context, stripe, { id: 'sub_1', customer: 'cus_1', schedule: null, status: 'incomplete' } as unknown as Stripe.Subscription)
+    expect(list).not.toHaveBeenCalled()
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
   it('keeps the schedule when the subscription is the one it started', async () => {
     const { stripe, cancel } = fakeStripe([{ id: 'sub_sched_trial', status: 'not_started', metadata: { capgo_trial_plan: 'true' } }])
-    await cancelTrialPlanScheduleForSubscription(context, stripe, { id: 'sub_1', customer: 'cus_1', schedule: 'sub_sched_trial' } as unknown as Stripe.Subscription)
+    await cancelTrialPlanScheduleForSubscription(context, stripe, { id: 'sub_1', customer: 'cus_1', schedule: 'sub_sched_trial', status: 'active' } as unknown as Stripe.Subscription)
     expect(cancel).not.toHaveBeenCalled()
   })
 })
@@ -96,8 +106,16 @@ describe('trial plan first invoice', () => {
   })
 
   it('does not convert while the first invoice is unpaid', async () => {
-    const { stripe } = fakeInvoiceStripe({ id: 'in_1', status: 'draft', billing_reason: 'subscription_create' }, 'declined')
+    const { stripe, release } = fakeInvoiceStripe({ id: 'in_1', status: 'draft', billing_reason: 'subscription_create' }, 'declined')
     expect(await settleTrialPlanFirstInvoice(context, stripe, trialSubscription)).toBe(false)
+    expect(release).not.toHaveBeenCalled()
+  })
+
+  it('releases the schedule once paid so the subscription can be canceled normally', async () => {
+    const { stripe, release } = fakeInvoiceStripe({ id: 'in_1', status: 'draft', billing_reason: 'subscription_create' }, 'paid')
+    const scheduled = { ...trialSubscription, schedule: 'sub_sched_trial' } as unknown as Stripe.Subscription
+    expect(await settleTrialPlanFirstInvoice(context, stripe, scheduled)).toBe(true)
+    expect(release).toHaveBeenCalledWith('sub_sched_trial')
   })
 
   it('leaves renewals to the normal subscription flow', async () => {

@@ -7,6 +7,7 @@ import { TRIAL_CARD_BENTO_TAG } from './billing_bento_tags.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { findPlanByProductId, getPlanPriceId, isAutomaticTaxEnabled } from './stripe_billing.ts'
+import { releaseSubscriptionSchedule } from './stripe_in_app.ts'
 import { supabaseAdmin } from './supabase.ts'
 
 // Starts the plan picked during onboarding when the free trial ends, charging the saved card.
@@ -256,8 +257,12 @@ export async function cancelTrialPlan(c: Context, ctx: InAppBillingContext, orgI
 
 // A subscription bought through checkout replaces the scheduled trial plan: drop the schedule
 // so the customer is not billed twice when the trial ends.
+// Only a subscription that is live (paid checkout) replaces the trial plan; an incomplete
+// checkout that is abandoned must keep the scheduled plan.
+const REPLACING_SUBSCRIPTION_STATUSES: readonly Stripe.Subscription.Status[] = ['active', 'trialing']
+
 export async function cancelTrialPlanScheduleForSubscription(c: Context, stripe: Stripe, subscription: Stripe.Subscription) {
-  if (subscription.schedule || isTrialPlanSubscription(subscription))
+  if (subscription.schedule || isTrialPlanSubscription(subscription) || !REPLACING_SUBSCRIPTION_STATUSES.includes(subscription.status))
     return
   const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
   const schedule = await findPendingTrialPlanSchedule(stripe, customerId)
@@ -293,5 +298,11 @@ export async function settleTrialPlanFirstInvoice(c: Context, stripe: Stripe, su
     cloudlog({ requestId: c.get('requestId'), message: 'trial plan first invoice not paid yet', subscriptionId: subscription.id, invoiceId, error })
     invoice = await stripe.invoices.retrieve(invoiceId)
   }
-  return invoice.status === 'paid'
+  if (invoice.status !== 'paid')
+    return false
+  // The schedule only existed to start the plan: release it so plan changes and
+  // cancellation work like any other subscription.
+  if (subscription.schedule)
+    await releaseSubscriptionSchedule(c, stripe, subscription.id)
+  return true
 }

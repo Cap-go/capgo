@@ -1745,7 +1745,10 @@ async function handleSubscriptionStripeEvent(
 ) {
   if (isSubscriptionUpdateStatus(stripeData.data.status) && stripeData.data.price_id && stripeData.data.product_id) {
     if (await isUnpaidTrialPlanSubscription(c, stripeEvent)) {
+      // Keep the live subscription visible to Billing (pay now, cancel) without converting the org.
       cloudlog({ requestId: c.get('requestId'), message: 'Trial plan subscription waits for its first payment', subscriptionId: stripeData.data.subscription_id })
+      stripeData.data.status = 'failed'
+      await updateStripeInfo(c, stripeData)
       return c.json(BRES)
     }
     const response = await handleActiveSubscriptionUpdate(c, stripeEvent, stripeData, org, customer)
@@ -1812,8 +1815,11 @@ async function stripeEventHandler(c: Context<MiddlewareKeyVariablesStripe>) {
   }
 
   // Fails the webhook on error so Stripe retries: a leftover schedule would bill the customer twice.
-  if (stripeEvent.type === 'customer.subscription.created')
+  // Checkout subscriptions can start incomplete, so also check when one becomes active.
+  if (stripeEvent.type === 'customer.subscription.created'
+    || (stripeEvent.type === 'customer.subscription.updated' && stripeEvent.data.previous_attributes?.status)) {
     await cancelTrialPlanScheduleForSubscription(c, getStripe(c, getWebhookBillingAccount(c)), stripeEvent.data.object)
+  }
 
   const subscriptionResponse = await handleSubscriptionStripeEvent(c, stripeEvent, stripeData, org, customer)
   if (subscriptionResponse)
