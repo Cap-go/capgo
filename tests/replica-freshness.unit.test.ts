@@ -27,24 +27,31 @@ describe('replica freshness', () => {
     expect(capEdgeCacheTtlForReplicaLag(contextFrom(undefined), 3600)).toBe(3600)
   })
 
-  it('keeps the full TTL only for a replica measured within the edge cache bound', () => {
+  it('shortens the TTL only for a replica measured behind (fails open)', () => {
     const c = contextFrom('HYPERDRIVE_CAPGO_READ_HK')
-    expect(capEdgeCacheTtlForReplicaLag(c, 3600)).toBe(30)
+    // No figure, unknown, or within the bound: unchanged TTL, no extra load.
+    expect(capEdgeCacheTtlForReplicaLag(c, 3600)).toBe(3600)
     setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_HK', { status: 'unknown', max_lag_seconds: null })
-    expect(capEdgeCacheTtlForReplicaLag(c, 3600)).toBe(30)
-    setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_HK', { status: 'ok', max_lag_seconds: 61 })
-    expect(capEdgeCacheTtlForReplicaLag(c, 3600)).toBe(30)
+    expect(capEdgeCacheTtlForReplicaLag(c, 3600)).toBe(3600)
     setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_HK', { status: 'ok', max_lag_seconds: 60 })
     expect(capEdgeCacheTtlForReplicaLag(c, 3600)).toBe(3600)
+    // Measured behind.
+    setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_HK', { status: 'ok', max_lag_seconds: 61 })
+    expect(capEdgeCacheTtlForReplicaLag(c, 3600)).toBe(30)
+    setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_HK', { status: 'lagging', max_lag_seconds: 2400 })
+    expect(capEdgeCacheTtlForReplicaLag(c, 3600)).toBe(30)
     // Never raises a shorter TTL.
     expect(capEdgeCacheTtlForReplicaLag(c, 10)).toBe(10)
-    setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_HK', { status: 'ok', max_lag_seconds: 0 }, Date.now() - 1)
-    expect(capEdgeCacheTtlForReplicaLag(c, 3600)).toBe(30)
+    // An expired figure no longer counts.
+    setReplicationLagMemoryEntry('HYPERDRIVE_CAPGO_READ_HK', { status: 'lagging', max_lag_seconds: 2400 }, Date.now() - 1)
+    expect(capEdgeCacheTtlForReplicaLag(c, 3600)).toBe(3600)
   })
 
   it('measures physical standbys, not only the logical subscriber', () => {
     expect(REPLICA_LAG_QUERY).toContain('pg_is_in_recovery()')
     expect(REPLICA_LAG_QUERY).toContain('pg_last_xact_replay_timestamp()')
     expect(REPLICA_LAG_QUERY).toContain('pg_stat_subscription')
+    // Readable without pg_read_all_stats (status is NULL then).
+    expect(REPLICA_LAG_QUERY).toContain('status IS NULL')
   })
 })

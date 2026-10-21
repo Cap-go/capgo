@@ -19,7 +19,7 @@ import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
 import { resolveRolloutDecision } from './rollout.ts'
 import type { ReplicationLagStatus, ReplicationStatus } from './replicaFreshness.ts'
-import { getFreshReplicationLagMemoryEntry, getReplicationLagCacheKey, REPLICA_LAG_QUERY, REPLICATION_LAG_CACHE_TTL_SECONDS, setReplicationLagMemoryEntry } from './replicaFreshness.ts'
+import { getFreshReplicationLagMemoryEntry, getReplicationLagCacheKey, REPLICA_LAG_QUERY, REPLICATION_LAG_CACHE_TTL_SECONDS, replicationLagCacheRequest, setReplicationLagMemoryEntry } from './replicaFreshness.ts'
 import { shouldRequireReadReplica, shouldSkipDirectHyperdriveFallback } from './supabase_write_guard.ts'
 import { getCachedChannelLookup, updatesCacheTags } from './updatesEdgeCache.ts'
 
@@ -188,7 +188,7 @@ async function getCachedReplicaLag(c: Context, pool: PluginPgClient): Promise<Re
     return existingQuery
 
   const cacheHelper = new CacheHelper(c)
-  const cacheRequest = cacheHelper.buildRequest('/cache/replication-lag', { source: cacheKey })
+  const cacheRequest = replicationLagCacheRequest(cacheHelper, cacheKey)
   const cachedEntry = await cacheHelper.matchJson<ReplicationLagStatus & { expiresAt: number }>(cacheRequest)
 
   if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
