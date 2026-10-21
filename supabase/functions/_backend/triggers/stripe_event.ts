@@ -1753,7 +1753,18 @@ async function handleSubscriptionStripeEvent(
       // Keep the live subscription visible to Billing (pay now, cancel) without converting the org.
       cloudlog({ requestId: c.get('requestId'), message: 'Trial plan subscription waits for its first payment', subscriptionId: stripeData.data.subscription_id })
       stripeData.data.status = 'failed'
-      await updateStripeInfo(c, stripeData)
+      // Same row-locked, ordered write as other subscription events, so an older unpaid
+      // event cannot overwrite a newer paid state.
+      const persisted = await persistStripeInfoAndRevenueMovement(
+        c,
+        stripeData.data.customer_id,
+        stripeEvent.id,
+        toStripeInfoUpdate(stripeData.data),
+        new Date(stripeEvent.created * 1000).toISOString(),
+        ZERO_REVENUE_MOVEMENT,
+      )
+      if (persisted === 'missing')
+        return quickError(404, 'customer_id_not_found', 'customer_id not found', { stripeData })
       return c.json(BRES)
     }
     const response = await handleActiveSubscriptionUpdate(c, stripeEvent, stripeData, org, customer)

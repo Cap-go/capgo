@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import process from 'node:process'
 import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../src/services/appOnboarding'
 import { BUILDER_STEP_IDS } from '../src/services/builderOnboardingChecklist'
 
@@ -435,8 +436,12 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       })
       await page.reload()
       const prompt = page.locator('[data-test="trial-card-prompt-add"]')
-      // The base branch never asks for the trial plan: capture the plain dashboard there.
-      // Once the head build asked, the prompt must render or the capture fails.
+      // The base branch has no prompt: capture the plain dashboard there. The head (after)
+      // capture, or any build that asked for the trial plan, must render it or fail.
+      if (process.env.VISUAL_DIFF_PHASE === 'after') {
+        await prompt.waitFor({ timeout: 15_000 })
+        return
+      }
       await prompt.waitFor({ timeout: 15_000 }).catch(() => {})
       if (promptRequested)
         await prompt.waitFor({ timeout: 5_000 })
