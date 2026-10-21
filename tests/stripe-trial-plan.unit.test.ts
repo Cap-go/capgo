@@ -210,3 +210,15 @@ describe('never-paid trial plan', () => {
     expect(await isTrialPlanFirstInvoiceUnpaid(stripeWithInvoice({ billing_reason: 'subscription_create', status: 'open' }), other)).toBe(false)
   })
 })
+
+describe('pending schedule pagination', () => {
+  it('reads every page before reporting pending schedules', async () => {
+    const list = vi.fn(async (params: Stripe.SubscriptionScheduleListParams) => params.starting_after
+      ? { data: [{ id: 'sub_sched_late', status: 'not_started', created: 1, metadata: { capgo_trial_plan: 'true' } }], has_more: false }
+      : { data: [{ id: 'sub_sched_other', status: 'released', created: 2, metadata: {} }], has_more: true })
+    const cancel = vi.fn(async (id: string) => ({ id }))
+    const stripe = { subscriptionSchedules: { list, cancel } } as unknown as Stripe
+    expect((await findPendingTrialPlanSchedule(stripe, 'cus_1'))?.id).toBe('sub_sched_late')
+    expect(list).toHaveBeenNthCalledWith(2, { customer: 'cus_1', limit: 100, starting_after: 'sub_sched_other' })
+  })
+})

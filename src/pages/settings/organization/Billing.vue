@@ -48,7 +48,11 @@ const canEnterCard = computed(() => !!overview.value?.publishableKey)
 const subscription = computed(() => overview.value?.subscription ?? null)
 const openInvoice = computed(() => overview.value?.openInvoice ?? null)
 const invoices = computed(() => overview.value?.invoices ?? [])
-const trialPlan = computed(() => subscription.value ? null : overview.value?.trialPlan ?? null)
+// A scheduled plan always shows (Stripe will charge it); the offer only without a subscription.
+const trialPlan = computed(() => {
+  const plan = overview.value?.trialPlan ?? null
+  return plan && (plan.scheduled || !subscription.value) ? plan : null
+})
 const trialPlanPrice = computed(() => trialPlan.value ? formatStripeAmount(trialPlan.value.amount, trialPlan.value.currency) : '')
 const trialPlanDate = computed(() => trialPlan.value ? formatLocalDate(trialPlan.value.startsAt) : '')
 const openInvoiceAmount = computed(() => openInvoice.value ? formatStripeAmount(openInvoice.value.amountDue, openInvoice.value.currency) : '')

@@ -82,8 +82,15 @@ async function loadTrialState(c: Context, ctx: InAppBillingContext): Promise<Tri
 }
 
 async function listPendingTrialPlanSchedules(stripe: Stripe, customerId: string) {
-  const schedules = await stripe.subscriptionSchedules.list({ customer: customerId, limit: 100 })
-  return schedules.data
+  // Read every page so cancellation is exhaustive.
+  const all: Stripe.SubscriptionSchedule[] = []
+  let startingAfter: string | undefined
+  do {
+    const page = await stripe.subscriptionSchedules.list({ customer: customerId, limit: 100, ...(startingAfter ? { starting_after: startingAfter } : {}) })
+    all.push(...page.data)
+    startingAfter = page.has_more ? page.data.at(-1)?.id : undefined
+  } while (startingAfter)
+  return all
     .filter(schedule => schedule.status === 'not_started' && schedule.metadata?.[TRIAL_PLAN_SCHEDULE_METADATA_KEY] === 'true')
     .sort((a, b) => a.created - b.created)
 }
@@ -112,23 +119,43 @@ async function cancelAllPendingTrialPlanSchedules(c: Context, stripe: Stripe, cu
   return schedules.length
 }
 
+// Describes the pending schedule as Stripe will bill it, whether or not the org would be
+// eligible to schedule a new one, so Billing always shows (and can cancel) a pending charge.
+async function summarizePendingSchedule(c: Context, ctx: InAppBillingContext, schedule: Stripe.SubscriptionSchedule): Promise<TrialPlanSummary | null> {
+  const phase = schedule.phases[0]
+  const scheduledPrice = phase?.items[0]?.price
+  const priceId = typeof scheduledPrice === 'string' ? scheduledPrice : scheduledPrice?.id
+  if (!phase || !priceId)
+    return null
+  const price = await ctx.stripe.prices.retrieve(priceId)
+  const productId = typeof price.product === 'string' ? price.product : price.product.id
+  const { data: plan } = await findPlanByProductId(c, productId)
+  return {
+    planName: plan?.name ?? '',
+    amount: price.unit_amount ?? 0,
+    currency: price.currency,
+    interval: 'month',
+    startsAt: new Date(phase.start_date * 1000).toISOString(),
+    scheduled: true,
+  }
+}
+
 export async function getTrialPlanSummary(c: Context, ctx: InAppBillingContext): Promise<TrialPlanSummary | null> {
+  const schedule = await findPendingTrialPlanSchedule(ctx.stripe, ctx.customerId)
+  if (schedule)
+    return summarizePendingSchedule(c, ctx, schedule)
+  // Eligibility only gates offering a new plan.
   const state = await loadTrialState(c, ctx)
   if (!state)
     return null
-  const [price, schedule] = await Promise.all([
-    ctx.stripe.prices.retrieve(state.priceId),
-    findPendingTrialPlanSchedule(ctx.stripe, ctx.customerId),
-  ])
+  const price = await ctx.stripe.prices.retrieve(state.priceId)
   return {
     planName: state.planName,
     amount: price.unit_amount ?? 0,
     currency: price.currency,
     interval: 'month',
-    startsAt: schedule?.phases[0]?.start_date
-      ? new Date(schedule.phases[0].start_date * 1000).toISOString()
-      : state.startsAt.toISOString(),
-    scheduled: !!schedule,
+    startsAt: state.startsAt.toISOString(),
+    scheduled: false,
   }
 }
 
