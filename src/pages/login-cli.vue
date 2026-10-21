@@ -117,10 +117,14 @@ function subscribe(orgIds: string[], session: string): Promise<boolean[]> {
           void complete()
       })
       .subscribe((status) => {
-        if (status === 'SUBSCRIBED')
+        if (status === 'SUBSCRIBED') {
+          // A late subscribe after the fallback timeout must clear the banner.
+          realtimeUnavailable.value = false
           finish(true)
-        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED')
+        }
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           finish(false)
+        }
       })
     channels.push(channel)
   })))

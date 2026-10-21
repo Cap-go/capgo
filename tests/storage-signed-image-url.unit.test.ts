@@ -11,6 +11,20 @@ vi.mock('../src/services/console.ts', () => ({
   }),
 }))
 
+describe('resolveImagePath', () => {
+  it('extracts the storage path from a console image relay URL', async () => {
+    const { resolveImagePath } = await import('../src/services/storage.ts')
+    expect(resolveImagePath('https://api.example.com/private/console/images/read?path=org%2Flogo.png&token=t')).toEqual({
+      normalized: 'org/logo.png',
+      shouldSign: true,
+    })
+    expect(resolveImagePath('https://api.example.com/private/console/images/read?path=org%2Flogo%20with%20spaces%25.png&token=t')).toEqual({
+      normalized: 'org/logo with spaces%.png',
+      shouldSign: true,
+    })
+  })
+})
+
 describe('createSignedImageUrl', () => {
   beforeEach(() => {
     vi.clearAllMocks()

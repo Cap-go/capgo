@@ -128,6 +128,9 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
   let refreshTimer: ReturnType<typeof setInterval> | undefined
   // Access token last confirmed by the provider; claims are only trusted after that check.
   let verifiedToken: string | null = null
+  // One in-flight /user check per token so concurrent getClaims share the round trip.
+  let verifying: Promise<Result<{ claims: Record<string, any>, header: Record<string, any>, signature: string }>> | null = null
+  let verifyingToken: string | null = null
 
   function emit(event: AuthChangeEvent, session: Session | null) {
     for (const listener of listeners) {
@@ -142,6 +145,11 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
 
   function save(session: Session | null) {
     current = session
+    if (!session) {
+      verifiedToken = null
+      verifying = null
+      verifyingToken = null
+    }
     if (!persist)
       return
     const store = storage()
@@ -244,6 +252,7 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
       }
       const session = toSession(result.data!)
       save(session)
+      verifiedToken = session.access_token
       emit(event, session)
       return { data: { session }, error: null }
     })().finally(() => {
@@ -271,8 +280,37 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
   function installSession(response: TokenResponse, event: AuthChangeEvent) {
     const session = toSession(response)
     save(session)
+    // Tokens freshly issued by the provider are already confirmed.
+    verifiedToken = session.access_token
     emit(event, session)
     return session
+  }
+
+  async function verifyAccessToken(token: string, claims: Record<string, any>): Promise<Result<{ claims: Record<string, any>, header: Record<string, any>, signature: string }>> {
+    const payload = { claims, header: decodeJwtHeader(token) ?? {}, signature: token.split('.')[2] ?? '' }
+    if (verifiedToken === token)
+      return { data: payload, error: null }
+    if (verifying && verifyingToken === token)
+      return verifying
+    verifyingToken = token
+    verifying = (async () => {
+      const { error: userError } = await getUser(token)
+      if (userError) {
+        // AuthApiError means the provider rejected the token. Transient outages
+        // keep the still-valid local JWT so a brief blip does not bounce to /login.
+        if (userError.name === 'AuthApiError')
+          return { data: null, error: userError }
+        return { data: payload, error: null }
+      }
+      verifiedToken = token
+      return { data: payload, error: null }
+    })().finally(() => {
+      if (verifyingToken === token) {
+        verifying = null
+        verifyingToken = null
+      }
+    })
+    return verifying
   }
 
   async function getUser(jwt?: string): Promise<Result<{ user: User | null }>> {
@@ -397,15 +435,8 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
       // A session kept through a transient refresh failure must not count as signed in once its token expired.
       if (typeof claims.exp === 'number' && claims.exp <= Date.now() / 1000)
         return { data: null, error: new ConsoleAuthError('JWT has expired', 401, 'bad_jwt', 'AuthInvalidJwtError') }
-      // Like the previous client, a locally stored token is only trusted once the
-      // provider has accepted it; one round trip per token, not per call.
-      if (verifiedToken !== token) {
-        const { error: userError } = await getUser(token)
-        if (userError)
-          return { data: null, error: userError }
-        verifiedToken = token
-      }
-      return { data: { claims, header: decodeJwtHeader(token) ?? {}, signature: token.split('.')[2] ?? '' }, error: null }
+      // Adopted or restored tokens are confirmed once; provider-issued ones are already marked.
+      return verifyAccessToken(token, claims)
     },
     onAuthStateChange(callback: Listener) {
       listeners.add(callback)

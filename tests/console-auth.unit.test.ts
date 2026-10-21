@@ -52,12 +52,9 @@ describe('console auth client', () => {
     expect(JSON.parse(storage.getItem(SESSION_STORAGE_KEY)!).user.id).toBe('user-1')
     await Promise.resolve()
     expect(events).toEqual(['INITIAL_SESSION', 'SIGNED_IN'])
-    // Claims are trusted only after the provider confirmed the token, once per token.
-    fetchMock.mockResolvedValueOnce(json({ id: 'user-1' }))
+    // A token just issued by the provider is already confirmed; no extra /user round trip.
     expect((await auth.getClaims()).data?.claims.sub).toBe('user-1')
-    expect(lastCall().url).toBe(`${BASE}/private/console/auth/user`)
-    expect((await auth.getClaims()).data?.claims.sub).toBe('user-1')
-    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
     auth.dispose()
   })
 
@@ -126,15 +123,28 @@ describe('console auth client', () => {
     expect(headers.get('Authorization')).toMatch(/^Bearer /)
     expect(storage.getItem(SESSION_STORAGE_KEY)).toBeNull()
     expect(events).toContain('SIGNED_OUT')
+    auth.dispose()
+  })
 
-    // A provider outage still ends the local session; the error is reported, not swallowed.
+  it('clears the local session on sign-out even when the provider is unreachable', async () => {
     storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session()))
     const offline = createConsoleAuthClient({ baseURL: BASE })
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
     expect((await offline.signOut()).error?.name).toBe('AuthRetryableFetchError')
     expect(storage.getItem(SESSION_STORAGE_KEY)).toBeNull()
-    auth.dispose()
     offline.dispose()
+  })
+
+  it('keeps claims during a transient /user outage and rejects only AuthApiError', async () => {
+    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session()))
+    const auth = createConsoleAuthClient({ baseURL: BASE })
+    fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    expect((await auth.getClaims()).data?.claims.sub).toBe('user-1')
+    fetchMock.mockResolvedValueOnce(json({ msg: 'invalid JWT' }, 401))
+    const rejected = await auth.getClaims()
+    expect(rejected.data).toBeNull()
+    expect(rejected.error?.name).toBe('AuthApiError')
+    auth.dispose()
   })
 
   it('installs a session from tokens by loading the user, like the previous client', async () => {
