@@ -23,7 +23,7 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', async () => {
   }
 })
 
-const { get } = await import('../supabase/functions/_backend/public/bundle/get.ts')
+const { BUNDLE_SUMMARY_COLUMNS, get } = await import('../supabase/functions/_backend/public/bundle/get.ts')
 
 const apikey = {
   key: 'test-apikey',
@@ -140,5 +140,38 @@ describe('bundle GET handler', () => {
     expect(await response.json()).toEqual([row])
     expect(chain.eqCalls).not.toContainEqual(['deleted', false])
     expect(chain.eqCalls).toContainEqual(['name', '1.0.0'])
+  })
+
+  it('returns full rows by default', async () => {
+    const chain = makeSupabaseChain({ data: [], error: null })
+    supabaseApikeyMock.mockReturnValue(chain)
+
+    await get(createContext({ userId: 'user-1' }), { app_id: 'com.example.app' }, apikey)
+    expect(chain.select).toHaveBeenCalledWith('*')
+    expect(chain.range).toHaveBeenCalledWith(0, 49)
+  })
+
+  it('fields=summary skips manifest and native_packages', async () => {
+    const chain = makeSupabaseChain({ data: [], error: null })
+    supabaseApikeyMock.mockReturnValue(chain)
+
+    await get(createContext({ userId: 'user-1' }), { app_id: 'com.example.app', fields: 'summary' }, apikey)
+    expect(chain.select).toHaveBeenCalledWith(BUNDLE_SUMMARY_COLUMNS)
+    expect(BUNDLE_SUMMARY_COLUMNS).not.toMatch(/manifest,|native_packages/)
+    expect(BUNDLE_SUMMARY_COLUMNS).toContain('manifest_count')
+  })
+
+  it('limit sets the page size and page counts in that size', async () => {
+    const chain = makeSupabaseChain({ data: [], error: null })
+    supabaseApikeyMock.mockReturnValue(chain)
+
+    await get(createContext({ userId: 'user-1' }), { app_id: 'com.example.app', limit: '1000', page: '2' }, apikey)
+    expect(chain.range).toHaveBeenCalledWith(2000, 2999)
+  })
+
+  it.each(['0', '1001', 'abc'])('rejects limit=%s', async (limit) => {
+    const error = await get(createContext({ userId: 'user-1' }), { app_id: 'com.example.app', limit }, apikey).catch(caught => caught) as HTTPException
+    expect(error).toBeInstanceOf(HTTPException)
+    expect(causeErrorCode(error)).toBe('invalid_query')
   })
 })

@@ -1,5 +1,6 @@
 import type { CapgoClient } from '../utils'
 import type { AppRow } from '../types/api'
+import type { CliPreflightResult } from './preflight'
 import { log } from '@clack/prompts'
 import { buildCliRequestHeaders } from '../analytics/cli-headers'
 import { CliUserError } from '../shared/cli-user-error'
@@ -191,18 +192,22 @@ export async function checkAppIdsExist(
   return results
 }
 
-/** Fail unless the org 2FA policy lets this key act on the app. */
+/**
+ * Fail unless the org 2FA policy lets this key act on the app. Returns the preflight
+ * result (user and org ids) so callers need no extra lookup; null when Capgo was unreachable.
+ */
 export async function check2FAComplianceForApp(
   client: CapgoClient,
   appid: string,
   silent = false,
-): Promise<void> {
-  await runCliPreflight(client, { appId: appid }, { silent, telemetryFunctionName: 'check2FAComplianceForApp' })
+): Promise<CliPreflightResult | null> {
+  return runCliPreflight(client, { appId: appid }, { silent, telemetryFunctionName: 'check2FAComplianceForApp' })
 }
 
 /**
  * Fail unless the app exists for this key and the key holds `requiredPermissionKey`
- * (2FA policy included unless `skip2FACheck`). One backend preflight call.
+ * (2FA policy included unless `skip2FACheck`). One backend preflight call; its result
+ * carries the app's org id and the key's user id (null when Capgo was unreachable).
  */
 export async function checkAppExistsAndHasPermissionOrgErr(
   client: CapgoClient,
@@ -212,8 +217,8 @@ export async function checkAppExistsAndHasPermissionOrgErr(
   silent = false,
   skip2FACheck = false,
   channelId?: number | null,
-) {
-  await runCliPreflight(client, {
+): Promise<CliPreflightResult | null> {
+  return runCliPreflight(client, {
     appId: appid,
     channelId,
     permission: requiredPermissionKey,
@@ -224,7 +229,6 @@ export async function checkAppExistsAndHasPermissionOrgErr(
     permissionDeniedErrorMessage: `Insufficient permissions for app. Required RBAC permission for this action: ${requiredPermissionKey}.`,
     telemetryFunctionName: 'checkAppExistsAndHasPermissionOrgErr',
   })
-  return true
 }
 
 export type { AppOptions as Options } from '../schemas/app'

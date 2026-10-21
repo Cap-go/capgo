@@ -161,9 +161,20 @@ describe('hosted MCP protocol', () => {
       method: 'tools/call',
       params: { name: 'capgo_list_bundles', arguments: { appId: 'com.example.app', page: 1 } },
     }, ctx)
-    expect(calls).toEqual([{ method: 'GET', path: '/bundle', query: { app_id: 'com.example.app', page: 1 } }])
+    expect(calls).toEqual([{ method: 'GET', path: '/bundle', query: { app_id: 'com.example.app', page: 1, fields: 'summary' } }])
     expect(response?.result).toMatchObject({ content: [{ type: 'text' }] })
     expect(response?.result).not.toHaveProperty('isError')
+  })
+
+  it.concurrent('keeps full bundle rows for single-bundle lookups', async () => {
+    const { ctx, calls } = fakeContext([{ id: 1, name: '1.0.0' }])
+    await handleJsonRpcMessage({
+      jsonrpc: '2.0',
+      id: 41,
+      method: 'tools/call',
+      params: { name: 'capgo_list_bundles', arguments: { appId: 'com.example.app', version: '1.0.0' } },
+    }, ctx)
+    expect(calls).toEqual([{ method: 'GET', path: '/bundle', query: { app_id: 'com.example.app', version: '1.0.0' } }])
   })
 
   it.concurrent('maps channel deploys to POST /channel without undefined fields', async () => {

@@ -950,8 +950,9 @@ export async function getRemoteConfig(silent = false, signal?: AbortSignal, apik
   }
   const localConfig = await getLocalConfig(silent)
   const host = localConfig.hostApi
+  // A cached config needs no request, so callers with an abort signal (telemetry) reuse it too.
   const cached = cachedRemoteConfig.get(host)
-  if (!signal && cached)
+  if (cached)
     return finish(cached)
   const inFlight = remoteConfigInFlight.get(host)
   if (!signal && inFlight)
@@ -969,8 +970,7 @@ export async function getRemoteConfig(silent = false, signal?: AbortSignal, apik
         throw new Error(`HTTP error! status: ${response.status}`)
       const data = await response.json() as CapgoConfig
       const merged = { ...data, ...localConfig } as CapgoConfig
-      if (!signal)
-        cachedRemoteConfig.set(host, merged)
+      cachedRemoteConfig.set(host, merged)
       return { ...merged }
     }
     catch {
@@ -2694,6 +2694,7 @@ export async function getRemoteChecksums(
   const { data, error } = await invokeCapgoCliApi<{
     bundle_name?: string | null
     bundle_id?: number | null
+    checksum?: string | null
   }>(`channel/current-bundle?${params.toString()}`, {
     apikey,
     method: 'GET',
@@ -2703,6 +2704,9 @@ export async function getRemoteChecksums(
 
   if (error || !data?.bundle_name)
     return null
+  // The API returns the linked bundle checksum; older self-hosted backends need a bundle lookup.
+  if (data.checksum !== undefined)
+    return data.checksum
 
   const { fetchBundleVersionRow } = await import('./api/versions')
   // Missing bundle → null; other lookup failures propagate so checksum checks are not skipped.
@@ -2868,9 +2872,13 @@ export async function checkCompatibilityCloud(
   packageJsonPath: string | undefined,
   nodeModules: string | undefined,
   httpOptions: CliHttpOptions = {},
+  /** Native packages of the channel bundle when the caller already loaded them. */
+  remoteNativePackages?: NativePackage[],
 ) {
   const dependenciesObject = await getLocalDependencies(packageJsonPath, nodeModules)
-  const mappedRemoteNativePackages = await getRemoteDependencies(apikey, appId, channel, httpOptions)
+  const mappedRemoteNativePackages = remoteNativePackages
+    ? convertNativePackages(remoteNativePackages)
+    : await getRemoteDependencies(apikey, appId, channel, httpOptions)
 
   const finalDependencies: Compatibility[] = dependenciesObject
     .filter(a => !!a.native)

@@ -1,5 +1,6 @@
 import type { CapgoClient } from '../src/utils.ts'
 import { describe, expect, it } from 'bun:test'
+import { checkVersionNotUsedInChannel } from '../src/api/channels.ts'
 import { cleanupAppVersions, deleteSpecificVersion, getLatestAppVersion, getVersionData, getVersionDataById } from '../src/api/versions.ts'
 import { CliUserError } from '../src/shared/cli-user-error.ts'
 
@@ -55,11 +56,14 @@ describe('bundle lookups use one filtered request', () => {
     expect(new URL(calls[0].path, 'https://example.test/').searchParams.get('id')).toBe('7')
   })
 
-  it('getLatestAppVersion only reads the first page', async () => {
-    const { calls, invoke } = recordingInvoke([{ data: Array.from({ length: 50 }, (_, i) => ({ ...bundleRow, id: 100 - i })), error: null }])
+  it('getLatestAppVersion reads a single one-row page', async () => {
+    const { calls, invoke } = recordingInvoke([{ data: [{ ...bundleRow, id: 100 }], error: null }])
     const row = await getLatestAppVersion('key', 'com.test.app', { silent: true, invoke })
     expect(row?.id).toBe(100)
     expect(calls).toHaveLength(1)
+    const url = new URL(calls[0].path, 'https://example.test/')
+    expect(url.searchParams.get('page')).toBe('0')
+    expect(url.searchParams.get('limit')).toBe('1')
   })
 })
 
@@ -110,5 +114,27 @@ describe('cleanupAppVersions', () => {
     await expect(cleanupAppVersions('com.test.app', { keep: 1, dryRun: false }, { apikey: 'key', silent: true, invoke }))
       .rejects
       .toThrow(/unexpected response/)
+  })
+})
+
+describe('checkVersionNotUsedInChannel', () => {
+  it('asks the API only for channels linked to the bundle', async () => {
+    const urls: string[] = []
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (async (input: string | URL | Request) => {
+      urls.push(String(input))
+      return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }) as typeof fetch
+    try {
+      const target = { apikey: 'key', apiHost: 'http://127.0.0.1:9' } as CapgoClient
+      await checkVersionNotUsedInChannel(target, 'com.test.app', bundleRow as any, { silent: true, apikey: 'key' })
+    }
+    finally {
+      globalThis.fetch = originalFetch
+    }
+    expect(urls).toHaveLength(1)
+    const url = new URL(urls[0])
+    expect(url.pathname).toEndWith('/private/cli/channels')
+    expect(url.searchParams.get('linked_version_id')).toBe('7')
   })
 })

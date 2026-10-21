@@ -10,6 +10,7 @@ import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { safeParseSchema } from '../../utils/schema_validation.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
+import { MAX_MANIFEST_ENTRIES } from '../../utils/manifest_limits.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 import { uploadCliAppIcon } from './storage_icon.ts'
 
@@ -65,6 +66,10 @@ const channelsQuerySchema = z.object({
 
 const CHANNELS_PAGE_SIZE = 1000
 const CHANNELS_MAX_PAGES = 50
+
+const MANIFEST_PAGE_SIZE = 1000
+// MAX_MANIFEST_ENTRIES (10k) rows plus one page of headroom.
+const MANIFEST_MAX_PAGES = Math.ceil(MAX_MANIFEST_ENTRIES / MANIFEST_PAGE_SIZE) + 1
 
 const manifestQuerySchema = z.object({
   app_version_id: z.coerce.number().int().positive(),
@@ -459,11 +464,23 @@ app.post('/bundles/deleted', middlewareKey(), versionedRoute<CliContext>({
 app.get('/manifest', middlewareKey(), versionedRoute<CliContext>({
   [CLI_API_2025_10_01]: async (c) => {
     const { app_version_id: appVersionId } = parseQuery(c, manifestQuerySchema, ['app_version_id'])
-    const data = unwrap(await callerClient(c)
-      .from('manifest')
-      .select('file_name, file_hash')
-      .eq('app_version_id', appVersionId), 'cannot_get_manifest', 'Cannot get manifest')
+    const supabase = callerClient(c)
+    const rows: { file_name: string | null, file_hash: string | null }[] = []
+    // A bundle can hold up to MAX_MANIFEST_ENTRIES files but PostgREST caps a response at
+    // 1000 rows: page explicitly so large bundles are never silently truncated.
+    for (let page = 0; page < MANIFEST_MAX_PAGES; page++) {
+      const from = page * MANIFEST_PAGE_SIZE
+      const data = unwrap(await supabase
+        .from('manifest')
+        .select('file_name, file_hash')
+        .eq('app_version_id', appVersionId)
+        .order('id')
+        .range(from, from + MANIFEST_PAGE_SIZE - 1), 'cannot_get_manifest', 'Cannot get manifest') ?? []
+      rows.push(...data)
+      if (data.length < MANIFEST_PAGE_SIZE)
+        break
+    }
 
-    return c.json(data ?? [])
+    return c.json(rows)
   },
 }))

@@ -38,7 +38,32 @@ describe('fetchBundlePages pagination', () => {
     expect(versions).toEqual([])
   })
 
-  it('stops paging when a page returns fewer than 50 bundles', async () => {
+  it('asks for 1000-row summary pages and stops after a short page', async () => {
+    const paths: string[] = []
+    const versions = await getActiveAppVersions('test-key', 'com.test.app', {
+      invoke: (async (path: string) => {
+        paths.push(path)
+        return { data: Array.from({ length: 690 }, (_, index) => makeBundleRow(index)), error: null }
+      }) as any,
+    })
+    expect(versions).toHaveLength(690)
+    expect(paths).toHaveLength(1)
+    const url = new URL(paths[0], 'https://example.test/')
+    expect(url.searchParams.get('limit')).toBe('1000')
+    expect(url.searchParams.get('fields')).toBe('summary')
+  })
+
+  it('keeps paging while the server returns full 1000-row pages', async () => {
+    const versions = await getActiveAppVersions('test-key', 'com.test.app', {
+      invoke: createInvokeStub({
+        0: async () => ({ data: Array.from({ length: 1000 }, (_, index) => makeBundleRow(index)), error: null }),
+        1: async () => ({ data: [makeBundleRow(1000)], error: null }),
+      }),
+    })
+    expect(versions).toHaveLength(1001)
+  })
+
+  it('stops paging when a page returns fewer than 50 bundles (backend without limit support)', async () => {
     const firstPage = Array.from({ length: 50 }, (_, index) => makeBundleRow(index))
     const secondPage = [makeBundleRow(50)]
     const versions = await getActiveAppVersions('test-key', 'com.test.app', {

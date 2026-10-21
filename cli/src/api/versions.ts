@@ -25,7 +25,9 @@ interface CapgoHttpOptions {
   apiHost?: string
 }
 
-const BUNDLE_PAGE_SIZE = 50
+const LEGACY_BUNDLE_PAGE_SIZE = 50
+// Bundle list page size (GET /bundle `limit`, capped server-side at PostgREST max_rows).
+const BUNDLE_LIST_LIMIT = 1000
 
 export type BundleVersionLookupRow = Pick<
   AppVersionRow,
@@ -41,6 +43,7 @@ export async function fetchBundleVersionRow(
   const params = new URLSearchParams({
     app_id: appId,
     version,
+    fields: 'summary',
   })
   if (options.includeDeleted)
     params.set('include_deleted', '1')
@@ -121,13 +124,16 @@ async function throwBundleHttpInvokeError(
   throw new Error(message, { cause: error })
 }
 
+/** A bundle row without the heavy per-file `manifest` and `native_packages` arrays. */
+export type BundleSummaryRow = Omit<AppVersionRow, 'manifest' | 'native_packages'>
+
 async function fetchBundlePages(appid: string, options: CapgoHttpOptions & Pick<VersionOptions, 'invoke'>) {
   const invoke = options.invoke ?? invokeCapgoCliApi
-  const all: AppVersionRow[] = []
+  const all: BundleSummaryRow[] = []
   let page = 0
   while (true) {
-    const params = new URLSearchParams({ app_id: appid, page: String(page) })
-    const { data, error } = await invoke<AppVersionRow[]>(
+    const params = new URLSearchParams({ app_id: appid, page: String(page), limit: String(BUNDLE_LIST_LIMIT), fields: 'summary' })
+    const { data, error } = await invoke<BundleSummaryRow[]>(
       `bundle?${params.toString()}`,
       {
         apikey: options.apikey,
@@ -139,10 +145,9 @@ async function fetchBundlePages(appid: string, options: CapgoHttpOptions & Pick<
     if (error)
       await throwBundleHttpInvokeError(appid, error, 'list', !!options.silent, 'app.read_bundles')
     const batch = Array.isArray(data) ? data : []
-    if (!batch.length)
-      break
     all.push(...batch)
-    if (batch.length < BUNDLE_PAGE_SIZE)
+    // A backend without `limit` support answers fixed 50-row pages: a full one may not be the last.
+    if (batch.length < BUNDLE_LIST_LIMIT && batch.length !== LEGACY_BUNDLE_PAGE_SIZE)
       break
     page += 1
   }
@@ -419,14 +424,14 @@ export async function getVersionDataById(
   return fetchSingleBundle(appid, { id }, { apikey, silent: options.silent, apiHost: options.apiHost, invoke: options.invoke })
 }
 
-/** Newest active bundle: only the first list page is needed. */
+/** Newest active bundle: a one-row list page. */
 export async function getLatestAppVersion(
   apikey: string,
   appid: string,
   options: VersionOptions = {},
 ) {
   const invoke = options.invoke ?? invokeCapgoCliApi
-  const params = new URLSearchParams({ app_id: appid, page: '0' })
+  const params = new URLSearchParams({ app_id: appid, page: '0', limit: '1' })
   const { data, error } = await invoke<AppVersionRow[]>(`bundle?${params.toString()}`, {
     apikey,
     method: 'GET',

@@ -89,9 +89,10 @@ export async function checkVersionNotUsedInChannel(
   }
 
   // Channel link reads run with the caller key so preview keys (no app.read_channels) still work.
+  // The API returns only channels linked to this version (stable or rollout).
   let data: Awaited<ReturnType<typeof fetchCliChannels>>
   try {
-    data = await fetchCliChannels(client, appid, channelName)
+    data = await fetchCliChannels(client, appid, channelName, { linkedVersionId: versionData.id })
   }
   catch (error) {
     if (!silent)

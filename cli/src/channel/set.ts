@@ -149,8 +149,9 @@ export async function setChannelInternal(channel: string, appId: string, options
   }
 
   const client = await createCapgoClient(options.apikey, options.apiHost)
-  await check2FAComplianceForApp(client, appId, silent)
-  const userId = await resolveUserIdFromApiKey(client, options.apikey)
+  // The preflight already resolves the key's user and the app's org: no extra lookups.
+  const preflight = await check2FAComplianceForApp(client, appId, silent)
+  const userId = preflight?.userId ?? await resolveUserIdFromApiKey(client, options.apikey)
 
   const {
     bundle,
@@ -307,7 +308,7 @@ export async function setChannelInternal(channel: string, appId: string, options
   if (hasBundlePromotion || disableUnlinksRollout)
     await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'channel.promote_bundle', silent, true, existingChannel.id)
 
-  const orgId = await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
+  const orgId = preflight?.orgId ?? await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
 
   const channelPayload: ChannelInsert = {
     created_by: userId,
