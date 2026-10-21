@@ -421,7 +421,9 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 
 export type PortalFlow = 'cancel_subscription'
 
-export async function getActiveSubscriptionId(c: Context, customerId: string) {
+// known is false on a stripe_info read error: the subscription may exist, so callers must not
+// treat null as "no subscription" for destructive work (e.g. spare-card detach).
+export async function lookupActiveSubscriptionId(c: Context, customerId: string) {
   const { data, error } = await supabaseAdmin(c)
     .from('stripe_info')
     .select('subscription_id, status')
@@ -429,11 +431,16 @@ export async function getActiveSubscriptionId(c: Context, customerId: string) {
     .maybeSingle()
   if (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getActiveSubscriptionId', error })
-    return null
+    return { subscriptionId: null as string | null, known: false }
   }
   if (!data?.subscription_id || data.status === 'canceled' || data.status === 'deleted')
-    return null
-  return data.subscription_id
+    return { subscriptionId: null as string | null, known: true }
+  return { subscriptionId: data.subscription_id, known: true }
+}
+
+export async function getActiveSubscriptionId(c: Context, customerId: string) {
+  const { subscriptionId } = await lookupActiveSubscriptionId(c, customerId)
+  return subscriptionId
 }
 
 export async function createPortal(c: Context, customerId: string, callbackUrl: string, flow?: PortalFlow) {

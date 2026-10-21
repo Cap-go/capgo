@@ -3,15 +3,22 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   findLatestOpenSubscriptionInvoice: vi.fn(),
   getActiveSubscriptionId: vi.fn(),
+  lookupActiveSubscriptionId: vi.fn(),
   syncSubscriptionData: vi.fn(),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/stripe.ts', () => ({
   findLatestOpenSubscriptionInvoice: mocks.findLatestOpenSubscriptionInvoice,
   getActiveSubscriptionId: mocks.getActiveSubscriptionId,
+  lookupActiveSubscriptionId: mocks.lookupActiveSubscriptionId,
   getStripe: vi.fn(),
   syncSubscriptionData: mocks.syncSubscriptionData,
 }))
+
+function mockActiveSubscription(subscriptionId: string | null, known = true) {
+  mocks.getActiveSubscriptionId.mockResolvedValue(subscriptionId)
+  mocks.lookupActiveSubscriptionId.mockResolvedValue({ subscriptionId, known })
+}
 
 const {
   createCardSetupIntent,
@@ -49,6 +56,7 @@ function createBillingContext(stripe = createStripe(), publishableKey = 'pk_test
 
 beforeEach(() => {
   vi.resetAllMocks()
+  mockActiveSubscription(null)
 })
 
 describe('cancel reason parsing', () => {
@@ -70,7 +78,7 @@ describe('cancel reason parsing', () => {
 describe('scheduleSubscriptionCancel', () => {
   it('cancels at period end and stores the reason on the subscription', async () => {
     const stripe = createStripe()
-    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    mockActiveSubscription('sub_123')
     stripe.subscriptions.retrieve.mockResolvedValue({
       status: 'active',
       cancel_at_period_end: true,
@@ -89,7 +97,7 @@ describe('scheduleSubscriptionCancel', () => {
   })
 
   it('refuses when there is no active subscription', async () => {
-    mocks.getActiveSubscriptionId.mockResolvedValue(null)
+    mockActiveSubscription(null)
     await expect(scheduleSubscriptionCancel(createContext(), createBillingContext(), 'unused')).rejects.toThrow()
   })
 })
@@ -97,7 +105,7 @@ describe('scheduleSubscriptionCancel', () => {
 describe('resumeSubscription', () => {
   it('clears both period-end and dated cancellation', async () => {
     const stripe = createStripe()
-    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    mockActiveSubscription('sub_123')
     stripe.subscriptions.retrieve.mockResolvedValue({ status: 'active', cancel_at_period_end: false, cancel_at: null, items: { data: [] } })
 
     await resumeSubscription(createContext(), createBillingContext(stripe))
@@ -143,7 +151,7 @@ describe('savePaymentMethodFromIntent', () => {
     const stripe = createStripe()
     stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_1' })
     stripe.paymentMethods.retrieve.mockResolvedValue({ id: 'pm_1', customer: 'cus_123', card: { brand: 'visa', last4: '4242', exp_month: 4, exp_year: 2030 } })
-    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    mockActiveSubscription('sub_123')
 
     const card = await savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123')
 
@@ -179,7 +187,7 @@ describe('backup card', () => {
     const stripe = createStripe()
     const main = card('pm_main', 'fp_main')
     mockSavedCards(stripe, null, [card('pm_new', 'fp_new'), main])
-    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    mockActiveSubscription('sub_123')
     stripe.subscriptions.retrieve.mockResolvedValue({ default_payment_method: main })
 
     const cards = await getSavedCards(createContext(), createBillingContext(stripe))
@@ -267,7 +275,7 @@ describe('backup card', () => {
     const subscriptionCard = card('pm_sub', 'fp_sub')
     const customerDefault = card('pm_cust', 'fp_cust')
     mockSavedCards(stripe, customerDefault, [card('pm_back', 'fp_back'), customerDefault, subscriptionCard])
-    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    mockActiveSubscription('sub_123')
     stripe.subscriptions.retrieve.mockResolvedValue({ default_payment_method: subscriptionCard })
 
     await removeBackupCard(createContext(), createBillingContext(stripe), 'pm_back')
@@ -281,7 +289,7 @@ describe('backup card', () => {
     const subscriptionCard = card('pm_sub', 'fp_sub')
     const customerDefault = card('pm_cust', 'fp_cust')
     mockSavedCards(stripe, customerDefault, [customerDefault, subscriptionCard])
-    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    mockActiveSubscription('sub_123')
     stripe.subscriptions.retrieve.mockResolvedValue({ default_payment_method: subscriptionCard })
 
     const cards = await getSavedCards(createContext(), createBillingContext(stripe))
@@ -296,7 +304,7 @@ describe('backup card', () => {
     const subscriptionCard = card('pm_sub', 'fp_sub')
     const customerDefault = card('pm_cust', 'fp_cust')
     mockSavedCards(stripe, customerDefault, [card('pm_back', 'fp_back'), customerDefault, subscriptionCard])
-    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    mockActiveSubscription('sub_123')
     stripe.subscriptions.retrieve.mockResolvedValue({ default_payment_method: subscriptionCard })
 
     const cards = await getSavedCards(createContext(), createBillingContext(stripe))
@@ -353,7 +361,7 @@ describe('backup card', () => {
     const stripe = createStripe()
     const main = card('pm_main', 'fp_main')
     mockSavedCards(stripe, main, [card('pm_back', 'fp_back'), main, card('pm_old', 'fp_old')])
-    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    mockActiveSubscription('sub_123')
     stripe.subscriptions.retrieve.mockRejectedValue(new Error('stripe down'))
 
     const cards = await getSavedCards(createContext(), createBillingContext(stripe))
@@ -362,6 +370,20 @@ describe('backup card', () => {
     await removeBackupCard(createContext(), createBillingContext(stripe), 'pm_back')
     expect(stripe.paymentMethods.detach).toHaveBeenCalledTimes(1)
     expect(stripe.paymentMethods.detach).toHaveBeenCalledWith('pm_back')
+  })
+
+  it('does not detach spare cards when stripe_info lookup fails', async () => {
+    const stripe = createStripe()
+    const customerDefault = card('pm_cust', 'fp_cust')
+    // Subscription card A is not the customer default; a failed DB lookup must not treat A as spare.
+    mockSavedCards(stripe, customerDefault, [card('pm_back', 'fp_back'), customerDefault, card('pm_sub', 'fp_sub')])
+    mockActiveSubscription(null, false)
+    stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_back' })
+    stripe.paymentMethods.retrieve.mockResolvedValue(card('pm_back', 'fp_back'))
+
+    await savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup')
+
+    expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
   })
 })
 

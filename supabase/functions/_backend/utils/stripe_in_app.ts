@@ -3,7 +3,7 @@ import type Stripe from 'stripe'
 import type { BillingAccount } from './stripe_billing.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { findLatestOpenSubscriptionInvoice, getActiveSubscriptionId, getStripe, syncSubscriptionData } from './stripe.ts'
+import { findLatestOpenSubscriptionInvoice, getActiveSubscriptionId, getStripe, lookupActiveSubscriptionId, syncSubscriptionData } from './stripe.ts'
 import { getBillingAccountForCustomer, getStripePublishableKey, isStripeConfiguredForAccount } from './stripe_billing.ts'
 
 // In-app replacements for the Stripe billing portal and hosted invoice page.
@@ -116,7 +116,10 @@ function isExpired(paymentMethod: Stripe.PaymentMethod, now = new Date()) {
 // known is false when the lookup failed: the subscription card is then unknown, not absent.
 async function getSubscriptionDefaultPaymentMethod(c: Context, stripe: Stripe, customerId: string) {
   try {
-    const subscriptionId = await getActiveSubscriptionId(c, customerId)
+    // getActiveSubscriptionId collapses DB errors to null; use the typed lookup for detach safety.
+    const { subscriptionId, known } = await lookupActiveSubscriptionId(c, customerId)
+    if (!known)
+      return { paymentMethod: null, known: false }
     if (!subscriptionId)
       return { paymentMethod: null, known: true }
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, { expand: ['default_payment_method'] })
