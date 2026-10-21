@@ -57,11 +57,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <BillingModal :title="props.title" :description="props.description" size="checkout" flush @close="emit('close')">
+  <BillingModal :title="props.title" :description="props.description" size="checkout" flush headerless @close="emit('close')">
     <div v-if="isLoading" class="flex justify-center py-16" data-test="embedded-checkout-loading">
       <span class="d-loading d-loading-spinner d-loading-lg text-blue-500" />
     </div>
-    <p v-if="loadError" class="m-5 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
+    <p v-if="loadError" class="mx-5 mb-5 mt-14 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
       {{ loadError }}
     </p>
     <!-- Full-bleed: no rounding or surface of our own so the Stripe iframe fills the modal body. -->
