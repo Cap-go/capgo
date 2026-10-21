@@ -913,7 +913,18 @@ function toCheckoutSessionResult(session: Stripe.Checkout.Session, publishableKe
   return { url: null, clientSecret: session.client_secret, publishableKey, sessionId: session.id }
 }
 
-export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string, datafastAttribution?: DatafastAttribution, affonsoReferral?: string | null, extraMau?: ExtraMauCheckout, embedded?: boolean): Promise<CheckoutSessionResult> {
+export interface CheckoutOptions {
+  clientReferenceId?: string
+  attributionId?: string
+  datafastAttribution?: DatafastAttribution
+  affonsoReferral?: string | null
+  extraMau?: ExtraMauCheckout
+  // Embedded session rendered in Capgo instead of the hosted page.
+  embedded?: boolean
+}
+
+export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, options: CheckoutOptions = {}): Promise<CheckoutSessionResult> {
+  const { clientReferenceId, attributionId, datafastAttribution, affonsoReferral, extraMau, embedded } = options
   const billingAccount = await getBillingAccountForCustomer(c, customerId)
   assertBillingAccountReachableForUser(c, billingAccount, customerId)
   if (!isStripeConfiguredForAccount(c, billingAccount))

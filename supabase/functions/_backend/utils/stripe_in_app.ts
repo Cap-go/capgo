@@ -27,6 +27,7 @@ export interface InAppBillingContext {
   customerId: string
   billingAccount: BillingAccount
   stripe: Stripe
+  // Empty when Stripe.js is not configured: server-only actions still work.
   publishableKey: string
 }
 
@@ -75,10 +76,14 @@ export async function getInAppBillingContext(c: Context, customerId: string): Pr
   const billingAccount = await getBillingAccountForCustomer(c, customerId)
   if (!isStripeConfiguredForAccount(c, billingAccount))
     throw simpleError('billing_account_unavailable', 'Billing is temporarily unavailable for this organization', { billingAccount })
-  const publishableKey = getStripePublishableKey(c, billingAccount)
-  if (!publishableKey)
-    throw simpleError('stripe_publishable_key_missing', 'In-app billing is not configured for this organization', { billingAccount })
-  return { customerId, billingAccount, stripe: getStripe(c, billingAccount), publishableKey }
+  return { customerId, billingAccount, stripe: getStripe(c, billingAccount), publishableKey: getStripePublishableKey(c, billingAccount) }
+}
+
+// Card forms and 3DS run in Stripe.js, which needs the account's publishable key.
+function requirePublishableKey(ctx: InAppBillingContext) {
+  if (!ctx.publishableKey)
+    throw simpleError('stripe_publishable_key_missing', 'Card entry is not configured for this organization', { billingAccount: ctx.billingAccount })
+  return ctx.publishableKey
 }
 
 function toCardSummary(paymentMethod: Stripe.PaymentMethod | null | undefined): CardSummary | null {
@@ -149,13 +154,14 @@ export async function getOpenInvoiceSummary(c: Context, ctx: InAppBillingContext
 }
 
 export async function createCardSetupIntent(ctx: InAppBillingContext) {
+  const publishableKey = requirePublishableKey(ctx)
   const setupIntent = await ctx.stripe.setupIntents.create({
     customer: ctx.customerId,
     // Renewals and credit auto top-up charge the card without the user present.
     usage: 'off_session',
     payment_method_types: ['card'],
   })
-  return { clientSecret: setupIntent.client_secret, publishableKey: ctx.publishableKey }
+  return { clientSecret: setupIntent.client_secret, publishableKey }
 }
 
 async function resolveConfirmedPaymentMethodId(ctx: InAppBillingContext, intentId: string) {
@@ -232,7 +238,9 @@ export async function scheduleSubscriptionCancel(c: Context, ctx: InAppBillingCo
 
 export async function resumeSubscription(c: Context, ctx: InAppBillingContext) {
   const subscriptionId = await requireActiveSubscriptionId(c, ctx)
+  // Clear both cancel styles: period end, and an explicit cancel_at date.
   await ctx.stripe.subscriptions.update(subscriptionId, {
+    cancel_at: '',
     cancel_at_period_end: false,
     cancellation_details: { feedback: '', comment: '' },
   })
@@ -276,7 +284,8 @@ export async function payOpenInvoice(c: Context, ctx: InAppBillingContext): Prom
       return { status: 'requires_payment_method', message: getStripeErrorMessage(error) }
   }
   const paymentIntent = await getInvoicePaymentIntent(ctx, invoice.id)
-  if (paymentIntent?.status === 'requires_action' && paymentIntent.client_secret)
+  // Without Stripe.js there is no way to run 3DS here; ask for another card instead.
+  if (paymentIntent?.status === 'requires_action' && paymentIntent.client_secret && ctx.publishableKey)
     return { status: 'requires_action', clientSecret: paymentIntent.client_secret, publishableKey: ctx.publishableKey }
   if (paymentIntent?.status === 'succeeded')
     return { status: 'paid' }
@@ -285,6 +294,7 @@ export async function payOpenInvoice(c: Context, ctx: InAppBillingContext): Prom
 
 // Lets the user pay the open invoice with a new card in one step (Payment Element).
 export async function getOpenInvoicePaymentSecret(c: Context, ctx: InAppBillingContext) {
+  const publishableKey = requirePublishableKey(ctx)
   const invoice = await findLatestOpenSubscriptionInvoice(c, ctx.customerId, ctx.billingAccount)
   if (!invoice?.id)
     return null
@@ -295,5 +305,5 @@ export async function getOpenInvoicePaymentSecret(c: Context, ctx: InAppBillingC
     // Save the new card so the next renewal does not fail again.
     await ctx.stripe.paymentIntents.update(paymentIntent.id, { setup_future_usage: 'off_session' })
   }
-  return { clientSecret: paymentIntent.client_secret, publishableKey: ctx.publishableKey }
+  return { clientSecret: paymentIntent.client_secret, publishableKey }
 }

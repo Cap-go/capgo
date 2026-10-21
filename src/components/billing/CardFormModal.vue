@@ -108,7 +108,16 @@ async function submit() {
       }
       intentId = setupIntent.id
     }
-    const { card } = await saveDefaultPaymentMethod(props.orgId, intentId)
+    let card: BillingCard | null = null
+    try {
+      card = (await saveDefaultPaymentMethod(props.orgId, intentId)).card
+    }
+    catch (error) {
+      // The invoice is already paid; only making the card the default failed.
+      if (props.mode !== 'invoice')
+        throw error
+      console.error('Cannot set default card after invoice payment', error)
+    }
     toast.success(props.mode === 'invoice' ? t('billing-invoice-paid') : t('billing-card-saved'))
     emit('saved', card)
   }

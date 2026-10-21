@@ -37,6 +37,8 @@ let loadRun = 0
 
 const orgId = computed(() => currentOrganization.value?.gid ?? '')
 const card = computed(() => overview.value?.card ?? null)
+// No publishable key: Stripe.js forms are unavailable, server-side actions still work.
+const canEnterCard = computed(() => !!overview.value?.publishableKey)
 const subscription = computed(() => overview.value?.subscription ?? null)
 const openInvoice = computed(() => overview.value?.openInvoice ?? null)
 const invoices = computed(() => overview.value?.invoices ?? [])
@@ -126,7 +128,10 @@ async function payNow() {
     return
   // No saved card: go straight to the card form.
   if (!card.value) {
-    showCardModal.value = 'invoice'
+    if (canEnterCard.value)
+      showCardModal.value = 'invoice'
+    else
+      toast.error(t('billing-payment-failed'))
     return
   }
   isPaying.value = true
@@ -138,7 +143,8 @@ async function payNow() {
       return
     }
     toast.error(result.message || t('billing-payment-failed'))
-    showCardModal.value = 'invoice'
+    if (canEnterCard.value)
+      showCardModal.value = 'invoice'
   }
   catch (error) {
     console.error('Cannot pay invoice', error)
@@ -298,7 +304,7 @@ onMounted(async () => {
             <p v-else class="mt-3 text-sm text-slate-600 dark:text-slate-300">
               {{ t('billing-no-card') }}
             </p>
-            <button type="button" class="d-btn d-btn-sm d-btn-outline mt-4" data-test="billing-update-card" @click="openCardForm">
+            <button v-if="canEnterCard" type="button" class="d-btn d-btn-sm d-btn-outline mt-4" data-test="billing-update-card" @click="openCardForm">
               {{ card ? t('billing-update-card') : t('billing-add-card') }}
             </button>
           </section>

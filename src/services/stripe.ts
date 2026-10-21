@@ -32,7 +32,15 @@ const stripeInstances = new Map<string, Promise<Stripe | null>>()
 export function getStripeJs(publishableKey: string) {
   let instance = stripeInstances.get(publishableKey)
   if (!instance) {
-    instance = loadStripe(publishableKey)
+    // Forget failed loads (network error, blocker) so a retry can try again.
+    instance = loadStripe(publishableKey).then((stripe) => {
+      if (!stripe)
+        stripeInstances.delete(publishableKey)
+      return stripe
+    }, (error) => {
+      stripeInstances.delete(publishableKey)
+      throw error
+    })
     stripeInstances.set(publishableKey, instance)
   }
   return instance

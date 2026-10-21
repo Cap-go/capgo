@@ -202,13 +202,15 @@ describe('stripe redirect URL allowlist', () => {
       'prod_test',
       '/app/success',
       '/app/cancel',
-      'org_123',
-      'legacy_visitor_123',
       {
-        visitorId: 'visitor_123',
-        sessionId: 'session_123',
+        clientReferenceId: 'org_123',
+        attributionId: 'legacy_visitor_123',
+        datafastAttribution: {
+          visitorId: 'visitor_123',
+          sessionId: 'session_123',
+        },
+        affonsoReferral: 'affonso_ref_123',
       },
-      'affonso_ref_123',
     )
 
     expect(result.url).toBe('https://pay.capgo.test/p/pay')
@@ -240,7 +242,7 @@ describe('stripe redirect URL allowlist', () => {
     } as any)
 
     const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
-    const result = await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', undefined, undefined, undefined, undefined, undefined, true)
+    const result = await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', { embedded: true })
 
     expect(result).toEqual({ url: null, clientSecret: 'cs_test_123_secret', publishableKey: 'pk_test_123', sessionId: 'cs_test_123' })
     const params = createSession.mock.calls[0][0]
@@ -263,7 +265,7 @@ describe('stripe redirect URL allowlist', () => {
     } as any)
 
     const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
-    const result = await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', undefined, undefined, undefined, undefined, undefined, true)
+    const result = await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', { embedded: true })
 
     expect(result).toEqual({ url: 'https://pay.capgo.test/p/pay' })
     expect(createSession.mock.calls[0][0]).not.toHaveProperty('ui_mode')

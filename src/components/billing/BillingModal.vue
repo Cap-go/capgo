@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconX from '~icons/heroicons/x-mark'
 
@@ -19,6 +19,9 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const titleId = useId()
+const box = ref<HTMLElement | null>(null)
+let previouslyFocused: HTMLElement | null = null
 
 const sizeClass = {
   md: 'max-w-lg',
@@ -32,30 +35,52 @@ function requestClose() {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape')
+    return
+  // Handled here so the window fallback below does not close twice.
+  event.stopPropagation()
+  requestClose()
+}
+
+// Escape while focus has left the dialog (e.g. on <body>); keys inside Stripe iframes never bubble.
+function onWindowKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape')
     requestClose()
 }
 
-onMounted(() => window.addEventListener('keydown', onKeydown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
+onMounted(async () => {
+  previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  window.addEventListener('keydown', onWindowKeydown)
+  await nextTick()
+  box.value?.focus()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onWindowKeydown)
+  // Return focus to the control that opened the dialog.
+  previouslyFocused?.focus?.()
+})
 </script>
 
 <template>
   <Teleport to="body">
-    <div
+    <dialog
+      open
       class="d-modal d-modal-open"
-      role="dialog"
       aria-modal="true"
-      aria-labelledby="billing-modal-title"
+      :aria-labelledby="titleId"
       @click.self="requestClose"
+      @keydown="onKeydown"
     >
       <div
-        class="d-modal-box w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+        ref="box"
+        tabindex="-1"
+        class="d-modal-box outline-none w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-0 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
         :class="sizeClass[props.size]"
       >
         <div class="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-slate-100 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
           <div class="min-w-0">
-            <h2 id="billing-modal-title" class="text-lg font-semibold leading-7 text-slate-950 dark:text-white">
+            <h2 :id="titleId" class="text-lg font-semibold leading-7 text-slate-950 dark:text-white">
               {{ props.title }}
             </h2>
             <p v-if="props.description" class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -80,6 +105,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           <slot name="footer" />
         </div>
       </div>
-    </div>
+    </dialog>
   </Teleport>
 </template>

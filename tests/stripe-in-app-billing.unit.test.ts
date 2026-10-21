@@ -14,9 +14,11 @@ vi.mock('../supabase/functions/_backend/utils/stripe.ts', () => ({
 }))
 
 const {
+  createCardSetupIntent,
   parseCancelComment,
   parseCancelFeedback,
   payOpenInvoice,
+  resumeSubscription,
   scheduleSubscriptionCancel,
   setDefaultPaymentMethodFromIntent,
 } = await import('../supabase/functions/_backend/utils/stripe_in_app.ts')
@@ -37,8 +39,8 @@ function createStripe() {
   }
 }
 
-function createBillingContext(stripe = createStripe()) {
-  return { customerId: 'cus_123', billingAccount: 'ee' as const, stripe: stripe as any, publishableKey: 'pk_test_123' }
+function createBillingContext(stripe = createStripe(), publishableKey = 'pk_test_123') {
+  return { customerId: 'cus_123', billingAccount: 'ee' as const, stripe: stripe as any, publishableKey }
 }
 
 beforeEach(() => {
@@ -85,6 +87,38 @@ describe('scheduleSubscriptionCancel', () => {
   it('refuses when there is no active subscription', async () => {
     mocks.getActiveSubscriptionId.mockResolvedValue(null)
     await expect(scheduleSubscriptionCancel(createContext(), createBillingContext(), 'unused')).rejects.toThrow()
+  })
+})
+
+describe('resumeSubscription', () => {
+  it('clears both period-end and dated cancellation', async () => {
+    const stripe = createStripe()
+    mocks.getActiveSubscriptionId.mockResolvedValue('sub_123')
+    stripe.subscriptions.retrieve.mockResolvedValue({ status: 'active', cancel_at_period_end: false, cancel_at: null, items: { data: [] } })
+
+    await resumeSubscription(createContext(), createBillingContext(stripe))
+
+    expect(stripe.subscriptions.update).toHaveBeenCalledWith('sub_123', {
+      cancel_at: '',
+      cancel_at_period_end: false,
+      cancellation_details: { feedback: '', comment: '' },
+    })
+  })
+})
+
+describe('without a publishable key', () => {
+  it('refuses to start a card form', async () => {
+    await expect(createCardSetupIntent(createBillingContext(createStripe(), ''))).rejects.toThrow()
+  })
+
+  it('asks for another card instead of an unrunnable 3DS step', async () => {
+    const stripe = createStripe()
+    mocks.findLatestOpenSubscriptionInvoice.mockResolvedValue({ id: 'in_123' })
+    stripe.invoices.pay.mockRejectedValue(Object.assign(new Error('requires action'), { code: 'invoice_payment_intent_requires_action' }))
+    stripe.invoicePayments.list.mockResolvedValue({ data: [{ status: 'open', payment: { payment_intent: 'pi_123' } }] })
+    stripe.paymentIntents.retrieve.mockResolvedValue({ id: 'pi_123', status: 'requires_action', client_secret: 'pi_123_secret' })
+
+    await expect(payOpenInvoice(createContext(), createBillingContext(stripe, ''))).resolves.toMatchObject({ status: 'requires_payment_method' })
   })
 })
 
