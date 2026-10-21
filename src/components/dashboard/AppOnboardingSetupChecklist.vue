@@ -2,6 +2,7 @@
 import type { OnboardingChannelEvent, OnboardingChannelEventProperties } from '~/utils/onboardingChannelAnalytics'
 import { computed, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { toast } from 'vue-sonner'
 import IconCopy from '~icons/ion/copy-outline'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconCheck from '~icons/lucide/check'
@@ -13,11 +14,13 @@ import IconLoader from '~icons/lucide/loader-2'
 import IconMessageCircle from '~icons/lucide/message-circle'
 import IconMinus from '~icons/lucide/minus'
 import { useAppOnboardingCliProgress } from '~/composables/useAppOnboardingCliProgress'
-import { getAppOnboardingStepIds } from '~/services/appOnboarding'
+import { getAppOnboardingStepIds, hasSupportedOtaTodoList, isOpenOnboardingStepStatus } from '~/services/appOnboarding'
 import { isAppOnboardingChecklistStep } from '~/utils/appOnboardingChecklist'
 import { APP_ONBOARDING_STEP_GUIDES } from '~/utils/appOnboardingGuides'
 import { hasDualOnboardingChecklists } from '~/utils/dualOnboardingChecklists'
+import { skipOnboardingStep } from '~/utils/onboardingSkipStep'
 import AppOnboardingAiAgentCard from './AppOnboardingAiAgentCard.vue'
+import AppOnboardingSkipStep from './AppOnboardingSkipStep.vue'
 import ChannelSetupOnboardingDialog from './ChannelSetupOnboardingDialog.vue'
 import TechnicalTeammateInviteCard from './TechnicalTeammateInviteCard.vue'
 
@@ -46,7 +49,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const panelId = useId()
-const { onboarding, rawOnboarding, hasChannel, refreshError, refreshOnboarding } = useAppOnboardingCliProgress(() => props.appId, () => props.initialOnboarding, () => props.active !== false)
+const { onboarding, rawOnboarding, hasChannel, refreshError, refreshOnboarding, applyOnboarding } = useAppOnboardingCliProgress(() => props.appId, () => props.initialOnboarding, () => props.active !== false)
 watch([rawOnboarding, hasChannel], ([value, observedChannel]) => emit('snapshot', value, observedChannel))
 const steps = computed(() => getAppOnboardingStepIds(onboarding.value.todo_list_version, onboarding.value.ota_todo_list_version).filter(isAppOnboardingChecklistStep).map((id, index) => ({
   id,
@@ -60,6 +63,9 @@ const currentStep = computed(() => steps.value.find(step => step.status !== 'don
 const selectedId = ref<string | null>(null)
 const selectedStep = computed(() => steps.value.find(step => step.id === selectedId.value) ?? currentStep.value ?? steps.value.at(-1)!)
 const isSelectedCurrent = computed(() => selectedStep.value.id === currentStep.value?.id)
+// v3/v4 live-update checklist: any open step can be skipped with a reason.
+const canSkipSelected = computed(() => hasSupportedOtaTodoList(onboarding.value) && isOpenOnboardingStepStatus(selectedStep.value.status))
+const skipping = ref(false)
 const isFirstStep = computed(() => selectedStep.value.index === 0)
 const guideHref = computed(() => APP_ONBOARDING_STEP_GUIDES[selectedStep.value.id])
 const guideLabel = computed(() => isFirstStep.value ? t('setup-checklist-manual-guide') : t('setup-checklist-task-guide', { task: selectedStep.value.title }))
@@ -97,6 +103,31 @@ watch(() => currentStep.value?.id, (id, previous) => {
 function selectStep(id: string) {
   selectedId.value = id
   checklistOpen.value = false
+}
+
+async function skipSelectedStep(reason: string) {
+  const id = selectedStep.value.id
+  const appId = props.appId
+  skipping.value = true
+  try {
+    const value = await skipOnboardingStep(appId, `ota.${id}`, reason)
+    if (appId !== props.appId)
+      return
+    if (value === undefined)
+      void refreshOnboarding()
+    else
+      applyOnboarding(value)
+    // Fall back to the next open task, unless the user picked another one meanwhile.
+    if (selectedStep.value.id === id)
+      selectedId.value = null
+  }
+  catch (error) {
+    console.error('Cannot skip onboarding step', error)
+    toast.error(t('setup-checklist-skip-step-error'))
+  }
+  finally {
+    skipping.value = false
+  }
 }
 
 function statusLabel(status: string | undefined) {
@@ -180,7 +211,7 @@ function statusLabel(status: string | undefined) {
               @click="selectStep(step.id)"
             >
               <IconCheck v-if="step.status === 'done'" class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" :aria-label="statusLabel(step.status)" />
-              <IconMinus v-else-if="step.status === 'skipped'" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="statusLabel(step.status)" />
+              <IconMinus v-else-if="step.status === 'skipped'" class="mt-0.5 h-5 w-5 shrink-0 text-slate-400 dark:text-slate-500" :aria-label="statusLabel(step.status)" />
               <IconCircle v-else class="mt-0.5 h-5 w-5 shrink-0" :class="currentStep?.id === step.id ? 'text-azure-500' : 'text-slate-300 dark:text-slate-600'" :aria-label="statusLabel(step.status)" />
               <span class="mt-0.5 shrink-0 text-xs text-slate-400 dark:text-slate-500" aria-hidden="true">{{ step.index + 1 }}.</span>
               <span class="min-w-0 flex-1 text-base leading-6" :class="{ 'font-medium': selectedStep.id === step.id }">
@@ -264,11 +295,13 @@ function statusLabel(status: string | undefined) {
             {{ t(selectedStep.id === 'add_channel' ? 'setup-checklist-channel-detection' : 'setup-checklist-follow-terminal') }}
           </p>
 
+          <AppOnboardingSkipStep v-if="canSkipSelected" :key="selectedStep.id" test-id="setup-checklist" :skipping="skipping" @skip="skipSelectedStep" />
+
           <output class="mt-7 block border-t border-slate-200 py-5 dark:border-white/15" aria-live="polite" aria-atomic="true">
             <span class="flex items-start gap-3 text-sm font-medium text-slate-800 dark:text-slate-200">
               <IconInfo v-if="refreshError" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
               <IconCheck v-else-if="selectedStep.status === 'done'" class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden="true" />
-              <IconMinus v-else-if="selectedStep.status === 'skipped'" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
+              <IconMinus v-else-if="selectedStep.status === 'skipped'" class="mt-0.5 h-5 w-5 shrink-0 text-slate-400" aria-hidden="true" />
               <IconLoader v-else class="mt-0.5 h-5 w-5 shrink-0 text-slate-400 motion-safe:animate-spin" aria-hidden="true" />
               <span>{{ refreshError ? t('setup-checklist-refresh-error') : selectedStep.status ? statusLabel(selectedStep.status) : isSelectedCurrent || selectedStep.id === 'add_channel' ? t(waitingMessageKey) : t('setup-checklist-future-task') }}</span>
             </span>

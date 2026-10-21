@@ -11,3 +11,14 @@ export function releasePgClient(
   if (client && 'release' in client)
     client.release?.(error)
 }
+
+/** Mirrors production beginWriteTransaction for unit mocks that replace utils/pg. */
+export async function beginWriteTransaction(client: { query: (queryText: string) => Promise<unknown> }) {
+  await client.query('BEGIN')
+}
+
+/** True for plain BEGIN and the production bounded BEGIN batch. */
+export function isBeginTransactionSql(sql: unknown): boolean {
+  const text = String(sql)
+  return text === 'BEGIN' || text.startsWith('BEGIN READ WRITE') || text.startsWith('BEGIN READ ONLY') || text.startsWith('BEGIN;')
+}

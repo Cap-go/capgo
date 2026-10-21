@@ -93,6 +93,13 @@ export function useAppOnboardingCliProgress(appId: MaybeRefOrGetter<string>, ini
   }
 
   const refreshOnboarding = () => refreshProgress(true)
+  // Apply a snapshot returned by a write and drop any older in-flight poll.
+  function applyOnboarding(value: unknown) {
+    generation += 1
+    refreshing = false
+    rawOnboarding.value = value
+    reportedOnboarding.value = parseAppOnboarding(value)
+  }
   watch(() => toValue(initialOnboarding), (value) => {
     rawOnboarding.value = value
     reportedOnboarding.value = parseAppOnboarding(value)
@@ -135,5 +142,5 @@ export function useAppOnboardingCliProgress(appId: MaybeRefOrGetter<string>, ini
     generation += 1
     stopPolling()
   })
-  return { onboarding, rawOnboarding, hasChannel, refreshError, refreshOnboarding }
+  return { onboarding, rawOnboarding, hasChannel, refreshError, refreshOnboarding, applyOnboarding }
 }
