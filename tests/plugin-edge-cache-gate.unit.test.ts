@@ -263,6 +263,18 @@ describe('plugin edge cache gate (UPDATES_EDGE_CACHE)', () => {
         expect(response.status).toBe(503)
       }
       expect(setAppStatus).not.toHaveBeenCalled()
+
+      // A batch looks the owner up once: a later event cannot fail after an
+      // earlier one was written (the retry would write it again).
+      vi.mocked(getAppOwnerWithEdgeCache).mockClear()
+      vi.mocked(getAppOwnerWithEdgeCache).mockResolvedValueOnce({ value: null, hit: true })
+      const event = { ...baseBody(deviceId(1)), action: 'app_moved_to_foreground' }
+      const request = new Request('http://plugin.example.test/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify([event, event]) })
+      markSnippetEdgeReplay(request, { endpoint: 'stats' })
+      const response = await app.fetch(request, {}, { waitUntil: () => {} } as any)
+      expect(response.status).toBe(200)
+      expect((await response.json() as { results: unknown[] }).results).toHaveLength(2)
+      expect(getAppOwnerWithEdgeCache).toHaveBeenCalledTimes(1)
     }
     finally {
       vi.mocked(getAppStatus).mockReset()

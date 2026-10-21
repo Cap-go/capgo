@@ -27,6 +27,28 @@ const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION = parse('7.17.0')
 const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6 = parse('6.14.25')
 
 type AppStatusResult = Awaited<ReturnType<typeof getAppStatus>>
+type OwnerLookup = Awaited<ReturnType<typeof getAppOwnerWithEdgeCache>>
+
+const ownerLookups = new WeakMap<Request, Map<string, Promise<OwnerLookup>>>()
+
+/**
+ * One owner lookup per request and app: a batch reuses its first event's
+ * lookup, so a lookup failure answers before any event of it is written (a
+ * replay retries the whole batch).
+ */
+function getRequestOwnerLookup(c: Context, appId: string, drizzleClient: ReturnType<typeof getDrizzleClient>, planActions: Array<'mau' | 'bandwidth'>) {
+  let lookups = ownerLookups.get(c.req.raw)
+  if (!lookups) {
+    lookups = new Map()
+    ownerLookups.set(c.req.raw, lookups)
+  }
+  let lookup = lookups.get(appId)
+  if (!lookup) {
+    lookup = getAppOwnerWithEdgeCache(c, appId, drizzleClient, planActions)
+    lookups.set(appId, lookup)
+  }
+  return lookup
+}
 
 async function blockProviderInfrastructure(c: Context, shouldBlockProviderInfrastructure = true) {
   // Replays too: the snippet answers /stats of apps it learned nothing about,
@@ -135,7 +157,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return { success: false, error: 'need_plan_upgrade', message: PLAN_ERROR }
   }
   // Same plan actions as /updates, so both endpoints share the cached owner entry.
-  const ownerLookup = edgeCache ? await getAppOwnerWithEdgeCache(c, app_id, drizzleClient, planActions) : null
+  const ownerLookup = edgeCache ? await getRequestOwnerLookup(c, app_id, drizzleClient, planActions) : null
   // A failed lookup is not an on-prem app: a replay answers 503 so the queue
   // retries it, instead of dropping the stat and caching 'onprem'.
   if (ownerLookup?.lookupFailed && getSnippetEdgeReplay(c))
