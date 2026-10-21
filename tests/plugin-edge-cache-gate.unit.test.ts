@@ -275,6 +275,12 @@ describe('plugin edge cache gate (UPDATES_EDGE_CACHE)', () => {
       expect(response.status).toBe(200)
       expect((await response.json() as { results: unknown[] }).results).toHaveLength(2)
       expect(getAppOwnerWithEdgeCache).toHaveBeenCalledTimes(1)
+
+      // A connection error is thrown, not reported: a batch still answers 503.
+      vi.mocked(getAppOwnerWithEdgeCache).mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
+      const thrown = new Request('http://plugin.example.test/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify([event, event]) })
+      markSnippetEdgeReplay(thrown, { endpoint: 'stats' })
+      expect((await app.fetch(thrown, {}, { waitUntil: () => {} } as any)).status).toBe(503)
     }
     finally {
       vi.mocked(getAppStatus).mockReset()

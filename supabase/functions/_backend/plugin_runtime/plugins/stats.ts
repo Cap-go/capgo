@@ -58,6 +58,14 @@ function getRequestOwnerLookup(c: Context, appId: string, drizzleClient: ReturnT
     lookup = edgeCache
       ? getAppOwnerWithEdgeCache(c, appId, drizzleClient, planActions)
       : queryOwnerLookup(c, appId, drizzleClient, planActions)
+    // The edge read rethrows connection errors; a batch would catch them per
+    // event and answer 200, which a replay never retries.
+    if (getSnippetEdgeReplay(c)) {
+      lookup = lookup.catch((error: unknown) => {
+        cloudlog({ requestId: c.get('requestId'), message: 'stats replay owner lookup failed', app_id: appId, error })
+        return { value: null, hit: false, lookupFailed: true }
+      })
+    }
     lookups.set(appId, lookup)
   }
   return lookup
