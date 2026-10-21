@@ -276,18 +276,16 @@ export async function savePaymentMethodFromIntent(c: Context, ctx: InAppBillingC
   if (!paymentMethodId)
     throw simpleError('missing_payment_method', 'No card was saved')
   const paymentMethod = await ctx.stripe.paymentMethods.retrieve(paymentMethodId)
-  const attachedNow = paymentMethod.customer !== ctx.customerId
-  if (attachedNow)
+  // Backup path resolves subscription role first so an unknown lookup never attaches or detaches.
+  const backupCards = role === 'backup'
+    ? await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId, paymentMethodId)
+    : null
+  if (backupCards && !backupCards.subscriptionKnown)
+    throw simpleError('subscription_lookup_unknown', 'Subscription payment method is temporarily unknown')
+  if (paymentMethod.customer !== ctx.customerId)
     await ctx.stripe.paymentMethods.attach(paymentMethodId, { customer: ctx.customerId })
-  if (role === 'backup') {
-    const { defaultPaymentMethod, isCustomerDefault, spareCards, subscriptionKnown } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId, paymentMethodId)
-    // Unknown subscription default: a guessed primary must not be pinned as customer default.
-    if (!subscriptionKnown) {
-      // Only detach a method we just attached; an existing card may already be the live primary.
-      if (attachedNow)
-        await ctx.stripe.paymentMethods.detach(paymentMethodId)
-      throw simpleError('subscription_lookup_unknown', 'Subscription payment method is temporarily unknown')
-    }
+  if (backupCards) {
+    const { defaultPaymentMethod, isCustomerDefault, spareCards } = backupCards
     if (defaultPaymentMethod && defaultPaymentMethod.id !== paymentMethodId) {
       const fingerprint = paymentMethod.card?.fingerprint
       if (fingerprint && fingerprint === defaultPaymentMethod.card?.fingerprint) {

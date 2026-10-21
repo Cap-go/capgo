@@ -385,27 +385,13 @@ describe('backup card', () => {
     stripe.customers.retrieve.mockResolvedValue({ invoice_settings: { default_payment_method: null } })
     stripe.paymentMethods.list.mockResolvedValue({ data: [card('pm_guess', 'fp_guess'), card('pm_sub', 'fp_sub')] })
     mockActiveSubscription(null, false)
-    stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_main' })
-    // Already attached: may be the live primary, so refuse without detaching.
-    stripe.paymentMethods.retrieve.mockResolvedValue(card('pm_main', 'fp_main'))
-
-    await expectSubscriptionLookupUnknown(savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup'))
-    expect(stripe.customers.update).not.toHaveBeenCalled()
-    expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
-  })
-
-  it('detaches only a newly attached backup card when subscription lookup is unknown', async () => {
-    const stripe = createStripe()
-    stripe.customers.retrieve.mockResolvedValue({ invoice_settings: { default_payment_method: null } })
-    stripe.paymentMethods.list.mockResolvedValue({ data: [card('pm_guess', 'fp_guess'), card('pm_sub', 'fp_sub')] })
-    mockActiveSubscription(null, false)
     stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_new' })
     stripe.paymentMethods.retrieve.mockResolvedValue({ ...card('pm_new', 'fp_new'), customer: null })
 
     await expectSubscriptionLookupUnknown(savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup'))
-    expect(stripe.paymentMethods.attach).toHaveBeenCalledWith('pm_new', { customer: 'cus_123' })
+    expect(stripe.paymentMethods.attach).not.toHaveBeenCalled()
     expect(stripe.customers.update).not.toHaveBeenCalled()
-    expect(stripe.paymentMethods.detach).toHaveBeenCalledWith('pm_new')
+    expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
   })
 
   it('refuses to remove a card that could be the subscription default while lookup is unknown', async () => {
