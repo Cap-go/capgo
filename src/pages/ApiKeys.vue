@@ -169,12 +169,12 @@ const orgCache = ref(new Map<string, string>())
 const appCache = ref(new Map<string, string>())
 const organizationNameById = computed(() => new Map(organizationStore.organizations.map(org => [org.gid, org.name])))
 
-// Function to truncate strings (show first 5 and last 5 characters)
+// Function to truncate strings (show first 3 and last 3 characters)
 function hideString(str: string | null) {
   if (!str)
     return ''
-  const first = str.slice(0, 5)
-  const last = str.slice(-5)
+  const first = str.slice(0, 3)
+  const last = str.slice(-3)
   return `${first}...${last}`
 }
 
