@@ -249,11 +249,20 @@ export interface BillingInvoice {
 // The onboarding plan that starts (and is first charged) when the free trial ends.
 export interface TrialPlan {
   planName: string
+  productId: string
   amount: number
   currency: string
   interval: 'month'
   startsAt: string
   scheduled: boolean
+}
+
+// Solo / Maker / Team choices shown when saving a card to auto-start a plan.
+export interface TrialPlanOption {
+  productId: string
+  planName: string
+  amount: number
+  currency: string
 }
 
 export interface BillingOverview {
@@ -306,14 +315,15 @@ export function getBillingOverview(orgId: string) {
 }
 
 export function getTrialPlan(orgId: string) {
-  return callBilling<{ card: BillingCard | null, plan: TrialPlan | null }>('trial-plan', { orgId })
+  return callBilling<{ card: BillingCard | null, plan: TrialPlan | null, plans: TrialPlanOption[] }>('trial-plan', { orgId })
 }
 
-export async function scheduleTrialPlan(orgId: string) {
+export async function scheduleTrialPlan(orgId: string, productId?: string) {
   const datafastAttribution = await getDatafastAttribution()
   const affonsoReferral = await getAffonsoReferral()
   return callBilling<{ plan: TrialPlan }>('trial-plan/schedule', {
     orgId,
+    ...(productId ? { productId } : {}),
     affonsoReferral,
     datafastVisitorId: datafastAttribution.visitorId,
     datafastSessionId: datafastAttribution.sessionId,

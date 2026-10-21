@@ -249,11 +249,19 @@ describe('cancel trial plan', () => {
     expect(cancel.mock.invocationCallOrder[0]).toBeLessThan(retrieve.mock.invocationCallOrder[0])
     expect(result).toEqual({
       planName: '',
+      productId: '',
       amount: 0,
       currency: 'usd',
       interval: 'month',
       startsAt: '2025-01-01T00:00:00.000Z',
       scheduled: false,
     })
+  })
+})
+
+describe('schedulable trial plans', () => {
+  it('exposes Solo, Maker and Team for the plan picker', async () => {
+    const { SCHEDULABLE_TRIAL_PLAN_NAMES } = await import('../supabase/functions/_backend/utils/stripe_trial_plan.ts')
+    expect([...SCHEDULABLE_TRIAL_PLAN_NAMES]).toEqual(['Solo', 'Maker', 'Team'])
   })
 })
