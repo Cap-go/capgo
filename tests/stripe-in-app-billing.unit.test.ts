@@ -20,6 +20,13 @@ function mockActiveSubscription(subscriptionId: string | null, known = true) {
   mocks.lookupActiveSubscriptionId.mockResolvedValue({ subscriptionId, known })
 }
 
+async function expectSubscriptionLookupUnknown(promise: Promise<unknown>) {
+  await expect(promise).rejects.toMatchObject({
+    message: 'Subscription payment method is temporarily unknown',
+    cause: { error: 'subscription_lookup_unknown' },
+  })
+}
+
 const {
   createCardSetupIntent,
   getSavedCards,
@@ -357,7 +364,7 @@ describe('backup card', () => {
     await expect(payInvoiceWithBackupCard(createContext(), stripe as any, 'cus_123', 'in_123')).rejects.toThrow('timeout')
   })
 
-  it('keeps the customer card and detaches nothing when the subscription lookup fails', async () => {
+  it('hides the backup and refuses removal when the subscription lookup fails', async () => {
     const stripe = createStripe()
     const main = card('pm_main', 'fp_main')
     mockSavedCards(stripe, main, [card('pm_back', 'fp_back'), main, card('pm_old', 'fp_old')])
@@ -366,24 +373,47 @@ describe('backup card', () => {
 
     const cards = await getSavedCards(createContext(), createBillingContext(stripe))
     expect(cards.card?.id).toBe('pm_main')
+    expect(cards.backupCard).toBeNull()
 
-    await removeBackupCard(createContext(), createBillingContext(stripe), 'pm_back')
-    expect(stripe.paymentMethods.detach).toHaveBeenCalledTimes(1)
-    expect(stripe.paymentMethods.detach).toHaveBeenCalledWith('pm_back')
+    await expectSubscriptionLookupUnknown(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_back'))
+    expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
   })
 
-  it('does not detach spare cards when stripe_info lookup fails', async () => {
+  it('refuses backup saves when the subscription lookup is unknown', async () => {
+    const stripe = createStripe()
+    // No customer default: a guessed first card must not be pinned while lookup is unknown.
+    stripe.customers.retrieve.mockResolvedValue({ invoice_settings: { default_payment_method: null } })
+    stripe.paymentMethods.list.mockResolvedValue({ data: [card('pm_guess', 'fp_guess'), card('pm_sub', 'fp_sub')] })
+    mockActiveSubscription(null, false)
+    stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_new' })
+    stripe.paymentMethods.retrieve.mockResolvedValue({ ...card('pm_new', 'fp_new'), customer: null })
+
+    await expectSubscriptionLookupUnknown(savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup'))
+    expect(stripe.paymentMethods.attach).not.toHaveBeenCalled()
+    expect(stripe.customers.update).not.toHaveBeenCalled()
+    expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
+  })
+
+  it('refuses to remove a card that could be the subscription default while lookup is unknown', async () => {
     const stripe = createStripe()
     const customerDefault = card('pm_cust', 'fp_cust')
-    // Subscription card A is not the customer default; a failed DB lookup must not treat A as spare.
-    mockSavedCards(stripe, customerDefault, [card('pm_back', 'fp_back'), customerDefault, card('pm_sub', 'fp_sub')])
+    mockSavedCards(stripe, customerDefault, [card('pm_sub', 'fp_sub'), customerDefault])
     mockActiveSubscription(null, false)
-    stripe.setupIntents.retrieve.mockResolvedValue({ customer: 'cus_123', status: 'succeeded', payment_method: 'pm_back' })
-    stripe.paymentMethods.retrieve.mockResolvedValue(card('pm_back', 'fp_back'))
 
-    await savePaymentMethodFromIntent(createContext(), createBillingContext(stripe), 'seti_123', 'backup')
-
+    const cards = await getSavedCards(createContext(), createBillingContext(stripe))
+    expect(cards.backupCard).toBeNull()
+    await expectSubscriptionLookupUnknown(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_sub'))
     expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
+  })
+
+  it('throws when charging the backup while the subscription lookup is unknown', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [main, card('pm_back', 'fp_back')])
+    mockActiveSubscription(null, false)
+
+    await expectSubscriptionLookupUnknown(payInvoiceWithBackupCard(createContext(), stripe as any, 'cus_123', 'in_123', { chargeId: 'ch_1' }))
+    expect(stripe.invoices.pay).not.toHaveBeenCalled()
   })
 })
 
@@ -471,5 +501,23 @@ describe('payOpenInvoice', () => {
       status: 'requires_payment_method',
       message: 'Your card was declined.',
     })
+  })
+
+  it('surfaces a temporary subscription lookup failure from Pay now backup fallback', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [main, card('pm_back', 'fp_back')])
+    mockActiveSubscription(null, false)
+    mocks.findLatestOpenSubscriptionInvoice.mockResolvedValue({ id: 'in_123' })
+    stripe.invoices.retrieve.mockResolvedValue({ id: 'in_123', status: 'open' })
+    stripe.invoices.pay.mockRejectedValueOnce(Object.assign(new Error('Your card was declined.'), {
+      type: 'StripeCardError',
+      code: 'card_declined',
+      charge: 'ch_1',
+      payment_method: 'pm_main',
+    }))
+
+    await expectSubscriptionLookupUnknown(payOpenInvoice(createContext(), createBillingContext(stripe)))
+    expect(stripe.invoices.pay).toHaveBeenCalledTimes(1)
   })
 })

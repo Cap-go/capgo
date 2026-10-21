@@ -7,15 +7,17 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import IconBell from '~icons/heroicons/bell'
 import IconChart from '~icons/heroicons/chart-bar'
+import IconHammer from '~icons/lucide/hammer'
 import IconTimer from '~icons/lucide/timer'
 import DeliveryLatencyPanel from '~/components/dashboard/DeliveryLatencyPanel.vue'
+import OrgNativeBuildStatsPanel from '~/components/dashboard/OrgNativeBuildStatsPanel.vue'
 import OrgNotificationStatsPanel from '~/components/dashboard/OrgNotificationStatsPanel.vue'
 import Tabs from '~/components/Tabs.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
-type DashboardTab = 'usage' | 'delivery' | 'notifications'
+type DashboardTab = 'usage' | 'builds' | 'delivery' | 'notifications'
 
 const route = useRoute('/dashboard')
 const organizationStore = useOrganizationStore()
@@ -31,6 +33,7 @@ const { currentOrganization } = storeToRefs(organizationStore)
 
 const dashboardTabs = computed<Tab[]>(() => [
   { label: 'dashboard-tab-usage', icon: IconChart, key: 'usage' },
+  { label: 'native-builds', icon: IconHammer, key: 'builds' },
   { label: 'update-delivery-latency', icon: IconTimer, key: 'delivery', badge: 'beta' },
   { label: 'notifications', icon: IconBell, key: 'notifications', badge: 'beta' },
 ])
@@ -100,7 +103,7 @@ displayStore.NavTitle = t('dashboard')
 displayStore.defaultBack = '/apps'
 
 function handleTab(key: string) {
-  if (key === 'usage' || key === 'delivery' || key === 'notifications')
+  if (key === 'usage' || key === 'builds' || key === 'delivery' || key === 'notifications')
     activeTab.value = key
 }
 </script>
@@ -131,6 +134,14 @@ function handleTab(key: string) {
             v-if="!lacksSecurityAccess && activeTab === 'usage'"
             :force-demo="paymentFailed"
           />
+
+          <div v-else-if="!lacksSecurityAccess && activeTab === 'builds'" class="mb-6">
+            <OrgNativeBuildStatsPanel
+              :key="['org-builds', currentOrganization?.gid || ''].join(':')"
+              :org-id="currentOrganization?.gid || ''"
+              :apps="apps"
+            />
+          </div>
 
           <div v-else-if="!lacksSecurityAccess && activeTab === 'delivery'" class="mb-6">
             <DeliveryLatencyPanel

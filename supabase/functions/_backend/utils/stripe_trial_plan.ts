@@ -6,7 +6,8 @@ import { syncBentoSubscriberTags, trackBentoEvent } from './bento.ts'
 import { TRIAL_CARD_BENTO_TAG } from './billing_bento_tags.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { findPlanByProductId, getPlanPriceId, isAutomaticTaxEnabled, TRIAL_PLAN_SCHEDULE_METADATA_KEY } from './stripe_billing.ts'
+import type { BillingAccount } from './stripe_billing.ts'
+import { findPlanByProductId, getPlanPriceId, getPlanProductId, isAutomaticTaxEnabled, TRIAL_PLAN_SCHEDULE_METADATA_KEY } from './stripe_billing.ts'
 import { supabaseAdmin } from './supabase.ts'
 
 // Starts the plan picked during onboarding when the free trial ends, charging the saved card.
@@ -16,14 +17,28 @@ import { supabaseAdmin } from './supabase.ts'
 export const TRIAL_CARD_ADDED_BENTO_EVENT = 'org:trial_card_added'
 export const TRIAL_PLAN_CANCELED_BENTO_EVENT = 'org:trial_plan_canceled'
 
+// Fixed monthly plans that can auto-start when the trial ends. Enterprise needs a custom MAU quote.
+export const SCHEDULABLE_TRIAL_PLAN_NAMES = ['Solo', 'Maker', 'Team'] as const
+
 export interface TrialPlanSummary {
   planName: string
+  // Stripe product id for this billing account; used when the user switches plan before scheduling.
+  productId: string
   amount: number
   currency: string
   interval: 'month'
   // When the plan starts and the first invoice is charged.
   startsAt: string
   scheduled: boolean
+}
+
+// Plans the user can pick in the card/prompt flow (default = onboarding product).
+export interface TrialPlanOption {
+  productId: string
+  planName: string
+  // Monthly list price in the smallest currency unit (same as Stripe unit_amount).
+  amount: number
+  currency: string
 }
 
 export interface TrialPlanAttribution {
@@ -34,6 +49,7 @@ export interface TrialPlanAttribution {
 
 interface TrialState {
   planName: string
+  productId: string
   priceId: string
   startsAt: Date
 }
@@ -70,15 +86,79 @@ async function loadTrialState(c: Context, ctx: InAppBillingContext): Promise<Tri
   if (!plan)
     return null
   let priceId: string
+  let productId: string
   try {
     priceId = getPlanPriceId(plan, ctx.billingAccount, 'month')
+    productId = getPlanProductId(plan, ctx.billingAccount)
   }
   catch {
     return null
   }
-  if (!priceId)
+  if (!priceId || !productId)
     return null
-  return { planName: plan.name, priceId, startsAt }
+  return { planName: plan.name, productId, priceId, startsAt }
+}
+
+function isSchedulableTrialPlanName(name: string | null | undefined): boolean {
+  return !!name && (SCHEDULABLE_TRIAL_PLAN_NAMES as readonly string[]).includes(name)
+}
+
+// Monthly Solo/Maker/Team for the org's billing account so the prompt can switch before scheduling.
+export async function listSchedulableTrialPlans(c: Context, billingAccount: BillingAccount): Promise<TrialPlanOption[]> {
+  const { data: plans, error } = await supabaseAdmin(c)
+    .from('plans')
+    .select('name, price_m, stripe_id, price_m_id, price_y_id, stripe_id_us, price_m_id_us, price_y_id_us')
+    .in('name', [...SCHEDULABLE_TRIAL_PLAN_NAMES])
+  if (error)
+    throw error
+  // Console Plans page lists these in USD; keep the picker consistent.
+  return (plans ?? [])
+    .flatMap((plan) => {
+      try {
+        const productId = getPlanProductId(plan, billingAccount)
+        if (!productId || !isSchedulableTrialPlanName(plan.name))
+          return []
+        // plans.price_m is a major-unit monthly list price (e.g. 14 for Solo).
+        const amount = Math.round(Number(plan.price_m) * 100)
+        if (!Number.isFinite(amount) || amount <= 0)
+          return []
+        return [{ productId, planName: plan.name!, amount, currency: 'usd' }]
+      }
+      catch {
+        return []
+      }
+    })
+    .sort((a, b) => a.amount - b.amount)
+}
+
+// Persist a different onboarding product before scheduling so Billing and the schedule agree.
+async function applyTrialPlanProduct(c: Context, ctx: InAppBillingContext, productId: string | undefined): Promise<TrialState | null> {
+  const state = await loadTrialState(c, ctx)
+  if (!state)
+    return null
+  if (!productId || productId === state.productId)
+    return state
+  const { data: plan } = await findPlanByProductId(c, productId)
+  if (!plan || !isSchedulableTrialPlanName(plan.name))
+    throw simpleError('invalid_trial_plan', 'This plan cannot start automatically when the trial ends')
+  let nextProductId: string
+  let priceId: string
+  try {
+    nextProductId = getPlanProductId(plan, ctx.billingAccount)
+    priceId = getPlanPriceId(plan, ctx.billingAccount, 'month')
+  }
+  catch {
+    throw simpleError('invalid_trial_plan', 'This plan cannot start automatically when the trial ends')
+  }
+  if (nextProductId !== productId)
+    throw simpleError('invalid_trial_plan', 'This plan cannot start automatically when the trial ends')
+  const { error } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .update({ product_id: nextProductId })
+    .eq('customer_id', ctx.customerId)
+  if (error)
+    throw error
+  return { planName: plan.name!, productId: nextProductId, priceId, startsAt: state.startsAt }
 }
 
 async function listPendingTrialPlanSchedules(stripe: Stripe, customerId: string) {
@@ -119,6 +199,19 @@ async function cancelAllPendingTrialPlanSchedules(c: Context, stripe: Stripe, cu
   return schedules.length
 }
 
+async function cancelPendingTrialPlanSchedulesExcept(
+  c: Context,
+  stripe: Stripe,
+  customerId: string,
+  keepScheduleId: string,
+  message: string,
+) {
+  const schedules = (await listPendingTrialPlanSchedules(stripe, customerId))
+    .filter(schedule => schedule.id !== keepScheduleId)
+  await cancelSchedules(c, stripe, customerId, schedules, message)
+  return schedules.length
+}
+
 // Describes the pending schedule as Stripe will bill it, whether or not the org would be
 // eligible to schedule a new one, so Billing always shows (and can cancel) a pending charge.
 async function summarizePendingSchedule(c: Context, ctx: InAppBillingContext, schedule: Stripe.SubscriptionSchedule): Promise<TrialPlanSummary | null> {
@@ -132,6 +225,7 @@ async function summarizePendingSchedule(c: Context, ctx: InAppBillingContext, sc
   const { data: plan } = await findPlanByProductId(c, productId)
   return {
     planName: plan?.name ?? '',
+    productId,
     amount: price.unit_amount ?? 0,
     currency: price.currency,
     interval: 'month',
@@ -151,6 +245,7 @@ export async function getTrialPlanSummary(c: Context, ctx: InAppBillingContext):
   const price = await ctx.stripe.prices.retrieve(state.priceId)
   return {
     planName: state.planName,
+    productId: state.productId,
     amount: price.unit_amount ?? 0,
     currency: price.currency,
     interval: 'month',
@@ -242,19 +337,32 @@ async function notifyBento(c: Context, orgId: string, userId: string | undefined
   }
 }
 
-export async function scheduleTrialPlan(c: Context, ctx: InAppBillingContext, orgId: string, attribution: TrialPlanAttribution = {}) {
-  const state = await loadTrialState(c, ctx)
+export async function scheduleTrialPlan(
+  c: Context,
+  ctx: InAppBillingContext,
+  orgId: string,
+  attribution: TrialPlanAttribution = {},
+  productId?: string,
+) {
+  const state = await applyTrialPlanProduct(c, ctx, productId)
   if (!state)
     throw simpleError('trial_plan_unavailable', 'This organization is not on a free trial')
   if (!await ensureDefaultPaymentMethod(ctx))
     throw simpleError('missing_payment_method', 'Add a card before starting the plan')
 
   const existing = await findPendingTrialPlanSchedule(ctx.stripe, ctx.customerId)
-  if (!existing) {
+  const existingPrice = existing?.phases[0]?.items[0]?.price
+  const existingPriceId = typeof existingPrice === 'string' ? existingPrice : existingPrice?.id
+  const needsReplacement = !!existing && !!existingPriceId && existingPriceId !== state.priceId
+  let notifiedNewSchedule = false
+
+  if (!existing || needsReplacement) {
     await ensureCustomerTaxAddress(ctx)
     const metadata = attributionMetadata(attribution)
     if (Object.keys(metadata).length)
       await ctx.stripe.customers.update(ctx.customerId, { metadata })
+    // Create the replacement before canceling any pending schedule so a Stripe failure
+    // leaves the previously confirmed automatic start intact.
     const schedule = await ctx.stripe.subscriptionSchedules.create({
       customer: ctx.customerId,
       start_date: Math.floor(state.startsAt.getTime() / 1000),
@@ -267,7 +375,17 @@ export async function scheduleTrialPlan(c: Context, ctx: InAppBillingContext, or
       phases: [{ items: [{ price: state.priceId, quantity: 1 }], metadata: { ...metadata, org_id: orgId, [TRIAL_PLAN_SCHEDULE_METADATA_KEY]: 'true' } }],
       metadata: { [TRIAL_PLAN_SCHEDULE_METADATA_KEY]: 'true', org_id: orgId },
     })
-    cloudlog({ requestId: c.get('requestId'), message: 'trial plan scheduled', orgId, scheduleId: schedule.id, startsAt: state.startsAt.toISOString() })
+    cloudlog({ requestId: c.get('requestId'), message: 'trial plan scheduled', orgId, scheduleId: schedule.id, startsAt: state.startsAt.toISOString(), productId: state.productId })
+    if (needsReplacement) {
+      await cancelPendingTrialPlanSchedulesExcept(
+        c,
+        ctx.stripe,
+        ctx.customerId,
+        schedule.id,
+        'trial plan schedule replaced by plan change',
+      )
+    }
+    notifiedNewSchedule = true
   }
   // No idempotency key (it would replay a canceled schedule): drop duplicates from concurrent
   // submits instead, on every call so a retry repairs a cleanup that failed earlier.
@@ -276,7 +394,7 @@ export async function scheduleTrialPlan(c: Context, ctx: InAppBillingContext, or
   const summary = await getTrialPlanSummary(c, ctx)
   if (!summary)
     throw simpleError('trial_plan_unavailable', 'This organization is not on a free trial')
-  if (!existing)
+  if (notifiedNewSchedule)
     await notifyBento(c, orgId, c.get('auth')?.userId, true, summary)
   return summary
 }
@@ -297,6 +415,7 @@ export async function cancelTrialPlan(c: Context, ctx: InAppBillingContext, orgI
       const phase = schedule.phases[0]
       summary = {
         planName: '',
+        productId: '',
         amount: 0,
         currency: 'usd',
         interval: 'month',
