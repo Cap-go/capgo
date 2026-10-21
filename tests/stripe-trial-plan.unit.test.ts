@@ -304,7 +304,7 @@ describe('start trial plan now', () => {
 
   it('charges the first invoice now and marks the subscription as a trial plan started now', async () => {
     const create = vi.fn(async () => ({ id: 'sub_now', created: 1 }))
-    const stripe = { subscriptions: { create } } as unknown as Stripe
+    const stripe = { subscriptions: { create, list: vi.fn(async () => ({ data: [] })) } } as unknown as Stripe
     await createStartNowSubscription(stripe, input)
     expect(create).toHaveBeenCalledWith({
       customer: 'cus_1',
@@ -317,9 +317,27 @@ describe('start trial plan now', () => {
     }, { idempotencyKey: expect.stringMatching(/^capgo-trial-start-now:cus_1:[0-9a-f]{64}$/) })
   })
 
+  it('returns the started-now subscription instead of charging again', async () => {
+    const live = { id: 'sub_now', status: 'active', metadata: { capgo_trial_plan: 'true', capgo_trial_started_now: 'true' } }
+    const create = vi.fn()
+    const list = vi.fn(async () => ({ data: [{ id: 'sub_old', status: 'canceled', metadata: {} }, live] }))
+    const stripe = { subscriptions: { create, list } } as unknown as Stripe
+    await expect(createStartNowSubscription(stripe, { ...input, paymentMethodId: 'pm_other' })).resolves.toEqual({ subscription: live, reused: true })
+    expect(list).toHaveBeenCalledWith({ customer: 'cus_1', status: 'all', limit: 100 })
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('refuses to start now when another subscription is live', async () => {
+    const create = vi.fn()
+    const list = vi.fn(async () => ({ data: [{ id: 'sub_checkout', status: 'past_due', metadata: {} }] }))
+    const stripe = { subscriptions: { create, list } } as unknown as Stripe
+    await expect(createStartNowSubscription(stripe, input)).rejects.toMatchObject({ cause: { error: 'trial_plan_already_subscribed' } })
+    expect(create).not.toHaveBeenCalled()
+  })
+
   it('reuses the idempotency key for a double click and changes it for another card', async () => {
     const create = vi.fn(async () => ({ id: 'sub_now', created: 1 }))
-    const stripe = { subscriptions: { create } } as unknown as Stripe
+    const stripe = { subscriptions: { create, list: vi.fn(async () => ({ data: [] })) } } as unknown as Stripe
     await createStartNowSubscription(stripe, input)
     await createStartNowSubscription(stripe, input)
     await createStartNowSubscription(stripe, { ...input, paymentMethodId: 'pm_2' })
@@ -332,7 +350,7 @@ describe('start trial plan now', () => {
     const create = vi.fn(async () => {
       throw Object.assign(new Error('Your card was declined.'), { type: 'StripeCardError', statusCode: 402, code: 'card_declined' })
     })
-    const stripe = { subscriptions: { create } } as unknown as Stripe
+    const stripe = { subscriptions: { create, list: vi.fn(async () => ({ data: [] })) } } as unknown as Stripe
     await expect(createStartNowSubscription(stripe, input)).rejects.toMatchObject({
       status: 400,
       cause: { error: 'trial_plan_payment_failed', moreInfo: { code: 'card_declined' } },
@@ -343,7 +361,7 @@ describe('start trial plan now', () => {
     const create = vi.fn(async () => {
       throw Object.assign(new Error('rate limited'), { type: 'StripeRateLimitError', statusCode: 429 })
     })
-    const stripe = { subscriptions: { create } } as unknown as Stripe
+    const stripe = { subscriptions: { create, list: vi.fn(async () => ({ data: [] })) } } as unknown as Stripe
     await expect(createStartNowSubscription(stripe, input)).rejects.toThrow('rate limited')
   })
 })

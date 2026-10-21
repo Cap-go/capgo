@@ -592,6 +592,7 @@ onMounted(async () => {
       source="billing"
       @close="showStartNowModal = false"
       @started="onTrialPlanStartedNow"
+      @stale="onTrialPlanStartedNow"
     />
     <CancelPlanModal
       v-if="showCancelModal"

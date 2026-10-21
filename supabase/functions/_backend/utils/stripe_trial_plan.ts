@@ -6,6 +6,7 @@ import { syncBentoSubscriberTags, trackBentoEvent } from './bento.ts'
 import { TRIAL_CARD_BENTO_TAG } from './billing_bento_tags.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
+import { closeClient, getPgClient, withPgTransaction } from './pg.ts'
 import type { BillingAccount } from './stripe_billing.ts'
 import { findPlanByProductId, getPlanPriceId, getPlanProductId, isAutomaticTaxEnabled, TRIAL_PLAN_SCHEDULE_METADATA_KEY } from './stripe_billing.ts'
 import { supabaseAdmin } from './supabase.ts'
@@ -425,11 +426,28 @@ export interface StartNowSubscriptionInput {
   metadata: Record<string, string>
 }
 
+// Statuses that mean the customer already has a subscription Stripe bills or may still bill.
+const LIVE_SUBSCRIPTION_STATUSES = new Set<Stripe.Subscription.Status>(['active', 'trialing', 'past_due', 'unpaid', 'incomplete'])
+
+// The webhook updates stripe_info only after the fact, so ask Stripe directly.
+async function findLiveSubscription(stripe: Stripe, customerId: string) {
+  const page = await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 100 })
+  return page.data.find(subscription => LIVE_SUBSCRIPTION_STATUSES.has(subscription.status)) ?? null
+}
+
 // Charges the first month right away. error_if_incomplete makes Stripe reject the request
 // (no subscription is left behind) when the card is declined or needs authentication.
-// The idempotency key covers the card and parameters, so a double click returns the same
-// subscription while a retry with another card is a new attempt.
-export async function createStartNowSubscription(stripe: Stripe, input: StartNowSubscriptionInput) {
+// Callers hold the per-customer start-now lock: an existing live subscription is reused when
+// it is a started-now plan (a retry after a lost response) and refused otherwise, so two
+// requests, other cards or other attribution cookies can never charge twice. The
+// idempotency key also covers a network retry of the same request.
+export async function createStartNowSubscription(stripe: Stripe, input: StartNowSubscriptionInput): Promise<{ subscription: Stripe.Subscription, reused: boolean }> {
+  const live = await findLiveSubscription(stripe, input.customerId)
+  if (live) {
+    if (isTrialPlanStartedNow(live))
+      return { subscription: live, reused: true }
+    throw simpleError('trial_plan_already_subscribed', 'This organization already has a subscription')
+  }
   const metadata = {
     ...input.metadata,
     org_id: input.orgId,
@@ -447,7 +465,7 @@ export async function createStartNowSubscription(stripe: Stripe, input: StartNow
   }
   const idempotencyKey = `capgo-trial-start-now:${input.customerId}:${await sha256Hex(JSON.stringify(params))}`
   try {
-    return await stripe.subscriptions.create(params, { idempotencyKey })
+    return { subscription: await stripe.subscriptions.create(params, { idempotencyKey }), reused: false }
   }
   catch (error) {
     const stripeError = error as { type?: string, statusCode?: number, code?: string }
@@ -461,9 +479,23 @@ export function isTrialPlanStartedNow(subscription: Pick<Stripe.Subscription, 'm
   return subscription.metadata?.[TRIAL_PLAN_STARTED_NOW_METADATA_KEY] === 'true'
 }
 
+// Serializes Start now per Stripe customer for the duration of the Stripe calls.
+async function withStartNowLock<T>(c: Context, customerId: string, run: () => Promise<T>): Promise<T> {
+  const pool = await getPgClient(c)
+  try {
+    return await withPgTransaction(pool, async (client) => {
+      await client.query('SELECT pg_catalog.pg_advisory_xact_lock(hashtextextended($1, 0))', [`trial_start_now:${customerId}`])
+      return await run()
+    })
+  }
+  finally {
+    closeClient(c, pool)
+  }
+}
+
 // "Start now": begin the trial plan today instead of when the trial ends. Stripe's billing
-// period starts today, and the billing cycle (subscription_anchor_start/end) follows it, so
-// the monthly usage counters restart from zero.
+// period starts today and the billing cycle (subscription_anchor_start/end) follows it. Usage
+// is summed per UTC day from the cycle start date, so today's usage stays in the new cycle.
 export async function startTrialPlanNow(
   c: Context,
   ctx: InAppBillingContext,
@@ -487,15 +519,15 @@ export async function startTrialPlanNow(
     throw simpleError('missing_payment_method', 'Add a card before starting the plan')
 
   const price = await ctx.stripe.prices.retrieve(state.priceId)
-  const subscription = await createStartNowSubscription(ctx.stripe, {
+  const { subscription, reused } = await withStartNowLock(c, ctx.customerId, () => createStartNowSubscription(ctx.stripe, {
     customerId: ctx.customerId,
     orgId,
     priceId: state.priceId,
     paymentMethodId,
     automaticTax: isAutomaticTaxEnabled(ctx.billingAccount),
     metadata,
-  })
-  cloudlog({ requestId: c.get('requestId'), message: 'trial plan started now', orgId, subscriptionId: subscription.id, productId: state.productId })
+  }))
+  cloudlog({ requestId: c.get('requestId'), message: reused ? 'trial plan already started now' : 'trial plan started now', orgId, subscriptionId: subscription.id, productId: state.productId })
   // The plan already started: a pending trial-end schedule would bill a second subscription.
   // The webhook repeats this for the new subscription, so a failure here is retried there.
   try {
@@ -513,7 +545,8 @@ export async function startTrialPlanNow(
     startsAt: new Date(subscription.created * 1000).toISOString(),
     scheduled: false,
   }
-  await notifyBento(c, orgId, c.get('auth')?.userId, 'started_now', summary)
+  if (!reused)
+    await notifyBento(c, orgId, c.get('auth')?.userId, 'started_now', summary)
   return { plan: summary, subscriptionId: subscription.id }
 }
 

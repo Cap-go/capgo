@@ -548,8 +548,14 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
         trialPlan: visualTrialPlan(true),
       } }))
       await page.reload()
-      await page.locator('[data-test="billing-trial-plan-start-now"]').click()
-      await page.locator('[data-test="trial-plan-start-now-confirm"]').waitFor()
+      // The base revision has no Start now button: capture Billing there instead.
+      if (process.env.VISUAL_DIFF_PHASE === 'after') {
+        await page.locator('[data-test="billing-trial-plan-start-now"]').click()
+        await page.locator('[data-test="trial-plan-start-now-confirm"]').waitFor()
+      }
+      else {
+        await page.locator('[data-test="billing-subscription"]').waitFor()
+      }
     },
   },
   { slug: 'account-settings', path: '/settings/account', auth: true },
