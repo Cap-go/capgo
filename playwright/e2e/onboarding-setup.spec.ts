@@ -722,3 +722,21 @@ test.describe('Dashboard exploration and returning to v3 setup', () => {
     })
   }
 })
+
+test('asks to finish or explicitly skip a step passed over by out-of-order setup', async ({ page }) => {
+  // The AI (or the user) created a channel before running `npx @capgo/cli init`.
+  await page.goto(`${fixture}?channel=1`)
+  const missed = page.locator('[data-test="setup-checklist-missed"]')
+  await expect(missed).toContainText('Steps passed over: 1')
+  await expect(missed.locator('[data-test="setup-checklist-missed-login_cli_mcp"]')).toHaveText('1. Start guided setup')
+  await expect(page.locator('[data-test="setup-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.locator(instructions)).toContainText('Passed over · 1 of 7')
+  await expect(page.locator('[data-test="app-onboarding-command-copy"]')).toBeVisible()
+
+  await page.locator('[data-test="setup-checklist-skip-step"]').click()
+  await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.skips)).toEqual(['ota.login_cli_mcp'])
+  await expect(missed).toBeHidden()
+  await expect(page.locator(instructions)).toContainText('Current task · 3 of 7')
+  await expect(page.locator('[data-test="setup-checklist-progress"]')).toContainText('2 of 7 complete')
+  await expect(page.locator('[data-test="app-onboarding-cli-step-login_cli_mcp"]')).toHaveAttribute('data-status', 'skipped')
+})

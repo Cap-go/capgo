@@ -2,7 +2,9 @@
 import type { OnboardingChannelEvent, OnboardingChannelEventProperties } from '~/utils/onboardingChannelAnalytics'
 import { computed, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { toast } from 'vue-sonner'
 import IconCopy from '~icons/ion/copy-outline'
+import IconAlertTriangle from '~icons/lucide/alert-triangle'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconCheck from '~icons/lucide/check'
 import IconChevronDown from '~icons/lucide/chevron-down'
@@ -13,11 +15,13 @@ import IconLoader from '~icons/lucide/loader-2'
 import IconMessageCircle from '~icons/lucide/message-circle'
 import IconMinus from '~icons/lucide/minus'
 import { useAppOnboardingCliProgress } from '~/composables/useAppOnboardingCliProgress'
-import { getAppOnboardingStepIds } from '~/services/appOnboarding'
+import { getAppOnboardingStepIds, getMissedStepIds, hasSupportedOtaTodoList } from '~/services/appOnboarding'
 import { isAppOnboardingChecklistStep } from '~/utils/appOnboardingChecklist'
 import { APP_ONBOARDING_STEP_GUIDES } from '~/utils/appOnboardingGuides'
 import { hasDualOnboardingChecklists } from '~/utils/dualOnboardingChecklists'
+import { skipOnboardingStep } from '~/utils/onboardingSkipStep'
 import AppOnboardingAiAgentCard from './AppOnboardingAiAgentCard.vue'
+import AppOnboardingMissedSteps from './AppOnboardingMissedSteps.vue'
 import ChannelSetupOnboardingDialog from './ChannelSetupOnboardingDialog.vue'
 import TechnicalTeammateInviteCard from './TechnicalTeammateInviteCard.vue'
 
@@ -46,7 +50,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const panelId = useId()
-const { onboarding, rawOnboarding, hasChannel, refreshError, refreshOnboarding } = useAppOnboardingCliProgress(() => props.appId, () => props.initialOnboarding, () => props.active !== false)
+const { onboarding, rawOnboarding, hasChannel, refreshError, refreshOnboarding, applyOnboarding } = useAppOnboardingCliProgress(() => props.appId, () => props.initialOnboarding, () => props.active !== false)
 watch([rawOnboarding, hasChannel], ([value, observedChannel]) => emit('snapshot', value, observedChannel))
 const steps = computed(() => getAppOnboardingStepIds(onboarding.value.todo_list_version, onboarding.value.ota_todo_list_version).filter(isAppOnboardingChecklistStep).map((id, index) => ({
   id,
@@ -60,6 +64,11 @@ const currentStep = computed(() => steps.value.find(step => step.status !== 'don
 const selectedId = ref<string | null>(null)
 const selectedStep = computed(() => steps.value.find(step => step.id === selectedId.value) ?? currentStep.value ?? steps.value.at(-1)!)
 const isSelectedCurrent = computed(() => selectedStep.value.id === currentStep.value?.id)
+// Only the v3/v4 live-update checklist can record an explicit skip.
+const missedIds = computed<string[]>(() => hasSupportedOtaTodoList(onboarding.value) ? getMissedStepIds(steps.value) : [])
+const missedSteps = computed(() => steps.value.filter(step => missedIds.value.includes(step.id)))
+const isSelectedMissed = computed(() => missedIds.value.includes(selectedStep.value.id))
+const skipping = ref(false)
 const isFirstStep = computed(() => selectedStep.value.index === 0)
 const guideHref = computed(() => APP_ONBOARDING_STEP_GUIDES[selectedStep.value.id])
 const guideLabel = computed(() => isFirstStep.value ? t('setup-checklist-manual-guide') : t('setup-checklist-task-guide', { task: selectedStep.value.title }))
@@ -97,6 +106,26 @@ watch(() => currentStep.value?.id, (id, previous) => {
 function selectStep(id: string) {
   selectedId.value = id
   checklistOpen.value = false
+}
+
+async function skipSelectedStep() {
+  skipping.value = true
+  try {
+    const value = await skipOnboardingStep(props.appId, `ota.${selectedStep.value.id}`)
+    if (value === undefined)
+      void refreshOnboarding()
+    else
+      applyOnboarding(value)
+    // Fall back to the next open task instead of staying on the skipped one.
+    selectedId.value = null
+  }
+  catch (error) {
+    console.error('Cannot skip onboarding step', error)
+    toast.error(t('setup-checklist-skip-step-error'))
+  }
+  finally {
+    skipping.value = false
+  }
 }
 
 function statusLabel(status: string | undefined) {
@@ -138,6 +167,8 @@ function statusLabel(status: string | undefined) {
         :aria-label="t('setup-checklist-progress', { done: doneCount, total: steps.length })"
       />
     </div>
+
+    <AppOnboardingMissedSteps v-if="!completed && missedSteps.length" :steps="missedSteps" :selected-id="selectedStep.id" @select="selectStep" />
 
     <div class="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/15 dark:bg-slate-900" :class="{ 'lg:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)]': checklistOpen }">
       <nav class="border-b border-slate-200 px-4 py-3 sm:px-6 dark:border-white/15" :class="{ 'sm:py-6 lg:border-b-0 lg:border-r': checklistOpen }" :aria-label="t('setup-checklist-list-title')">
@@ -181,6 +212,7 @@ function statusLabel(status: string | undefined) {
             >
               <IconCheck v-if="step.status === 'done'" class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" :aria-label="statusLabel(step.status)" />
               <IconMinus v-else-if="step.status === 'skipped'" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="statusLabel(step.status)" />
+              <IconAlertTriangle v-else-if="missedIds.includes(step.id)" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="statusLabel(step.status)" />
               <IconCircle v-else class="mt-0.5 h-5 w-5 shrink-0" :class="currentStep?.id === step.id ? 'text-azure-500' : 'text-slate-300 dark:text-slate-600'" :aria-label="statusLabel(step.status)" />
               <span class="mt-0.5 shrink-0 text-xs text-slate-400 dark:text-slate-500" aria-hidden="true">{{ step.index + 1 }}.</span>
               <span class="min-w-0 flex-1 text-base leading-6" :class="{ 'font-medium': selectedStep.id === step.id }">
@@ -208,7 +240,7 @@ function statusLabel(status: string | undefined) {
         </template>
         <template v-else>
           <p class="text-sm font-medium text-sky-700 dark:text-azure-400">
-            {{ t(isSelectedCurrent ? 'setup-checklist-current-task-number' : 'setup-checklist-task-number', { number: selectedStep.index + 1, total: steps.length }) }}
+            {{ t(isSelectedMissed ? 'setup-checklist-missed-task-number' : isSelectedCurrent ? 'setup-checklist-current-task-number' : 'setup-checklist-task-number', { number: selectedStep.index + 1, total: steps.length }) }}
           </p>
           <h2 class="mt-3 text-2xl font-semibold leading-tight text-slate-950 sm:text-3xl dark:text-white">
             {{ selectedStep.title }}
@@ -216,6 +248,17 @@ function statusLabel(status: string | undefined) {
           <p class="mt-4 max-w-prose text-base leading-7 text-slate-600 dark:text-slate-300">
             {{ selectedStep.description }}
           </p>
+
+          <div v-if="isSelectedMissed" class="mt-5 flex flex-col gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-400/30 dark:bg-amber-500/10" data-test="setup-checklist-missed-step">
+            <p class="flex items-start gap-3 text-sm leading-6 text-slate-700 dark:text-slate-300">
+              <IconAlertTriangle class="mt-1 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+              {{ t('setup-checklist-missed-step-note') }}
+            </p>
+            <button type="button" class="d-btn h-auto min-h-11 shrink-0 self-start border-slate-300 bg-white px-4 text-slate-700 hover:border-slate-400 hover:bg-slate-50 sm:self-center dark:border-white/20 dark:bg-slate-900 dark:text-slate-200" data-test="setup-checklist-skip-step" :disabled="skipping" @click="skipSelectedStep">
+              <IconLoader v-if="skipping" class="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
+              {{ t('setup-checklist-skip-step') }}
+            </button>
+          </div>
 
           <template v-if="isFirstStep">
             <p class="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">

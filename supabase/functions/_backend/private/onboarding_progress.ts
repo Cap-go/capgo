@@ -1,22 +1,24 @@
 import type { Context } from 'hono'
-import type { AppOnboardingPatch, AppOnboardingState } from '../utils/appOnboarding.ts'
+import type { AppOnboardingPatch, AppOnboardingState, AppOnboardingStepId } from '../utils/appOnboarding.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Permission } from '../utils/rbac.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod'
 import { emitCommittedAppOnboardingHistory } from '../utils/app_onboarding_posthog.ts'
-import { hasSupportedOtaTodoList, parseAppOnboarding, pickAppOnboardingSource } from '../utils/appOnboarding.ts'
+import { getAppOnboardingStepIds, hasSupportedOtaTodoList, parseAppOnboarding, pickAppOnboardingSource } from '../utils/appOnboarding.ts'
 import { tryCompletePendingAppOnboarding } from '../utils/appOnboardingCompletion.ts'
 import { persistAuthorizedOnboardingMutation } from '../utils/appOnboardingMutation.ts'
 import { parseBody, quickError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { cloudlogErr, serializeError } from '../utils/logging.ts'
+import { BUILDER_STEP_IDS, getMissedStepIds } from '../utils/onboardingMissedSteps.ts'
 import { appIdSchema } from '../utils/privateAnalyticsValidation.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { readDevices, readStats } from '../utils/stats.ts'
 import { supabaseWithAuth } from '../utils/supabase.ts'
 
 const bodySchema = z.object({ appId: appIdSchema, N: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER), initial: z.boolean().optional(), includeBilling: z.boolean().optional() })
+const skipStepBodySchema = z.object({ appId: appIdSchema, step: z.string().regex(/^(?:ota\.[a-z_]+|builder\.(?:ios|android)\.[a-z_]+)$/) })
 type Observations = Partial<Record<'login_cli_mcp' | 'add_channel' | 'run_device' | 'upload_bundle' | 'test_update', boolean>>
 type AuthenticatedClient = ReturnType<typeof supabaseWithAuth>
 type BillingSummary = { status: 'available', orgId: string, trialEndsAt: string | null, isPaying: boolean, hasCredits: boolean } | { status: 'unavailable' }
@@ -101,6 +103,43 @@ export async function persistObservedProgress(c: Context<MiddlewareKeyVariables>
   return result?.onboarding
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function readBuilderStatuses(currentValue: unknown, platform: keyof typeof BUILDER_STEP_IDS) {
+  const setup = isRecord(currentValue) && isRecord(currentValue.setup) ? currentValue.setup : {}
+  if (setup.todo_list_version !== 4 || setup.builder_todo_list_version !== '1' || !Array.isArray(setup.paths) || !setup.paths.includes('builder'))
+    return null
+  const builder = isRecord(setup.steps) && isRecord(setup.steps.builder) ? setup.steps.builder : null
+  const steps = builder && isRecord(builder[platform]) ? builder[platform] : null
+  if (!steps)
+    return null
+  return BUILDER_STEP_IDS[platform].map(id => ({ id: id as string, status: isRecord(steps[id]) ? String(steps[id].status) : 'pending' }))
+}
+
+// Only a missed step (open while a later one is done) can be skipped, so the
+// final proof-of-setup step always has to really happen.
+function skipStepPatch(currentValue: unknown, current: AppOnboardingState, step: string, at: string): AppOnboardingPatch | null {
+  if (current.outcome === 'skipped')
+    return null
+  const [path, first, second] = step.split('.')
+  if (path === 'ota') {
+    if (!hasSupportedOtaTodoList(current))
+      return null
+    const ids = getAppOnboardingStepIds(current.todo_list_version, current.ota_todo_list_version)
+    const missed = getMissedStepIds(ids.map(id => ({ id, status: current.steps[id]?.status })))
+    return missed.includes(first as AppOnboardingStepId) ? { steps: { [first!]: { status: 'skipped', at } } } : null
+  }
+  const platform = first as keyof typeof BUILDER_STEP_IDS
+  const statuses = readBuilderStatuses(currentValue, platform)
+  if (!statuses || !getMissedStepIds(statuses).includes(second!))
+    return null
+  const builderSteps: NonNullable<AppOnboardingPatch['builderSteps']> = {}
+  builderSteps[`builder.${platform}.${second}`] = { status: 'skipped', at }
+  return { builderSteps }
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 app.use('*', useCors)
 app.post('/', middlewareAuth({ preferApiKey: true }), async (c) => {
@@ -161,4 +200,25 @@ app.post('/', middlewareAuth({ preferApiKey: true }), async (c) => {
     : row.onboarding
   c.header('Cache-Control', 'no-store')
   return c.json({ onboarding, ...(observations.add_channel !== undefined ? { hasChannel: observations.add_channel } : {}), checkErrors, ...(billing ? { billing: await billing } : {}) })
+})
+
+app.post('/skip_step', middlewareAuth({ preferApiKey: true }), async (c) => {
+  const parsed = skipStepBodySchema.safeParse(await parseBody(c))
+  if (!parsed.success)
+    throw quickError(400, 'invalid_body', 'Invalid body')
+  const { appId, step } = parsed.data
+  if (!(await checkPermission(c, 'app.read', { appId })))
+    throw quickError(403, 'app_access_denied', 'You cannot access this app')
+  const result = await persistAuthorizedOnboardingMutation(c, appId, {
+    requestedSteps: [step as `${string}.${string}`],
+    buildPatch: ({ current, currentValue, allowedSteps, at }) => allowedSteps.has(step as `${string}.${string}`)
+      ? skipStepPatch(currentValue, current, step, at)
+      : null,
+    afterPersist: tryCompletePendingAppOnboarding,
+  })
+  if (!result)
+    throw quickError(409, 'step_not_skippable', 'This onboarding step cannot be skipped')
+  await emitCommittedAppOnboardingHistory(c, [result])
+  c.header('Cache-Control', 'no-store')
+  return c.json({ onboarding: result.onboarding })
 })

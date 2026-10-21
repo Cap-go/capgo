@@ -1,6 +1,14 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 
 const fixture = '/playwright/fixtures/onboarding-setup.html?view=builder'
+
+async function openBuilderTask(page: Page, id: string) {
+  const toggle = page.locator('[data-test="builder-checklist-toggle"]')
+  if (await toggle.getAttribute('aria-expanded') === 'false')
+    await toggle.click()
+  await page.locator(`[data-test="builder-step-${id}"] button`).click()
+}
 
 test('shows live Builder progress while keeping platform tasks separate', async ({ page }) => {
   await page.clock.install()
@@ -21,7 +29,7 @@ test('shows live Builder progress while keeping platform tasks separate', async 
   await expect(page.locator('[data-test="builder-checklist-progress"]')).toHaveText('0 of 6 complete')
   await expect(page.locator('[data-test="builder-step-start_setup"]')).toContainText('Current task')
   await expect(page.locator('[data-test="builder-checklist-command"]')).toHaveText('npx @capgo/cli@latest build init -a [API_KEY] --platform ios')
-  await page.locator('[data-test="builder-step-prepare_certificate"] button').click()
+  await openBuilderTask(page, 'prepare_certificate')
   await expect(page.locator('[data-test="builder-checklist-instructions"]')).toContainText('Import an existing Apple distribution certificate')
   await expect(page.locator('[data-test="builder-checklist-instructions"]')).toContainText('Not started')
 
@@ -107,3 +115,25 @@ for (const assignment of ['both-builder', 'both-ota']) {
     await expect(page.getByRole('tab')).toHaveCount(0)
   })
 }
+
+test('asks to finish or explicitly skip a Builder step passed over by out-of-order setup', async ({ page }) => {
+  await page.clock.install()
+  await page.goto(`${fixture}&platform=android`)
+  await expect(page.locator('[data-test="builder-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.locator('[data-test="builder-checklist-missed"]')).toHaveCount(0)
+
+  await page.evaluate(() => {
+    (window as any).onboardingSetupPreview.state.builderSteps.android.prepare_keystore = { status: 'done' }
+  })
+  await page.clock.runFor(5000)
+  const missed = page.locator('[data-test="setup-checklist-missed"]')
+  await expect(missed).toContainText('Steps passed over: 1')
+  await expect(missed.locator('[data-test="setup-checklist-missed-start_setup"]')).toHaveText('1. Start guided Builder setup')
+  await expect(page.locator('[data-test="builder-checklist-instructions"]')).toContainText('Passed over · 1 of 4')
+
+  await page.locator('[data-test="builder-checklist-skip-step"]').click()
+  await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.skips)).toEqual(['builder.android.start_setup'])
+  await expect(missed).toBeHidden()
+  await expect(page.locator('[data-test="builder-checklist-instructions"]')).toContainText('Current task · 3 of 4')
+  await expect(page.locator('[data-test="builder-step-start_setup"]')).toHaveAttribute('data-status', 'skipped')
+})
