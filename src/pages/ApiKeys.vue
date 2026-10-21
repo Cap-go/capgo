@@ -812,6 +812,7 @@ columns.value = [
       if (isHashedKey(row)) {
         return h('span', {
           'class': 'inline-flex items-center justify-center rounded-md bg-emerald-50 p-1.5 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400',
+          'role': 'img',
           'title': t('secure-key-hidden'),
           'aria-label': t('secure-key-hidden'),
         }, [
