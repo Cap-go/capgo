@@ -1188,27 +1188,15 @@ export async function createApiKey(c: Context, userId: string) {
 
 export async function customerToSegmentOrg(
   c: Context,
-  orgId: string,
+  org: { id: string, created_by: string },
   price_id?: string | null,
   plan?: Database['public']['Tables']['plans']['Row'] | null,
   trialPlanNamesToRemove?: readonly string[] | null,
 ): Promise<{ segments: string[], deleteSegments: string[] }> {
   // Direct-offer (paid ads) orgs never had a trial: tag offer=direct and strip trial tags.
-  const isDirectOffer = await isDirectOfferOrg(c, orgId)
-  return applyDirectOfferBentoTags(await customerToSegmentOrgBase(c, orgId, price_id, plan, trialPlanNamesToRemove), isDirectOffer)
-}
-
-async function isDirectOfferOrg(c: Context, orgId: string) {
-  const { data, error } = await supabaseAdmin(c)
-    .from('orgs')
-    .select('created_by')
-    .eq('id', orgId)
-    .maybeSingle()
-  if (error || !data) {
-    cloudlog({ requestId: c.get('requestId'), message: 'isDirectOfferOrg org lookup failed', orgId, error })
-    return false
-  }
-  return await isDirectOfferUser(c, supabaseAdmin(c), data.created_by)
+  // Callers already loaded the org, so reuse its created_by instead of re-reading it.
+  const isDirectOffer = await isDirectOfferUser(c, supabaseAdmin(c), org.created_by)
+  return applyDirectOfferBentoTags(await customerToSegmentOrgBase(c, org.id, price_id, plan, trialPlanNamesToRemove), isDirectOffer)
 }
 
 async function customerToSegmentOrgBase(

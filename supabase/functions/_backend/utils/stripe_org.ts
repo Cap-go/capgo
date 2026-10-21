@@ -157,9 +157,10 @@ export async function createStripeCustomer(c: Context, org: OrgRow) {
     throw new Error('no default plan')
   }
 
-  const customer = await createCustomer(c, current.management_email, current.created_by, current.id, current.name, billingAccount)
   // Direct-offer (paid ads) creators get no trial; everyone else gets the standard trial.
+  // Resolve before creating the Stripe customer so a failed lookup retries cleanly.
   const trial_at = await resolveNewOrgTrialEnd(c, supabaseAdmin(c), current.created_by)
+  const customer = await createCustomer(c, current.management_email, current.created_by, current.id, current.name, billingAccount)
   cloudlog({ requestId: c.get('requestId'), message: 'createInfo', plan: selectedPlan, customer, billingAccount })
 
   const { error: createInfoError } = await supabaseAdmin(c)

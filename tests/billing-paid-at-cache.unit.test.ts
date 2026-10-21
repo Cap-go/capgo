@@ -63,4 +63,31 @@ describe('billing paid-at cache', () => {
 
     expect(mocks.from).toHaveBeenCalledTimes(2)
   })
+
+  it('flags orgs that never paid and had a zero-length trial', async () => {
+    mocks.maybeSingle.mockResolvedValue({ data: { created_at: '2026-10-20T12:00:00.000Z', stripe_info: { paid_at: null, trial_at: '2026-10-20T12:00:00.000Z' } }, error: null })
+    const { useBillingPaidAt } = await import('../src/composables/useBillingPaidAt')
+    const result = useBillingPaidAt(ref(crypto.randomUUID()))
+
+    await vi.waitFor(() => expect(result.paidAt.value).toBeNull())
+    expect(result.trialSkipped.value).toBe(true)
+  })
+
+  it('does not flag a churned direct-offer customer that already paid', async () => {
+    mocks.maybeSingle.mockResolvedValue({ data: { created_at: '2026-10-20T12:00:00.000Z', stripe_info: { paid_at: '2026-10-21T08:00:00.000Z', trial_at: '2026-10-20T12:00:00.000Z' } }, error: null })
+    const { useBillingPaidAt } = await import('../src/composables/useBillingPaidAt')
+    const result = useBillingPaidAt(ref(crypto.randomUUID()))
+
+    await vi.waitFor(() => expect(result.paidAt.value).toBe('2026-10-21T08:00:00.000Z'))
+    expect(result.trialSkipped.value).toBe(false)
+  })
+
+  it('does not flag a standard 15-day trial', async () => {
+    mocks.maybeSingle.mockResolvedValue({ data: { created_at: '2026-10-20T12:00:00.000Z', stripe_info: { paid_at: null, trial_at: '2026-11-04T12:00:00.000Z' } }, error: null })
+    const { useBillingPaidAt } = await import('../src/composables/useBillingPaidAt')
+    const result = useBillingPaidAt(ref(crypto.randomUUID()))
+
+    await vi.waitFor(() => expect(result.paidAt.value).toBeNull())
+    expect(result.trialSkipped.value).toBe(false)
+  })
 })

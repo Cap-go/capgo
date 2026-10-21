@@ -31,7 +31,7 @@ const registerSchema = z.object({
   utm_medium: z.string().trim().min(1).optional(),
   utm_campaign: z.string().trim().min(1).optional(),
   // Paid-ads signups send offer=direct (no free trial). Any other value is ignored.
-  offer: z.string().trim().max(64).optional(),
+  offer: z.string().max(64).optional(),
   opt_for_newsletters: z.boolean().default(false),
   captcha_token: z.string().min(1).optional(),
   registration_device_type: z.string().trim().min(1).optional(),

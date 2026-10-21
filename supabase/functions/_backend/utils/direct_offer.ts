@@ -32,8 +32,18 @@ export function computeNewOrgTrialEnd(isDirectOffer: boolean, now = new Date()):
   return trialAt
 }
 
-/** Whether `userId` signed up through the direct offer. Lookup failures count as not direct. */
-export async function isDirectOfferUser(c: Context, admin: DirectOfferAdminClient, userId: string | null | undefined): Promise<boolean> {
+/**
+ * Whether `userId` signed up through the direct offer. By default a failed
+ * lookup is logged and treated as "not direct" (fine for Bento tagging, which
+ * is recomputed later). Entitlement callers pass `throwOnError: true` so a
+ * transient failure never persists a trial the user should not get.
+ */
+export async function isDirectOfferUser(
+  c: Context,
+  admin: DirectOfferAdminClient,
+  userId: string | null | undefined,
+  options: { throwOnError?: boolean } = {},
+): Promise<boolean> {
   if (!userId)
     return false
   try {
@@ -43,12 +53,18 @@ export async function isDirectOfferUser(c: Context, admin: DirectOfferAdminClien
     return isDirectOfferMetadata(data.user?.user_metadata)
   }
   catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'direct offer lookup failed, treating user as standard', userId, error: serializeError(error) })
+    cloudlogErr({ requestId: c.get('requestId'), message: options.throwOnError ? 'direct offer lookup failed' : 'direct offer lookup failed, treating user as standard', userId, error: serializeError(error) })
+    if (options.throwOnError)
+      throw error
     return false
   }
 }
 
-/** Trial end for a new org created by `creatorId`; falls back to the standard trial if the lookup fails. */
+/**
+ * Trial end for a new org created by `creatorId`. Without a creator the
+ * standard trial applies; a failed lookup is rethrown so callers fail (and
+ * retry) instead of persisting a 15-day trial for a direct-offer user.
+ */
 export async function resolveNewOrgTrialEnd(c: Context, admin: DirectOfferAdminClient, creatorId: string | null | undefined): Promise<Date> {
-  return computeNewOrgTrialEnd(await isDirectOfferUser(c, admin, creatorId))
+  return computeNewOrgTrialEnd(await isDirectOfferUser(c, admin, creatorId, { throwOnError: true }))
 }

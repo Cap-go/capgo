@@ -70,7 +70,8 @@ export function useBillingPaidAt(orgId: Readonly<Ref<string | null | undefined>>
     }
 
     const resolvedPaidAt = resolveBillingPaidAt(data.stripe_info)
-    const resolvedTrialSkipped = isZeroLengthTrial(data.created_at, data.stripe_info?.trial_at)
+    // Only orgs that never paid: a churned customer must not see "choose a plan to start".
+    const resolvedTrialSkipped = resolvedPaidAt === null && isZeroLengthTrial(data.created_at, data.stripe_info?.trial_at)
     cacheBillingPaidAt(nextOrgId, resolvedPaidAt, resolvedTrialSkipped)
     paidAt.value = resolvedPaidAt
     trialSkipped.value = resolvedTrialSkipped

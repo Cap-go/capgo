@@ -76,7 +76,10 @@ async function createPendingStripeInfo(c: Context<MiddlewareKeyVariables>, orgId
   const billingAccount = resolvePlanBillingAccount(c, plan, requestedBillingAccount, explicit)
   const pendingCustomerId = `pending_${orgId}`
   // Direct-offer (paid ads) creators get no trial; everyone else gets the standard trial.
-  const trialAt = await resolveNewOrgTrialEnd(c, supabaseAdmin(c), creatorId)
+  // A failed lookup aborts org creation rather than granting a trial by mistake.
+  const trialAt = await resolveNewOrgTrialEnd(c, supabaseAdmin(c), creatorId).catch((error: unknown) => {
+    throw simpleError('cannot_create_org_plan', 'Cannot create org plan', { error: error instanceof Error ? error.message : String(error) })
+  })
 
   const { error } = await supabaseAdmin(c)
     .from('stripe_info')
