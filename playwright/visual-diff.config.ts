@@ -757,6 +757,19 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
         await appOnlyScope.check()
     },
   },
+  {
+    slug: 'api-keys-secure-column',
+    path: '/apikeys',
+    auth: true,
+    prepare: async (page) => {
+      const createKey = page.locator('[data-test="create-key"]')
+      await createKey.waitFor({ state: 'visible', timeout: 30_000 })
+      // Seed includes hashed + plain keys for test@capgo.app — wait for the table body.
+      await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 30_000 })
+      const hashed = page.getByLabel('Secure key (hidden)').or(page.getByText('Secure key (hidden)'))
+      await hashed.first().waitFor({ state: 'visible', timeout: 30_000 })
+    },
+  },
 ]
 
 export const visualDiffViewport = {
