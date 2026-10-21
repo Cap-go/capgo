@@ -130,6 +130,7 @@ test('asks to finish or explicitly skip a Builder step passed over by out-of-ord
   await expect(missed).toContainText('Steps passed over: 1')
   await expect(missed.locator('[data-test="setup-checklist-missed-start_setup"]')).toHaveText('1. Start guided Builder setup')
   await expect(page.locator('[data-test="builder-checklist-instructions"]')).toContainText('Passed over · 1 of 4')
+  await expect(page.locator('[data-test="builder-checklist-skip-reason"]')).toHaveCount(0)
 
   await page.locator('[data-test="builder-checklist-skip-step"]').click()
   await page.locator('[data-test="builder-checklist-skip-reason"]').fill('Keystore came from our old CI')

@@ -537,7 +537,6 @@
   "setup-checklist-missed-title": "Steps passed over: {count}",
   "setup-checklist-missed-description": "You are ahead of the checklist, which is fine. Finish what was passed over, or skip it if you already set it up another way.",
   "setup-checklist-missed-task-number": "Passed over · {number} of {total}",
-  "setup-checklist-missed-step-note": "A later step is already done, so this one was passed over. Finish it now, or skip it if you already handled it another way.",
   "setup-checklist-missed-step-required-note": "A later step is already done, but this one is still needed for live updates to work. Finish it to continue.",
   "setup-checklist-missed-status": "Passed over",
   "setup-checklist-skip-step": "Skip this step",

@@ -732,6 +732,9 @@ test('asks to finish or explicitly skip a step passed over by out-of-order setup
   await expect(page.locator('[data-test="setup-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'false')
   await expect(page.locator(instructions)).toContainText('Passed over · 1 of 7')
   await expect(page.locator('[data-test="app-onboarding-command-copy"]')).toBeVisible()
+  // Reason form stays closed until the user chooses Skip.
+  await expect(page.locator('[data-test="setup-checklist-skip-reason"]')).toHaveCount(0)
+  await expect(page.getByLabel('Why are you skipping this step?')).toHaveCount(0)
 
   await page.locator('[data-test="setup-checklist-skip-step"]').click()
   const confirm = page.locator('[data-test="setup-checklist-skip-confirm"]')
