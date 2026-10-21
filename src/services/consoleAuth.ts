@@ -128,7 +128,7 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
   let refreshTimer: ReturnType<typeof setInterval> | undefined
   // Access token last confirmed by the provider; claims are only trusted after that check.
   let verifiedToken: string | null = null
-  type ClaimsPayload = { claims: Record<string, any>, header: Record<string, any>, signature: string }
+  interface ClaimsPayload { claims: Record<string, any>, header: Record<string, any>, signature: string }
   // One in-flight /user check per token so concurrent getClaims share the round trip.
   let verifying: Promise<Result<ClaimsPayload | null>> | null = null
   let verifyingToken: string | null = null
