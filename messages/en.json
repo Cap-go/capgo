@@ -3864,5 +3864,18 @@
   "billing-cancel-keep-plan": "Keep my plan",
   "billing-cancel-confirm": "Cancel plan",
   "billing-cancel-success": "Your plan is canceled and will end at the end of the billing period.",
-  "billing-cancel-error": "We couldn't cancel your plan. Please try again."
+  "billing-cancel-error": "We couldn't cancel your plan. Please try again.",
+  "native-builds": "Native builds",
+  "native-build-stats-title": "Native build statistics",
+  "native-build-stats-help": "Native builds across every app in this organization.",
+  "native-build-stats-total": "Total builds",
+  "native-build-stats-total-hint": "{succeeded} succeeded · {failed} failed",
+  "native-build-stats-success-rate": "Success rate",
+  "native-build-stats-in-progress": "{count} still in progress",
+  "native-build-stats-avg-duration": "Avg build time",
+  "native-build-stats-avg-wait": "Avg queue wait",
+  "native-build-stats-by-app": "Builds by app",
+  "native-build-stats-by-app-help": "Busiest apps first, for the selected period.",
+  "native-build-stats-empty-help": "Native build activity for your apps will appear here once you request a build with the Capgo CLI.",
+  "native-build-stats-load-error": "Could not load native build statistics."
 }
