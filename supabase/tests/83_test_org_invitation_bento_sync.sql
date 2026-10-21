@@ -1,7 +1,7 @@
 SET default_transaction_isolation = 'repeatable read';
 BEGIN;
 
-SELECT plan(24);
+SELECT plan(26);
 
 SELECT hasnt_table(
     'public', 'bento_event_dispatches',
@@ -48,6 +48,20 @@ SELECT is(
         'public.queue_org_invitation_bento_sync(text)',
         'EXECUTE'
     ), false, 'anonymous callers cannot queue Bento syncs directly'
+);
+SELECT is(
+    pg_catalog.has_function_privilege(
+        'authenticated',
+        'public.trigger_queue_org_invitation_bento_sync()',
+        'EXECUTE'
+    ), false, 'authenticated callers cannot execute the sync trigger directly'
+);
+SELECT is(
+    pg_catalog.has_function_privilege(
+        'anon',
+        'public.trigger_queue_org_invitation_bento_sync()',
+        'EXECUTE'
+    ), false, 'anonymous callers cannot execute the sync trigger directly'
 );
 
 CREATE FUNCTION pg_temp.bento_syncs(p_email text)
@@ -184,11 +198,16 @@ SELECT is(
     1::bigint, 'touching an already-cancelled invite queues nothing more'
 );
 
+-- Simulate the cancellation sync exhausting its queue budget before deletion.
+DELETE FROM pgmq.q_send_email
+WHERE
+    message -> 'payload' -> 'org_invitation_bento_sync' ->> 'email'
+    = 'bento-sync-rescind@example.com';
 DELETE FROM public.tmp_users
 WHERE id = 830001;
 SELECT is(
     pg_temp.bento_syncs('bento-sync-rescind@example.com'),
-    1::bigint, 'deleting a cancelled invite does not queue a duplicate sync'
+    1::bigint, 'deletion retries a failed cancellation sync'
 );
 
 DELETE FROM public.tmp_users

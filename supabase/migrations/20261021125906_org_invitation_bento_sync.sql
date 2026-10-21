@@ -205,10 +205,10 @@ TO service_role;
 
 -- New-user invitations close when accepted (row deleted), rescinded
 -- (cancelled_at set) or removed with their organization.
+-- Deletion reconciles even cancelled rows: their earlier sync may have failed.
 CREATE TRIGGER queue_tmp_user_invitation_bento_delete
 BEFORE DELETE ON public.tmp_users
 FOR EACH ROW
-WHEN (old.cancelled_at IS null)
 EXECUTE FUNCTION public.trigger_queue_org_invitation_bento_sync();
 
 CREATE TRIGGER queue_tmp_user_invitation_bento_cancel
