@@ -9,6 +9,7 @@ vi.mock('../src/services/capgoApi', () => ({ invokeCapgoApi: mocks.api }))
 vi.mock('../src/services/date', () => ({ formatDate: () => '' }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('vue-sonner', () => ({ toast: { error: vi.fn() } }))
 vi.mock('../src/stores/dialogv2', () => ({ useDialogV2Store: () => ({}) }))
 vi.mock('../src/stores/organization', () => ({ useOrganizationStore: () => ({ currentOrganization: { gid: 'fixture-org' }, getOrgByAppId: () => ({ paying: true }), awaitInitialLoad: async () => {} }) }))
 vi.mock('../src/services/supabase', () => ({ useSupabase: () => ({
@@ -44,8 +45,8 @@ function mount() {
   const app = createApp(defineComponent({ setup: () => () => h(BuildTable, { appId: appId.value }) }))
   app.component('StepsBuild', { render: () => h('div', { 'data-test': 'commands' }) })
   app.component('DataTable', defineComponent({
-    props: { isLoading: Boolean, elementList: { type: Array, default: () => [] } },
-    setup: props => () => h('div', { 'data-test': 'table', 'data-loading': String(props.isLoading), 'data-count': props.elementList.length }),
+    props: { isLoading: Boolean, elementList: { type: Array, default: () => [] }, total: Number },
+    setup: props => () => h('div', { 'data-test': 'table', 'data-loading': String(props.isLoading), 'data-count': props.elementList.length, 'data-total': props.total }),
   }))
   app.mount(host)
   cleanups.push(() => app.unmount())
@@ -138,5 +139,19 @@ describe('builds page checklist activation access', () => {
     expect(host.querySelector('[data-test="intro"]')).toBeNull()
     expect(host.querySelector('[data-test="table"]')?.getAttribute('data-count')).toBe('1')
     expect(host.querySelector('[data-test="table"]')?.getAttribute('data-loading')).toBe('false')
+  })
+
+  it('clears the previous pagination total when the new app load fails', async () => {
+    mocks.api.mockResolvedValue({ data: { canEnable: true }, error: null })
+    mocks.builds = [{ builder_job_id: null, platform: 'ios' }]
+    const { host, appId } = mount()
+    await vi.waitFor(() => expect(host.querySelector('[data-test="table"]')?.getAttribute('data-total')).toBe('1'))
+    mocks.delayed['com.example.second'] = Promise.resolve({ data: [], count: null, error: { message: 'Unavailable' } })
+    appId.value = 'com.example.second'
+    await vi.waitFor(() => {
+      expect(host.querySelector('[data-test="table"]')?.getAttribute('data-loading')).toBe('false')
+      expect(host.querySelector('[data-test="table"]')?.getAttribute('data-count')).toBe('0')
+      expect(host.querySelector('[data-test="table"]')?.getAttribute('data-total')).toBe('0')
+    })
   })
 })

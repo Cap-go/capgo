@@ -220,6 +220,9 @@ async function reload() {
 
   currentPage.value = 1
   elements.value = []
+  total.value = 0
+  buildDurations.value = {}
+  platformBuildCounts.value = { ios: 0, android: 0 }
   canEnableBuilder.value = false
   builderAccessReady.value = false
   buildCountsReady.value = false
