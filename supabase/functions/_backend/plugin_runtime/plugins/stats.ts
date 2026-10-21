@@ -10,7 +10,7 @@ import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hon
 import { invalidIpInfo } from '../utils/invalids_ip.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
-import { closeClient, createLazyPgClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getEffectiveDeviceChannelNamePostgres, getLazyPgQueryCount, getPgClient, getReadReplicaBinding } from '../utils/pg.ts'
+import { closeClient, createLazyPgClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getEffectiveDeviceChannelNamePostgres, getLazyPgQueryCount, getPgClient, getReadReplicaBinding, queryAppOwnerPostgres } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/plugin_stats.ts'
 import { statsRequestSchema } from '../utils/plugin_validation.ts'
@@ -31,12 +31,23 @@ type OwnerLookup = Awaited<ReturnType<typeof getAppOwnerWithEdgeCache>>
 
 const ownerLookups = new WeakMap<Request, Map<string, Promise<OwnerLookup>>>()
 
+/** Uncached owner read that reports a failure instead of reading as a missing (on-prem) app. */
+async function queryOwnerLookup(c: Context, appId: string, drizzleClient: ReturnType<typeof getDrizzleClient>, planActions: Array<'mau' | 'bandwidth'>): Promise<OwnerLookup> {
+  try {
+    return { value: await queryAppOwnerPostgres(c, appId, drizzleClient, planActions), hit: false }
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'stats replay owner lookup failed', app_id: appId, error })
+    return { value: null, hit: false, lookupFailed: true }
+  }
+}
+
 /**
  * One owner lookup per request and app: a batch reuses its first event's
  * lookup, so a lookup failure answers before any event of it is written (a
  * replay retries the whole batch).
  */
-function getRequestOwnerLookup(c: Context, appId: string, drizzleClient: ReturnType<typeof getDrizzleClient>, planActions: Array<'mau' | 'bandwidth'>) {
+function getRequestOwnerLookup(c: Context, appId: string, drizzleClient: ReturnType<typeof getDrizzleClient>, planActions: Array<'mau' | 'bandwidth'>, edgeCache: boolean) {
   let lookups = ownerLookups.get(c.req.raw)
   if (!lookups) {
     lookups = new Map()
@@ -44,7 +55,9 @@ function getRequestOwnerLookup(c: Context, appId: string, drizzleClient: ReturnT
   }
   let lookup = lookups.get(appId)
   if (!lookup) {
-    lookup = getAppOwnerWithEdgeCache(c, appId, drizzleClient, planActions)
+    lookup = edgeCache
+      ? getAppOwnerWithEdgeCache(c, appId, drizzleClient, planActions)
+      : queryOwnerLookup(c, appId, drizzleClient, planActions)
     lookups.set(appId, lookup)
   }
   return lookup
@@ -157,7 +170,8 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return { success: false, error: 'need_plan_upgrade', message: PLAN_ERROR }
   }
   // Same plan actions as /updates, so both endpoints share the cached owner entry.
-  const ownerLookup = edgeCache ? await getRequestOwnerLookup(c, app_id, drizzleClient, planActions) : null
+  // Replays read the owner with failure reporting, with or without the edge cache.
+  const ownerLookup = edgeCache || getSnippetEdgeReplay(c) ? await getRequestOwnerLookup(c, app_id, drizzleClient, planActions, edgeCache) : null
   // A failed lookup is not an on-prem app: a replay answers 503 so the queue
   // retries it, instead of dropping the stat and caching 'onprem'.
   if (ownerLookup?.lookupFailed && getSnippetEdgeReplay(c))

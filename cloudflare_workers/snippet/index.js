@@ -33,14 +33,16 @@ const EDGE_ANSWERS_ENABLED = true
 // /stats needs no learned fill: the replay runs the full handler (plan,
 // on-prem, provider networks, LIMITED_APPS, unknown actions), so the device
 // answer is all the worker would add. Requests without a fill still reach the
-// worker at STATS_LEARN_SHARE, so it can teach the answers that change what
+// worker at STATS_LEARN_BPS, so it can teach the answers that change what
 // the device does: on-prem / plan-upgrade 429s (the plugin backs off on
 // Retry-After) and the provider networks the worker must check itself.
 // Installs and failures always reach the worker: rollout auto-pause sums
 // their version usage, and the replay delivers at least once.
 // false: back to fill-only answers (sampled devices).
 const STATS_ANSWER_ALL = true
-const STATS_LEARN_SHARE = 0.05
+// Basis points of devices per minute (FNV bucket of app, device and minute,
+// so every device takes its turn).
+const STATS_LEARN_BPS = 500
 const STATS_ACTION_RE = /^\w{1,64}$/
 // PROVIDER_INFRA_ASNS (plugin_runtime/utils/providerAsns.ts): without a fill
 // the snippet does not know whether the app blocks them, so their /stats keep
@@ -77,14 +79,17 @@ function canSpend(budget, count = 1, reserve = 0) {
   return budget.used + count + reserve <= MAX_SUBREQUESTS
 }
 
-/** `failClosed`: a lookup error reads as a hit, for entries that block an answer. */
-async function cacheMatch(budget, key, failClosed = false) {
+/**
+ * `onError`: what a lookup error reads as (a miss by default); `true` for
+ * entries that block an answer, null where a miss would allow one.
+ */
+async function cacheMatch(budget, key, onError = undefined) {
   budget.used++
   try {
     return await caches.default.match(key)
   }
   catch {
-    return failClosed ? true : undefined
+    return onError
   }
 }
 
@@ -553,6 +558,14 @@ function isProviderNetwork(request, fill) {
   return typeof asn !== 'number' || !Array.isArray(fill.pa) || fill.pa.includes(asn)
 }
 
+/** The devices of this minute whose /stats teach the worker's answers. */
+function isStatsLearnSample(appId, body) {
+  const deviceId = (Array.isArray(body) ? body[0] : body)?.device_id
+  if (typeof deviceId !== 'string')
+    return true
+  return edgeBucket(appId, `${deviceId.toLowerCase()}:${Math.floor(Date.now() / 60_000)}`) < STATS_LEARN_BPS
+}
+
 function isLiveEdgeFill(fill, appId, deviceId) {
   return isPlainObject(fill)
     && typeof fill.exp === 'number' && fill.exp > Date.now()
@@ -732,7 +745,8 @@ export default {
       edgeKey = variant === null ? null : getEdgeCacheKey(hostname, appId, endpoint, method, variant)
 
       if (edgeKey) {
-        const cached = await cacheMatch(budget, edgeKey)
+        // null: the lookup failed, which must not read as nothing learned.
+        const cached = await cacheMatch(budget, edgeKey, null)
         if (cached) {
           if (cached.headers.get(EDGE_KIND_HEADER) !== 'answers') {
             console.log(`Edge cache HIT (${cached.headers.get(EDGE_KIND_HEADER)}) for ${appId}/${endpoint}/${method}`)
@@ -754,7 +768,7 @@ export default {
         }
         // Nothing learned for this app here yet: answer /stats anyway, except
         // the share left to the worker to learn from.
-        else if (STATS_ANSWER_ALL && endpoint === 'stats' && method === 'POST' && Math.random() >= STATS_LEARN_SHARE) {
+        else if (cached === undefined && STATS_ANSWER_ALL && endpoint === 'stats' && method === 'POST' && !isStatsLearnSample(appId, body)) {
           const answer = await tryEdgeAnswer(budget, request, url, endpoint, appId, body, new TextDecoder().decode(requestBody), {})
           if (answer)
             return answer

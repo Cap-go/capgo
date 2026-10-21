@@ -283,6 +283,25 @@ describe('plugin edge cache gate (UPDATES_EDGE_CACHE)', () => {
     }
   })
 
+  it('retries a replayed /stats whose uncached owner read failed', async () => {
+    vi.stubEnv('UPDATES_EDGE_CACHE', 'off')
+    const { getAppStatus, setAppStatus } = await import('../supabase/functions/_backend/plugin_runtime/utils/appStatus.ts')
+    const { markSnippetEdgeReplay } = await import('../supabase/functions/_backend/plugin_runtime/utils/snippetEdgeAnswer.ts')
+    const { app } = await import('../supabase/functions/_backend/plugin_runtime/plugins/stats.ts')
+    vi.mocked(getAppStatus).mockResolvedValueOnce({ status: 'cloud', cacheHit: false, allow_device_custom_id: true, block_provider_infra_requests: false } as any)
+    vi.mocked(setAppStatus).mockClear()
+    eagerClient.query.mockRejectedValueOnce(new Error('replica down'))
+    const request = new Request('http://plugin.example.test/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...baseBody(deviceId(1)), action: 'app_moved_to_foreground' }),
+    })
+    markSnippetEdgeReplay(request, { endpoint: 'stats' })
+    const response = await app.fetch(request, {}, { waitUntil: () => {} } as any)
+    expect(response.status).toBe(503)
+    expect(setAppStatus).not.toHaveBeenCalled()
+  })
+
   it('applies a percentage with the same per-device decision on every endpoint', async () => {
     const { updatesEdgeCacheBucket } = await import('../supabase/functions/_backend/plugin_runtime/utils/updatesEdgeCache.ts')
     vi.stubEnv('UPDATES_EDGE_CACHE', '50%')

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import snippet from '../cloudflare_workers/snippet/index.js'
 import { PROVIDER_INFRA_ASNS } from '../supabase/functions/_backend/plugin_runtime/utils/providerAsns.ts'
 import { decodeSnippetEdgeStat } from '../supabase/functions/_backend/plugin_runtime/utils/snippetEdgeReplay.ts'
+import { updatesEdgeCacheBucket } from '../supabase/functions/_backend/plugin_runtime/utils/updatesEdgeCache.ts'
 
 const APP_ID = 'com.edge.app'
 const DEVICE_ID = '00000000-0000-4000-8000-000000000001'
@@ -58,6 +59,24 @@ function noNewWithFill(fill = updatesFill) {
   return new Response(JSON.stringify(NO_NEW_BODY), { status: 200, headers: { 'Content-Type': 'application/json', 'X-Capgo-Edge-Fill': fill } })
 }
 
+/** The snippet's /stats learning sample: FNV bucket of app, device and minute under 500 bps. */
+function isLearnSample(deviceId: string, minute: number) {
+  return updatesEdgeCacheBucket(APP_ID, `${deviceId}:${minute}`) < 500
+}
+
+/** A time (ms) in the first minute that matches. */
+function minuteWhere(predicate: (minute: number) => boolean) {
+  for (let minute = 29_700_000; ; minute++) {
+    if (predicate(minute))
+      return minute * 60_000
+  }
+}
+
+/** Both test devices teach the worker: /stats without a fill reach it. */
+const LEARN_TIME = minuteWhere(minute => isLearnSample(DEVICE_ID, minute) && isLearnSample(OTHER_DEVICE_ID, minute))
+/** Neither does: /stats without a fill are answered at the edge. */
+const ANSWER_TIME = minuteWhere(minute => !isLearnSample(DEVICE_ID, minute) && !isLearnSample(OTHER_DEVICE_ID, minute))
+
 function buildCache() {
   const store = new Map<string, Response>()
   const keyOf = (key: RequestInfo | URL) => key instanceof Request ? key.url : String(key)
@@ -82,14 +101,16 @@ describe('cloudflare snippet edge answers', () => {
 
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
-    // /stats without a fill: every request is the learning share, so the
-    // fill tests below reach the worker first.
-    vi.spyOn(Math, 'random').mockReturnValue(0)
+    // /stats without a fill: the test devices are in the learning sample, so
+    // the fill tests below reach the worker first.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(LEARN_TIME)
     cache = buildCache()
     vi.stubGlobal('caches', { default: cache })
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
   })
@@ -263,7 +284,7 @@ describe('cloudflare snippet edge answers', () => {
   })
 
   it('answers /stats of an app it learned nothing about, outside the learning share', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    vi.setSystemTime(ANSWER_TIME)
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 'ok' }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -294,7 +315,7 @@ describe('cloudflare snippet edge answers', () => {
   })
 
   it('sends /stats of provider networks to the worker while nothing is learned', async () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    vi.setSystemTime(ANSWER_TIME)
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: 'provider_infrastructure_request_blocked' }), { status: 429 }))
     vi.stubGlobal('fetch', fetchMock)
     // Every PROVIDER_INFRA_ASNS network, and a request of unknown network.
@@ -314,12 +335,26 @@ describe('cloudflare snippet edge answers', () => {
   it('sends the learning share of /stats without a fill to the worker', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 'ok' }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
-    vi.spyOn(Math, 'random').mockReturnValue(0.049)
     await snippet.fetch(buildRequest('/stats', statsEvent()))
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    vi.spyOn(Math, 'random').mockReturnValue(0.05)
-    const answered = await snippet.fetch(buildRequest('/stats', statsEvent()))
+    // The same device a minute it is not sampled, and a batch keyed by its first event.
+    vi.setSystemTime(ANSWER_TIME)
+    const answered = await snippet.fetch(buildRequest('/stats', [statsEvent(), statsEvent({ device_id: OTHER_DEVICE_ID })]))
     expect(answered.headers.get('X-Capgo-Edge')).toBe('answer')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    // About 5% of devices per minute.
+    const sampled = Array.from({ length: 4000 }, (_, i) => isLearnSample(`00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, 29_700_000)).filter(Boolean).length
+    expect(sampled).toBeGreaterThan(120)
+    expect(sampled).toBeLessThan(280)
+  })
+
+  it('sends /stats to the worker when the app entry lookup fails', async () => {
+    vi.setSystemTime(ANSWER_TIME)
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 'ok' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    cache.match.mockRejectedValueOnce(new Error('cache unavailable'))
+    const response = await snippet.fetch(buildRequest('/stats', statsEvent()))
+    expect(response.headers.get('X-Capgo-Edge')).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
@@ -332,7 +367,7 @@ describe('cloudflare snippet edge answers', () => {
     await snippet.fetch(buildRequest('/stats', statsEvent()))
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
-    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    vi.setSystemTime(ANSWER_TIME)
     const cached = await snippet.fetch(buildRequest('/stats', statsEvent()))
     expect(cached.status).toBe(429)
     expect(cached.headers.get('X-Capgo-Edge-Stat')).toBeNull()
