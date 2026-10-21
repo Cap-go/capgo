@@ -18,6 +18,9 @@ export const cleanupBundleBodySchema = z.object({
   bundle: z.string().min(1).optional(),
   ignore_channel: booleanLikeSchema.optional(),
   dry_run: booleanLikeSchema.optional(),
+  // Execute only these bundles (the ones the user confirmed from a dry run). Anything the
+  // fresh plan would keep is still kept, so a concurrent upload cannot widen the deletion.
+  ids: z.array(integerLikeSchema).max(100_000).optional(),
 })
 
 export type CleanupBundleBody = z.infer<typeof cleanupBundleBodySchema>
@@ -30,6 +33,9 @@ export interface CleanupBundleRow {
 }
 
 export interface CleanupPlan {
+  /** Active bundles of the app, placeholders excluded, before the `bundle` range filter. */
+  active: number
+  /** Bundles inside the cleanup scope (the `bundle` range when given). */
   total: number
   kept: CleanupBundleRow[]
   removed: CleanupBundleRow[]
@@ -52,7 +58,8 @@ export function planBundleCleanup(
   linkedIds: Set<number>,
   options: { keep: number, bundle?: string, ignoreChannel: boolean },
 ): CleanupPlan {
-  let candidates = versions.filter(version => !RESERVED_BUNDLE_NAMES.has(version.name))
+  const active = versions.filter(version => !RESERVED_BUNDLE_NAMES.has(version.name))
+  let candidates = active
 
   if (options.bundle) {
     const lower = tryParse(options.bundle)
@@ -75,7 +82,7 @@ export function planBundleCleanup(
       removed.push(row)
   }
 
-  return { total: candidates.length, kept, removed }
+  return { active: active.length, total: candidates.length, kept, removed }
 }
 
 async function fetchActiveVersions(c: Context<MiddlewareKeyVariables>, apikey: Database['public']['Tables']['apikeys']['Row'], appId: string) {
@@ -99,13 +106,26 @@ async function fetchActiveVersions(c: Context<MiddlewareKeyVariables>, apikey: D
 }
 
 async function fetchLinkedVersionIds(c: Context<MiddlewareKeyVariables>, apikey: Database['public']['Tables']['apikeys']['Row'], appId: string) {
-  const { data, error } = await supabaseApikey(c, apikey.key)
-    .from('channels')
-    .select('version, rollout_version')
-    .eq('app_id', appId)
-  if (error)
-    quickError(500, 'cannot_check_linked_channels', 'Cannot check linked channels', { supabaseError: error })
-  return new Set((data ?? []).flatMap(channel => [channel.version, channel.rollout_version]).filter((id): id is number => typeof id === 'number'))
+  const supabase = supabaseApikey(c, apikey.key)
+  const linked = new Set<number>()
+  for (let from = 0; ; from += SELECT_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('channels')
+      .select('version, rollout_version')
+      .eq('app_id', appId)
+      .order('id', { ascending: true })
+      .range(from, from + SELECT_PAGE_SIZE - 1)
+    if (error)
+      quickError(500, 'cannot_check_linked_channels', 'Cannot check linked channels', { supabaseError: error })
+    for (const channel of data ?? []) {
+      if (typeof channel.version === 'number')
+        linked.add(channel.version)
+      if (typeof channel.rollout_version === 'number')
+        linked.add(channel.rollout_version)
+    }
+    if (!data || data.length < SELECT_PAGE_SIZE)
+      return linked
+  }
 }
 
 export async function cleanupBundles(c: Context<MiddlewareKeyVariables>, bodyRaw: unknown, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -125,14 +145,20 @@ export async function cleanupBundles(c: Context<MiddlewareKeyVariables>, bodyRaw
     fetchLinkedVersionIds(c, apikey, body.app_id),
   ])
   const plan = planBundleCleanup(versions, linkedIds, { keep: body.keep ?? DEFAULT_KEEP, bundle: body.bundle, ignoreChannel })
+  if (body.ids) {
+    const confirmed = new Set(body.ids)
+    plan.kept.push(...plan.removed.filter(row => !confirmed.has(row.id)))
+    plan.removed = plan.removed.filter(row => confirmed.has(row.id))
+  }
 
   if (body.dry_run === true || !plan.removed.length)
     return c.json({ ...plan, dry_run: body.dry_run === true })
 
-  // Soft-delete in batches. Linked bundles are only in `removed` with ignore_channel; the
-  // unlink_channels_from_deleted_version trigger clears their channel links.
+  // Soft-delete in batches. Linked bundles are only in `removed` with ignore_channel, which
+  // means "unlink and delete": the unlink_channels_from_deleted_version trigger clears those
+  // links, including links made after planning. Without it, re-check links right before
+  // deleting so a bundle linked in the meantime is kept.
   const supabase = supabaseApikey(c, apikey.key)
-  // A channel may have been linked since the plan was computed; never delete those silently.
   const freshLinkedIds = ignoreChannel ? new Set<number>() : await fetchLinkedVersionIds(c, apikey, body.app_id)
   const removedIds = new Set<number>()
   for (let i = 0; i < plan.removed.length; i += DELETE_BATCH_SIZE) {
@@ -147,12 +173,12 @@ export async function cleanupBundles(c: Context<MiddlewareKeyVariables>, bodyRaw
       .in('id', ids)
       .select('id')
     if (error)
-      quickError(500, 'cannot_delete_version', 'Cannot delete bundles', { supabaseError: error, deleted: removedIds.size })
+      quickError(500, 'cannot_delete_version', 'Cannot delete bundles', { supabaseError: error, removed_ids: [...removedIds] })
     for (const row of data ?? [])
       removedIds.add(row.id)
   }
 
   const removed = plan.removed.filter(row => removedIds.has(row.id))
   const skipped = plan.removed.filter(row => !removedIds.has(row.id))
-  return c.json({ total: plan.total, kept: [...plan.kept, ...skipped], removed, dry_run: false })
+  return c.json({ active: plan.active, total: plan.total, kept: [...plan.kept, ...skipped], removed, dry_run: false })
 }

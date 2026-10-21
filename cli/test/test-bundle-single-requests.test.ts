@@ -77,12 +77,22 @@ describe('deleteSpecificVersion', () => {
   it('reports a missing bundle without listing bundles', async () => {
     const { calls, invoke } = recordingInvoke([{
       data: null,
-      error: makeBundleApiError({ error: 'cannot_delete_version', message: 'Cannot delete version' }, 400),
+      error: makeBundleApiError({ error: 'error_version_not_found', message: 'Version not found' }, 404),
     }])
     await expect(deleteSpecificVersion(client, 'com.test.app', '9.9.9', { silent: true, apikey: 'key', invoke }))
       .rejects
       .toThrow('App version com.test.app@9.9.9 doesn\'t exist')
     expect(calls).toHaveLength(1)
+  })
+
+  it('does not report a backend failure as a missing bundle', async () => {
+    const { invoke } = recordingInvoke([{
+      data: null,
+      error: makeBundleApiError({ error: 'cannot_delete_version', message: 'Cannot delete version' }, 400),
+    }])
+    await expect(deleteSpecificVersion(client, 'com.test.app', '1.2.3', { silent: true, apikey: 'key', invoke }))
+      .rejects
+      .toThrow(/Could not delete bundle for app com\.test\.app/)
   })
 
   it('surfaces permission errors from DELETE /bundle', async () => {
@@ -98,7 +108,7 @@ describe('deleteSpecificVersion', () => {
 
 describe('cleanupAppVersions', () => {
   it('sends the whole cleanup to the API in one request', async () => {
-    const result = { total: 3, kept: [{ id: 3, name: '1.0.2', created_at: null, linked: false }], removed: [{ id: 1, name: '1.0.0', created_at: null, linked: false }], dry_run: true }
+    const result = { active: 3, total: 3, kept: [{ id: 3, name: '1.0.2', created_at: null, linked: false }], removed: [{ id: 1, name: '1.0.0', created_at: null, linked: false }], dry_run: true }
     const { calls, invoke } = recordingInvoke([{ data: result, error: null }])
     const data = await cleanupAppVersions('com.test.app', { keep: 1, bundle: '1.0.0', ignoreChannel: true, dryRun: true }, { apikey: 'key', silent: true, invoke })
     expect(data).toEqual(result)
@@ -107,6 +117,12 @@ describe('cleanupAppVersions', () => {
       method: 'POST',
       body: { app_id: 'com.test.app', keep: 1, bundle: '1.0.0', ignore_channel: true, dry_run: true },
     }])
+  })
+
+  it('sends the confirmed ids with the execute request', async () => {
+    const { calls, invoke } = recordingInvoke([{ data: { active: 2, total: 2, kept: [], removed: [], dry_run: false }, error: null }])
+    await cleanupAppVersions('com.test.app', { keep: 1, dryRun: false, ids: [4, 5] }, { apikey: 'key', silent: true, invoke })
+    expect(calls[0].body).toEqual({ app_id: 'com.test.app', keep: 1, ignore_channel: false, dry_run: false, ids: [4, 5] })
   })
 
   it('rejects an unexpected response shape', async () => {

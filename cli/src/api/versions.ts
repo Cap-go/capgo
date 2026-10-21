@@ -71,6 +71,8 @@ async function isBundleAccessDeniedError(error: unknown) {
   const payload = await readCapgoCliApiErrorPayload(error)
   if (status === 401 || status === 403 || payload?.error === 'cannot_access_app')
     return true
+  if (payload?.error === 'cannot_delete_bundle')
+    return true
   return payload?.error === 'cannot_get_bundle'
     && typeof payload.message === 'string'
     && payload.message.toLowerCase().includes('access')
@@ -267,7 +269,7 @@ export async function deleteSpecificVersion(
     return
 
   const payload = await readCapgoCliApiErrorPayload(error)
-  if (payload?.error === 'cannot_delete_version')
+  if (payload?.error === 'error_version_not_found')
     throwMissingVersion(appid, bundle, silent)
   if (payload?.error !== 'cannot_delete_linked_version')
     await throwBundleHttpInvokeError(appid, error, 'delete', silent, 'bundle.delete')
@@ -287,6 +289,9 @@ export interface CleanupBundleRow {
 }
 
 export interface CleanupBundlesResult {
+  /** Active bundles of the app (placeholders excluded), before the `bundle` range filter. */
+  active: number
+  /** Bundles inside the cleanup scope. */
   total: number
   kept: CleanupBundleRow[]
   removed: CleanupBundleRow[]
@@ -296,7 +301,7 @@ export interface CleanupBundlesResult {
 /** Server-side cleanup: the API selects and soft-deletes old bundles in one request. */
 export async function cleanupAppVersions(
   appid: string,
-  body: { keep: number, bundle?: string, ignoreChannel?: boolean, dryRun: boolean },
+  body: { keep: number, bundle?: string, ignoreChannel?: boolean, dryRun: boolean, ids?: number[] },
   options: CapgoHttpOptions & Pick<VersionOptions, 'invoke'>,
 ) {
   const invoke = options.invoke ?? invokeCapgoCliApi
@@ -309,6 +314,7 @@ export async function cleanupAppVersions(
       ...(body.bundle ? { bundle: body.bundle } : {}),
       ignore_channel: !!body.ignoreChannel,
       dry_run: body.dryRun,
+      ...(body.ids ? { ids: body.ids } : {}),
     },
     apiHost: options.apiHost,
   })

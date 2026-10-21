@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, createAppVersions, getSupabaseClient, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
+import { BASE_URL, createAppVersions, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const APPNAME = `com.app.cleanup.${randomUUID()}`
 // Scope every request to 5.x so the seeded bundles of the app are never touched.
 const RANGE = '5.0.0'
 
 interface CleanupResponse {
+  active: number
   total: number
   kept: { id: number, name: string, linked: boolean }[]
   removed: { id: number, name: string, linked: boolean }[]
@@ -72,5 +73,38 @@ describe('[POST] /bundle/cleanup', () => {
     const againData = await again.json() as CleanupResponse
     expect(againData.total).toBe(2)
     expect(againData.removed).toEqual([])
+  })
+
+  it('keeps channel-linked bundles and only deletes the confirmed ids', async () => {
+    const supabase = getSupabaseClient()
+    const { data: rows, error: rowsError } = await supabase
+      .from('app_versions')
+      .select('id, name, owner_org')
+      .eq('app_id', APPNAME)
+      .in('name', ['5.0.3', '5.0.4'])
+    expect(rowsError).toBeNull()
+    const linkedRow = rows!.find(row => row.name === '5.0.3')!
+    const { error: channelError } = await supabase
+      .from('channels')
+      .insert({ name: `cleanup-${randomUUID().slice(0, 8)}`, app_id: APPNAME, version: linkedRow.id, created_by: USER_ID, owner_org: linkedRow.owner_org })
+    expect(channelError).toBeNull()
+
+    const preview = await (await postCleanup({ keep: 0, dry_run: true })).json() as CleanupResponse
+    expect(preview.kept).toEqual([expect.objectContaining({ name: '5.0.3', linked: true })])
+    expect(preview.removed.map(row => row.name)).toEqual(['5.0.4'])
+
+    // Nothing confirmed: the execute request must not widen the deletion.
+    const response = await postCleanup({ keep: 0, ids: [] })
+    expect(response.status).toBe(200)
+    const data = await response.json() as CleanupResponse
+    expect(data.removed).toEqual([])
+    expect(await deletedNames()).toEqual(['5.0.1', '5.0.2'])
+  })
+
+  it('treats an empty range as nothing to remove', async () => {
+    const data = await (await postCleanup({ bundle: '9.0.0', keep: 0, dry_run: true })).json() as CleanupResponse
+    expect(data.total).toBe(0)
+    expect(data.active).toBeGreaterThan(0)
+    expect(data.removed).toEqual([])
   })
 })
