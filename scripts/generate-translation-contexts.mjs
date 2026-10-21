@@ -10,7 +10,7 @@ const keySet = new Set(keys)
 function walk(dir, out = []) {
   const names = readdirSync(dir).sort()
   for (const name of names) {
-    if (name === 'node_modules' || name === 'dist' || name === '.git' || name === 'graphify-out')
+    if (name === 'node_modules' || name === 'dist' || name === '.git')
       continue
     const path = join(dir, name)
     const st = statSync(path)
