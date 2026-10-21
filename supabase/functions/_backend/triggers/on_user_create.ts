@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { syncNewUserABTests } from '../utils/ab_tests.ts'
-import { syncBentoSubscriberTags, trackBentoEvent } from '../utils/bento.ts'
+import { isBentoConfigured, syncBentoSubscriberTags, trackBentoEvent } from '../utils/bento.ts'
 import { normalizeBentoEmail, prepareNewUserProvisioning, syncBentoFirstOrgOnUserCreate } from '../utils/bento_first_org.ts'
 import { directOfferTrialTagsToRemove } from '../utils/billing_bento_tags.ts'
 import { DIRECT_OFFER_BENTO_TAG, isDirectOfferMetadata } from '../utils/direct_offer.ts'
@@ -50,7 +50,8 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'INSERT'), async (c
   await syncUserPreferenceTags(c, normalizeBentoEmail(record.email), record)
   await syncBentoFirstOrgOnUserCreate(c, record)
   // The offer lives in server-only app metadata (set by /auth/register and the Apple flow).
-  if (isDirectOfferMetadata(authUser.app_metadata)) {
+  // Skip when Bento is off so the plans lookup can never fail provisioning for nothing.
+  if (isBentoConfigured(c) && isDirectOfferMetadata(authUser.app_metadata)) {
     // Direct-offer (paid ads) signups: tag offer=direct so lifecycle emails can
     // target them, and remove trial tags a reused Bento subscriber may still
     // carry. Tag writes are idempotent on retry.

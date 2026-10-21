@@ -57,7 +57,10 @@ vi.mock('../supabase/functions/_backend/utils/ab_tests.ts', () => ({
   syncNewUserABTests: syncNewUserABTestsMock,
 }))
 
+const bentoState = vi.hoisted(() => ({ configured: true, plansLookups: 0 }))
+
 vi.mock('../supabase/functions/_backend/utils/bento.ts', () => ({
+  isBentoConfigured: () => bentoState.configured,
   syncBentoSubscriberTags: syncBentoSubscriberTagsMock,
   trackBentoEvent: trackBentoEventMock,
   unsubscribeBento: unsubscribeBentoMock,
@@ -81,7 +84,10 @@ vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   createApiKey: createApiKeyMock,
   supabaseAdmin: vi.fn(() => ({
     auth: { admin: { getUserById: getUserByIdMock } },
-    from: () => ({ select: async () => ({ data: [{ name: 'Solo' }, { name: 'Team' }], error: null }) }),
+    from: () => ({ select: async () => {
+      bentoState.plansLookups++
+      return { data: [{ name: 'Solo' }, { name: 'Team' }], error: null }
+    } }),
   })),
 }))
 
@@ -94,7 +100,11 @@ vi.mock('../supabase/functions/_backend/utils/user_preferences.ts', () => ({
 }))
 
 // Model the Edge Runtime binding while executing trigger handlers under Node.
-beforeEach(() => vi.stubGlobal('EdgeRuntime', undefined))
+beforeEach(() => {
+  vi.stubGlobal('EdgeRuntime', undefined)
+  bentoState.configured = true
+  bentoState.plansLookups = 0
+})
 afterEach(() => vi.unstubAllGlobals())
 
 const { app: onUserCreateApp } = await import('../supabase/functions/_backend/triggers/on_user_create.ts')
@@ -281,6 +291,16 @@ describe('first-organization lifecycle on user registration', () => {
       email: 'new.user@example.com',
       segments: ['offer=direct'],
     })
+  })
+
+  it('skips the plans lookup for direct-offer signups when Bento is disabled', async () => {
+    bentoState.configured = false
+    mockRegistrationMetadata({}, { offer: 'direct' })
+
+    const response = await postUser()
+
+    expect(response.status).toBe(200)
+    expect(bentoState.plansLookups).toBe(0)
   })
 
   it('ignores a user-writable offer in user metadata', async () => {
