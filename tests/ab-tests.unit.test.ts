@@ -836,6 +836,36 @@ describe('new-user A/B test assignment', () => {
     ])
   })
 
+  it('deletes the Bento tags of retired experiments the user was assigned to', async () => {
+    const module = await loadABTestsModule()
+    installIntentTest(module)
+    const existing = {
+      ...persistedAssignments({ development: 'D', emails: 'B', publish: 'B' }),
+      webnativeapp_publish_intent: { assigned_at: FIXED_DATE.toISOString(), branch: 'A' },
+    }
+    const persisted = {
+      ...existing,
+      [INTENT_TEST_NAME]: intentAssignment(),
+    }
+    const context = { get: vi.fn(() => 'request-id') } as never
+    drizzleExecuteMock
+      .mockResolvedValueOnce({ rows: [{ abtests: existing, created_via_invite: false, email: 'User@Example.com', intent: 'ota' }] })
+      .mockResolvedValueOnce({ rows: [{ abtests: persisted }] })
+    const currentUser = { abtests: persisted, created_via_invite: false, email: 'User@Example.com', intent: 'ota' }
+    queueBentoSnapshot(currentUser)
+    queueBentoSnapshot(currentUser, true)
+
+    await module.getOrCreateUserABTests(context, USER_ID)
+
+    const [, update] = syncBentoSubscriberTagsMock.mock.calls[0]!
+    expect(update.deleteSegments).toEqual(expect.arrayContaining([
+      'ab:webnativeapp_publish_intent',
+      'ab:no_webnativeapp_publish_intent',
+    ]))
+    expect(update.deleteSegments).not.toContain('ab:webnativeapp_development_environment')
+    expect(update.segments).not.toContain('ab:webnativeapp_publish_intent')
+  })
+
   it('retries Bento when a newer reconciliation commits during synchronization', async () => {
     const module = await loadABTestsModule()
     installIntentTest(module)
