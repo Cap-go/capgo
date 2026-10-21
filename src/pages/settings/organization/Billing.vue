@@ -8,6 +8,7 @@ import { toast } from 'vue-sonner'
 import IconDownload from '~icons/heroicons/arrow-down-tray'
 import IconCard from '~icons/heroicons/credit-card'
 import IconExclamationTriangle from '~icons/heroicons/exclamation-triangle'
+import IconShieldCheck from '~icons/heroicons/shield-check'
 import CancelPlanModal from '~/components/billing/CancelPlanModal.vue'
 import CardFormModal from '~/components/billing/CardFormModal.vue'
 import TrialPlanOfferModal from '~/components/billing/TrialPlanOfferModal.vue'
@@ -15,7 +16,7 @@ import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { formatLocalDate } from '~/services/date'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
-import { cancelTrialPlan, formatStripeAmount, getBillingOverview, payOpenInvoice, resumeSubscription, scheduleTrialPlan } from '~/services/stripe'
+import { cancelTrialPlan, formatStripeAmount, getBillingOverview, payOpenInvoice, removeBackupCard, resumeSubscription, scheduleTrialPlan } from '~/services/stripe'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -31,18 +32,20 @@ const isLoading = ref(true)
 const loadFailed = ref(false)
 const isPaying = ref(false)
 const isResuming = ref(false)
+const isRemovingBackup = ref(false)
 const isUpdatingTrialPlan = ref(false)
 // Org the post-card trial plan offer is for (pinned in case the user switches org).
 const trialPlanOfferOrgId = ref<string | null>(null)
 // Start the trial plan once the card form saves a card.
 let scheduleAfterCardSave = false
-const showCardModal = ref<'setup' | 'invoice' | null>(null)
+const showCardModal = ref<'setup' | 'backup' | 'invoice' | null>(null)
 const showCancelModal = ref(false)
 const permissionModal = ref<'org.read_billing' | 'org.update_billing' | null>(null)
 let loadRun = 0
 
 const orgId = computed(() => currentOrganization.value?.gid ?? '')
 const card = computed(() => overview.value?.card ?? null)
+const backupCard = computed(() => overview.value?.backupCard ?? null)
 // No publishable key: Stripe.js forms are unavailable, server-side actions still work.
 const canEnterCard = computed(() => !!overview.value?.publishableKey)
 const subscription = computed(() => overview.value?.subscription ?? null)
@@ -119,9 +122,40 @@ async function requireUpdateBilling() {
   return false
 }
 
-async function openCardForm() {
+async function openCardForm(mode: 'setup' | 'backup' = 'setup') {
   if (await requireUpdateBilling())
-    showCardModal.value = 'setup'
+    showCardModal.value = mode
+}
+
+async function removeBackup() {
+  const backup = backupCard.value
+  // Scope the request to the org that rendered this card.
+  const id = orgId.value
+  if (!backup || !id || isRemovingBackup.value)
+    return
+  // Lock before the async permission check so double clicks send one request.
+  isRemovingBackup.value = true
+  try {
+    if (!await requireUpdateBilling())
+      return
+    const cards = await removeBackupCard(id, backup.id)
+    if (orgId.value !== id)
+      return
+    if (overview.value)
+      overview.value = { ...overview.value, ...cards }
+    toast.success(t('billing-backup-card-removed'))
+  }
+  catch (error) {
+    console.error('Cannot remove backup card', error)
+    if (orgId.value === id) {
+      toast.error(t('billing-backup-card-remove-failed'))
+      // Server may have already dropped the card; refresh so retries match reality.
+      void loadOverview()
+    }
+  }
+  finally {
+    isRemovingBackup.value = false
+  }
 }
 
 async function openCancel() {
@@ -417,9 +451,61 @@ onMounted(async () => {
             <p v-else class="mt-3 text-sm text-slate-600 dark:text-slate-300">
               {{ t('billing-no-card') }}
             </p>
-            <button v-if="canEnterCard" type="button" class="d-btn d-btn-sm d-btn-outline mt-4" data-test="billing-update-card" @click="openCardForm">
+            <button v-if="canEnterCard" type="button" class="d-btn d-btn-sm d-btn-outline mt-4" data-test="billing-update-card" @click="openCardForm()">
               {{ card ? t('billing-update-card') : t('billing-add-card') }}
             </button>
+
+            <div v-if="card && backupCard" class="mt-5 border-t border-slate-100 pt-4 dark:border-white/10" data-test="billing-backup-card">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {{ t('billing-backup-card-heading') }}
+              </h3>
+              <div class="mt-2 flex items-center gap-3">
+                <span class="flex h-8 w-11 items-center justify-center rounded-md bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700">
+                  <IconCard class="h-4 w-4" />
+                </span>
+                <div>
+                  <p class="text-sm font-medium text-slate-900 dark:text-white">
+                    {{ brandLabel(backupCard) }} •••• {{ backupCard.last4 }}
+                  </p>
+                  <p class="text-xs text-slate-500 dark:text-slate-400">
+                    {{ t('billing-card-expires', { month: String(backupCard.expMonth).padStart(2, '0'), year: backupCard.expYear }) }}
+                  </p>
+                </div>
+              </div>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <button v-if="canEnterCard" type="button" class="d-btn d-btn-xs d-btn-outline" data-test="billing-replace-backup-card" @click="openCardForm('backup')">
+                  {{ t('billing-backup-card-replace') }}
+                </button>
+                <button
+                  type="button"
+                  class="d-btn d-btn-xs d-btn-ghost text-slate-600 hover:text-red-600 dark:text-slate-300 dark:hover:text-red-400"
+                  :disabled="isRemovingBackup"
+                  data-test="billing-remove-backup-card"
+                  @click="removeBackup"
+                >
+                  <span v-if="isRemovingBackup" class="d-loading d-loading-spinner d-loading-xs" />
+                  {{ t('billing-backup-card-remove') }}
+                </button>
+              </div>
+            </div>
+            <div
+              v-else-if="card && canEnterCard"
+              class="mt-5 flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-950 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-100"
+              data-test="billing-backup-card-recommendation"
+            >
+              <IconShieldCheck class="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-300" />
+              <div>
+                <p class="text-sm font-semibold">
+                  {{ t('billing-backup-card-recommendation-title') }}
+                </p>
+                <p class="mt-0.5 text-xs text-blue-900/80 dark:text-blue-200/80">
+                  {{ t('billing-backup-card-recommendation-desc') }}
+                </p>
+                <button type="button" class="d-btn d-btn-xs d-btn-primary mt-2" data-test="billing-add-backup-card" @click="openCardForm('backup')">
+                  {{ t('billing-backup-card-add') }}
+                </button>
+              </div>
+            </div>
           </section>
         </div>
 

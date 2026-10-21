@@ -8,18 +8,20 @@ import { middlewareAuth } from '../utils/hono_jwt.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import {
   createCardSetupIntent,
-  getDefaultCard,
   getInAppBillingContext,
   getOpenInvoicePaymentSecret,
   getOpenInvoiceSummary,
+  getSavedCards,
   getSubscriptionSummary,
   listInvoices,
   parseCancelComment,
   parseCancelFeedback,
+  parsePaymentMethodRole,
   payOpenInvoice,
+  removeBackupCard,
   resumeSubscription,
+  savePaymentMethodFromIntent,
   scheduleSubscriptionCancel,
-  setDefaultPaymentMethodFromIntent,
 } from '../utils/stripe_in_app.ts'
 import { cancelTrialPlan, getTrialPlanSummary, scheduleTrialPlan } from '../utils/stripe_trial_plan.ts'
 import { supabaseClient } from '../utils/supabase.ts'
@@ -32,6 +34,11 @@ interface OrgBody {
 
 interface PaymentMethodBody extends OrgBody {
   intentId?: string
+  role?: unknown
+}
+
+interface RemovePaymentMethodBody extends OrgBody {
+  paymentMethodId?: string
 }
 
 interface TrialPlanBody extends OrgBody {
@@ -77,8 +84,8 @@ app.use('*', useCors)
 app.post('/overview', middlewareAuth, async (c) => {
   const body = await parseBody<OrgBody>(c)
   const ctx = await resolveBillingContext(c, body.orgId, 'org.read_billing')
-  const [card, subscription, invoices, openInvoice, trialPlan] = await Promise.all([
-    getDefaultCard(ctx),
+  const [{ card, backupCard }, subscription, invoices, openInvoice, trialPlan] = await Promise.all([
+    getSavedCards(c, ctx),
     getSubscriptionSummary(c, ctx),
     listInvoices(ctx),
     getOpenInvoiceSummary(c, ctx),
@@ -87,15 +94,15 @@ app.post('/overview', middlewareAuth, async (c) => {
       return null
     }),
   ])
-  return c.json({ publishableKey: ctx.publishableKey, card, subscription, invoices, openInvoice, trialPlan })
+  return c.json({ publishableKey: ctx.publishableKey, card, backupCard, subscription, invoices, openInvoice, trialPlan })
 })
 
 // Trial card prompt: card on file and the onboarding plan that starts when the trial ends.
 app.post('/trial-plan', middlewareAuth, async (c) => {
   const body = await parseBody<OrgBody>(c)
   const ctx = await resolveBillingContext(c, body.orgId, 'org.update_billing')
-  const [card, plan] = await Promise.all([getDefaultCard(ctx), getTrialPlanSummary(c, ctx)])
-  return c.json({ card, plan })
+  const [cards, plan] = await Promise.all([getSavedCards(c, ctx), getTrialPlanSummary(c, ctx)])
+  return c.json({ card: cards.card, plan })
 })
 
 function optionalString(value: unknown) {
@@ -129,8 +136,17 @@ app.post('/payment-method', middlewareAuth, async (c) => {
   const body = await parseBody<PaymentMethodBody>(c)
   if (typeof body.intentId !== 'string')
     throw simpleError('invalid_intent_id', 'Missing intentId')
+  const role = parsePaymentMethodRole(body.role)
   const ctx = await resolveBillingContext(c, body.orgId, 'org.update_billing')
-  return c.json({ card: await setDefaultPaymentMethodFromIntent(c, ctx, body.intentId) })
+  return c.json({ card: await savePaymentMethodFromIntent(c, ctx, body.intentId, role) })
+})
+
+app.post('/remove-backup-card', middlewareAuth, async (c) => {
+  const body = await parseBody<RemovePaymentMethodBody>(c)
+  if (typeof body.paymentMethodId !== 'string' || !/^pm_\w+$/.test(body.paymentMethodId))
+    throw simpleError('invalid_payment_method', 'Missing paymentMethodId')
+  const ctx = await resolveBillingContext(c, body.orgId, 'org.update_billing')
+  return c.json(await removeBackupCard(c, ctx, body.paymentMethodId))
 })
 
 app.post('/cancel', middlewareAuth, async (c) => {

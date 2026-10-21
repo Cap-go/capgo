@@ -21,7 +21,8 @@ import * as schema from '../utils/postgres_schema.ts'
 import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { getRetryablePostgrestStatus, isRetryablePostgrestError } from '../utils/retry.ts'
 import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
-import { ensureCustomerMetadata, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionCharge, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
+import { ensureCustomerMetadata, findInvoiceForCharge, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionCharge, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
+import { payInvoiceWithBackupCard } from '../utils/stripe_in_app.ts'
 import { buildTransferInvoiceFooter, getStripeCustomerEmailFromEvent, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
 import type { TrialPlanFirstInvoiceState } from '../utils/stripe_trial_plan.ts'
 import { cancelTrialPlanScheduleForSubscription, isTrialPlanFirstInvoiceUnpaid, isTrialPlanSubscription, settleTrialPlanFirstInvoice } from '../utils/stripe_trial_plan.ts'
@@ -1636,11 +1637,46 @@ async function handleActiveSubscriptionUpdate(
   return null
 }
 
+type BackupRecovery = 'recovered' | 'backup_attempt_failed' | 'not_recovered'
+
+// Stripe only retries the default card; charge the backup before the org is marked failed.
+// Stripe errors propagate so the webhook is retried; the backup charge is idempotent per failed charge.
+async function chargeBackupCard(c: Context<MiddlewareKeyVariablesStripe>, stripeEvent: Stripe.Event, customerId: string): Promise<BackupRecovery> {
+  if (stripeEvent.type !== 'charge.failed')
+    return 'not_recovered'
+  const charge = stripeEvent.data.object
+  const stripe = getStripe(c, getWebhookBillingAccount(c))
+  // Retry the invoice this charge was for, not whichever invoice is newest.
+  const invoice = await findInvoiceForCharge(stripe, charge)
+  if (!invoice?.id || !isSubscriptionInvoice(invoice))
+    return 'not_recovered'
+  // Already settled (for example Pay now charged the backup first): nothing failed anymore.
+  if (invoice.status === 'paid')
+    return 'recovered'
+  if (invoice.status !== 'open')
+    return 'not_recovered'
+  const result = await payInvoiceWithBackupCard(c, stripe, customerId, invoice.id, {
+    chargeId: charge.id,
+    paymentMethodId: typeof charge.payment_method === 'string' ? charge.payment_method : null,
+  })
+  if (result === 'paid')
+    return 'recovered'
+  // The default card's failure already sent dunning; the backup's own failure must not send it twice.
+  return result === 'failed_card_is_backup' ? 'backup_attempt_failed' : 'not_recovered'
+}
+
 async function handleFailedSubscriptionPayment(
   c: Context<MiddlewareKeyVariablesStripe>,
+  stripeEvent: Stripe.Event,
   stripeData: StripeData,
   org: Org,
 ) {
+  const recovery = await chargeBackupCard(c, stripeEvent, stripeData.data.customer_id)
+  if (recovery !== 'not_recovered') {
+    // recovered: charge.succeeded keeps the plan active. backup_attempt_failed: dunning already ran.
+    cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment handling', recovery, orgId: org.id })
+    return null
+  }
   if (await orgHasActiveUsageCredits(c, org.id)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment email because org has active usage credits', orgId: org.id })
   }
@@ -1785,7 +1821,7 @@ async function handleSubscriptionStripeEvent(
       return response
   }
   else if (stripeData.data.status === 'failed') {
-    await handleFailedSubscriptionPayment(c, stripeData, org)
+    await handleFailedSubscriptionPayment(c, stripeEvent, stripeData, org)
   }
   else if (isSubscriptionUpdateStatus(stripeData.data.status) && (!stripeData.data.price_id || !stripeData.data.product_id)) {
     handleSubscriptionMissingPriceData(c, stripeData)
