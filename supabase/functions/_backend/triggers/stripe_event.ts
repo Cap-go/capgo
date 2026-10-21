@@ -21,7 +21,7 @@ import * as schema from '../utils/postgres_schema.ts'
 import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { getRetryablePostgrestStatus, isRetryablePostgrestError } from '../utils/retry.ts'
 import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
-import { ensureCustomerMetadata, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
+import { ensureCustomerMetadata, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionCharge, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
 import { buildTransferInvoiceFooter, getStripeCustomerEmailFromEvent, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
@@ -1794,6 +1794,12 @@ async function stripeEventHandler(c: Context<MiddlewareKeyVariablesStripe>) {
     if (getWebhookBillingAccount(c) === 'us')
       await backgroundTask(c, trackUsChargeSucceeded(c, stripeEvent.data.object))
     return handleChargeSucceededStripeEvent(c, org, stripeData)
+  }
+
+  if (stripeEvent.type === 'charge.failed' && !await isSubscriptionCharge(getStripe(c, getWebhookBillingAccount(c)), stripeEvent.data.object)) {
+    // A failed credit top-up or one-off purchase must not mark the plan as failed.
+    cloudlog({ requestId: c.get('requestId'), message: 'Ignoring failed non-subscription charge', orgId: org.id, chargeId: stripeEvent.data.object.id })
+    return c.json(BRES)
   }
 
   const subscriptionResponse = await handleSubscriptionStripeEvent(c, stripeEvent, stripeData, org, customer)

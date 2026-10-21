@@ -611,6 +611,25 @@ export function isSubscriptionInvoice(invoice: Pick<OpenInvoiceShape, 'billing_r
   return typeof invoice.billing_reason === 'string' && invoice.billing_reason.startsWith('subscription')
 }
 
+// charge.failed fires for every charge, including credit auto top-ups and one-off
+// purchases. Only a failed subscription invoice says anything about the plan.
+// Errors propagate so the webhook is retried instead of guessing.
+export async function isSubscriptionCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
+  const paymentIntentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
+  // Legacy charges without a PaymentIntent keep the previous behavior.
+  if (!paymentIntentId)
+    return true
+  const payments = await stripe.invoicePayments.list({
+    payment: { type: 'payment_intent', payment_intent: paymentIntentId },
+    limit: 1,
+    expand: ['data.invoice'],
+  })
+  const invoice = payments.data[0]?.invoice
+  if (!invoice || typeof invoice === 'string' || invoice.deleted)
+    return false
+  return isSubscriptionInvoice(invoice)
+}
+
 export function toOpenSubscriptionInvoiceSummary(invoice: OpenInvoiceShape): OpenSubscriptionInvoiceSummary {
   return {
     hosted_invoice_url: invoice.hosted_invoice_url ?? null,
