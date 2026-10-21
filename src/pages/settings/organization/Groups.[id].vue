@@ -14,6 +14,7 @@ import DataTable from '~/components/DataTable.vue'
 import RoleCapabilitiesHint from '~/components/forms/RoleCapabilitiesHint.vue'
 import SearchInput from '~/components/forms/SearchInput.vue'
 import { checkPermissions } from '~/services/permissions'
+import { emptySsoManagedAccess, fetchSsoManagedAccess } from '~/services/ssoManaged'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -147,9 +148,16 @@ const groupAppBindings = computed(() =>
   groupBindings.value.filter((b: RoleBinding) => b.scope_type === 'app' && !!b.app_id),
 )
 
+const ssoManaged = ref(emptySsoManagedAccess())
+
+// The SSO role mapping owns the membership of SSO members in the groups it maps.
+function isSsoManagedMember(userId: string) {
+  return !!group.value && ssoManaged.value.groupIds.has(group.value.id) && ssoManaged.value.userIds.has(userId)
+}
+
 const availableMembersToAdd = computed(() => {
   const alreadyInGroup = new Set(groupMembers.value.map((m: GroupMember) => m.user_id))
-  return orgMembers.value.filter((m: OrgMember) => !alreadyInGroup.has(m.user_id))
+  return orgMembers.value.filter((m: OrgMember) => !alreadyInGroup.has(m.user_id) && !isSsoManagedMember(m.user_id))
 })
 
 const orgRoleOptions = computed<RoleOption[]>(() =>
@@ -198,7 +206,8 @@ const memberDynamicColumns = computed<TableColumn[]>(() => [
     actions: [
       {
         icon: IconTrash,
-        title: t('remove'),
+        title: (member: GroupMember) => isSsoManagedMember(member.user_id) ? t('sso-managed-role') : t('remove'),
+        disabled: (member: GroupMember) => isSsoManagedMember(member.user_id),
         onClick: (member: GroupMember) => removeMemberFromGroup(member.user_id),
       },
     ],
@@ -246,6 +255,7 @@ async function loadAll() {
       fetchRoleBindings(),
       fetchApps(),
       fetchOrgMembers(),
+      currentOrganization.value?.gid ? fetchSsoManagedAccess(currentOrganization.value.gid).then(managed => ssoManaged.value = managed) : undefined,
     ])
     // fetchGroupMembers needs orgMembers loaded first to resolve emails
     await fetchGroupMembers()

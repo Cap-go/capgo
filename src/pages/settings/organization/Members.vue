@@ -18,6 +18,7 @@ import RoleSelect from '~/components/forms/RoleSelect.vue'
 import SearchInput from '~/components/forms/SearchInput.vue'
 import { invokeCapgoApi } from '~/services/capgoApi'
 import { checkPermissions } from '~/services/permissions'
+import { emptySsoManagedAccess, fetchSsoManagedAccess } from '~/services/ssoManaged'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -111,6 +112,11 @@ const selectedUserToDelegateAdmin = ref()
 const searchUserForAdminDelegation = ref('')
 
 const members = ref([] as OrganizationMemberRows)
+const ssoManaged = ref(emptySsoManagedAccess())
+
+function isSsoManaged(member: OrganizationMemberRow) {
+  return !!member.uid && ssoManaged.value.userIds.has(member.uid)
+}
 let memberImageLoadRun = 0
 
 interface MemberImageSource {
@@ -189,6 +195,10 @@ function renderRoleCell(member: OrganizationMemberRow) {
   const content = [
     h('span', { class: 'truncate text-slate-700 dark:text-slate-200' }, getMemberRoleLabel(member)),
   ]
+
+  if (isSsoManaged(member)) {
+    content.push(h('span', { class: 'rounded-full border border-slate-300 px-2 py-0.5 text-[0.625rem] font-medium text-slate-600 shrink-0 dark:border-slate-600 dark:text-slate-300', title: t('sso-managed-role') }, 'SSO'))
+  }
 
   if (isInviteMember(member)) {
     content.push(
@@ -367,8 +377,9 @@ columns.value = [
     actions: computed(() => [
       {
         icon: IconWrench,
-        title: t('edit-role'),
+        title: (member: OrganizationMemberRow) => isSsoManaged(member) ? t('sso-managed-role') : t('edit-role'),
         visible: (member: OrganizationMemberRow) => canUpdateUserRoles.value && member.uid !== currentOrganization?.value?.created_by,
+        disabled: (member: OrganizationMemberRow) => isSsoManaged(member),
         onClick: (member: OrganizationMemberRow) => {
           changeMemberPermission(member)
         },
@@ -403,10 +414,12 @@ async function reloadData() {
     if (!currentOrganization.value)
       return
 
-    const { data: rbacMembers, error: rbError } = await supabase
-      .rpc('get_org_members_rbac', {
-        p_org_id: currentOrganization.value.gid,
-      })
+    const orgId = currentOrganization.value.gid
+    const [{ data: rbacMembers, error: rbError }, managed] = await Promise.all([
+      supabase.rpc('get_org_members_rbac', { p_org_id: orgId }),
+      fetchSsoManagedAccess(orgId),
+    ])
+    ssoManaged.value = managed
 
     if (rbError) {
       console.error('Error fetching RBAC members:', rbError)
@@ -1251,6 +1264,11 @@ function updateAppAccessSaveButton() {
   saveButton.disabled = isAppAccessSubmitting.value || !isAppAccessSelectionValid.value
 }
 
+// Roles on the apps of the SSO role mapping are rewritten at each SSO login.
+function isSsoManagedApp(appId: string) {
+  return !!appAccessMember.value && isSsoManaged(appAccessMember.value) && ssoManaged.value.appIds.has(appId)
+}
+
 async function openAppAccessModal(member: OrganizationMemberRow) {
   if (!currentOrganization.value) {
     toast.error(t('no-permission'))
@@ -1675,6 +1693,7 @@ async function handleInviteNewUserSubmit() {
                       type="checkbox"
                       name="app-access-app"
                       :value="app.id"
+                      :disabled="isSsoManagedApp(app.id)"
                       class="mt-1 checkbox checkbox-primary"
                     >
                     <div class="flex flex-col">
@@ -1686,6 +1705,9 @@ async function handleInviteNewUserSubmit() {
                       </span>
                       <span v-if="getAppAccessLabel(app.id)" class="text-xs text-primary">
                         {{ getAppAccessLabel(app.id) }}
+                      </span>
+                      <span v-if="isSsoManagedApp(app.id)" class="text-xs text-gray-500">
+                        {{ t('sso-managed-role') }}
                       </span>
                     </div>
                   </label>

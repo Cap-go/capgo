@@ -766,6 +766,52 @@ app.get('/:orgId/links', async (c) => {
   return c.json(result)
 })
 
+// What the SSO role mapping rewrites on every login of this org's SSO members:
+// their org role, their roles on the mapped apps and their membership of the
+// mapped groups. The UI locks those controls since a manual edit would be
+// silently reverted at the next login.
+app.get('/:orgId/managed', async (c) => {
+  const orgId = parseUuidParam(c.req.param('orgId'), 'invalid_org_id', 'Invalid org_id')
+  if (!await checkPermission(c, 'org.read_members', { orgId }))
+    quickError(403, 'not_authorized', 'Not authorized')
+
+  const result = await withPgPool(c, async (pool) => {
+    const { rows } = await pool.query<{ provider_id: string, role_mapping: unknown }>(
+      `
+        select p.provider_id, p.role_mapping
+        from public.sso_providers p
+        where p.org_id = $1 and p.status = 'active' and p.provider_id is not null and p.role_mapping is not null
+        union all
+        select p.provider_id, l.role_mapping
+        from public.sso_provider_org_links l
+        join public.sso_providers p on p.id = l.sso_provider_id
+        where l.org_id = $1 and p.status = 'active' and p.provider_id is not null and l.role_mapping is not null
+      `,
+      [orgId],
+    )
+    const mapped = rows.filter(row => parseStoredRoleMapping(row.role_mapping))
+    if (mapped.length === 0)
+      return { user_ids: [], app_ids: [], group_ids: [] }
+
+    const targets = mapped.map(row => mappingTargets(parseStoredRoleMapping(row.role_mapping)))
+    const users = await pool.query<{ user_id: string }>(
+      `
+        select distinct ou.user_id
+        from public.org_users ou
+        join auth.identities i on i.user_id = ou.user_id
+        where ou.org_id = $1 and i.provider = any($2::text[])
+      `,
+      [orgId, mapped.map(row => `sso:${row.provider_id}`)],
+    )
+    return {
+      user_ids: users.rows.map(row => row.user_id),
+      app_ids: [...new Set(targets.flatMap(target => [...target.appIds]))],
+      group_ids: [...new Set(targets.flatMap(target => [...target.groupIds]))],
+    }
+  })
+  return c.json(result)
+})
+
 // Being super admin of both orgs is the consent of both sides.
 app.post('/:id/links', async (c) => {
   const id = parseUuidParam(c.req.param('id'), 'invalid_provider_id', 'Invalid provider id')

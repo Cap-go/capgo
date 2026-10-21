@@ -3344,6 +3344,7 @@
   "sso-role-mapping-value": "Used in Capgo web console areas: components/organizations. Role: short UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "sso-role-mapping-value-placeholder": "Used in Capgo web console areas: components/organizations. Role: input placeholder. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "sso-service-provider-metadata": "Used in Capgo web console areas: components/organizations. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "sso-managed-role": "Used in Capgo web console areas: components/tables, pages/settings/organization. Role: tooltip or helper text. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "sso-share": "Used in Capgo web console areas: components/organizations. Role: short UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "sso-share-description": "Used in Capgo web console areas: components/organizations. Role: helper or description text. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "sso-share-no-orgs": "Used in Capgo web console areas: components/organizations. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
