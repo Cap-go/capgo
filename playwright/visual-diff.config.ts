@@ -403,6 +403,33 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     },
   },
   { slug: 'dashboard', path: '/dashboard', auth: true },
+  {
+    slug: 'dashboard-trial-card-prompt',
+    path: '/dashboard',
+    auth: true,
+    prepare: async (page) => {
+      // Trial org whose first device just installed an update, with no card on file yet.
+      await page.route('**/private/config', route => route.fulfill({ json: { stripeEnabled: true } }))
+      await page.route('**/rest/v1/rpc/get_orgs_v7', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json().catch(() => null)
+        const rows = Array.isArray(json) ? json.map(org => ({ ...org, paying: false, trial_left: 9 })) : json
+        await route.fulfill({ response, json: rows })
+      })
+      await page.route('**/rest/v1/apps?*', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json().catch(() => null)
+        const withOtaSuccess = (row: any) => row?.app_id === 'com.demo.app' && row?.onboarding !== undefined
+          ? { ...row, onboarding: { ...row.onboarding, features: { ...row.onboarding?.features, ota: { started_at: '2026-10-20T09:00:00.000Z', succeeded_at: '2026-10-20T10:00:00.000Z' } } } }
+          : row
+        await route.fulfill({ response, json: Array.isArray(json) ? json.map(withOtaSuccess) : withOtaSuccess(json) })
+      })
+      await page.route('**/private/stripe_billing/card', route => route.fulfill({ json: { card: null } }))
+      await page.reload()
+      // The base branch has no prompt: capture the plain dashboard there.
+      await page.locator('[data-test="trial-card-prompt-add"]').waitFor({ timeout: 15_000 }).catch(() => {})
+    },
+  },
   { slug: 'account-settings', path: '/settings/account', auth: true },
   {
     slug: 'email-verification-send',
