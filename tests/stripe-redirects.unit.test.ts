@@ -77,6 +77,7 @@ function mockBillingAccountLookup(billingAccount = 'ee') {
 
 afterEach(() => {
   delete mockedEnv.STRIPE_API_BASE_URL
+  delete mockedEnv.STRIPE_PUBLISHABLE_KEY
   mockedEnv.ENV = 'local'
   mockedEnv.STRIPE_SECRET_KEY = 'sk_test_123'
   mockedSupabaseAdmin.mockReset()
@@ -226,6 +227,63 @@ describe('stripe redirect URL allowlist', () => {
         affonso_referral: 'affonso_ref_123',
       },
     }))
+  })
+
+  it('creates an embedded checkout session when a publishable key is configured', async () => {
+    mockedEnv.STRIPE_PUBLISHABLE_KEY = 'pk_test_123'
+    const createSession = vi.fn().mockResolvedValue({ id: 'cs_test_123', url: null, client_secret: 'cs_test_123_secret' })
+    vi.mocked(Stripe).mockImplementation(function () {
+      return {
+        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList() }) },
+        checkout: { sessions: { create: createSession } },
+      }
+    } as any)
+
+    const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const result = await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', undefined, undefined, undefined, undefined, undefined, true)
+
+    expect(result).toEqual({ url: null, clientSecret: 'cs_test_123_secret', publishableKey: 'pk_test_123', sessionId: 'cs_test_123' })
+    const params = createSession.mock.calls[0][0]
+    expect(params).toMatchObject({
+      ui_mode: 'embedded_page',
+      redirect_on_completion: 'if_required',
+      return_url: 'https://capgo.test/app/success?success=true&session_id={CHECKOUT_SESSION_ID}',
+    })
+    expect(params).not.toHaveProperty('success_url')
+    expect(params).not.toHaveProperty('cancel_url')
+  })
+
+  it('keeps hosted checkout when embedded is requested without a publishable key', async () => {
+    const createSession = vi.fn().mockResolvedValue({ id: 'cs_test_123', url: 'https://pay.capgo.test/p/pay' })
+    vi.mocked(Stripe).mockImplementation(function () {
+      return {
+        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList() }) },
+        checkout: { sessions: { create: createSession } },
+      }
+    } as any)
+
+    const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const result = await createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', undefined, undefined, undefined, undefined, undefined, true)
+
+    expect(result).toEqual({ url: 'https://pay.capgo.test/p/pay' })
+    expect(createSession.mock.calls[0][0]).not.toHaveProperty('ui_mode')
+  })
+
+  it('keeps the credit session placeholder on embedded one-time checkout', async () => {
+    mockedEnv.STRIPE_PUBLISHABLE_KEY = 'pk_test_123'
+    const createSession = vi.fn().mockResolvedValue({ id: 'cs_test_456', url: null, client_secret: 'cs_test_456_secret' })
+    vi.mocked(Stripe).mockImplementation(function () {
+      return {
+        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList('month', 'one_time') }) },
+        checkout: { sessions: { create: createSession } },
+      }
+    } as any)
+
+    const { createOneTimeCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const result = await createOneTimeCheckout(createContext(), 'cus_123', 'prod_credit', 50, '/settings/organization/credits?creditCheckout=success&session_id={CHECKOUT_SESSION_ID}', '/settings/organization/credits', 'org_123', undefined, undefined, true)
+
+    expect(result.clientSecret).toBe('cs_test_456_secret')
+    expect(createSession.mock.calls[0][0].return_url).toBe('https://capgo.test/settings/organization/credits?creditCheckout=success&session_id={CHECKOUT_SESSION_ID}&success=true')
   })
 
   it('rejects external success URLs for checkout', async () => {

@@ -21,6 +21,8 @@ interface CheckoutData {
   orgId: string
   // Enterprise MAU slider: MAU bought on top of the plan allowance.
   extraMau?: number
+  // Request an in-app embedded Checkout session instead of a hosted page URL.
+  embedded?: boolean
 }
 
 function parseExtraMau(value: unknown) {
@@ -89,6 +91,6 @@ app.post('/', middlewareAuth, async (c) => {
   const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', planId, body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId, {
     visitorId: body.datafastVisitorId,
     sessionId: body.datafastSessionId,
-  }, body.affonsoReferral, extraMauCheckout)
-  return c.json({ url: checkout.url })
+  }, body.affonsoReferral, extraMauCheckout, body.embedded === true)
+  return c.json(checkout)
 })
