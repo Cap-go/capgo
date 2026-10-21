@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createApp, defineComponent, h, nextTick, ref } from 'vue'
 import BuildTable from '../src/components/tables/BuildTable.vue'
 
-const mocks = vi.hoisted(() => ({ api: vi.fn(), builds: [] as any[] }))
+interface BuildResponse { data: any[], count: number | null, error: { message: string } | null }
+const mocks = vi.hoisted(() => ({ api: vi.fn(), builds: [] as any[], countFailure: false, delayed: {} as Record<string, Promise<BuildResponse>> }))
 vi.mock('../src/services/capgoApi', () => ({ invokeCapgoApi: mocks.api }))
 vi.mock('../src/services/date', () => ({ formatDate: () => '' }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
@@ -12,8 +13,24 @@ vi.mock('../src/stores/dialogv2', () => ({ useDialogV2Store: () => ({}) }))
 vi.mock('../src/stores/organization', () => ({ useOrganizationStore: () => ({ currentOrganization: { gid: 'fixture-org' }, getOrgByAppId: () => ({ paying: true }), awaitInitialLoad: async () => {} }) }))
 vi.mock('../src/services/supabase', () => ({ useSupabase: () => ({
   from: () => {
-    const query: any = { then: (resolve: (data: unknown) => void) => resolve({ data: mocks.builds, count: mocks.builds.length, error: null }) }
-    for (const method of ['select', 'eq', 'order', 'range'])
+    let appId = ''
+    let head = false
+    const query: any = {
+      then: (resolve: (data: unknown) => void, reject: (error: unknown) => void) => {
+        const response = mocks.delayed[appId] ?? Promise.resolve({ data: mocks.builds, count: head && mocks.countFailure ? null : mocks.builds.length, error: head && mocks.countFailure ? { message: 'Count unavailable' } : null })
+        return response.then(resolve, reject)
+      },
+      select: (_columns: string, options?: { head?: boolean }) => {
+        head = options?.head === true
+        return query
+      },
+      eq: (column: string, value: string) => {
+        if (column === 'app_id')
+          appId = value
+        return query
+      },
+    }
+    for (const method of ['order', 'range'])
       query[method] = () => query
     return query
   },
@@ -38,6 +55,8 @@ function mount() {
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.builds = []
+  mocks.countFailure = false
+  mocks.delayed = {}
 })
 afterEach(() => cleanups.splice(0).forEach(cleanup => cleanup()))
 
@@ -94,5 +113,30 @@ describe('builds page checklist activation access', () => {
     expect(host.querySelector('[data-test="commands"]')).toBeNull()
     resolveAccess({ data: { canEnable: false }, error: null })
     await vi.waitFor(() => expect(host.querySelector('[data-test="commands"]')).not.toBeNull())
+  })
+
+  it('leaves the loading state when counts fail for an empty app', async () => {
+    mocks.countFailure = true
+    mocks.api.mockResolvedValue({ data: { canEnable: true }, error: null })
+    const { host } = mount()
+    await vi.waitFor(() => expect(host.querySelector('[data-test="table"]')?.getAttribute('data-loading')).toBe('false'))
+    expect(host.querySelector('[data-test="intro"]')).toBeNull()
+  })
+
+  it('discards previous-app rows and counts that arrive after the next app has loaded', async () => {
+    let resolveFirst!: (value: BuildResponse) => void
+    mocks.delayed['com.example.first'] = new Promise(resolve => resolveFirst = resolve)
+    mocks.api.mockResolvedValue({ data: { canEnable: true }, error: null })
+    const { host, appId } = mount()
+    await vi.waitFor(() => expect(mocks.api).toHaveBeenCalledOnce())
+    mocks.builds = [{ builder_job_id: null, platform: 'ios' }]
+    appId.value = 'com.example.second'
+    await vi.waitFor(() => expect(host.querySelector('[data-test="table"]')?.getAttribute('data-count')).toBe('1'))
+    resolveFirst({ data: [], count: 0, error: null })
+    await new Promise(resolve => setTimeout(resolve, 0))
+    await nextTick()
+    expect(host.querySelector('[data-test="intro"]')).toBeNull()
+    expect(host.querySelector('[data-test="table"]')?.getAttribute('data-count')).toBe('1')
+    expect(host.querySelector('[data-test="table"]')?.getAttribute('data-loading')).toBe('false')
   })
 })

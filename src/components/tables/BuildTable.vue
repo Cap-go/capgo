@@ -44,10 +44,12 @@ const total = ref(0)
 const totalAllBuilds = ref<number | null>(null)
 const canEnableBuilder = ref(false)
 const builderAccessReady = ref(false)
+const buildCountsReady = ref(false)
 let reloadSequence = 0
+let dataSequence = 0
 const platformBuildCounts = ref<Record<Platform, number>>({ ios: 0, android: 0 })
 const showSetupFlow = computed(() => showSteps.value || (totalAllBuilds.value === 0 && builderAccessReady.value))
-const isTableLoading = computed(() => isLoading.value || (elements.value.length === 0 && totalAllBuilds.value === null) || (totalAllBuilds.value === 0 && !builderAccessReady.value))
+const isTableLoading = computed(() => isLoading.value || (elements.value.length === 0 && !buildCountsReady.value) || (totalAllBuilds.value === 0 && !builderAccessReady.value))
 const organizationStore = useOrganizationStore()
 const builderEntitlement = computed(() => {
   const org = organizationStore.getOrgByAppId(props.appId)
@@ -95,19 +97,33 @@ async function countBuildRequests(platform?: Platform): Promise<number | null> {
 }
 
 async function updateOverallBuildsCount(): Promise<void> {
-  const [allBuilds, iosBuilds, androidBuilds] = await Promise.all([
-    countBuildRequests(),
-    countBuildRequests('ios'),
-    countBuildRequests('android'),
-  ])
+  const sequence = reloadSequence
+  const appId = props.appId
+  try {
+    const [allBuilds, iosBuilds, androidBuilds] = await Promise.all([
+      countBuildRequests(),
+      countBuildRequests('ios'),
+      countBuildRequests('android'),
+    ])
+    if (!isCurrentLoad(sequence, appId))
+      return
 
-  if (allBuilds !== null)
-    totalAllBuilds.value = allBuilds
+    if (allBuilds !== null)
+      totalAllBuilds.value = allBuilds
 
-  platformBuildCounts.value = {
-    ios: iosBuilds ?? platformBuildCounts.value.ios,
-    android: androidBuilds ?? platformBuildCounts.value.android,
+    platformBuildCounts.value = {
+      ios: iosBuilds ?? platformBuildCounts.value.ios,
+      android: androidBuilds ?? platformBuildCounts.value.android,
+    }
   }
+  finally {
+    if (isCurrentLoad(sequence, appId))
+      buildCountsReady.value = true
+  }
+}
+
+function isCurrentLoad(sequence: number, appId: string) {
+  return sequence === reloadSequence && appId === props.appId
 }
 
 async function getData() {
@@ -116,13 +132,17 @@ async function getData() {
     return
   }
   const orgId = organizationStore.currentOrganization.gid
+  const appId = props.appId
+  const sequence = reloadSequence
+  const request = ++dataSequence
+  const isCurrent = () => request === dataSequence && isCurrentLoad(sequence, appId)
 
   isLoading.value = true
   try {
     let query = supabase
       .from('build_requests')
       .select('*', { count: 'exact' })
-      .eq('app_id', props.appId)
+      .eq('app_id', appId)
       .order('created_at', { ascending: false })
       .range(currentBuildsNumber.value, currentBuildsNumber.value + offset - 1)
 
@@ -131,6 +151,8 @@ async function getData() {
     }
 
     const { data, error, count } = await query
+    if (!isCurrent())
+      return
 
     if (error) {
       console.error('Error fetching build requests:', error)
@@ -139,28 +161,34 @@ async function getData() {
     }
 
     const builds = data || []
-    await loadBuildDurations(builds, orgId)
+    const durations = await loadBuildDurations(builds, orgId)
+    if (!isCurrent())
+      return
+    buildDurations.value = durations ?? {}
+    if (durations === null)
+      toast.error(t('error-fetching-build-durations'))
     elements.value = builds
     total.value = count || 0
   }
   catch (error) {
+    if (!isCurrent())
+      return
     console.error(error)
     toast.error(t('error-fetching-builds'))
   }
   finally {
-    isLoading.value = false
+    if (isCurrent())
+      isLoading.value = false
   }
 }
 
-async function loadBuildDurations(builds: Element[], orgId: string) {
+async function loadBuildDurations(builds: Element[], orgId: string): Promise<Record<string, number> | null> {
   const jobIds = builds
     .map(build => build.builder_job_id)
     .filter((id): id is string => !!id)
 
-  if (jobIds.length === 0) {
-    buildDurations.value = {}
-    return
-  }
+  if (jobIds.length === 0)
+    return {}
 
   // Scope to the current org: build_logs.build_id is only unique per
   // (build_id, org_id), so an unscoped lookup could pick up a colliding
@@ -173,9 +201,7 @@ async function loadBuildDurations(builds: Element[], orgId: string) {
 
   if (error) {
     console.error('Error fetching build durations:', error)
-    buildDurations.value = {}
-    toast.error(t('error-fetching-build-durations'))
-    return
+    return null
   }
 
   const durations: Record<string, number> = {}
@@ -183,7 +209,7 @@ async function loadBuildDurations(builds: Element[], orgId: string) {
     if (log.build_id != null && log.build_time_unit != null)
       durations[log.build_id] = log.build_time_unit
   }
-  buildDurations.value = durations
+  return durations
 }
 
 async function reload() {
@@ -196,17 +222,22 @@ async function reload() {
   elements.value = []
   canEnableBuilder.value = false
   builderAccessReady.value = false
+  buildCountsReady.value = false
   isLoading.value = true
   totalAllBuilds.value = null
   const sequence = ++reloadSequence
   const appId = props.appId
   try {
     const loadAccess = async () => {
-      const { data, error } = await invokeCapgoApi<{ canEnable: boolean }>(`app/${encodeURIComponent(appId)}/onboarding/builder`, { method: 'GET' })
-      if (sequence !== reloadSequence || appId !== props.appId)
-        return
-      canEnableBuilder.value = !error && data?.canEnable === true
-      builderAccessReady.value = true
+      try {
+        const { data, error } = await invokeCapgoApi<{ canEnable: boolean }>(`app/${encodeURIComponent(appId)}/onboarding/builder`, { method: 'GET' })
+        if (isCurrentLoad(sequence, appId))
+          canEnableBuilder.value = !error && data?.canEnable === true
+      }
+      finally {
+        if (isCurrentLoad(sequence, appId))
+          builderAccessReady.value = true
+      }
     }
     await Promise.all([getData(), updateOverallBuildsCount(), loadAccess()])
   }
