@@ -78,6 +78,13 @@ app.post('/overview', middlewareAuth, async (c) => {
   return c.json({ publishableKey: ctx.publishableKey, card, subscription, invoices, openInvoice })
 })
 
+// Card on file only: the trial card prompt checks this without loading invoices.
+app.post('/card', middlewareAuth, async (c) => {
+  const body = await parseBody<OrgBody>(c)
+  const ctx = await resolveBillingContext(c, body.orgId, 'org.update_billing')
+  return c.json({ card: await getDefaultCard(ctx) })
+})
+
 app.post('/setup-intent', middlewareAuth, async (c) => {
   const body = await parseBody<OrgBody>(c)
   const ctx = await resolveBillingContext(c, body.orgId, 'org.update_billing')

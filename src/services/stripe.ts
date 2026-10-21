@@ -292,6 +292,10 @@ export function getBillingOverview(orgId: string) {
   return callBilling<BillingOverview>('overview', { orgId })
 }
 
+export function getBillingCard(orgId: string) {
+  return callBilling<{ card: BillingCard | null }>('card', { orgId })
+}
+
 export function createCardSetupIntent(orgId: string) {
   return callBilling<IntentSecret>('setup-intent', { orgId })
 }
