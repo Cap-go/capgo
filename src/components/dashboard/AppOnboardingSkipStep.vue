@@ -4,9 +4,11 @@ import { useI18n } from 'vue-i18n'
 import IconAlertTriangle from '~icons/lucide/alert-triangle'
 import IconLoader from '~icons/lucide/loader-2'
 
-defineProps<{
+const props = defineProps<{
   skipping: boolean
   testId: string
+  /** False for steps that must be done, e.g. creating a channel. */
+  skippable: boolean
 }>()
 
 const emit = defineEmits<{
@@ -28,6 +30,8 @@ async function ask() {
 }
 
 function cancel() {
+  if (props.skipping)
+    return
   asking.value = false
   reason.value = ''
 }
@@ -43,9 +47,9 @@ function submit() {
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <p class="flex items-start gap-3 text-sm leading-6 text-slate-700 dark:text-slate-300">
         <IconAlertTriangle class="mt-1 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-        {{ t('setup-checklist-missed-step-note') }}
+        {{ t(skippable ? 'setup-checklist-missed-step-note' : 'setup-checklist-missed-step-required-note') }}
       </p>
-      <button v-if="!asking" type="button" class="d-btn h-auto min-h-11 shrink-0 self-start border-slate-300 bg-white px-4 text-slate-700 hover:border-slate-400 hover:bg-slate-50 sm:self-center dark:border-white/20 dark:bg-slate-900 dark:text-slate-200" :data-test="`${testId}-skip-step`" @click="ask">
+      <button v-if="skippable && !asking" type="button" class="d-btn h-auto min-h-11 shrink-0 self-start border-slate-300 bg-white px-4 text-slate-700 hover:border-slate-400 hover:bg-slate-50 sm:self-center dark:border-white/20 dark:bg-slate-900 dark:text-slate-200" :data-test="`${testId}-skip-step`" @click="ask">
         {{ t('setup-checklist-skip-step') }}
       </button>
     </div>
@@ -60,6 +64,7 @@ function submit() {
         ref="input"
         v-model="reason"
         rows="2"
+        minlength="3"
         maxlength="500"
         required
         class="d-textarea mt-2 w-full border-slate-300 bg-white text-base text-slate-900 dark:border-white/20 dark:bg-slate-900 dark:text-white"

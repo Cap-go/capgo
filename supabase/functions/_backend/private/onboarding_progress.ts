@@ -11,7 +11,8 @@ import { persistAuthorizedOnboardingMutation } from '../utils/appOnboardingMutat
 import { parseBody, quickError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { cloudlogErr, serializeError } from '../utils/logging.ts'
-import { BUILDER_STEP_IDS, getMissedStepIds } from '../utils/onboardingMissedSteps.ts'
+import { isActiveBuilderChecklistSetup } from '../utils/builder_onboarding_checklist.ts'
+import { BUILDER_STEP_IDS, getMissedStepIds, isSkippableOtaStep } from '../utils/onboardingMissedSteps.ts'
 import { appIdSchema } from '../utils/privateAnalyticsValidation.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { readDevices, readStats } from '../utils/stats.ts'
@@ -114,13 +115,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function readBuilderStatuses(currentValue: unknown, platform: keyof typeof BUILDER_STEP_IDS) {
   const setup = isRecord(currentValue) && isRecord(currentValue.setup) ? currentValue.setup : {}
-  if (setup.todo_list_version !== 4 || setup.builder_todo_list_version !== '1' || !Array.isArray(setup.paths) || !setup.paths.includes('builder'))
+  if (!isActiveBuilderChecklistSetup(setup))
     return null
   const builder = isRecord(setup.steps) && isRecord(setup.steps.builder) ? setup.steps.builder : null
   const steps = builder && isRecord(builder[platform]) ? builder[platform] : null
   if (!steps)
     return null
-  return BUILDER_STEP_IDS[platform].map(id => ({ id: id as string, status: isRecord(steps[id]) ? String(steps[id].status) : 'pending' }))
+  return BUILDER_STEP_IDS[platform].map(id => ({ id: id as string, exists: isRecord(steps[id]), status: isRecord(steps[id]) ? String(steps[id].status) : 'pending' }))
 }
 
 // Only a missed step (open while a later one is done) can be skipped, so the
@@ -134,15 +135,24 @@ function skipStepPatch(currentValue: unknown, current: AppOnboardingState, step:
       return null
     const ids = getAppOnboardingStepIds(current.todo_list_version, current.ota_todo_list_version)
     const missed = getMissedStepIds(ids.map(id => ({ id, status: current.steps[id]?.status })))
-    return missed.includes(first as AppOnboardingStepId) ? { steps: { [first!]: { status: 'skipped', at } } } : null
+    return isSkippableOtaStep(first!) && missed.includes(first as AppOnboardingStepId) ? { steps: { [first!]: { status: 'skipped', at } } } : null
   }
   const platform = first as keyof typeof BUILDER_STEP_IDS
   const statuses = readBuilderStatuses(currentValue, platform)
-  if (!statuses || !getMissedStepIds(statuses).includes(second!))
+  // A step without a stored record cannot be patched, so do not report success.
+  if (!statuses?.find(status => status.id === second)?.exists || !getMissedStepIds(statuses).includes(second!))
     return null
   const builderSteps: NonNullable<AppOnboardingPatch['builderSteps']> = {}
   builderSteps[`builder.${platform}.${second}`] = { status: 'skipped', at }
   return { builderSteps }
+}
+
+// Same rule as persistAuthorizedOnboardingMutation: settings update or app creation in the org.
+async function canWriteOnboarding(c: Context<MiddlewareKeyVariables>, appId: string) {
+  if (await checkPermission(c, 'app.update_settings', { appId }))
+    return true
+  const { data } = await supabaseWithAuth(c, c.get('auth')!).from('apps').select('owner_org').eq('app_id', appId).maybeSingle()
+  return !!data && checkPermission(c, 'org.create_app', { orgId: data.owner_org })
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -214,6 +224,9 @@ app.post('/skip_step', middlewareAuth({ preferApiKey: true }), async (c) => {
   const { appId, step, reason } = parsed.data
   if (!(await checkPermission(c, 'app.read', { appId })))
     throw quickError(403, 'app_access_denied', 'You cannot access this app')
+  // Fail fast with 403 for read-only callers; the locked write rechecks this.
+  if (!(await canWriteOnboarding(c, appId)))
+    throw quickError(403, 'app_access_denied', 'You cannot update this app onboarding')
   const result = await persistAuthorizedOnboardingMutation(c, appId, {
     requestedSteps: [step as `${string}.${string}`],
     buildPatch: ({ current, currentValue, allowedSteps, at }) => allowedSteps.has(step as `${string}.${string}`)

@@ -15,7 +15,7 @@ import IconLoader from '~icons/lucide/loader-2'
 import IconMessageCircle from '~icons/lucide/message-circle'
 import IconMinus from '~icons/lucide/minus'
 import { useAppOnboardingCliProgress } from '~/composables/useAppOnboardingCliProgress'
-import { getAppOnboardingStepIds, getMissedStepIds, hasSupportedOtaTodoList } from '~/services/appOnboarding'
+import { getAppOnboardingStepIds, getMissedStepIds, hasSupportedOtaTodoList, isSkippableOtaStep } from '~/services/appOnboarding'
 import { isAppOnboardingChecklistStep } from '~/utils/appOnboardingChecklist'
 import { APP_ONBOARDING_STEP_GUIDES } from '~/utils/appOnboardingGuides'
 import { hasDualOnboardingChecklists } from '~/utils/dualOnboardingChecklists'
@@ -110,15 +110,17 @@ function selectStep(id: string) {
 }
 
 async function skipSelectedStep(reason: string) {
+  const id = selectedStep.value.id
   skipping.value = true
   try {
-    const value = await skipOnboardingStep(props.appId, `ota.${selectedStep.value.id}`, reason)
+    const value = await skipOnboardingStep(props.appId, `ota.${id}`, reason)
     if (value === undefined)
       void refreshOnboarding()
     else
       applyOnboarding(value)
-    // Fall back to the next open task instead of staying on the skipped one.
-    selectedId.value = null
+    // Fall back to the next open task, unless the user picked another one meanwhile.
+    if (selectedStep.value.id === id)
+      selectedId.value = null
   }
   catch (error) {
     console.error('Cannot skip onboarding step', error)
@@ -213,7 +215,7 @@ function statusLabel(status: string | undefined) {
             >
               <IconCheck v-if="step.status === 'done'" class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" :aria-label="statusLabel(step.status)" />
               <IconMinus v-else-if="step.status === 'skipped'" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="statusLabel(step.status)" />
-              <IconAlertTriangle v-else-if="missedIds.includes(step.id)" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="statusLabel(step.status)" />
+              <IconAlertTriangle v-else-if="missedIds.includes(step.id)" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="t('setup-checklist-missed-status')" />
               <IconCircle v-else class="mt-0.5 h-5 w-5 shrink-0" :class="currentStep?.id === step.id ? 'text-azure-500' : 'text-slate-300 dark:text-slate-600'" :aria-label="statusLabel(step.status)" />
               <span class="mt-0.5 shrink-0 text-xs text-slate-400 dark:text-slate-500" aria-hidden="true">{{ step.index + 1 }}.</span>
               <span class="min-w-0 flex-1 text-base leading-6" :class="{ 'font-medium': selectedStep.id === step.id }">
@@ -250,7 +252,7 @@ function statusLabel(status: string | undefined) {
             {{ selectedStep.description }}
           </p>
 
-          <AppOnboardingSkipStep v-if="isSelectedMissed" :key="selectedStep.id" test-id="setup-checklist" :skipping="skipping" @skip="skipSelectedStep" />
+          <AppOnboardingSkipStep v-if="isSelectedMissed" :key="selectedStep.id" test-id="setup-checklist" :skippable="isSkippableOtaStep(selectedStep.id)" :skipping="skipping" @skip="skipSelectedStep" />
 
           <template v-if="isFirstStep">
             <p class="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">

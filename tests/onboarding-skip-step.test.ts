@@ -27,7 +27,7 @@ async function readSetup() {
 beforeAll(async () => {
   expect((await admin.from('orgs').insert({ id: orgId, created_by: USER_ID, name: 'Onboarding skip test', management_email: 'onboarding-skip@example.com' })).error).toBeNull()
   expect((await admin.from('apps').insert({ app_id: appId, owner_org: orgId, name: 'Onboarding skip test', icon_url: '' })).error).toBeNull()
-  // A channel exists although `init` never ran: the step was passed over.
+  // The updater is installed although `init` never ran and no channel exists yet.
   expect((await admin.from('apps').update({ onboarding: { setup: {
     todo_list_version: 4,
     ota_todo_list_version: '1',
@@ -36,9 +36,10 @@ beforeAll(async () => {
     source: 'manual',
     outcome: 'in_progress',
     steps: {
-      ota: { login_cli_mcp: { status: 'pending' }, add_channel: { status: 'done' } },
+      ota: { login_cli_mcp: { status: 'pending' }, add_channel: { status: 'pending' }, add_updater: { status: 'done' } },
       builder: {
-        ios: {},
+        // Sparse: only a later iOS step has a record.
+        ios: { prepare_certificate: { status: 'done' } },
         android: { start_setup: { status: 'pending' }, prepare_keystore: { status: 'done' }, connect_google_play: { status: 'pending' }, successful_cloud_build: { status: 'pending' } },
       },
     },
@@ -68,7 +69,8 @@ describe('onboarding skip step', () => {
   })
 
   it('refuses steps that were not passed over, including the final step', async () => {
-    for (const step of ['ota.add_updater', 'ota.test_update', 'builder.android.connect_google_play', 'builder.android.successful_cloud_build']) {
+    // add_channel is passed over but a channel is required; ios.start_setup has no stored record.
+    for (const step of ['ota.add_code', 'ota.test_update', 'ota.add_channel', 'builder.android.connect_google_play', 'builder.android.successful_cloud_build', 'builder.ios.start_setup']) {
       const response = await skip(writerKey, step)
       expect(response.status, step).toBe(409)
       expect(await response.json()).toMatchObject({ error: 'step_not_skippable' })
@@ -77,7 +79,8 @@ describe('onboarding skip step', () => {
 
   it('does not let an app reader skip steps', async () => {
     const response = await skip(readerKey, 'ota.login_cli_mcp')
-    expect(response.status).toBe(409)
+    expect(response.status).toBe(403)
+    expect(await response.json()).toMatchObject({ error: 'app_access_denied' })
     expect((await readSetup()).steps.ota.login_cli_mcp.status).toBe('pending')
   })
 
@@ -90,7 +93,16 @@ describe('onboarding skip step', () => {
     expect(builder.status).toBe(200)
     const setup = await readSetup()
     expect(setup.steps.builder.android.start_setup.status).toBe('skipped')
-    expect(setup.steps.ota.add_channel.status).toBe('done')
+    expect(setup.steps.ota.add_updater.status).toBe('done')
+    expect(setup.steps.ota.add_channel.status).toBe('pending')
     expect(setup.outcome).toBe('in_progress')
+  })
+
+  it('completes, rather than dismisses, a v4 checklist finished with skipped tasks in SQL', async () => {
+    const rows = await executeSQL(`SELECT public.merge_app_onboarding_setup($1::jsonb, $2::jsonb) -> 'setup' ->> 'outcome' AS outcome`, [
+      JSON.stringify({ setup: { todo_list_version: 4, ota_todo_list_version: '1', paths: ['ota'], steps: { ota: {} } } }),
+      JSON.stringify({ steps: { login_cli_mcp: { status: 'skipped' }, add_channel: { status: 'done' }, add_updater: { status: 'done' }, add_code: { status: 'done' }, run_device: { status: 'done' }, upload_bundle: { status: 'done' }, test_update: { status: 'done' } } }),
+    ])
+    expect(rows[0].outcome).toBe('completed')
   })
 })

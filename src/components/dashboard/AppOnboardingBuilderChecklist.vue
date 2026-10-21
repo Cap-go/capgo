@@ -62,6 +62,8 @@ const selectedId = computed({
 })
 const refreshError = ref(false)
 let refreshTimer: ReturnType<typeof setInterval> | undefined
+// Bumped by writes so an older in-flight poll cannot overwrite their snapshot.
+let refreshGeneration = 0
 let hasLoadedPlatform = false
 let hasInteractedWithPlatform = false
 
@@ -120,8 +122,9 @@ async function refreshOnboarding() {
   if (props.active === false)
     return
   const appId = props.appId
+  const generation = refreshGeneration
   const { data, error } = await supabase.from('apps').select('onboarding').eq('app_id', appId).maybeSingle()
-  if (appId !== props.appId)
+  if (appId !== props.appId || generation !== refreshGeneration)
     return
   refreshError.value = !!error
   if (!error && data) {
@@ -182,11 +185,13 @@ async function skipSelectedStep(reason: string) {
     if (appId !== props.appId)
       return
     if (value !== undefined) {
+      refreshGeneration += 1
       onboarding.value = parseBuilderOnboarding(value)
       emit('snapshot', value)
     }
-    // Fall back to the next open task instead of staying on the skipped one.
-    selectedIds.value[platform] = null
+    // Fall back to the next open task, unless the user picked another one meanwhile.
+    if (selectedIds.value[platform] === step.id)
+      selectedIds.value[platform] = null
   }
   catch (error) {
     console.error('Cannot skip builder onboarding step', error)
@@ -299,7 +304,7 @@ function statusLabel(status: BuilderStepStatus) {
               >
                 <IconCheck v-if="step.status === 'done'" class="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" :aria-label="statusLabel(step.status)" />
                 <IconMinus v-else-if="step.status === 'skipped'" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="statusLabel(step.status)" />
-                <IconAlertTriangle v-else-if="missedIds.includes(step.id)" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="statusLabel(step.status)" />
+                <IconAlertTriangle v-else-if="missedIds.includes(step.id)" class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" :aria-label="t('setup-checklist-missed-status')" />
                 <IconCircle v-else class="mt-0.5 h-5 w-5 shrink-0 text-slate-400" :aria-label="statusLabel(step.status)" />
                 <span class="mt-0.5 shrink-0 text-xs text-slate-400" aria-hidden="true">{{ step.index + 1 }}.</span>
                 <span class="min-w-0 flex-1 text-base leading-6" :class="{ 'font-medium': selectedStep.id === step.id }">
@@ -336,7 +341,7 @@ function statusLabel(status: BuilderStepStatus) {
               {{ selectedStep.description }}
             </p>
 
-            <AppOnboardingSkipStep v-if="isSelectedMissed" :key="`${viewedPlatform}-${selectedStep.id}`" test-id="builder-checklist" :skipping="skipping" @skip="skipSelectedStep" />
+            <AppOnboardingSkipStep v-if="isSelectedMissed" :key="`${viewedPlatform}-${selectedStep.id}`" test-id="builder-checklist" skippable :skipping="skipping" @skip="skipSelectedStep" />
 
             <template v-if="isFirstStep">
               <p class="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">

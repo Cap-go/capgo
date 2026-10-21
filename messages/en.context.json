@@ -3227,6 +3227,8 @@
   "setup-checklist-missed-description": "Used in Capgo web console areas: components/dashboard. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "setup-checklist-missed-task-number": "Used in Capgo web console areas: components/dashboard. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "setup-checklist-missed-step-note": "Used in Capgo web console areas: components/dashboard. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "setup-checklist-missed-step-required-note": "Used in Capgo web console areas: components/dashboard. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "setup-checklist-missed-status": "Used in Capgo web console areas: components/dashboard. Role: status label for assistive technology. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "setup-checklist-skip-step": "Used in Capgo web console areas: components/dashboard. Role: button label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "setup-checklist-skip-step-error": "Used in Capgo web console areas: components/dashboard. Role: error message. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "setup-checklist-skip-reason-label": "Used in Capgo web console areas: components/dashboard. Role: form field label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",

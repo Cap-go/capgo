@@ -15,6 +15,14 @@ export const BUILDER_STEP_IDS = {
   ],
 } as const
 
+// A channel is required for live updates to work, and the console already
+// offers to create one, so it is pushed but never skippable.
+const UNSKIPPABLE_OTA_STEP_IDS = new Set<string>(['add_channel'])
+
+export function isSkippableOtaStep(id: string) {
+  return !UNSKIPPABLE_OTA_STEP_IDS.has(id)
+}
+
 // People (and their AI agents) rarely follow the checklist in order. A step is
 // "missed" when it is still open although a later step is already done, so the
 // console can ask the user to go back to it or skip it on purpose. The last

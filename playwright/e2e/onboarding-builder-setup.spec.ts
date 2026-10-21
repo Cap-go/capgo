@@ -120,7 +120,7 @@ test('asks to finish or explicitly skip a Builder step passed over by out-of-ord
   await page.clock.install()
   await page.goto(`${fixture}&platform=android`)
   await expect(page.locator('[data-test="builder-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'false')
-  await expect(page.locator('[data-test="builder-checklist-missed"]')).toHaveCount(0)
+  await expect(page.locator('[data-test="setup-checklist-missed"]')).toHaveCount(0)
 
   await page.evaluate(() => {
     (window as any).onboardingSetupPreview.state.builderSteps.android.prepare_keystore = { status: 'done' }
@@ -135,6 +135,7 @@ test('asks to finish or explicitly skip a Builder step passed over by out-of-ord
   await page.locator('[data-test="builder-checklist-skip-reason"]').fill('Keystore came from our old CI')
   await page.locator('[data-test="builder-checklist-skip-confirm"]').click()
   await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.skips)).toEqual(['builder.android.start_setup'])
+  expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.skipReasons)).toEqual(['Keystore came from our old CI'])
   await expect(missed).toBeHidden()
   await expect(page.locator('[data-test="builder-checklist-instructions"]')).toContainText('Current task · 3 of 4')
   await expect(page.locator('[data-test="builder-step-start_setup"]')).toHaveAttribute('data-status', 'skipped')
