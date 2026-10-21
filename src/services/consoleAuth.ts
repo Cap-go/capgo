@@ -296,6 +296,9 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
     verifyingToken = token
     const pending = (async (): Promise<Result<ClaimsPayload | null>> => {
       const { error: userError } = await getUser(token)
+      // Sign-out may have cleared the session while /user was in flight.
+      if (current?.access_token !== token)
+        return { data: null, error: sessionMissing() }
       if (userError) {
         // AuthApiError means the provider rejected the token. Transient outages
         // keep the still-valid local JWT so a brief blip does not bounce to /login.

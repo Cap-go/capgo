@@ -147,6 +147,22 @@ describe('console auth client', () => {
     auth.dispose()
   })
 
+  it('does not re-verify a token after sign-out clears the in-flight check', async () => {
+    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session()))
+    const auth = createConsoleAuthClient({ baseURL: BASE })
+    let resolveUser!: (value: Response) => void
+    fetchMock
+      .mockImplementationOnce(() => new Promise<Response>((resolve) => { resolveUser = resolve }))
+      .mockResolvedValueOnce(json({}))
+    const claimsPromise = auth.getClaims()
+    expect((await auth.signOut()).error).toBeNull()
+    resolveUser(json({ id: 'user-1' }))
+    const late = await claimsPromise
+    expect(late.data).toBeNull()
+    expect(late.error?.name).toBe('AuthSessionMissingError')
+    auth.dispose()
+  })
+
   it('installs a session from tokens by loading the user, like the previous client', async () => {
     const tokens = session()
     fetchMock.mockResolvedValueOnce(json(tokens.user))
