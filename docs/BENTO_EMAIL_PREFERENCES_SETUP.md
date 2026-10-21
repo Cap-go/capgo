@@ -95,17 +95,19 @@ Keep this recovery email non-transactional so Bento's global unsubscribe state r
 
 #### 3b. Invite-to-org reminders
 
-**Entry events**: `org:invite_new_capgo_user_to_org`, `org:invite_existing_capgo_user_to_org`
+Capgo sends the initial invitation itself (Cloudflare Email). After a successful send it emits one Bento event per invitation:
 
-**Exit tag**: `org:invite_accepted`
+**Entry event**: `org:invite_sent`, with `details.invite_id`, `details.kind` (`new` or `existing`), `details.org_id`, `details.org_name`, `details.org_name_subject`, `details.org_admin_name`, `details.invited_first_name`, `details.invited_last_name`, and `details.invite_link`.
 
-Capgo adds `org:invite_accepted` when a user-org `role_bindings` row is written with reason `Accepted invitation` (dashboard RPC `accept_invitation_to_org` and the private accept-invitation API). Wire the Invite-to-org workflow with a Match before each reminder send:
+**Open-invites field**: `capgo_open_invites`, a space-separated list of the recipient's invite ids that are still open. The `org:invite_sent` call sets it, and Capgo rewrites it whenever an invitation is accepted, cancelled, rescinded, or removed.
 
-```text
-Tag contains: org:invite_accepted → End
+The flow (kept as JSON in `Cap-go/bento-unofficial-api`, `bento-json-flows/capgo-invitation-reminders.json`) owns the timing and checks the field before each reminder:
+
+```liquid
+{% assign open_invites = visitor.capgo_open_invites | default: "" | split: " " %}{% if open_invites contains event.details.invite_id %}true{% else %}false{% endif %}
 ```
 
-Queue delivery is at least once, so the tag sync can repeat; treat the tag as a sticky exit condition, not an entry trigger.
+`org:invite_accepted` is still added on acceptance for older Bento segments, but the reminder flow no longer depends on it.
 
 #### 3c. Public email preference footer link
 

@@ -11,22 +11,48 @@ import { BRES, middlewareAPISecret, parseBody, quickError, simpleError } from '.
 import { getEnv } from '../../../supabase/functions/_backend/utils/utils.ts'
 import { isAuthEmailAction, renderAuthEmail, selectAuthEmailTemplate } from '../email_templates/index.ts'
 import { sendCloudflareEmail } from '../email_templates/send.ts'
+import { startOrgInvitationBentoFlow, syncOrgInvitationBentoField } from './org_invitation_bento.ts'
 import { sendOrgInvitationEmail } from './org_invitation_email.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+const orgInvitationBentoSyncSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('new'), email: z.string().trim().min(1) }),
+  z.object({ kind: z.literal('existing'), user_id: z.uuid() }),
+])
+
 app.post('/', middlewareAPISecret, async (c) => {
+  const body = await parseBody<GoTrueSendEmailEvent & { org_invitation_id?: unknown, org_invitation_bento_sync?: unknown }>(c)
+  if (body && typeof body === 'object' && Object.hasOwn(body, 'org_invitation_bento_sync')) {
+    const recipient = orgInvitationBentoSyncSchema.safeParse(body.org_invitation_bento_sync)
+    if (!recipient.success)
+      throw simpleError('invalid_payload', 'Invalid organization invitation Bento sync payload')
+    try {
+      await syncOrgInvitationBentoField(c, recipient.data.kind === 'new'
+        ? { kind: 'new', email: recipient.data.email }
+        : { kind: 'existing', userId: recipient.data.user_id })
+    }
+    catch (error) {
+      quickError(500, 'org_invitation_bento_sync_failed', 'Organization invitation Bento sync failed', {
+        kind: recipient.data.kind,
+      }, error)
+    }
+    return c.json(BRES)
+  }
+
   const emailBinding = c.env?.AUTH_EMAIL
   if (!emailBinding)
     quickError(500, 'cloudflare_email_unavailable', 'Cloudflare Email Sending is unavailable')
 
-  const body = await parseBody<GoTrueSendEmailEvent & { org_invitation_id?: unknown }>(c)
   if (body && typeof body === 'object' && Object.hasOwn(body, 'org_invitation_id')) {
     const invitationId = z.uuid().safeParse(body.org_invitation_id)
     if (!invitationId.success)
       throw simpleError('invalid_payload', 'Invalid organization invitation email payload')
     try {
+      // Both steps are idempotent per generation, so a queue retry after a
+      // Bento failure skips the already-sent email and retries only Bento.
       const delivery = sendOrgInvitationEmail(c, invitationId.data)
+        .then(() => startOrgInvitationBentoFlow(c, invitationId.data))
       // Finish recording acceptance even if the queue's HTTP client times out.
       if (getRuntimeKey() === 'workerd')
         c.executionCtx.waitUntil(delivery.catch(() => {}))

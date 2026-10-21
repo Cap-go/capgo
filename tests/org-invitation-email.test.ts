@@ -12,8 +12,22 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', async () => ({
 
 const { app } = await import('../cloudflare_workers/api/triggers/send_email.ts')
 type Kind = 'new' | 'existing'
+interface BentoEvent { type: string, email: string, details?: Record<string, string>, fields?: Record<string, string> }
 
-beforeAll(() => vi.stubGlobal('EdgeRuntime', undefined))
+// Record Bento batch events instead of calling the real API.
+const bentoEvents: BentoEvent[] = []
+const realFetch = globalThis.fetch
+beforeAll(() => {
+  vi.stubGlobal('EdgeRuntime', undefined)
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input)
+    if (!url.startsWith('https://app.bentonow.com/'))
+      return realFetch(input, init)
+    const { events } = JSON.parse(String(init?.body)) as { events: BentoEvent[] }
+    bentoEvents.push(...events)
+    return Response.json({ results: events.length, failed: 0 })
+  })
+})
 afterAll(() => vi.unstubAllGlobals())
 
 async function createFixture(kind: Kind) {
@@ -36,8 +50,8 @@ async function createFixture(kind: Kind) {
   const inviteId = invitations[0]!.id
   const column = kind === 'new' ? 'tmp_user_id' : 'org_user_id'
   const state = async () => {
-    const rows = await executeSQL<{ id: string, sent_at: string | null, message_id: string | null }>(`
-      SELECT id, sent_at, message_id FROM public.org_invitation_email_requests WHERE ${column} = $1
+    const rows = await executeSQL<{ id: string, sent_at: string | null, message_id: string | null, bento_synced_at: string | null }>(`
+      SELECT id, sent_at, message_id, bento_synced_at FROM public.org_invitation_email_requests WHERE ${column} = $1
     `, [inviteId])
     const row = rows[0]!
     if (row && !generations.includes(row.id))
@@ -54,7 +68,11 @@ async function createFixture(kind: Kind) {
     SUPABASE_DB_URL: POSTGRES_URL,
     WEBAPP_URL: 'https://console.capgo.app',
     AUTH_EMAIL: { send },
+    BENTO_PUBLISHABLE_KEY: 'invitation-test-publishable',
+    BENTO_SECRET_KEY: 'invitation-test-secret',
+    BENTO_SITE_UUID: 'invitation-test-site',
   } as never)
+  const inviteSentEvents = () => bentoEvents.filter(event => event.type === 'org:invite_sent' && event.details?.org_id === orgId)
   await state()
   return {
     orgId,
@@ -64,16 +82,17 @@ async function createFixture(kind: Kind) {
     state,
     send,
     post,
+    inviteSentEvents,
     cleanup: async () => {
-      await executeSQL('DELETE FROM public.bento_event_dispatches WHERE context_key = ANY($1)', [generations])
       await executeSQL('DELETE FROM public.orgs WHERE id = $1', [orgId])
       await executeSQL(`DELETE FROM pgmq.q_send_email WHERE message->'payload'->>'org_invitation_id' = ANY($1)`, [generations])
+      await executeSQL(`DELETE FROM pgmq.q_send_email WHERE message->'payload'->'org_invitation_bento_sync'->>'email' = $1`, [`invitation-${orgId}@example.com`])
     },
   }
 }
 
 describe.each(['new', 'existing'] as const)('%s-account invitation delivery with PostgreSQL', (kind) => {
-  it.concurrent('sends once across eight concurrent deliveries and records provider acceptance', async () => {
+  it.concurrent('sends once across eight concurrent deliveries and starts one Bento flow', async () => {
     const fixture = await createFixture(kind)
     try {
       const queued = await fixture.state()
@@ -89,19 +108,12 @@ describe.each(['new', 'existing'] as const)('%s-account invitation delivery with
         : `/dashboard?invite_org=${fixture.orgId}`)
       const sent = await fixture.state()
       expect(sent.sent_at).not.toBeNull()
-      const facts = await executeSQL<{ tag: string, status: string, details: { kind: string, invitationId: number }, pending_audit: unknown[] }>(
-        'SELECT tag, status, details, pending_audit FROM public.bento_event_dispatches WHERE context_key = $1',
-        [sent.id],
-      )
-      expect(facts).toHaveLength(1)
-      expect(facts[0]).toMatchObject({ tag: 'flow:started', status: 'recorded', details: { kind, invitationId: String(fixture.inviteId) } })
-      expect(facts[0]!.pending_audit).toHaveLength(1)
-      const [timing] = await executeSQL<{ exact: boolean }>(`SELECT d.event_at = r.sent_at AS exact
-        FROM public.bento_event_dispatches d JOIN public.org_invitation_email_requests r ON r.id::text = d.context_key
-        WHERE r.id = $1`, [sent.id])
-      expect(timing!.exact).toBe(true)
-      expect(JSON.stringify(facts)).not.toContain('invite_magic_string')
+      expect(sent.bento_synced_at).not.toBeNull()
       expect(sent.message_id).toBe(`message-${fixture.orgId}`)
+      const events = fixture.inviteSentEvents()
+      expect(events).toHaveLength(1)
+      expect(events[0]!.details).toMatchObject({ invite_id: sent.id, kind })
+      expect(events[0]!.fields!.capgo_open_invites.split(' ')).toContain(sent.id)
     }
     finally {
       await fixture.cleanup()
