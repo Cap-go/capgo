@@ -167,6 +167,7 @@ describe.runIf(process.env.USE_CLOUDFLARE_WORKERS === 'true')('[POST] /private/e
         tags: {
           'app-id': APPNAME_EVENT,
           'size_mb': 42,
+          'recommended_size_mb': 20,
         },
       }),
     })
