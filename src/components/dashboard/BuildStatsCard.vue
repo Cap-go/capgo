@@ -18,6 +18,8 @@ import { useSupabase } from '~/services/supabase'
 
 const props = defineProps({
   appId: { type: String, default: '' },
+  // When set, aggregate builds across every app of the organization instead of one app.
+  orgId: { type: String, default: '' },
   useBillingPeriod: { type: Boolean, default: false },
   accumulated: { type: Boolean, default: false },
   reloadTrigger: { type: Number, default: 0 },
@@ -37,7 +39,7 @@ const { isLoading, result } = useBuildCardStats<BuildStatsResult>(props, emit, {
     const rows = await fetchAllRows<BuildRow>((from, to) => supabase
       .from('build_requests')
       .select('created_at, platform, status')
-      .eq('app_id', props.appId)
+      .eq(props.orgId ? 'owner_org' : 'app_id', props.orgId || props.appId)
       .gte('created_at', window.startISO)
       .lte('created_at', window.endISO)
       .order('created_at')
@@ -87,7 +89,7 @@ const hasData = computed(() => totalBuilds.value > 0)
     :has-data="hasData"
   >
     <BuildStatsChart
-      :key="`${appId}:${JSON.stringify(dataBySeries)}`"
+      :key="`${orgId || appId}:${JSON.stringify(dataBySeries)}`"
       :data-by-series="dataBySeries"
       :use-billing-period="useBillingPeriod"
       :accumulated="accumulated"

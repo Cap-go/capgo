@@ -207,6 +207,10 @@ export async function resolveCheckoutPlanProductId(
   return getPlanProductId(plan, billingAccount)
 }
 
+// Marks the subscription schedule (and the subscription it starts) that begins the
+// onboarding plan when the free trial ends.
+export const TRIAL_PLAN_SCHEDULE_METADATA_KEY = 'capgo_trial_plan'
+
 // The US entity has no sales tax registrations yet; collect tax only on the EE account.
 export function isAutomaticTaxEnabled(billingAccount: BillingAccount): boolean {
   return billingAccount !== 'us'

@@ -34,7 +34,7 @@
 - [x] Bind the existing PostHog queue in Worker configuration and update deployment dependency matching. Retain one evaluation queue with batch size one and at most five delivery attempts.
 - [x] Update feature/cutover documentation and remove obsolete plan descriptions that suggest partitions or enrollment triggers. Keep deferred Bento recreation assets clearly distinguished from executable TypeScript definitions.
 - [x] Run lint before validation, then targeted feature tests and real database tests/pgTAP; inspect indexed plans. Run full UTC unit suite, typecheck, and production Worker dry-run.
-- [ ] Obtain separate specification and quality reviews, address findings, commit/push, update PR description, pass CI, undraft for automatic review, and establish stable-green twice 300 seconds apart. Preserve unrelated `codedb.snapshot` and exclude generated Graphify changes.
+- [ ] Obtain separate specification and quality reviews, address findings, commit/push, update PR description, pass CI, undraft for automatic review, and establish stable-green twice 300 seconds apart. Preserve unrelated `codedb.snapshot`.
 
 Local verification: 3,954 UTC unit tests, 31 real PostgreSQL integration tests,
 24 pgTAP checks, frontend/backend lint, full typecheck and production Worker

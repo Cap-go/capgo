@@ -4,7 +4,7 @@ import { sql } from 'drizzle-orm'
 import { Client, Pool } from 'pg'
 import { describe, expect, it, vi } from 'vitest'
 import { closeClient as closePluginClient, createLazyPgClient, getDrizzleClient as getPluginDrizzleClient, getPgClient as getPluginPgClient } from '../supabase/functions/_backend/plugin_runtime/utils/pg.ts'
-import { checkoutPgClient, closeClient, getDrizzleClient, getPgClient, releasePgClient, withPgTransaction } from '../supabase/functions/_backend/utils/pg.ts'
+import { BEGIN_WRITE_TRANSACTION_SQL, beginWriteTransaction, checkoutPgClient, closeClient, getDrizzleClient, getPgClient, releasePgClient, withPgTransaction } from '../supabase/functions/_backend/utils/pg.ts'
 
 const runtime = vi.hoisted(() => ({ key: 'node' }))
 vi.mock('hono/adapter', async importOriginal => ({
@@ -123,6 +123,37 @@ describe('pooled PostgreSQL transaction access modes', () => {
     }
     finally {
       await client.end()
+    }
+  })
+
+  it('bounds idle time on raw write BEGIN in one round trip', async () => {
+    const client = new Client({ connectionString })
+    await client.connect()
+    try {
+      expect(BEGIN_WRITE_TRANSACTION_SQL).toMatch(/^BEGIN READ WRITE; SET LOCAL idle_in_transaction_session_timeout = 15000$/)
+      await beginWriteTransaction(client)
+      expect((await client.query('SHOW idle_in_transaction_session_timeout')).rows[0].idle_in_transaction_session_timeout).toBe('15s')
+      expect((await client.query('SHOW transaction_read_only')).rows[0].transaction_read_only).toBe('off')
+      await client.query('ROLLBACK')
+      expect((await client.query('SHOW idle_in_transaction_session_timeout')).rows[0].idle_in_transaction_session_timeout).toBe('0')
+    }
+    finally {
+      await client.end()
+    }
+  })
+
+  it('bounds idle time inside withPgTransaction without a separate SET after BEGIN', async () => {
+    const c = context()
+    const pool = await getPgClient(c, false)
+    try {
+      await withPgTransaction(pool, async (client) => {
+        expect((await client.query('SHOW idle_in_transaction_session_timeout')).rows[0].idle_in_transaction_session_timeout).toBe('15s')
+        expect((await client.query('SHOW statement_timeout')).rows[0].statement_timeout).toBe('10s')
+      })
+      expect((await pool.query('SHOW idle_in_transaction_session_timeout')).rows[0].idle_in_transaction_session_timeout).toBe('0')
+    }
+    finally {
+      await closeClient(c, pool)
     }
   })
 
