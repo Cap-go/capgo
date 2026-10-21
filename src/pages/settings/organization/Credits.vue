@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CreditMetricType, CreditPricingStep } from '~/services/creditPricing'
-import type { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/database.types'
 import { FormKit } from '@formkit/vue'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -17,13 +17,13 @@ import CardFormModal from '~/components/billing/CardFormModal.vue'
 import EmbeddedCheckoutModal from '~/components/billing/EmbeddedCheckoutModal.vue'
 import CreditsOnlyTip from '~/components/CreditsOnlyTip.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
+import { getCreditPricingSteps, useConsole } from '~/services/console'
 import { creditPricingMetricOrder, formatCreditPricingPrice, formatCreditPricingTierLabel } from '~/services/creditPricing'
 import { formatLocalDate } from '~/services/date'
 import { formatNumber, formatNumberValue } from '~/services/formatLocale'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { completeCreditTopUp, getCreditAutoTopUp, saveCreditAutoTopUp, startCreditTopUp } from '~/services/stripe'
-import { getCreditPricingSteps, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 import { isCreditsOnlyOrg } from '~/utils/organizationBilling'
@@ -65,7 +65,7 @@ interface DailyLedgerRow {
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
-const supabase = useSupabase()
+const capgo = useConsole()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const isCreditsOnly = computed(() => isCreditsOnlyOrg(currentOrganization.value))
@@ -422,7 +422,7 @@ async function loadTransactions() {
   isLoadingTransactions.value = true
   loadError.value = null
 
-  const { data, error } = await supabase
+  const { data, error } = await capgo
     .from('usage_credit_ledger')
     .select('*')
     .eq('org_id', orgId)

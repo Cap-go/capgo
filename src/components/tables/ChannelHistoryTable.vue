@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import type { TableColumn, TableSort } from '~/components/comp_def'
-
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { channelUpdatePackageErrorKey } from '~/services/channelUpdatePackageError'
+import { useConsole } from '~/services/console'
 import { formatDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
-import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -39,7 +38,7 @@ const props = defineProps<{
 const members = ref([] as ExtendedOrganizationMembers)
 const { t } = useI18n()
 const router = useRouter()
-const supabase = useSupabase()
+const capgo = useConsole()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 
@@ -109,7 +108,7 @@ async function fetchCurrentVersion() {
     return
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await capgo
       .from('channels')
       .select('version')
       .eq('id', props.channelId)
@@ -223,7 +222,7 @@ async function fetchHistory() {
     members.value = await organizationStore.getMembers()
 
     // Fetch ALL audit log entries for this channel
-    const { data: auditData, error: auditError } = await supabase
+    const { data: auditData, error: auditError } = await capgo
       .from('audit_logs')
       .select('*')
       .eq('table_name', 'channels')
@@ -249,7 +248,7 @@ async function fetchHistory() {
     // Fetch version names
     const versionMap = new Map<number, { id: number, name: string, deleted?: boolean }>()
     if (versionIds.size > 0) {
-      const { data: versionsData } = await supabase
+      const { data: versionsData } = await capgo
         .from('app_versions')
         .select('id, name, deleted')
         .in('id', Array.from(versionIds))
@@ -394,7 +393,7 @@ async function handleRollback(item: HistoryEntry) {
         role: 'primary',
         handler: async () => {
           try {
-            const { error } = await supabase
+            const { error } = await capgo
               .from('channels')
               .update({ version: item.bundle!.id })
               .eq('id', props.channelId)

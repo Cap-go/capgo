@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { IncompatibilityReason, NativePackage, PackageComparison, PackageStatus } from '~/services/bundleCompatibility'
-import type { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/database.types'
 import { FormKit } from '@formkit/vue'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -11,7 +11,7 @@ import IconPuzzle from '~icons/heroicons/puzzle-piece'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { comparePackages, hasPlatformChecksumMetadataDrift, summarizeCompatibility } from '~/services/bundleCompatibility'
-import { useSupabase } from '~/services/supabase'
+import { useConsole } from '~/services/console'
 import { useDisplayStore } from '~/stores/display'
 
 type VersionRow = Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'name' | 'created_at' | 'manifest_count' | 'app_id'>
@@ -41,7 +41,7 @@ const route = useRoute()
 const router = useRouter()
 const displayStore = useDisplayStore()
 const { t } = useI18n()
-const supabase = useSupabase()
+const capgo = useConsole()
 const packageId = ref<string>('')
 const id = ref<number>(0)
 const loading = ref(true)
@@ -262,7 +262,7 @@ function openNpmPackage(packageName: string) {
 async function fetchBaselinePackages(versionId: number) {
   if (!packageId.value)
     return []
-  const { data, error } = await supabase
+  const { data, error } = await capgo
     .from('app_versions')
     .select('id, native_packages')
     .eq('app_id', packageId.value)
@@ -282,7 +282,7 @@ async function getVersion() {
     return
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await capgo
       .from('app_versions')
       .select()
       .eq('app_id', packageId.value)
@@ -345,7 +345,7 @@ async function restoreCompareFromQuery() {
   // bundle or one without native packages (which the picker excludes), else the
   // baseline load would coerce missing packages to [] and report every
   // dependency as newly added/incompatible. Scrub the param if it doesn't match.
-  const { data, error } = await supabase
+  const { data, error } = await capgo
     .from('app_versions')
     .select('id, name, created_at, manifest_count, app_id')
     .eq('app_id', packageId.value)

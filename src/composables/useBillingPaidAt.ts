@@ -1,7 +1,7 @@
 import type { Ref } from 'vue'
 import { ref, watch } from 'vue'
+import { useConsole } from '~/services/console'
 import { resolveBillingPaidAt } from '~/services/paymentRequired'
-import { useSupabase } from '~/services/supabase'
 
 const BILLING_PAID_AT_CACHE_TTL_MS = 5 * 60 * 1000
 const BILLING_PAID_AT_CACHE_MAX_ENTRIES = 100
@@ -48,7 +48,7 @@ export function useBillingPaidAt(orgId: Readonly<Ref<string | null | undefined>>
       return
     }
 
-    const { data, error } = await useSupabase()
+    const { data, error } = await useConsole()
       .from('orgs')
       .select('stripe_info(paid_at)')
       .eq('id', nextOrgId)

@@ -30,7 +30,7 @@ const organizationStore = vi.hoisted(() => ({
   organizations: [{ gid: 'org-1', name: 'Test organization', app_count: 1 }],
   getAppsByOrgId: vi.fn((orgId: string) => organizationApps.get(orgId) ?? []),
 }))
-const supabase = vi.hoisted(() => ({
+const capgo = vi.hoisted(() => ({
   channel: vi.fn(),
   from: vi.fn(),
   removeChannel: vi.fn(),
@@ -47,8 +47,8 @@ vi.mock('vue-sonner', () => ({
 
 vi.mock('~/services/cliLogin', () => cliLoginMocks)
 
-vi.mock('~/services/supabase', () => ({
-  useSupabase: () => supabase,
+vi.mock('~/services/console', () => ({
+  useConsole: () => capgo,
 }))
 
 vi.mock('~/stores/main', () => ({
@@ -133,7 +133,7 @@ describe('/login-cli page', () => {
       callback('SUBSCRIBED')
       return channel
     }) }
-    supabase.channel.mockReturnValue(channel)
+    capgo.channel.mockReturnValue(channel)
     const container = mountLoginCliPage()
     await flushPromises()
     await vi.waitFor(() => expect(container.textContent).toContain('capgo_xxxxxxxxxxxxxxxxxxxx'))

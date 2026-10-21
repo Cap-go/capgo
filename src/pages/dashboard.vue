@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Tab } from '~/components/comp_def'
-import type { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/database.types'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -11,7 +11,7 @@ import IconTimer from '~icons/lucide/timer'
 import DeliveryLatencyPanel from '~/components/dashboard/DeliveryLatencyPanel.vue'
 import OrgNotificationStatsPanel from '~/components/dashboard/OrgNotificationStatsPanel.vue'
 import Tabs from '~/components/Tabs.vue'
-import { useSupabase } from '~/services/supabase'
+import { useConsole } from '~/services/console'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -20,7 +20,7 @@ type DashboardTab = 'usage' | 'delivery' | 'notifications'
 const route = useRoute('/dashboard')
 const organizationStore = useOrganizationStore()
 const isLoading = ref(true)
-const supabase = useSupabase()
+const capgo = useConsole()
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
@@ -76,7 +76,7 @@ async function getMyApps() {
     return
   }
 
-  const { data } = await supabase
+  const { data } = await capgo
     .from('apps')
     .select()
     .eq('owner_org', currentGid)

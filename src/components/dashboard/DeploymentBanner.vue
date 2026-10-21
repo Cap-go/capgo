@@ -23,13 +23,13 @@
  * <DeploymentBanner :app-id="appId" @deployed="refreshData" />
  */
 
-import type { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/database.types'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconInfo from '~icons/lucide/info'
+import { useConsole } from '~/services/console'
 import { checkPermissions } from '~/services/permissions'
-import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 /**
@@ -52,7 +52,7 @@ const emit = defineEmits<{
 
 // Initialize services and stores
 const { t } = useI18n()
-const supabase = useSupabase()
+const capgo = useConsole()
 const dialogStore = useDialogV2Store()
 
 // Component state
@@ -148,7 +148,7 @@ async function loadData() {
 
   try {
     // Step 1: Get default channels configuration (public download channels)
-    const { data: publicChannels } = await supabase
+    const { data: publicChannels } = await capgo
       .from('channels')
       .select('id, name, ios, android, electron, public, version')
       .eq('app_id', props.appId)
@@ -165,7 +165,7 @@ async function loadData() {
     // Step 2: Get latest bundle (excluding special bundle types)
     // We filter out 'unknown' and 'builtin' bundles as these are not deployable
     // Only fetch non-deleted bundles ordered by creation date (newest first)
-    const { data: bundles } = await supabase
+    const { data: bundles } = await capgo
       .from('app_versions')
       .select('*')
       .eq('app_id', props.appId)
@@ -228,7 +228,7 @@ async function executeDeployment() {
     })
 
     // Perform the deployment by updating the channel versions in bulk
-    const { data, error } = await supabase
+    const { data, error } = await capgo
       .from('channels')
       .update({ version: bundle.id })
       .in('id', targetIds)

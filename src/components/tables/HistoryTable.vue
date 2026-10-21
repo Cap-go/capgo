@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import type { TableColumn, TableSort } from '~/components/comp_def'
-
 import { computedAsync } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { channelUpdatePackageErrorKey } from '~/services/channelUpdatePackageError'
+import { useConsole } from '~/services/console'
 import { formatDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
-import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -54,7 +53,7 @@ const canRollbackBundle = computedAsync(async () => {
 const members = ref([] as ExtendedOrganizationMembers)
 const { t } = useI18n()
 const router = useRouter()
-const supabase = useSupabase()
+const capgo = useConsole()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 
@@ -79,7 +78,7 @@ async function fetchCurrentVersion() {
     return
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await capgo
       .from('channels')
       .select('version')
       .eq('id', props.channelId)
@@ -239,7 +238,7 @@ async function fetchChannelHistory() {
     )
   `
 
-  let query = supabase
+  let query = capgo
     .from('deploy_history')
     .select(selectFields, { count: 'exact' })
     .eq('app_id', props.appId)
@@ -300,7 +299,7 @@ async function fetchBundleHistory() {
     )
   `
 
-  const { data: assignmentData, error: assignmentError } = await supabase
+  const { data: assignmentData, error: assignmentError } = await capgo
     .from('deploy_history')
     .select(assignmentSelectFields)
     .eq('app_id', props.appId)
@@ -314,7 +313,7 @@ async function fetchBundleHistory() {
 
   // Fetch removals from audit_logs
   // When a channel's version changes FROM this bundle TO another bundle, that's a removal
-  const { data: auditData, error: auditError } = await supabase
+  const { data: auditData, error: auditError } = await capgo
     .from('audit_logs')
     .select('*')
     .eq('table_name', 'channels')
@@ -354,7 +353,7 @@ async function fetchBundleHistory() {
     // Fetch channel names
     const channelMap = new Map<number, { id: number, name: string }>()
     if (channelIds.size > 0) {
-      const { data: channelsData } = await supabase
+      const { data: channelsData } = await capgo
         .from('channels')
         .select('id, name')
         .in('id', Array.from(channelIds))
@@ -448,7 +447,7 @@ async function handleRollback(item: DeployHistory) {
         role: 'primary',
         handler: async () => {
           try {
-            const { error } = await supabase
+            const { error } = await capgo
               .from('channels')
               .update({ version: item.version_id })
               .eq('id', channelId)

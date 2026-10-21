@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import type { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/database.types'
 import { FormKit } from '@formkit/vue'
 import { useDebounceFn } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconSearch from '~icons/ic/round-search?raw'
+import { useConsole } from '~/services/console'
 import { formatLocalDate } from '~/services/date'
-import { useSupabase } from '~/services/supabase'
 
 type VersionRow = Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'name' | 'created_at' | 'manifest_count' | 'app_id'>
 type DeployHistoryRow = Pick<Database['public']['Tables']['deploy_history']['Row'], 'channel_id' | 'version_id' | 'created_at' | 'deployed_at'>
@@ -37,7 +37,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const supabase = useSupabase()
+const capgo = useConsole()
 
 const latestCompareVersions = ref<VersionRow[]>([])
 const preferredCompareVersions = ref<VersionRow[]>([])
@@ -92,7 +92,7 @@ function selectCompareVersion(option: VersionRow | null) {
 // bundles are excluded — their storage may be gone (and is purged after 90 days),
 // so they are not meaningful comparison targets.
 function buildCompareBaseQuery() {
-  const query = supabase
+  const query = capgo
     .from('app_versions')
     .select('id, name, created_at, manifest_count, app_id')
     .eq('app_id', props.appId)
@@ -134,7 +134,7 @@ async function loadPreferredCompareVersions() {
   const channelIds = new Set<number>()
   const deployedAtByChannel = new Map<number, string | null>()
 
-  const { data: currentChannels, error: currentChannelsError } = await supabase
+  const { data: currentChannels, error: currentChannelsError } = await capgo
     .from('channels')
     .select('id')
     .eq('app_id', props.appId)
@@ -151,7 +151,7 @@ async function loadPreferredCompareVersions() {
       channelIds.add(channel.id)
   }
 
-  const { data: deployHistory, error: deployHistoryError } = await supabase
+  const { data: deployHistory, error: deployHistoryError } = await capgo
     .from('deploy_history')
     .select('channel_id, version_id, created_at, deployed_at')
     .eq('app_id', props.appId)
@@ -185,7 +185,7 @@ async function loadPreferredCompareVersions() {
   const candidatesByChannel: Array<Array<{ versionId: number, deployedAt: string | null }>> = []
   for (const channelId of channelIds) {
     const cutoff = deployedAtByChannel.get(channelId)
-    let query = supabase
+    let query = capgo
       .from('deploy_history')
       .select('version_id, created_at, deployed_at')
       .eq('app_id', props.appId)
@@ -258,7 +258,7 @@ async function loadLiveChannels() {
   if (!props.appId)
     return
 
-  const { data, error } = await supabase
+  const { data, error } = await capgo
     .from('channels')
     .select('name, version')
     .eq('app_id', props.appId)
@@ -326,7 +326,7 @@ async function searchCompareVersions(term: string) {
   const requestId = ++compareSearchRequestId.value
   compareSearchLoading.value = true
 
-  // Each chain must start from its own builder: the Supabase query builder is
+  // Each chain must start from its own builder: the console query builder is
   // mutable and returns `this`, so reusing one instance across concurrent
   // chains would leak filters between the requests.
   // Exact and prefix matches are fetched separately so they are never pushed out

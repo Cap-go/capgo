@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getAuthHeaders, getEndpointUrl, USER_ID, USER_ID_NONMEMBER } from './test-utils'
+import { getAuthHeaders, getEndpointUrl, USER_EMAIL, USER_ID, USER_ID_NONMEMBER, USER_PASSWORD } from './test-utils'
 
 interface QueryResponse {
   data: unknown
@@ -85,5 +85,39 @@ describe('[POST] /private/console/query', () => {
     expect(probe.status).toBe(200)
     const other = await query({ kind: 'rpc', name: 'is_platform_admin', args: [], operations: [] })
     expect(other.status).toBe(401)
+  })
+})
+
+describe('[ANY] /private/console/auth/*', () => {
+  it('relays a password grant to the auth provider and returns its session', async () => {
+    const response = await fetch(getEndpointUrl('/private/console/auth/token?grant_type=password'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: USER_EMAIL, password: USER_PASSWORD }),
+    })
+    expect(response.status).toBe(200)
+    const body = await response.json() as { access_token?: string, refresh_token?: string, user?: { id: string } }
+    expect(body.user?.id).toBe(USER_ID)
+    expect(typeof body.access_token).toBe('string')
+    expect(typeof body.refresh_token).toBe('string')
+
+    const me = await fetch(getEndpointUrl('/private/console/auth/user'), { headers: { Authorization: `Bearer ${body.access_token}` } })
+    expect(me.status).toBe(200)
+    expect((await me.json() as { id: string }).id).toBe(USER_ID)
+  })
+
+  it('surfaces auth provider errors with their codes', async () => {
+    const response = await fetch(getEndpointUrl('/private/console/auth/token?grant_type=password'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: USER_EMAIL, password: 'wrong-password' }),
+    })
+    expect(response.status).toBe(400)
+    expect((await response.json() as { error_code?: string }).error_code).toBe('invalid_credentials')
+  })
+
+  it('never relays admin endpoints', async () => {
+    const response = await fetch(getEndpointUrl('/private/console/auth/admin/users'), { headers: await getAuthHeaders() })
+    expect(response.status).toBe(404)
   })
 })

@@ -1,13 +1,16 @@
-import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createConsoleClient } from '../src/services/consoleClient'
+import { SESSION_STORAGE_KEY } from '../src/services/consoleAuth'
+import { createConsoleClient, FunctionsFetchError, FunctionsHttpError } from '../src/services/consoleClient'
+import { fakeJwt, memoryStorage } from './console-auth-fixtures'
 
 const fetchMock = vi.fn()
 
 function client(token: string | null = 'session-jwt') {
-  return createConsoleClient({
-    auth: { getSession: async () => ({ data: { session: token ? { access_token: token } : null }, error: null }) } as any,
-  })
+  const storage = memoryStorage()
+  if (token)
+    storage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ access_token: fakeJwt({ sub: 'user-1' }), refresh_token: 'refresh', expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: 'user-1' } }))
+  vi.stubGlobal('localStorage', storage)
+  return createConsoleClient()
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -32,7 +35,7 @@ describe('console client transport', () => {
     expect(result).toEqual({ data: [{ id: 'app-1' }], error: null, count: 1, status: 200 })
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('https://api.example.com/private/console/query')
-    expect(new Headers(init.headers).get('Authorization')).toBe('Bearer session-jwt')
+    expect(new Headers(init.headers).get('Authorization')).toBe(`Bearer ${fakeJwt({ sub: 'user-1' })}`)
     expect(JSON.parse(init.body)).toEqual({
       kind: 'table',
       name: 'apps',

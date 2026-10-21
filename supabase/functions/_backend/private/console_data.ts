@@ -7,6 +7,7 @@ import { parseBody, quickError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_jwt.ts'
 import { emptySupabase, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
+import { app as consoleAuthProxy } from './console_auth_proxy.ts'
 
 // The console records PostgREST builder calls and replays them here with the
 // caller's own JWT, so the browser never talks to Supabase for data. Only these
@@ -22,6 +23,7 @@ const imagePathSchema = z.string().min(1).max(1024).refine(path => path.split('/
 
 export const app = new Hono<MiddlewareKeyVariables>()
 app.use('*', useCors)
+app.route('/auth', consoleAuthProxy)
 
 app.post('/query', async (c) => {
   const parsed = querySchema.safeParse(await parseBody(c))

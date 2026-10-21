@@ -2,7 +2,7 @@
 import type { BuilderPlatform } from '~/services/builderOnboardingChecklist'
 import type { CliAiPromptOrganization } from '~/services/cliAiPrompt'
 import type { OrganizationApp } from '~/stores/organization'
-import type { Database, Json } from '~/types/supabase.types'
+import type { Database, Json } from '~/types/database.types'
 import type { ChecklistPath } from '~/utils/dualOnboardingChecklists'
 import type { OnboardingABTestAssignment } from '~/utils/onboardingABTests'
 import type { OnboardingChannelEvent, OnboardingChannelEventProperties, OnboardingChannelStage } from '~/utils/onboardingChannelAnalytics'
@@ -49,10 +49,10 @@ import {
 import { isBuilderTodoListSelected } from '~/services/builderOnboardingChecklist'
 import { getCapgoApiErrorCode, invokeCapgoApi } from '~/services/capgoApi'
 import { buildCliAiSetupPrompt } from '~/services/cliAiPrompt'
+import { defaultApiHost, getLocalConfig, isLocal, useConsole } from '~/services/console'
 import { APP_ONBOARDING_READY_EVENT, sendOnboardingEvent } from '~/services/onboardingTracking'
 import { uploadOrgLogoFile } from '~/services/photos'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
-import { defaultApiHost, getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import {
   mergeUserOnboardingProgress,
   replaceUserOnboardingWithRetry,
@@ -146,7 +146,7 @@ const props = defineProps<{
 
 const router = useRouter()
 const { t } = useI18n()
-const supabase = useSupabase()
+const capgo = useConsole()
 const dialogStore = useDialogV2Store()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
@@ -265,7 +265,7 @@ const onboardingTelemetry = createOnboardingTelemetryIdentity({
   continueFrom: setupHandoff ?? profileHandoff,
   flow: props.preOrg ? 'pre_org' : 'existing_org',
   onboardingVersion: onboardingAnalyticsVersion,
-  supaHost: config.supaHost,
+  apiHost: config.apiHost,
 })
 const webNativeRecommendationDismissed = ref(false)
 const orgNameInput = ref('')
@@ -316,7 +316,7 @@ const startingOutUserCountStop: UserCountStop = {
 }
 const planNameOrder = ['Solo', 'Maker', 'Team', 'Enterprise'] as const
 
-const localCommand = isLocal(config.supaHost) ? ` --api-host ${defaultApiHost}` : ''
+const localCommand = isLocal(config.apiHost) ? ` --api-host ${defaultApiHost}` : ''
 // TODO(2027-03-19): Remove v3 compatibility after all existing OTA checklists have migrated.
 const usesOtaTodoList = computed(() => !!createdApp.value && hasSupportedOtaTodoList(parseAppOnboarding(createdApp.value.onboarding)))
 const usesDualTodoList = computed(() => !!createdApp.value && hasDualOnboardingChecklists(createdApp.value.onboarding))
@@ -427,7 +427,7 @@ async function markOnboardingFeatureStarted(featureKey: 'cli_install' | 'ota' | 
 
   for (let attempt = 0; attempt < 2; attempt++) {
     markedOnboardingFeatures.add(markKey)
-    const { data, error } = await supabase.rpc('mark_onboarding_feature_started', {
+    const { data, error } = await capgo.rpc('mark_onboarding_feature_started', {
       p_app_id: appId,
       p_feature_key: featureKey,
     })
@@ -474,7 +474,7 @@ const cliCommandArgs = computed(() => {
   if (usesBuilderSetupCommand.value && apiKey.value)
     args.push('-a', apiKey.value)
 
-  if (isLocal(config.supaHost))
+  if (isLocal(config.apiHost))
     args.push('--api-host', defaultApiHost)
 
   return args
@@ -731,7 +731,7 @@ function initializeProgressTracking(resumed: boolean) {
     onboardingVersion: onboardingAnalyticsVersion,
     resumed: resumed && !setupHandoff,
     steps: trackedAnalyticsSteps,
-    supaHost: config.supaHost,
+    apiHost: config.apiHost,
     onboardingAttemptId: onboardingTelemetry.attemptId,
     onboardingRunId: onboardingTelemetry.runId,
   })
@@ -1246,16 +1246,16 @@ async function loadResumeIconPreview(rawIconUrl: string | null | undefined, appI
 }
 
 async function ensureApiKey(userId: string, orgId?: string | null, appId?: string | null): Promise<string | null> {
-  const existingKey = await findUsablePlainApiKey(supabase, userId, orgId, appId)
+  const existingKey = await findUsablePlainApiKey(capgo, userId, orgId, appId)
   if (existingKey)
     return existingKey
 
-  const { data: claimsData } = await supabase.auth.getClaims()
+  const { data: claimsData } = await capgo.auth.getClaims()
   const claimsUserId = claimsData?.claims?.sub
   if (!claimsUserId)
     return null
 
-  const { data, error: createError } = await createDefaultApiKey(supabase, 'api-key', {
+  const { data, error: createError } = await createDefaultApiKey(capgo, 'api-key', {
     orgId,
     appId,
   })
@@ -1264,7 +1264,7 @@ async function ensureApiKey(userId: string, orgId?: string | null, appId?: strin
 
   return typeof data?.key === 'string'
     ? data.key
-    : await findUsablePlainApiKey(supabase, claimsUserId, orgId, appId)
+    : await findUsablePlainApiKey(capgo, claimsUserId, orgId, appId)
 }
 
 function loadApiKey() {
@@ -1300,7 +1300,7 @@ async function loadResumeApp(appId = resumeAppId.value) {
   if (!currentOrg.value?.gid)
     return false
 
-  const { data, error } = await supabase
+  const { data, error } = await capgo
     .from('apps')
     .select()
     .eq('owner_org', currentOrg.value.gid)
@@ -1825,7 +1825,7 @@ async function uploadIcon(appId: string, iconSourceUrl?: string) {
   }
 
   const iconPath = `org/${currentOrg.value.gid}/${appId}/icon`
-  const { error: uploadError } = await supabase.storage
+  const { error: uploadError } = await capgo.storage
     .from('images')
     .upload(iconPath, fileToUpload, {
       upsert: true,
@@ -1838,7 +1838,7 @@ async function uploadIcon(appId: string, iconSourceUrl?: string) {
     return
   }
 
-  const { error: appUpdateError } = await supabase
+  const { error: appUpdateError } = await capgo
     .from('apps')
     .update({ icon_url: iconPath })
     .eq('app_id', appId)
@@ -2288,7 +2288,7 @@ async function createAppRecord(options?: { nextStep?: 'organization' }): Promise
       : { iosStoreUrl: null, androidStoreUrl: null }
 
     let appId = generatedAppId.value
-    const createResult = await createOnboardingAppWithFallbackIds(supabase, {
+    const createResult = await createOnboardingAppWithFallbackIds(capgo, {
       ownerOrgId: currentOrg.value.gid,
       baseAppId: appId,
       appName: appName.value.trim(),
@@ -2354,7 +2354,7 @@ async function createAppRecord(options?: { nextStep?: 'organization' }): Promise
     const restoredLocalIconSource = localIconPreview.value.startsWith('data:image/') ? localIconPreview.value : ''
     const importedIconSource = canUseStoreImportPreview.value ? storeIconPreview.value : ''
     await uploadIcon(appId, restoredLocalIconSource || importedIconSource)
-    const { data: refreshed } = await supabase
+    const { data: refreshed } = await capgo
       .from('apps')
       .select()
       .eq('app_id', appId)
@@ -2559,7 +2559,7 @@ async function openDashboard() {
     })
   }
   const app = createdApp.value
-  const { data } = await supabase
+  const { data } = await capgo
     .from('apps')
     .select('onboarding')
     .eq('app_id', app.app_id)
@@ -2581,8 +2581,8 @@ async function skipOnboardingSplash() {
   isHidingSplash.value = true
   try {
     const appId = createdApp.value.app_id
-    await supabase.rpc('verify_getting_started', { p_app_id: appId })
-    const { data, error } = await supabase.rpc('dismiss_getting_started', { p_app_id: appId })
+    await capgo.rpc('verify_getting_started', { p_app_id: appId })
+    const { data, error } = await capgo.rpc('dismiss_getting_started', { p_app_id: appId })
     if (error)
       throw error
     if (data != null)
@@ -2606,7 +2606,7 @@ async function leaveSplashIfAlreadySetup() {
   const app = createdApp.value
   if (!app || props.showChecklist)
     return false
-  const { data } = await supabase.rpc('verify_getting_started', { p_app_id: app.app_id })
+  const { data } = await capgo.rpc('verify_getting_started', { p_app_id: app.app_id })
   if (data != null)
     organizationStore.updateAppOnboarding(app.app_id, data)
   const latestOnboarding = data ?? app.onboarding

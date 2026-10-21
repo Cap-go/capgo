@@ -89,8 +89,8 @@ async function continuePastChannelOnboardingIfShown(page: Page) {
 }
 
 async function forceWebNativeOnboardingTreatments(email: string, password: string) {
-  const supabase = createClient(localSupabaseUrl, localSupabaseAnonKey)
-  const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+  const capgo = createClient(localSupabaseUrl, localSupabaseAnonKey)
+  const { data: sessionData, error: signInError } = await capgo.auth.signInWithPassword({ email, password })
   if (signInError || !sessionData.user)
     throw signInError ?? new Error('Cannot sign in treatment user')
 
@@ -139,7 +139,7 @@ async function forceWebNativeOnboardingTreatments(email: string, password: strin
     throw updateError
 
   // End only this helper session; the browser must stay signed in.
-  await supabase.auth.signOut({ scope: 'local' })
+  await capgo.auth.signOut({ scope: 'local' })
 }
 
 async function expectProtectedRouteRedirect(page: Page, targetPath: string, expectedUrl: RegExp, expectedSelector: string) {
@@ -222,7 +222,7 @@ test.describe('Registration', () => {
     await expect(page.locator('[data-test="last_name"]')).toHaveCount(0)
     await page.fill('[data-test="email"]', email)
     await page.fill('[data-test="password"]', 'Password123!')
-    await page.route('**/auth/v1/signup', route => route.abort())
+    await page.route('**/private/console/auth/signup', route => route.abort())
     const registrationRequest = page.waitForRequest(request => request.url().endsWith('/auth/register') && request.method() === 'POST')
     await page.click('[data-test="submit"]')
     const registrationPayload = (await registrationRequest).postDataJSON()
@@ -280,16 +280,16 @@ test.describe('Registration', () => {
     await page.click('[data-test="app-onboarding-continue-intent"]')
     await continuePastDevelopmentEnvironmentIfShown(page)
 
-    const supabase = createClient(localSupabaseUrl, localSupabaseAnonKey)
-    const { data: signedIn, error: signInError } = await supabase.auth.signInWithPassword({ email, password: 'Password123!' })
+    const capgo = createClient(localSupabaseUrl, localSupabaseAnonKey)
+    const { data: signedIn, error: signInError } = await capgo.auth.signInWithPassword({ email, password: 'Password123!' })
     expect(signInError).toBeNull()
-    const { data: profile, error: profileError } = await supabase.from('users')
+    const { data: profile, error: profileError } = await capgo.from('users')
       .select('first_name, last_name')
       .eq('id', signedIn.user!.id)
       .single()
     expect(profileError).toBeNull()
     expect(profile).toEqual({ first_name: 'Example', last_name: 'User' })
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
 
     await expect(page.locator('[data-test="app-onboarding-existing-yes"]')).toHaveCount(0)
     await expect(page.locator('[data-test="app-onboarding-existing-no"]')).toHaveCount(0)
@@ -392,10 +392,10 @@ test.describe('Registration', () => {
       await page.fill('[data-test="onboarding-last-name"]', 'User')
       await draftSaved
 
-      const supabase = createClient(localSupabaseUrl, localSupabaseAnonKey)
-      const { data: session, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      const capgo = createClient(localSupabaseUrl, localSupabaseAnonKey)
+      const { data: session, error: signInError } = await capgo.auth.signInWithPassword({ email, password })
       expect(signInError).toBeNull()
-      const { data: profile, error } = await supabase.from('users')
+      const { data: profile, error } = await capgo.from('users')
         .select('first_name, last_name, onboarding')
         .eq('id', session.user!.id)
         .single()
@@ -403,7 +403,7 @@ test.describe('Registration', () => {
       expect(profile?.first_name || '').toBe('')
       expect(profile?.last_name || '').toBe('')
       expect(profile?.onboarding).toMatchObject({ profile_draft: { first_name: 'Draft', last_name: 'User' } })
-      await supabase.auth.signOut({ scope: 'local' })
+      await capgo.auth.signOut({ scope: 'local' })
 
       await page.reload()
       const firstName = page.locator('[data-test="onboarding-first-name"]')
@@ -438,12 +438,12 @@ test.describe('Registration', () => {
   test('should save an incomplete profile before creating a standalone organization', async ({ page }) => {
     const email = `standalone-profile-e2e-${Date.now()}@example.com`
     const password = 'Password123!'
-    const supabase = createClient(localSupabaseUrl, localSupabaseAnonKey)
-    const { data: signedUp, error: signUpError } = await supabase.auth.signUp({ email, password })
+    const capgo = createClient(localSupabaseUrl, localSupabaseAnonKey)
+    const { data: signedUp, error: signUpError } = await capgo.auth.signUp({ email, password })
     expect(signUpError).toBeNull()
     const { error: updateError } = await localAdminClient().from('users').upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '', onboarding: {} }, { onConflict: 'id' })
     expect(updateError).toBeNull()
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
 
     await loginToOnboarding(page, email, password)
     await page.goto('/onboarding/organization?source=org-switcher')
@@ -475,27 +475,27 @@ test.describe('Registration', () => {
     await expect(page.locator('[data-test="onboarding-logo-action"]')).toBeVisible({ timeout: 60000 })
     expect(writes).toEqual(['profile', 'organization'])
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: signInError } = await capgo.auth.signInWithPassword({ email, password })
     expect(signInError).toBeNull()
-    const { data: profile, error: profileError } = await supabase.from('users')
+    const { data: profile, error: profileError } = await capgo.from('users')
       .select('first_name, last_name')
       .eq('id', signedUp.user!.id)
       .single()
     expect(profileError).toBeNull()
     expect(profile).toEqual({ first_name: 'Example', last_name: 'User' })
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
   })
 
   test('should complete a partial profile and skip both names for subsequent organizations', async ({ page }) => {
     const email = `partial-profile-e2e-${Date.now()}@example.com`
     const password = 'Password123!'
-    const supabase = createClient(localSupabaseUrl, localSupabaseAnonKey)
-    const { data: signedUp, error: signUpError } = await supabase.auth.signUp({ email, password })
+    const capgo = createClient(localSupabaseUrl, localSupabaseAnonKey)
+    const { data: signedUp, error: signUpError } = await capgo.auth.signUp({ email, password })
     expect(signUpError).toBeNull()
     const { data: seededProfile, error: updateError } = await localAdminClient().from('users').upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '', onboarding: {} }, { onConflict: 'id' }).select('first_name, last_name').single()
     expect(updateError).toBeNull()
     expect(seededProfile).toEqual({ first_name: 'Example', last_name: '' })
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
 
     await loginToOnboarding(page, email, password)
     await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveValue('Example')
@@ -521,15 +521,15 @@ test.describe('Registration', () => {
     await createOrganization.click()
     await expect(page.locator('[data-test="onboarding-logo-action"]')).toBeVisible({ timeout: 60000 })
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: signInError } = await capgo.auth.signInWithPassword({ email, password })
     expect(signInError).toBeNull()
-    const { data: profile, error: profileError } = await supabase.from('users')
+    const { data: profile, error: profileError } = await capgo.from('users')
       .select('first_name, last_name')
       .eq('id', signedUp.user!.id)
       .single()
     expect(profileError).toBeNull()
     expect(profile).toEqual({ first_name: 'Example', last_name: 'User' })
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
 
     await page.goto('/onboarding/organization?source=org-switcher')
     await page.click('[data-test="onboarding-intent-ota"]')
@@ -541,12 +541,12 @@ test.describe('Registration', () => {
   test('should preserve an existing surname when saving the first name', async ({ page }) => {
     const email = `surname-profile-e2e-${Date.now()}@example.com`
     const password = 'Password123!'
-    const supabase = createClient(localSupabaseUrl, localSupabaseAnonKey)
-    const { data: signedUp, error: signUpError } = await supabase.auth.signUp({ email, password })
+    const capgo = createClient(localSupabaseUrl, localSupabaseAnonKey)
+    const { data: signedUp, error: signUpError } = await capgo.auth.signUp({ email, password })
     expect(signUpError).toBeNull()
     const { error: updateError } = await localAdminClient().from('users').upsert({ id: signedUp.user!.id, email, first_name: '', last_name: 'Existing', onboarding: {} }, { onConflict: 'id' })
     expect(updateError).toBeNull()
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
 
     await loginToOnboarding(page, email, password)
     await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('Existing')
@@ -558,15 +558,15 @@ test.describe('Registration', () => {
     await continuePastDevelopmentEnvironmentIfShown(page)
     await expect(page.locator('[data-test="app-onboarding-name"]')).toBeVisible()
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: signInError } = await capgo.auth.signInWithPassword({ email, password })
     expect(signInError).toBeNull()
-    const { data: profile, error: profileError } = await supabase.from('users')
+    const { data: profile, error: profileError } = await capgo.from('users')
       .select('first_name, last_name')
       .eq('id', signedUp.user!.id)
       .single()
     expect(profileError).toBeNull()
     expect(profile).toEqual({ first_name: 'Example', last_name: 'Existing' })
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
   })
 
   test('should offer to continue or restart onboarding after a dropout', async ({ page }) => {

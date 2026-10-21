@@ -415,7 +415,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     prepare: async (page) => {
       // Keep screenshots deterministic and never send a real verification email.
       await routeConsoleQuery(page, 'user_security', route => route.fulfill(consoleQueryJson({ email_otp_verified_at: null })))
-      await page.route('**/auth/v1/otp', route => route.fulfill({ json: { user: null, session: null } }))
+      await page.route('**/private/console/auth/otp', route => route.fulfill({ json: { user: null, session: null } }))
       await page.goto('/resend_email?reason=email_not_verified&return_to=/settings/account')
       await page.getByRole('button', { name: 'Send verification code', exact: true }).click()
       await page.getByLabel('Enter the verification code', { exact: true }).waitFor()

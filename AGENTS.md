@@ -905,24 +905,40 @@ Also applies to dialog/Teleport content, admin filters, and hidden utility input
 
 ## Console Data Access
 
-- The console never queries Supabase directly. `useSupabase()` returns a
-  console client (`src/services/consoleClient.ts`) whose `from`/`rpc`,
-  storage, realtime and `functions.invoke` calls go to the Capgo API
-  (`/private/console/*`, `supabase/functions/_backend/private/console_data.ts`),
-  which replays them with the caller's own JWT so RLS still applies.
+- **Never call Supabase from the console or the CLI.** Only the backend
+  (`supabase/functions/_backend`, `cloudflare_workers`) holds a Supabase URL or
+  key. The console and the CLI talk to the Capgo API only. No `@supabase/*`
+  import, `sb.capgo.app`/`*.supabase.co` host, anon key, or `/rest/v1`,
+  `/auth/v1`, `/storage/v1` URL may appear under `src/`; the word "Supabase"
+  must not appear there either. `tests/console-no-supabase.unit.test.ts` and
+  the `console-api-only` Vite build plugin enforce this.
+- `useConsole()` (`src/services/console.ts`) returns the console client
+  (`src/services/consoleClient.ts`). Its `from`/`rpc`, storage, realtime and
+  `functions.invoke` calls go to `/private/console/*`
+  (`supabase/functions/_backend/private/console_data.ts`), which replays them
+  with the caller's own JWT so RLS still applies.
+- Auth goes through `/private/console/auth/*`
+  (`supabase/functions/_backend/private/console_auth_proxy.ts`), a relay to
+  the auth provider's user-facing endpoints only (never admin). The console auth
+  client (`src/services/consoleAuth.ts`) keeps the session in localStorage under
+  `capgo.console.auth` and mirrors the previous SDK surface (`getSession`,
+  `signInWithPassword`, `mfa.*`, `onAuthStateChange`, ...).
+- The relay forwards the browser address in `X-Forwarded-For` and
+  `Sb-Forwarded-For`, so the auth provider's per-IP rate limits, CAPTCHA checks
+  and audit log keep working. Do not drop those headers.
 - Any new table or RPC used from `src/` must be added to
   `supabase/functions/_backend/utils/console_query_allowlist.ts`;
   `tests/console-query-allowlist.unit.test.ts` enforces this.
-- Only `auth` still talks to Supabase Auth; swapping it is the remaining step
-  to leave Supabase on the console side.
+- Generated database types live in `src/types/database.types.ts` (copied to
+  the backend by `scripts/getTypes.mjs`).
 
 ## Auth Redirect Guardrails
 
 - We intentionally route auth email links through `/confirm-signup` to avoid
   mailbox link prefetchers triggering Supabase verification/recovery links.
-- `confirm-signup.vue` only allows redirects to the console host and the
-  Supabase host; if you change `VITE_APP_URL` or `VITE_SUPABASE_URL`, update
-  both allow-lists accordingly.
+- `confirm-signup.vue` rewrites `/auth/v1/verify` links onto the Capgo API
+  relay (`/private/console/auth/verify`) and otherwise only allows redirects to
+  the console host and the API host (`VITE_APP_URL`, `VITE_API_HOST`).
 
 ## Frontend Testing
 

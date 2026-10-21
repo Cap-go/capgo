@@ -13,7 +13,7 @@ import IconMinus from '~icons/lucide/minus'
 import IconAndroid from '~icons/mdi/android'
 import IconApple from '~icons/mdi/apple'
 import { BUILDER_STEP_IDS, parseBuilderOnboarding } from '~/services/builderOnboardingChecklist'
-import { useSupabase } from '~/services/supabase'
+import { useConsole } from '~/services/console'
 import { resolveDualChecklistResume } from '~/utils/dualOnboardingChecklists'
 import AppOnboardingAiAgentCard from './AppOnboardingAiAgentCard.vue'
 
@@ -41,7 +41,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const supabase = useSupabase()
+const capgo = useConsole()
 const onboarding = ref(parseBuilderOnboarding(props.initialOnboarding))
 const viewedPlatform = ref<BuilderPlatform | null>(props.initialPlatform ?? onboarding.value.selectedPlatform)
 const selectedIds = ref<Partial<Record<BuilderPlatform, string | null>>>({})
@@ -107,7 +107,7 @@ async function refreshOnboarding() {
   if (props.active === false)
     return
   const appId = props.appId
-  const { data, error } = await supabase.from('apps').select('onboarding').eq('app_id', appId).maybeSingle()
+  const { data, error } = await capgo.from('apps').select('onboarding').eq('app_id', appId).maybeSingle()
   if (appId !== props.appId)
     return
   refreshError.value = !!error

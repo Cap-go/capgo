@@ -2,7 +2,7 @@
 import type { TableColumn } from '../comp_def'
 import type { DateRangePreset } from '~/services/dateRange'
 import type { DeviceDataCollection } from '~/services/deviceDataCollection'
-import type { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/database.types'
 import { computed, h, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -11,6 +11,7 @@ import IconInformationCircle from '~icons/heroicons/information-circle'
 import IconSmartphone from '~icons/lucide/smartphone'
 import ChannelOverrideRetentionNotice from '~/components/ChannelOverrideRetentionNotice.vue'
 import DateRangePicker from '~/components/DateRangePicker.vue'
+import { defaultApiHost, useConsole } from '~/services/console'
 import { formatDate } from '~/services/date'
 import {
   getDateRangeForPreset,
@@ -19,7 +20,6 @@ import {
   TABLE_DATE_RANGE_DEFAULT,
 } from '~/services/dateRange'
 import { DEFAULT_DEVICE_DATA_COLLECTION } from '~/services/deviceDataCollection'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
 import BundleMultiFilter from './BundleMultiFilter.vue'
 import VersionCompareField from './VersionCompareField.vue'
 
@@ -51,7 +51,7 @@ interface DateRangePickerHandle {
 }
 
 const { t } = useI18n()
-const supabase = useSupabase()
+const capgo = useConsole()
 const router = useRouter()
 const total = ref(0)
 const unfilteredTotal = ref<number | null>(null)
@@ -312,7 +312,7 @@ async function loadBundleNames() {
   if (!appId)
     return
 
-  const { data, error } = await supabase
+  const { data, error } = await capgo
     .from('app_versions')
     .select('name')
     .eq('app_id', appId)
@@ -343,7 +343,7 @@ async function loadChannelNames() {
   if (!appId)
     return
 
-  const { data, error } = await supabase
+  const { data, error } = await capgo
     .from('channels')
     .select('name')
     .eq('app_id', appId)
@@ -362,7 +362,7 @@ async function loadChannelNames() {
 }
 
 async function getDevicesID() {
-  let req = supabase
+  let req = capgo
     .from('channel_devices')
     .select('device_id')
     .eq('app_id', props.appId)
@@ -385,7 +385,7 @@ async function resolveDeviceIds() {
 }
 
 async function countDevices(options?: { includeDateRange?: boolean }) {
-  const { data: currentSession } = await supabase.auth.getSession()!
+  const { data: currentSession } = await capgo.auth.getSession()!
   if (!currentSession.session)
     return 0
 
@@ -547,7 +547,7 @@ async function fetchDevicesPage(cursor: string | undefined | null) {
   const ids = await resolveDeviceIds()
   const searchTerm = getSearchTerm()
 
-  const { data: currentSession } = await supabase.auth.getSession()!
+  const { data: currentSession } = await capgo.auth.getSession()!
   if (!currentSession.session)
     return
   const currentJwt = currentSession.session.access_token
@@ -665,7 +665,7 @@ async function openOneVersion(one: Device) {
   }
 
   const loadingToastId = toast.loading(t('loading-version'))
-  const { data: versionRecord, error } = await supabase
+  const { data: versionRecord, error } = await capgo
     .from('app_versions')
     .select('id')
     .eq('app_id', props.appId)
@@ -693,7 +693,7 @@ async function ensureVersionNames(devices: Device[]) {
   if (!versionIds.length)
     return
 
-  const { data: versionRecords, error } = await supabase
+  const { data: versionRecords, error } = await capgo
     .from('app_versions')
     .select('id, name')
     .in('id', versionIds)
@@ -790,7 +790,7 @@ async function exportDevices(format: 'csv' | 'json') {
   isExporting.value = true
   const loadingToastId = toast.loading(t('exporting-devices'))
   try {
-    const { data: currentSession } = await supabase.auth.getSession()!
+    const { data: currentSession } = await capgo.auth.getSession()!
     if (!currentSession.session) {
       toast.dismiss(loadingToastId)
       toast.error(t('not-logged-in'))

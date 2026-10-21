@@ -1,4 +1,4 @@
-// Every table and RPC the console reaches through useSupabase() must be on the
+// Every table and RPC the console reaches through useConsole() must be on the
 // /private/console/query allowlist, otherwise the API answers 403 at runtime.
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'

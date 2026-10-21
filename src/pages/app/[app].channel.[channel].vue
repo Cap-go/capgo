@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/database.types'
 import { FormKit } from '@formkit/vue'
 import { greaterOrEqual, parse } from '@std/semver'
 import { computedAsync, onClickOutside } from '@vueuse/core'
@@ -16,9 +16,9 @@ import IconWarning from '~icons/lucide/alert-triangle'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { channelUpdatePackageErrorKey } from '~/services/channelUpdatePackageError'
+import { checkCompatibilityNativePackages, defaultApiHost, isCompatible, useConsole } from '~/services/console'
 import { formatDate, formatLocalDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
-import { checkCompatibilityNativePackages, defaultApiHost, isCompatible, useSupabase } from '~/services/supabase'
 import { isInternalVersionName, withBuiltinChannelVersion } from '~/services/versions'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -90,7 +90,7 @@ const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
 const appDetailStore = useAppDetailStore()
 const { t } = useI18n()
-const supabase = useSupabase()
+const capgo = useConsole()
 const packageId = ref<string>('')
 const id = ref<number>(0)
 const loading = ref(true)
@@ -275,7 +275,7 @@ async function getChannel(force = false) {
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await capgo
       .from('channels')
       .select(`
           id,
@@ -352,7 +352,7 @@ async function getChannel(force = false) {
 async function getDefaultUploadChannel() {
   if (!packageId.value)
     return
-  const { data, error } = await supabase
+  const { data, error } = await capgo
     .from('apps')
     .select('default_upload_channel')
     .eq('app_id', packageId.value)
@@ -392,7 +392,7 @@ async function saveChannelChanges(update: ChannelUpdate) {
   }
 
   try {
-    const { error } = await supabase
+    const { error } = await capgo
       .from('channels')
       .update(update)
       .eq('id', id.value)
@@ -417,7 +417,7 @@ async function saveChannelChange<K extends EditableChannelKey>(key: K, val: Chan
 }
 
 async function notificationAuthHeaders() {
-  const { data } = await supabase.auth.getSession()
+  const { data } = await capgo.auth.getSession()
   const token = data.session?.access_token
   if (!token)
     throw new Error(t('not-authenticated'))
@@ -656,7 +656,7 @@ async function loadPromoteTargets() {
     return
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await capgo
     .from('channels')
     .select('id, name, public, rollout_version, rollout_enabled, version:app_versions!channels_version_fkey(name)')
     .eq('app_id', source.app_id)
@@ -755,7 +755,7 @@ async function promoteBundleToChannel(target: PromoteTargetChannel) {
     return
   }
 
-  const { data: appVersion, error: versionError } = await supabase
+  const { data: appVersion, error: versionError } = await capgo
     .from('app_versions')
     .select('id, app_id, name, native_packages')
     .eq('id', source.version.id)
@@ -766,7 +766,7 @@ async function promoteBundleToChannel(target: PromoteTargetChannel) {
     return
   }
 
-  const { data: targetRow, error: targetError } = await supabase
+  const { data: targetRow, error: targetError } = await capgo
     .from('channels')
     .select('version')
     .eq('id', target.id)
@@ -780,7 +780,7 @@ async function promoteBundleToChannel(target: PromoteTargetChannel) {
   if (!(await confirmBundleCompatibleWithChannel(appVersion, target.name, targetVersionId)))
     return
 
-  const { data: updated, error } = await supabase
+  const { data: updated, error } = await capgo
     .from('channels')
     .update({ version: appVersion.id })
     .eq('id', target.id)
@@ -920,7 +920,7 @@ async function openSelectVersion(startInSearch = false) {
     return
 
   // Fetch versions when dialog opens
-  const { data, error } = await supabase.from('app_versions')
+  const { data, error } = await capgo.from('app_versions')
     .select('*')
     .eq('app_id', channel.value.app_id)
     .eq('deleted', false)
@@ -1109,7 +1109,7 @@ async function refreshFilteredVersions() {
     return
 
   if (bundleLinkSearchVal.value && bundleLinkSearchVal.value.trim()) {
-    const { data, error } = await supabase.from('app_versions')
+    const { data, error } = await capgo.from('app_versions')
       .select('*')
       .eq('app_id', channel.value.app_id)
       .eq('deleted', false)
@@ -1124,7 +1124,7 @@ async function refreshFilteredVersions() {
     bundleLinkVersions.value = data ?? []
   }
   else {
-    const { data, error } = await supabase.from('app_versions')
+    const { data, error } = await capgo.from('app_versions')
       .select('*')
       .eq('app_id', channel.value.app_id)
       .eq('deleted', false)
@@ -1267,7 +1267,7 @@ async function onSelectAutoUpdate(value: Database['public']['Enums']['disable_up
       toast.error(t('metadata-min-ver-not-set'))
   }
 
-  const { error } = await supabase
+  const { error } = await capgo
     .from('channels')
     .update({ disable_auto_update: value })
     .eq('id', id.value)

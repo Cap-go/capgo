@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { OrganizationRole } from '~/stores/organization'
-import type { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/database.types'
 import { FormKit } from '@formkit/vue'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -11,7 +11,7 @@ import IconAlertCircle from '~icons/lucide/alert-circle'
 import ChannelOverrideRetentionNotice from '~/components/ChannelOverrideRetentionNotice.vue'
 import { useDeviceDataCollection } from '~/composables/useDeviceDataCollection'
 import { invokeCapgoApi } from '~/services/capgoApi'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
+import { defaultApiHost, useConsole } from '~/services/console'
 import { withBuiltinChannelVersion } from '~/services/versions'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -29,7 +29,7 @@ const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const appDetailStore = useAppDetailStore()
 const { t } = useI18n()
-const supabase = useSupabase()
+const capgo = useConsole()
 const packageId = ref<string>('')
 const id = ref<number>(0)
 const loading = ref(true)
@@ -120,7 +120,7 @@ async function customDeviceOverwritePart4(
 }
 
 async function setChannelDeviceOverride(deviceId: string) {
-  const { data: currentSession } = await supabase.auth.getSession()!
+  const { data: currentSession } = await capgo.auth.getSession()!
   const currentJwt = currentSession.session?.access_token
   if (!currentJwt)
     throw new Error('Missing session')
@@ -184,7 +184,7 @@ async function getDeviceIds() {
   if (!channel.value)
     return
   try {
-    const { data: dataDevices } = await supabase
+    const { data: dataDevices } = await capgo
       .from('channel_devices')
       .select('device_id')
       .eq('channel_id', id.value)
@@ -213,7 +213,7 @@ async function getChannel() {
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await capgo
       .from('channels')
       .select(`
           id,

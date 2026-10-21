@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
-import type { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/database.types'
 import { computed, h, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import { defaultApiHost, useConsole } from '~/services/console'
 import { formatBytes } from '~/services/conversion'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
 type ManifestEntry = Database['public']['Tables']['manifest']['Row']
@@ -30,7 +30,7 @@ const route = useRoute('/app/[app].bundle.[bundle].manifest')
 const router = useRouter()
 const displayStore = useDisplayStore()
 const { t } = useI18n()
-const supabase = useSupabase()
+const capgo = useConsole()
 const packageId = ref<string>('')
 const id = ref<number>(0)
 const loading = ref(true)
@@ -192,7 +192,7 @@ async function fetchManifestEntries(versionId: number) {
   const allEntries: ManifestEntry[] = []
   let offset = 0
   while (true) {
-    const { data, error } = await supabase
+    const { data, error } = await capgo
       .from('manifest')
       .select('id, file_name, file_hash, file_size, s3_path, app_version_id')
       .eq('app_version_id', versionId)
@@ -267,7 +267,7 @@ async function getVersion() {
     return
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await capgo
       .from('app_versions')
       .select()
       .eq('app_id', packageId.value)

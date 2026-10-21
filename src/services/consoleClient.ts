@@ -1,25 +1,39 @@
-import type { FunctionInvokeOptions, FunctionsError, RealtimeChannel, SupabaseClient } from '@supabase/supabase-js'
-import type { ConsoleDataClient, ConsoleQuery } from '../../supabase/functions/_backend/utils/console_contract'
-import type { Database } from '~/types/supabase.types'
-import { FunctionsFetchError, FunctionsHttpError } from '@supabase/supabase-js'
+import type { AuthChangeEvent, AuthError, ConsoleDataClient, ConsoleQuery, Factor, FunctionInvokeOptions, RealtimeChannel, Session, User } from '../../supabase/functions/_backend/utils/console_contract'
+import type { Database } from '~/types/database.types'
+import { createConsoleAuthClient, resolveConsoleApiBase } from '~/services/consoleAuth'
+
+export type { AuthChangeEvent, AuthError, Factor, RealtimeChannel, Session, User }
 
 /**
  * Console transport to the Capgo API (VITE_API_HOST).
  *
  * Data (`from`/`rpc`), storage, realtime and function calls are sent to
- * `/private/console/*` and executed server-side with the caller's session, so
- * the browser never talks to Supabase for data. `auth` is still the Supabase
- * auth client for now; swapping it is the only step left to leave Supabase Auth.
+ * `/private/console/*` and executed server-side with the caller's session;
+ * auth goes through `/private/console/auth/*` (see consoleAuth.ts). The
+ * browser never holds an auth-provider host, key or SDK.
  */
-// Same option and result shapes as supabase-js functions.invoke, so a real
-// SupabaseClient still structurally satisfies ConsoleClient (tests rely on this).
 export type ConsoleInvokeOptions = FunctionInvokeOptions & { signal?: AbortSignal }
 
-export type ConsoleInvokeResult<T> = { data: T | null, error: null } | { data: null, error: FunctionsError }
+export type ConsoleInvokeResult<T> = { data: T | null, error: null } | { data: null, error: FunctionsHttpError | FunctionsFetchError }
+
+export class FunctionsHttpError extends Error {
+  code?: string
+  constructor(public context: Response) {
+    super('Capgo API returned an error')
+    this.name = 'FunctionsHttpError'
+  }
+}
+
+export class FunctionsFetchError extends Error {
+  code?: string
+  constructor(public context: unknown) {
+    super('Failed to send a request to the Capgo API', { cause: context })
+    this.name = 'FunctionsFetchError'
+  }
+}
 
 function resolveBaseURL() {
-  const configured = ((import.meta.env.VITE_API_HOST as string | undefined) ?? '').replace(/\/$/, '')
-  return configured.startsWith('/') ? new URL(configured, location.origin).href.replace(/\/$/, '') : configured
+  return resolveConsoleApiBase(import.meta.env.VITE_API_HOST as string | undefined)
 }
 
 const EVENTS_MAX_BACKOFF_MS = 30_000
@@ -38,11 +52,12 @@ function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-export function createConsoleClient(authClient: Pick<SupabaseClient<Database>, 'auth'>) {
+export function createConsoleClient(options: { persistSession?: boolean } = {}) {
   const baseURL = resolveBaseURL()
+  const auth = createConsoleAuthClient({ baseURL, persistSession: options.persistSession })
 
   async function bearer(): Promise<string | null> {
-    const { data } = await authClient.auth.getSession()
+    const { data } = await auth.getSession()
     return data.session?.access_token ?? null
   }
 
@@ -157,7 +172,7 @@ export function createConsoleClient(authClient: Pick<SupabaseClient<Database>, '
         signal,
       })
       if (response.status === 503) {
-        // No events backend (local Supabase runtime): report once and stop.
+        // No events backend (local edge runtime): report once and stop.
         callback('CHANNEL_ERROR')
         return 'stop'
       }
@@ -218,7 +233,7 @@ export function createConsoleClient(authClient: Pick<SupabaseClient<Database>, '
   }
 
   return {
-    auth: authClient.auth,
+    auth,
     from: ((name: string) => query('table', name, [])) as ConsoleDataClient['from'],
     rpc: ((name: string, ...args: unknown[]) => query('rpc', name, args)) as ConsoleDataClient['rpc'],
     functions: { invoke },

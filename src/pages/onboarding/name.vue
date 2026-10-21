@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Json } from '~/types/supabase.types'
+import type { Json } from '~/types/database.types'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -10,7 +10,7 @@ import AppOnboardingHeader from '~/components/dashboard/AppOnboardingHeader.vue'
 import AppOnboardingPageFrame from '~/components/dashboard/AppOnboardingPageFrame.vue'
 import AppOnboardingWelcome from '~/components/dashboard/AppOnboardingWelcome.vue'
 import OnboardingProfile from '~/components/OnboardingProfile.vue'
-import { getLocalConfig } from '~/services/supabase'
+import { getLocalConfig } from '~/services/console'
 import { mergeUserOnboardingProgress, replaceUserOnboardingWithRetry, serializeUserOnboardingWrite } from '~/services/userOnboardingWriteQueue'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -44,7 +44,7 @@ const progressSteps = computed(() => initialProfileOnboardingProgressSteps(main.
   .map(step => ({ id: step.id, label: t(step.labelKey) })))
 const profileHandoff = consumeProfileOnboardingHandoff(window.history)
 const resumePending = ref(!showWelcome.value && !profileHandoff)
-const identity = createOnboardingTelemetryIdentity({ continueFrom: profileHandoff, flow: 'pre_org', onboardingVersion: () => PROFILE_ONBOARDING_ANALYTICS_VERSION, supaHost: getLocalConfig().supaHost })
+const identity = createOnboardingTelemetryIdentity({ continueFrom: profileHandoff, flow: 'pre_org', onboardingVersion: () => PROFILE_ONBOARDING_ANALYTICS_VERSION, apiHost: getLocalConfig().apiHost })
 const analyticsSteps = targetPath.value.startsWith('/onboarding/organization') ? ['welcome', 'name', 'organization'] as const : initialProfileOnboardingSteps(main.user?.onboarding, true)
 let tracker: ReturnType<typeof createOnboardingProgressTracker> | undefined
 let disposed = false
@@ -207,7 +207,7 @@ onMounted(async () => {
   }
   if (resumePending.value && !await resumeSavedProfile())
     return
-  tracker = createOnboardingProgressTracker({ flow: 'pre_org', onboardingVersion: () => PROFILE_ONBOARDING_ANALYTICS_VERSION, resumed: !showWelcome.value && !profileHandoff, steps: analyticsSteps, supaHost: getLocalConfig().supaHost, onboardingAttemptId: identity.attemptId, onboardingRunId: identity.runId })
+  tracker = createOnboardingProgressTracker({ flow: 'pre_org', onboardingVersion: () => PROFILE_ONBOARDING_ANALYTICS_VERSION, resumed: !showWelcome.value && !profileHandoff, steps: analyticsSteps, apiHost: getLocalConfig().apiHost, onboardingAttemptId: identity.attemptId, onboardingRunId: identity.runId })
   tracker.viewStep(showWelcome.value ? 'welcome' : 'name', isEditingProfile.value ? 'intent' : undefined)
   document.addEventListener('visibilitychange', visibilityChanged)
   try {

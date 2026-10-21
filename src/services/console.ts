@@ -1,39 +1,37 @@
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { CreditMetricType, CreditPricingStep } from './creditPricing'
 import type { ConsoleClient } from '~/services/consoleClient'
-import type { Database } from '~/types/supabase.types'
-import { createClient } from '@supabase/supabase-js'
+import type { Database } from '~/types/database.types'
 import subset from 'semver/ranges/subset'
 import { ref } from 'vue'
 import { invokeCapgoApi } from '~/services/capgoApi'
+import { createConsoleAuthClient, resolveConsoleApiBase } from '~/services/consoleAuth'
 import { createConsoleClient } from '~/services/consoleClient'
 import { sortCreditPricingSteps } from './creditPricing'
 
-let supaClient: ConsoleClient<Database> = null as any
+let consoleClient: ConsoleClient<Database> = null as any
 
 export const defaultApiHost = import.meta.env.VITE_API_HOST as string
 
+export const PROD_API_URL = 'https://api.capgo.app'
+
 export interface CapgoConfig {
-  supaHost: string
-  supaKey: string
-  supbaseId: string
-  supaProxyPath?: string
+  /** Capgo API this build talks to; everything (data, auth, files) goes through it. */
+  apiHost: string
   host: string
   hostWeb: string
   stripeEnabled?: boolean
 }
 
-export function isLocal(supaHost: string) {
-  return supaHost !== 'https://sb.capgo.app'
+/** Anything that is not the Capgo cloud API (local, preprod, dev, self-host). */
+export function isLocal(apiHost: string) {
+  return apiHost !== PROD_API_URL
 }
 
 export function getLocalConfig() {
   const stripeEnabledEnv = import.meta.env.VITE_STRIPE_ENABLED as string | undefined
   return {
-    supaHost: import.meta.env.VITE_SUPABASE_URL as string,
-    supaKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-    supbaseId: import.meta.env.VITE_SUPABASE_URL?.split('//')[1].split('.')[0].split(':')[0] as string,
-    supaProxyPath: import.meta.env.VITE_SUPABASE_PROXY_PATH as string | undefined,
+    apiHost: defaultApiHost,
     host: import.meta.env.VITE_APP_URL as string,
     hostWeb: import.meta.env.LANDING_URL as string,
     stripeEnabled: stripeEnabledEnv === undefined ? true : stripeEnabledEnv !== 'false',
@@ -51,7 +49,7 @@ interface SpoofedAdminSession {
 const SPOOF_ADMIN_TOKEN_REFRESH_WINDOW_SECONDS = 60
 
 function getSpoofedAdminStorageKey() {
-  return `supabase-${config.supbaseId}.spoof_admin_jwt`
+  return 'capgo.console.spoof_admin_jwt'
 }
 
 function saveSpoofedAdminSession(session: SpoofedAdminSession) {
@@ -108,18 +106,13 @@ function isSpoofedAdminJwtUsable(jwt: string) {
   return expiresAt !== null && expiresAt > Date.now() / 1000
 }
 
-function createSpoofAdminSupabase() {
-  return createClient<Database>(getSupabaseHost(), config.supaKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-  })
+// A throwaway auth client: the admin session must never replace the stored user session.
+function createSpoofAdminAuth() {
+  return createConsoleAuthClient({ baseURL: resolveConsoleApiBase(defaultApiHost), persistSession: false })
 }
 
 async function refreshSpoofedAdminSession(session: SpoofedAdminSession): Promise<SpoofedAdminSession | null> {
-  const { data, error } = await createSpoofAdminSupabase().auth.refreshSession({ refresh_token: session.refreshToken })
+  const { data, error } = await createSpoofAdminAuth().refreshSession({ refresh_token: session.refreshToken })
   if (error || !data.session?.access_token || !data.session.refresh_token)
     return null
 
@@ -160,48 +153,13 @@ export async function getRemoteConfig() {
   }
 }
 
-export function getSupabaseHost(): string {
-  return resolveSupabaseHost(config.supaHost, config.supaProxyPath)
-}
+export function useConsole() {
+  if (consoleClient)
+    return consoleClient
 
-function trimLeadingSlashes(value: string): string {
-  let start = 0
-  while (value[start] === '/')
-    start++
-  return value.slice(start)
-}
-
-function trimTrailingSlashes(value: string): string {
-  let end = value.length
-  while (end > 0 && value[end - 1] === '/')
-    end--
-  return value.slice(0, end)
-}
-
-export function resolveSupabaseHost(supaHost: string, proxyPath?: string, runtimeOrigin = globalThis.location?.origin): string {
-  const normalizedHost = trimTrailingSlashes(supaHost)
-  if (!proxyPath || !runtimeOrigin)
-    return normalizedHost
-
-  const normalizedProxyPath = `/${trimLeadingSlashes(trimTrailingSlashes(proxyPath))}/`
-  return new URL(normalizedProxyPath, runtimeOrigin).href
-}
-
-export function useSupabase() {
-  const options = {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false,
-    },
-  }
-  if (supaClient)
-    return supaClient
-
-  // Supabase Auth stays for now; every data, storage, realtime and function call
-  // goes through the Capgo API (see consoleClient.ts).
-  supaClient = createConsoleClient(createClient<Database>(getSupabaseHost(), config.supaKey, options))
-  return supaClient
+  // Every data, storage, realtime, function and auth call goes through the Capgo API.
+  consoleClient = createConsoleClient()
+  return consoleClient
 }
 
 export function isSpoofed() {
@@ -271,11 +229,11 @@ export async function unspoofUser() {
   if (restoredAdminSession !== spoofedAdminSession)
     saveSpoofedAdminSession(restoredAdminSession)
 
-  const supabase = useSupabase()
+  const capgo = useConsole()
   let data: { session?: unknown } | null | undefined
   let error: unknown
   try {
-    ({ data, error } = await supabase.auth.setSession({ access_token: restoredAdminSession.jwt, refresh_token: restoredAdminSession.refreshToken }))
+    ({ data, error } = await capgo.auth.setSession({ access_token: restoredAdminSession.jwt, refresh_token: restoredAdminSession.refreshToken }))
   }
   catch {
     return false
@@ -295,7 +253,7 @@ export async function downloadUrl(provider: string, userId: string, appId: strin
     storage_provider: provider,
     id,
   }
-  const { data: currentSession } = await useSupabase().auth.getSession()!
+  const { data: currentSession } = await useConsole().auth.getSession()!
   if (!currentSession.session)
     return ''
 
@@ -330,8 +288,8 @@ export async function downloadUrl(provider: string, userId: string, appId: strin
 }
 
 export async function autoAuth(route: RouteLocationNormalizedLoaded) {
-  const supabase = useSupabase()
-  const { data: session } = await supabase.auth.getSession()!
+  const capgo = useConsole()
+  const { data: session } = await capgo.auth.getSession()!
   if (session.session || !route.hash)
     return null
   const queryString = route.hash.replace('#', '')
@@ -339,7 +297,7 @@ export async function autoAuth(route: RouteLocationNormalizedLoaded) {
   const refresh_token = urlParams.get('refresh_token')
   if (!refresh_token)
     return null
-  const { data: logSession } = await supabase.auth.refreshSession({
+  const { data: logSession } = await capgo.auth.refreshSession({
     refresh_token,
   })
   return logSession
@@ -455,7 +413,7 @@ export async function getAllDashboard(orgId: string, startDate?: string, endDate
 export async function getTotalStorage(orgId?: string): Promise<number> {
   if (!orgId)
     return 0
-  const { data, error } = await useSupabase()
+  const { data, error } = await useConsole()
     .rpc('get_total_storage_size_org', { org_id: orgId })
     .single()
   if (error)
@@ -468,7 +426,7 @@ export async function getTotalStorage(orgId?: string): Promise<number> {
 // Use this only for platform-rights checks in the UI flow; no other path should use
 // user-id based admin function checks from the browser.
 export async function isPlatformAdmin(): Promise<boolean> {
-  const rpc = useSupabase().rpc('is_platform_admin')
+  const rpc = useConsole().rpc('is_platform_admin')
   const { data, error } = await rpc.single()
   if (error)
     throw new Error(error.message)
@@ -477,7 +435,7 @@ export async function isPlatformAdmin(): Promise<boolean> {
 }
 
 export async function isPayingOrg(orgId: string): Promise<boolean> {
-  const { data, error } = await useSupabase()
+  const { data, error } = await useConsole()
     .rpc('is_paying_org', { orgid: orgId })
     .single()
   if (error)
@@ -541,8 +499,8 @@ export interface CreditCostCalculationResponse {
 
 export async function getCreditPricingSteps(orgId?: string): Promise<CreditPricingStep[]> {
   try {
-    const supabase = useSupabase()
-    const { data: currentSession } = await supabase.auth.getSession()
+    const capgo = useConsole()
+    const { data: currentSession } = await capgo.auth.getSession()
     const endpoint = new URL(`${defaultApiHost}/private/credits`)
 
     if (orgId)
@@ -573,7 +531,7 @@ export async function getUsageCreditDeductions(orgId: string): Promise<UsageCred
     return []
 
   try {
-    const { data, error } = await useSupabase()
+    const { data, error } = await useConsole()
       .from('usage_credit_ledger')
       .select('*')
       .eq('org_id', orgId)
@@ -623,7 +581,7 @@ export async function getPlanUsagePercent(orgId?: string): Promise<PlanUsage> {
       build_time_percent: 0,
     }
   }
-  const { data, error } = await useSupabase()
+  const { data, error } = await useConsole()
     .rpc('get_plan_usage_percent_detailed', { orgid: orgId })
     .single()
   if (error)
@@ -636,7 +594,7 @@ const DEFAULT_PLAN_NAME = 'Solo'
 export async function getCurrentPlanNameOrg(orgId?: string): Promise<string> {
   if (!orgId)
     return DEFAULT_PLAN_NAME
-  const { data, error } = await useSupabase()
+  const { data, error } = await useConsole()
     .rpc('get_current_plan_name_org', { orgid: orgId })
     .single()
   if (error)
@@ -649,7 +607,7 @@ export async function findBestPlan(stats: Database['public']['Functions']['find_
   // console.log('findBestPlan', stats)
   // const storage = bytesToGb(stats.storage)
   // const bandwidth = bytesToGb(stats.bandwidth)
-  const { data, error } = await useSupabase()
+  const { data, error } = await useConsole()
     .rpc('find_best_plan_v3', {
       mau: stats.mau ?? 0,
       bandwidth: stats.bandwidth,
@@ -690,7 +648,7 @@ export function convertNativePackages(nativePackages: { name: string, version: s
 }
 
 export async function getRemoteDependencies(appId: string, channel: string) {
-  const { data: remoteNativePackages, error } = await useSupabase()
+  const { data: remoteNativePackages, error } = await useConsole()
     .from('channels')
     .select(`version:app_versions!channels_version_fkey(
             native_packages
