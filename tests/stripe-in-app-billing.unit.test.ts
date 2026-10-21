@@ -397,6 +397,16 @@ describe('backup card', () => {
     await expect(removeBackupCard(createContext(), createBillingContext(stripe), 'pm_sub')).rejects.toThrow()
     expect(stripe.paymentMethods.detach).not.toHaveBeenCalled()
   })
+
+  it('throws when charging the backup while the subscription lookup is unknown', async () => {
+    const stripe = createStripe()
+    const main = card('pm_main', 'fp_main')
+    mockSavedCards(stripe, main, [main, card('pm_back', 'fp_back')])
+    mockActiveSubscription(null, false)
+
+    await expect(payInvoiceWithBackupCard(createContext(), stripe as any, 'cus_123', 'in_123', { chargeId: 'ch_1' })).rejects.toThrow()
+    expect(stripe.invoices.pay).not.toHaveBeenCalled()
+  })
 })
 
 describe('payOpenInvoice', () => {

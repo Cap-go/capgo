@@ -347,7 +347,10 @@ function isCardError(error: unknown) {
 // The key is scoped to the failed charge: the webhook and Pay now share one backup charge per attempt,
 // and a later failed attempt (a new charge) is still eligible.
 export async function payInvoiceWithBackupCard(c: Context, stripe: Stripe, customerId: string, invoiceId: string, attempt: FailedAttempt = {}): Promise<BackupChargeResult> {
-  const { backupPaymentMethod } = await findSavedPaymentMethods(c, stripe, customerId)
+  const { backupPaymentMethod, subscriptionKnown } = await findSavedPaymentMethods(c, stripe, customerId)
+  // Unknown lookup: do not treat as no_backup (that would skip the webhook retry and send dunning).
+  if (!subscriptionKnown)
+    throw simpleError('subscription_lookup_unknown', 'Subscription payment method is temporarily unknown')
   if (!backupPaymentMethod)
     return 'no_backup'
   // A failed backup charge fires charge.failed again: never retry the card that just failed.
