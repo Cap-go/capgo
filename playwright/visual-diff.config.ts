@@ -256,7 +256,23 @@ async function mockReleaseLive(page: Page) {
  * Add routes here when a PR touches a new screen reviewers should compare.
  */
 function visualTrialPlan(scheduled: boolean) {
-  return { planName: 'Solo', amount: 1400, currency: 'usd', interval: 'month', startsAt: '2026-10-30T00:00:00.000Z', scheduled }
+  return {
+    planName: 'Solo',
+    productId: 'prod_LQIregjtNduh4q',
+    amount: 1400,
+    currency: 'usd',
+    interval: 'month',
+    startsAt: '2026-10-30T00:00:00.000Z',
+    scheduled,
+  }
+}
+
+function visualTrialPlanOptions() {
+  return [
+    { productId: 'prod_LQIregjtNduh4q', planName: 'Solo', amount: 1400, currency: 'usd' },
+    { productId: 'prod_LQIs1Yucml9ChU', planName: 'Maker', amount: 3900, currency: 'usd' },
+    { productId: 'prod_LQIugvJcPrxhda', planName: 'Team', amount: 9900, currency: 'usd' },
+  ]
 }
 
 export const visualDiffRoutes: VisualDiffRoute[] = [
@@ -469,7 +485,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       let promptRequested = false
       await page.route('**/private/stripe_billing/trial-plan', (route) => {
         promptRequested = true
-        return route.fulfill({ json: { card: null, plan: visualTrialPlan(false) } })
+        return route.fulfill({ json: { card: null, plan: visualTrialPlan(false), plans: visualTrialPlanOptions() } })
       })
       await page.reload()
       const prompt = page.locator('[data-test="trial-card-prompt-add"]')
