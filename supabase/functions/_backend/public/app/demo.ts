@@ -4,7 +4,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { lockOnboardingApp, unlockOnboardingApp } from '../../utils/demo.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
+import { beginWriteTransaction, closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 
@@ -281,7 +281,7 @@ async function seedOnboardingDemoDataInTransaction(
   let shouldRollback = false
 
   try {
-    await pgClient.query('BEGIN')
+    await beginWriteTransaction(pgClient)
     shouldRollback = true
 
     await pgClient.query('SELECT public.reset_onboarding_demo_app_data($1::uuid)', [options.appUuid])

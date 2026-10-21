@@ -4,7 +4,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod'
 import { quickError, simpleError } from '../../utils/hono.ts'
-import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from '../../utils/pg.ts'
+import { beginWriteTransaction, checkoutPgClient, closeClient, getPgClient, releasePgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { safeParseSchema } from '../../utils/schema_validation.ts'
 import { emailPreferencesPatchSchema, ORG_SETTINGS_EMAIL_PREFERENCE_KEYS } from '../../utils/settings_email_preferences.ts'
@@ -342,7 +342,7 @@ async function updateOrg(
   try {
     pgPool = await getPgClient(c)
     dbClient = await checkoutPgClient(pgPool) as PgTransactionClient
-    await dbClient.query('BEGIN')
+    await beginWriteTransaction(dbClient)
     transactionStarted = true
     // Use the primary connection with the request role and claims so RLS and audit triggers remain authoritative.
     await setOrganizationUpdateAuditActor(c, dbClient, auth)

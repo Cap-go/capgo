@@ -9,3 +9,5 @@ export {
   hasSupportedOtaTodoList,
   parseAppOnboarding,
 } from '../../supabase/functions/_backend/utils/appOnboarding.ts'
+
+export { getMissedStepIds, isOpenOnboardingStepStatus } from '../../supabase/functions/_backend/utils/onboardingMissedSteps.ts'
