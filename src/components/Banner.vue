@@ -60,7 +60,7 @@ const statusLabel = computed(() => {
 
 const statusDetail = computed(() => {
   if (showNoTrialStatus.value)
-    return t('no-trial-money-back-guarantee')
+    return t('no-trial-money-back-guarantee-description')
   if (status.value.kind !== 'trial')
     return null
   if (status.value.trialDaysLeft === 1)

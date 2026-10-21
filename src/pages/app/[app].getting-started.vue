@@ -27,7 +27,14 @@ const { id, app, isLoading } = useAppPage({
 // Direct-offer orgs (no free trial) can create their app but cannot publish
 // updates until they subscribe. Explain that here so setup does not look stuck.
 const hideExternalPurchaseFlows = isNativeAppStoreContext()
-const unpaidOrgId = computed(() => organizationStore.currentOrganizationFailed ? organizationStore.currentOrganization?.gid : undefined)
+// Scope to the org that owns this app, and wait until it is the current org so
+// currentOrganizationFailed describes it (not the previously selected org).
+const unpaidOrgId = computed(() => {
+  const appOrgId = id.value ? organizationStore.getOrgByAppId(id.value)?.gid : undefined
+  if (!appOrgId || organizationStore.currentOrganization?.gid !== appOrgId)
+    return undefined
+  return organizationStore.currentOrganizationFailed ? appOrgId : undefined
+})
 const { trialSkipped } = useBillingPaidAt(unpaidOrgId, hideExternalPurchaseFlows)
 const showChoosePlanCallout = computed(() => !!unpaidOrgId.value && trialSkipped.value)
 
@@ -77,7 +84,7 @@ watch(() => app.value?.app_id, (appId) => {
           {{ t('no-trial-choose-plan-description') }}
         </p>
         <p class="mt-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-          {{ t('no-trial-money-back-guarantee') }}
+          {{ t('no-trial-money-back-guarantee-description') }}
         </p>
       </div>
       <router-link

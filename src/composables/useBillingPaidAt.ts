@@ -6,6 +6,36 @@ import { useSupabase } from '~/services/supabase'
 const BILLING_PAID_AT_CACHE_TTL_MS = 5 * 60 * 1000
 const BILLING_PAID_AT_CACHE_MAX_ENTRIES = 100
 const billingPaidAtCache = new Map<string, { paidAt: string | null, trialSkipped: boolean, expiresAt: number }>()
+type BillingHistoryResult = { paidAt: string | null, trialSkipped: boolean } | { error: unknown }
+// Several components (for example the two responsive navbar banners) can ask
+// for the same org at once: share one in-flight request per org.
+const billingPaidAtInFlight = new Map<string, Promise<BillingHistoryResult>>()
+
+async function fetchBillingHistory(orgId: string): Promise<BillingHistoryResult> {
+  const { data, error } = await useSupabase()
+    .from('orgs')
+    .select('created_at, stripe_info(paid_at, trial_at)')
+    .eq('id', orgId)
+    .maybeSingle()
+  if (error || !data)
+    return { error }
+  const paidAt = resolveBillingPaidAt(data.stripe_info)
+  // Only orgs that never paid: a churned customer must not see "choose a plan to start".
+  const trialSkipped = paidAt === null && isZeroLengthTrial(data.created_at, data.stripe_info?.trial_at)
+  cacheBillingPaidAt(orgId, paidAt, trialSkipped)
+  return { paidAt, trialSkipped }
+}
+
+function loadBillingHistory(orgId: string): Promise<BillingHistoryResult> {
+  const pending = billingPaidAtInFlight.get(orgId)
+  if (pending)
+    return pending
+  const request = fetchBillingHistory(orgId)
+    .catch((error: unknown) => ({ error }))
+    .finally(() => billingPaidAtInFlight.delete(orgId))
+  billingPaidAtInFlight.set(orgId, request)
+  return request
+}
 
 function cacheBillingPaidAt(orgId: string, paidAt: string | null, trialSkipped: boolean) {
   const now = Date.now()
@@ -54,27 +84,19 @@ export function useBillingPaidAt(orgId: Readonly<Ref<string | null | undefined>>
       return
     }
 
-    const { data, error } = await useSupabase()
-      .from('orgs')
-      .select('created_at, stripe_info(paid_at, trial_at)')
-      .eq('id', nextOrgId)
-      .maybeSingle()
+    const result = await loadBillingHistory(nextOrgId)
 
     if (currentRun !== billingLookupRun)
       return
 
-    if (error || !data) {
+    if ('error' in result) {
       billingLookupFailed.value = true
-      console.error('Failed to load organization billing history', { orgId: nextOrgId, error })
+      console.error('Failed to load organization billing history', { orgId: nextOrgId, error: result.error })
       return
     }
 
-    const resolvedPaidAt = resolveBillingPaidAt(data.stripe_info)
-    // Only orgs that never paid: a churned customer must not see "choose a plan to start".
-    const resolvedTrialSkipped = resolvedPaidAt === null && isZeroLengthTrial(data.created_at, data.stripe_info?.trial_at)
-    cacheBillingPaidAt(nextOrgId, resolvedPaidAt, resolvedTrialSkipped)
-    paidAt.value = resolvedPaidAt
-    trialSkipped.value = resolvedTrialSkipped
+    paidAt.value = result.paidAt
+    trialSkipped.value = result.trialSkipped
   }, { immediate: true })
 
   return { paidAt, billingLookupFailed, trialSkipped }

@@ -34,6 +34,20 @@ describe('billing paid-at cache', () => {
     expect(mocks.from).toHaveBeenCalledTimes(1)
   })
 
+  it('shares one in-flight lookup between concurrent callers for the same organization', async () => {
+    const { useBillingPaidAt } = await import('../src/composables/useBillingPaidAt')
+    const orgId = ref(crypto.randomUUID())
+
+    const first = useBillingPaidAt(orgId)
+    const second = useBillingPaidAt(orgId)
+    await vi.waitFor(() => {
+      expect(first.paidAt.value).toBeNull()
+      expect(second.paidAt.value).toBeNull()
+    })
+
+    expect(mocks.from).toHaveBeenCalledTimes(1)
+  })
+
   it('refreshes the lookup after five minutes', async () => {
     const now = vi.spyOn(Date, 'now').mockReturnValue(0)
     const { useBillingPaidAt } = await import('../src/composables/useBillingPaidAt')

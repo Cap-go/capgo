@@ -46,6 +46,8 @@ describe('payment required copy', () => {
     expect(isZeroLengthTrial(createdAt, '2026-10-20T12:00:00.500Z')).toBe(true)
     expect(isZeroLengthTrial(createdAt, '2026-10-20T11:59:59.000Z')).toBe(true)
     expect(isZeroLengthTrial(createdAt, '2026-11-04T12:00:00.000Z')).toBe(false)
+    // A trial end far before creation is not a skipped trial either.
+    expect(isZeroLengthTrial(createdAt, '2026-01-01T00:00:00.000Z')).toBe(false)
     expect(isZeroLengthTrial(createdAt, null)).toBe(false)
     expect(isZeroLengthTrial(null, '2026-10-20T12:00:00.000Z')).toBe(false)
     expect(isZeroLengthTrial(createdAt, 'not-a-date')).toBe(false)

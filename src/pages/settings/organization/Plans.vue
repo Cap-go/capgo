@@ -583,7 +583,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
             {{ t(showNoTrialState ? 'no-trial-choose-plan-description' : showExpiredTrialState ? 'trial-ended-plans-description' : isCreditsOnly ? 'credits-only-plan-page-desc' : 'plan-desc') }}
           </p>
           <p v-if="showNoTrialState" class="mt-1 text-sm font-medium text-gray-700 dark:text-gray-300" data-test="no-trial-money-back">
-            {{ t('no-trial-money-back-guarantee') }}
+            {{ t('no-trial-money-back-guarantee-description') }}
           </p>
           <p v-if="!isMobile" class="mt-2 text-sm">
             <a class="font-medium text-blue-600 hover:underline dark:text-blue-300" href="https://capgo.app/pricing/#compare-plans">

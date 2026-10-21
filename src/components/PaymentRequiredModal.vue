@@ -42,7 +42,7 @@ function goToPlans() {
       <div v-if="showNoTrialCopy" class="mb-6 max-w-sm text-gray-600 dark:text-gray-400">
         <p>{{ t('no-trial-choose-plan-description') }}</p>
         <p class="mt-2 text-sm font-medium text-gray-700 dark:text-gray-300" data-test="no-trial-money-back">
-          {{ t('no-trial-money-back-guarantee') }}
+          {{ t('no-trial-money-back-guarantee-description') }}
         </p>
       </div>
       <i18n-t v-else-if="showExpiredTrialCopy" keypath="trial-ended-description" tag="p" class="mb-6 max-w-sm text-gray-600 dark:text-gray-400">
