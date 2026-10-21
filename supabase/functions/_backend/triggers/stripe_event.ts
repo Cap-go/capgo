@@ -1767,6 +1767,11 @@ async function handleSubscriptionStripeEvent(
   customer: StripeInfoRow,
 ) {
   if (isSubscriptionUpdateStatus(stripeData.data.status) && stripeData.data.price_id && stripeData.data.product_id) {
+    // An obsolete event must not reach the trial plan settlement, which can charge a card.
+    if (isStaleStripeEvent(customer, new Date(stripeEvent.created * 1000).toISOString())) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Skipping stale Stripe subscription event', subscriptionId: stripeData.data.subscription_id })
+      return c.json(BRES)
+    }
     const trialPlanPayment = await getTrialPlanPaymentState(c, stripeEvent)
     // A first payment recovered after a decline arrives as an update: record it as the
     // conversion (paid_at, new business, subscribe event) the deferred create skipped.

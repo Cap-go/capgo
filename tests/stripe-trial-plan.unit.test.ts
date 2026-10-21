@@ -21,7 +21,7 @@ function fakeStripe(schedules: Array<Partial<Stripe.SubscriptionSchedule>>) {
   return { stripe, cancel, list }
 }
 
-function fakeInvoiceStripe(invoice: Partial<Stripe.Invoice>, payResult: 'paid' | 'declined') {
+function fakeInvoiceStripe(invoice: Partial<Stripe.Invoice>, payResult: 'paid' | 'declined', subscriptionStatus: Stripe.Subscription.Status = 'active') {
   const state = { ...invoice }
   const finalizeInvoice = vi.fn(async () => Object.assign(state, { status: 'open' }))
   const pay = vi.fn(async () => {
@@ -32,7 +32,7 @@ function fakeInvoiceStripe(invoice: Partial<Stripe.Invoice>, payResult: 'paid' |
   const release = vi.fn(async (id: string) => ({ id, status: 'released' }))
   const stripe = {
     invoices: { retrieve: vi.fn(async () => ({ ...state })), finalizeInvoice, pay },
-    subscriptions: { retrieve: vi.fn(async (id: string) => ({ id, schedule: 'sub_sched_trial' })) },
+    subscriptions: { retrieve: vi.fn(async (id: string) => ({ id, schedule: 'sub_sched_trial', status: subscriptionStatus, latest_invoice: 'in_1', metadata: { capgo_trial_plan: 'true' } })) },
     subscriptionSchedules: {
       release,
       retrieve: vi.fn(async (id: string) => ({ id, status: 'active', metadata: { capgo_trial_plan: 'true' } })),
@@ -125,6 +125,13 @@ describe('trial plan first invoice', () => {
     const scheduled = { ...trialSubscription, schedule: 'sub_sched_trial' } as unknown as Stripe.Subscription
     expect(await settleTrialPlanFirstInvoice(context, stripe, scheduled)).toBe('first_paid')
     expect(release).toHaveBeenCalledWith('sub_sched_trial')
+  })
+
+  it('never charges the first invoice once the live subscription is canceled', async () => {
+    const { stripe, finalizeInvoice, pay } = fakeInvoiceStripe({ id: 'in_1', status: 'open', billing_reason: 'subscription_create' }, 'paid', 'canceled')
+    expect(await settleTrialPlanFirstInvoice(context, stripe, trialSubscription)).toBe('unpaid')
+    expect(finalizeInvoice).not.toHaveBeenCalled()
+    expect(pay).not.toHaveBeenCalled()
   })
 
   it('leaves renewals to the normal subscription flow', async () => {

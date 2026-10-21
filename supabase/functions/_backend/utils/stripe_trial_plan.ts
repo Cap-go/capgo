@@ -302,13 +302,23 @@ export type TrialPlanFirstInvoiceState = 'first_paid' | 'unpaid' | 'renewal'
 // A schedule-born subscription is active before its first invoice is paid (Stripe finalizes it
 // about an hour later). Charge it now and only let the org convert once it is paid; on failure
 // the subscription goes past_due and the regular dunning flow takes over.
-export async function settleTrialPlanFirstInvoice(c: Context, stripe: Stripe, subscription: Stripe.Subscription): Promise<TrialPlanFirstInvoiceState> {
+// Statuses in which we may still collect the first invoice. A canceled or expired
+// subscription must never be charged, even by a delayed webhook carrying an old snapshot.
+const COLLECTIBLE_SUBSCRIPTION_STATUSES = new Set<Stripe.Subscription.Status>(['active', 'past_due'])
+
+export async function settleTrialPlanFirstInvoice(c: Context, stripe: Stripe, eventSubscription: Stripe.Subscription): Promise<TrialPlanFirstInvoiceState> {
+  // Work from the live subscription, not the webhook snapshot.
+  const subscription = await stripe.subscriptions.retrieve(eventSubscription.id)
   const invoiceId = typeof subscription.latest_invoice === 'string' ? subscription.latest_invoice : subscription.latest_invoice?.id
   if (!invoiceId)
     return 'unpaid'
   let invoice = await stripe.invoices.retrieve(invoiceId)
   if (invoice.billing_reason !== 'subscription_create')
     return 'renewal'
+  if (invoice.status !== 'paid' && !COLLECTIBLE_SUBSCRIPTION_STATUSES.has(subscription.status)) {
+    cloudlog({ requestId: c.get('requestId'), message: 'trial plan first invoice not collected: subscription no longer live', subscriptionId: subscription.id, status: subscription.status })
+    return 'unpaid'
+  }
   try {
     if (invoice.status === 'draft')
       invoice = await stripe.invoices.finalizeInvoice(invoice.id)
