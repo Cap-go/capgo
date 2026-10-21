@@ -36,7 +36,9 @@ const EDGE_ANSWERS_ENABLED = true
 // worker at STATS_LEARN_SHARE, so it can teach the answers that change what
 // the device does: on-prem / plan-upgrade 429s (the plugin backs off on
 // Retry-After) and the provider networks the worker must check itself.
-// false: back to fill-only answers (sampled devices, no installs or failures).
+// Installs and failures always reach the worker: rollout auto-pause sums
+// their version usage, and the replay delivers at least once.
+// false: back to fill-only answers (sampled devices).
 const STATS_ANSWER_ALL = true
 const STATS_LEARN_SHARE = 0.05
 const STATS_ACTION_RE = /^\w{1,64}$/
@@ -504,18 +506,15 @@ function isAnswerableStatsVersionBuild(versionBuild) {
 }
 
 /**
- * The stats request schema and an answerable action. With `actions` (a fill
- * answer) only the actions the worker lists, never installs or failures.
- * Without (STATS_ANSWER_ALL) any action: the replay records installs and
- * failures a Logpush interval later, well inside the rollout auto-pause cron
- * window, and rejects the actions it does not know.
+ * The stats request schema and an answerable action, never an install or a
+ * failure. With `actions` (a fill answer) only the actions the worker lists;
+ * without (STATS_ANSWER_ALL) any other action: the replay rejects the actions
+ * it does not know.
  */
 function isAnswerableStatsAction(action, actions) {
-  if (typeof action !== 'string')
+  if (typeof action !== 'string' || action === 'set' || action.endsWith('_fail'))
     return false
-  if (!actions)
-    return STATS_ACTION_RE.test(action)
-  return action !== 'set' && !action.endsWith('_fail') && actions.includes(action)
+  return actions ? actions.includes(action) : STATS_ACTION_RE.test(action)
 }
 
 function isAnswerableStatsEvent(event, appId, actions) {

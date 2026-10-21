@@ -33,12 +33,8 @@ const MAX_BYTES_PER_SEND = 240_000
 const REPLAY_CONCURRENCY = 8
 /** Replays of a record that failed (5xx or a throw), including the first one. */
 export const MAX_REPLAY_ATTEMPTS = 3
-/** Analytics Engine points one replayed event can write: APP_LOG (twice with customIdBlocked), DEVICE_USAGE, DEVICE_INFO. */
+/** Analytics Engine points one replayed event can write: APP_LOG, DEVICE_USAGE, DEVICE_INFO, VERSION_USAGE. */
 const POINTS_PER_EVENT = 4
-/** A failure adds its VERSION_USAGE fail point. */
-const POINTS_PER_FAILURE = 5
-/** An install adds VERSION_USAGE install + uninstall and the uninstall APP_LOG. */
-const POINTS_PER_INSTALL = 7
 
 export interface SnippetEdgeStatRecord {
   /** 'updates' | 'stats' */
@@ -147,30 +143,18 @@ export async function* readLogpushRecords(stream: ReadableStream<Uint8Array>, gz
     yield record
 }
 
-/**
- * Worst case of one stats event: an install also writes the uninstall of the
- * previous bundle (version usage and log), a failure its version usage.
- */
-function eventPoints(event: unknown) {
-  const action = (event as { action?: unknown } | null)?.action
-  if (action === 'set')
-    return POINTS_PER_INSTALL
-  if (typeof action === 'string' && action.endsWith('_fail'))
-    return POINTS_PER_FAILURE
-  return POINTS_PER_EVENT
-}
-
 function estimatePoints(record: SnippetEdgeStatRecord) {
   if (record.e === 'updates')
     return POINTS_PER_EVENT
-  // Snippet answers single events and batches of any action.
+  // Snippet answers single events and batches; a batch body starts with '['.
+  if (!record.b.trimStart().startsWith('['))
+    return POINTS_PER_EVENT
   try {
-    const body = JSON.parse(record.b) as unknown
-    const events = Array.isArray(body) ? body : [body]
-    return Math.max(POINTS_PER_EVENT, events.reduce((sum: number, event) => sum + eventPoints(event), 0))
+    const events = JSON.parse(record.b)
+    return Math.max(1, Array.isArray(events) ? events.length : 1) * POINTS_PER_EVENT
   }
   catch {
-    return POINTS_PER_INSTALL
+    return POINTS_PER_EVENT
   }
 }
 
