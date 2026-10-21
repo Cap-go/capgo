@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>API keys — before</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --slate-50: #f8fafc;
+      --slate-100: #f1f5f9;
+      --slate-200: #e2e8f0;
+      --slate-500: #64748b;
+      --slate-700: #334155;
+      --slate-800: #1e293b;
+      --cyan-50: #ecfeff;
+      --cyan-200: #a5f3fc;
+      --cyan-700: #0e7490;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: #fff;
+      color: var(--slate-800);
+    }
+    .wrap { padding: 24px; }
+    .label {
+      margin: 0 0 12px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--slate-500);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--slate-200);
+      border-radius: 12px;
+      overflow: hidden;
+      font-size: 14px;
+    }
+    th, td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--slate-200);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    th {
+      background: var(--slate-50);
+      color: var(--slate-500);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    tr:last-child td { border-bottom: none; }
+    .chip {
+      display: inline-block;
+      max-width: 9rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      border: 1px solid var(--slate-200);
+      background: var(--slate-100);
+      color: var(--slate-700);
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .chip-cyan {
+      border-color: var(--cyan-200);
+      background: var(--cyan-50);
+      color: var(--cyan-700);
+    }
+    .secure-text {
+      color: var(--slate-700);
+      font-weight: 500;
+    }
+    .actions { color: var(--slate-500); letter-spacing: 0.2em; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p class="label">Before — API key column</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>API key</th>
+          <th>Role</th>
+          <th>Organizations</th>
+          <th>Apps</th>
+          <th>Created</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CI deploy</td>
+          <td class="secure-text">Secure key (hidden)</td>
+          <td>Member</td>
+          <td><span class="chip">Demo Org</span></td>
+          <td><span class="chip chip-cyan">com.demo.app</span></td>
+          <td>21 Oct 2026</td>
+          <td class="actions">···</td>
+        </tr>
+        <tr>
+          <td>Local CLI</td>
+          <td>abcde...vwxyz</td>
+          <td>Admin</td>
+          <td><span class="chip">Demo Org</span></td>
+          <td><span class="chip">All apps</span></td>
+          <td>12 Sep 2026</td>
+          <td class="actions">···</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>

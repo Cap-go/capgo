@@ -12,6 +12,7 @@ import IconArrowPath from '~icons/heroicons/arrow-path'
 import IconCalendar from '~icons/heroicons/calendar'
 import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconCommandLine from '~icons/heroicons/command-line'
+import IconLockClosed from '~icons/heroicons/lock-closed'
 import IconPencil from '~icons/heroicons/pencil'
 import IconShield from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
@@ -806,9 +807,19 @@ columns.value = [
     key: 'key',
     label: t('api-key'),
     head: true,
-    displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
+    class: 'w-28 max-w-[7rem]',
+    renderFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
       if (isHashedKey(row)) {
-        return t('secure-key-hidden')
+        return h('span', {
+          'class': 'inline-flex items-center justify-center rounded-md bg-emerald-50 p-1.5 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400',
+          'title': t('secure-key-hidden'),
+          'aria-label': t('secure-key-hidden'),
+        }, [
+          h(IconLockClosed, {
+            'class': 'h-4 w-4 shrink-0',
+            'aria-hidden': 'true',
+          }),
+        ])
       }
       return hideString(row.key)
     },
