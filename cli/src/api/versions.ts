@@ -231,22 +231,91 @@ export async function deleteAppVersion(
   }
 }
 
+async function deleteBundleByName(appid: string, bundle: string, options: CapgoHttpOptions & Pick<VersionOptions, 'invoke'>) {
+  const invoke = options.invoke ?? invokeCapgoCliApi
+  const { error } = await invoke('bundle', {
+    apikey: options.apikey,
+    method: 'DELETE',
+    body: { app_id: appid, version: bundle },
+    apiHost: options.apiHost,
+  })
+  return error
+}
+
+/**
+ * Deletes one bundle with a single DELETE /bundle: the API already resolves the name and
+ * refuses bundles linked to a channel. Only that rare case does extra work (unlink, retry).
+ */
 export async function deleteSpecificVersion(
   client: CapgoClient,
   appid: string,
   bundle: string,
   options: DeleteSpecificVersionOptions = {},
 ) {
-  const { silent = false, autoUnlink = false, apikey, apiHost } = options
+  const { silent = false, autoUnlink = false, apikey, apiHost, invoke } = options
   if (!apikey)
     throw new Error('Missing API key for bundle delete')
-  const versionData = await getVersionData(apikey, appid, bundle, { silent, apikey, apiHost })
+  const http = { apikey, apiHost, silent, invoke }
+
+  let error = await deleteBundleByName(appid, bundle, http)
+  if (!error)
+    return
+
+  const payload = await readCapgoCliApiErrorPayload(error)
+  if (payload?.error === 'cannot_delete_version')
+    throwMissingVersion(appid, bundle, silent)
+  if (payload?.error !== 'cannot_delete_linked_version')
+    await throwBundleHttpInvokeError(appid, error, 'delete', silent, 'bundle.delete')
+
+  const versionData = await getVersionData(apikey, appid, bundle, { silent, apikey, apiHost, invoke })
   await checkVersionNotUsedInChannel(client, appid, versionData, { silent, autoUnlink, apikey, apiHost })
-  await deleteAppVersion(null, appid, bundle, { silent, apikey, apiHost })
+  error = await deleteBundleByName(appid, bundle, http)
+  if (error)
+    await throwBundleHttpInvokeError(appid, error, 'delete', silent, 'bundle.delete')
+}
+
+export interface CleanupBundleRow {
+  id: number
+  name: string
+  created_at: string | null
+  linked: boolean
+}
+
+export interface CleanupBundlesResult {
+  total: number
+  kept: CleanupBundleRow[]
+  removed: CleanupBundleRow[]
+  dry_run: boolean
+}
+
+/** Server-side cleanup: the API selects and soft-deletes old bundles in one request. */
+export async function cleanupAppVersions(
+  appid: string,
+  body: { keep: number, bundle?: string, ignoreChannel?: boolean, dryRun: boolean },
+  options: CapgoHttpOptions & Pick<VersionOptions, 'invoke'>,
+) {
+  const invoke = options.invoke ?? invokeCapgoCliApi
+  const { data, error } = await invoke<CleanupBundlesResult>('bundle/cleanup', {
+    apikey: options.apikey,
+    method: 'POST',
+    body: {
+      app_id: appid,
+      keep: body.keep,
+      ...(body.bundle ? { bundle: body.bundle } : {}),
+      ignore_channel: !!body.ignoreChannel,
+      dry_run: body.dryRun,
+    },
+    apiHost: options.apiHost,
+  })
+  if (error)
+    await throwBundleHttpInvokeError(appid, error, 'delete', !!options.silent, 'bundle.delete')
+  if (!data || !Array.isArray(data.kept) || !Array.isArray(data.removed))
+    throw new Error(`Cannot clean up bundles for app ${appid}: unexpected response`)
+  return data
 }
 
 export function displayBundles(
-  data: (AppVersionRow & { keep?: string })[],
+  data: (Pick<AppVersionRow, 'name' | 'created_at'> & { keep?: string })[],
   silent = false,
 ) {
   if (silent)
@@ -293,36 +362,36 @@ export async function getActiveAppVersions(
   })
 }
 
-export async function getChannelsVersion(
-  options: CapgoHttpOptions,
+async function fetchSingleBundle(
   appid: string,
+  filter: { version: string } | { id: number },
+  options: CapgoHttpOptions & Pick<VersionOptions, 'invoke'>,
 ) {
-  const versions: Array<number | null> = []
-  let page = 0
-  while (true) {
-    const params = new URLSearchParams({ app_id: appid, page: String(page) })
-    const { data: channels, error: channelsError } = await invokeCapgoCliApi<Array<{ version?: { id?: number } | null }>>(
-      `channel?${params.toString()}`,
-      {
-        apikey: options.apikey,
-        method: 'GET',
-        body: undefined,
-        apiHost: options.apiHost,
-      },
-    )
-    if (channelsError)
-      await throwBundleHttpInvokeError(appid, channelsError, 'channels', !!options.silent, 'app.read_channels')
-    const batch = Array.isArray(channels) ? channels : []
-    if (!batch.length)
-      break
-    versions.push(...batch.map(c => c.version?.id ?? null))
-    if (batch.length < 50)
-      break
-    page += 1
-  }
-  return versions
+  const invoke = options.invoke ?? invokeCapgoCliApi
+  const params = new URLSearchParams({ app_id: appid })
+  if ('version' in filter)
+    params.set('version', filter.version)
+  else
+    params.set('id', String(filter.id))
+  const { data, error } = await invoke<AppVersionRow[]>(`bundle?${params.toString()}`, {
+    apikey: options.apikey,
+    method: 'GET',
+    body: undefined,
+    apiHost: options.apiHost,
+  })
+  if (error)
+    await throwBundleHttpInvokeError(appid, error, 'list', !!options.silent, 'app.read_bundles')
+  return (Array.isArray(data) ? data[0] : undefined) ?? null
 }
 
+function throwMissingVersion(appid: string, bundle: string | number, silent: boolean): never {
+  const message = `App version ${appid}@${bundle} doesn't exist`
+  if (!silent)
+    log.error(message)
+  throw new CliUserError(message, { appId: appid, bundle: String(bundle) })
+}
+
+/** Looks up one active bundle by name with a single filtered request. */
 export async function getVersionData(
   apikeyOrClient: string | CapgoClient,
   appid: string,
@@ -334,13 +403,37 @@ export async function getVersionData(
   if (!apikey)
     throw new Error('Missing API key for bundle lookup')
 
-  const all = await getActiveAppVersions(apikey, appid, options)
-  const versionData = all.find(row => row.name === bundle)
-  if (!versionData) {
-    const message = `App version ${appid}@${bundle} doesn't exist`
-    if (!silent)
-      log.error(message)
-    throw new CliUserError(message, { appId: appid, bundle })
-  }
+  const versionData = await fetchSingleBundle(appid, { version: bundle }, { apikey, silent, apiHost: options.apiHost, invoke: options.invoke })
+  if (!versionData)
+    throwMissingVersion(appid, bundle, silent)
   return versionData
+}
+
+/** Looks up one active bundle by id with a single filtered request. */
+export async function getVersionDataById(
+  apikey: string,
+  appid: string,
+  id: number,
+  options: VersionOptions = {},
+) {
+  return fetchSingleBundle(appid, { id }, { apikey, silent: options.silent, apiHost: options.apiHost, invoke: options.invoke })
+}
+
+/** Newest active bundle: only the first list page is needed. */
+export async function getLatestAppVersion(
+  apikey: string,
+  appid: string,
+  options: VersionOptions = {},
+) {
+  const invoke = options.invoke ?? invokeCapgoCliApi
+  const params = new URLSearchParams({ app_id: appid, page: '0' })
+  const { data, error } = await invoke<AppVersionRow[]>(`bundle?${params.toString()}`, {
+    apikey,
+    method: 'GET',
+    body: undefined,
+    apiHost: options.apiHost,
+  })
+  if (error)
+    await throwBundleHttpInvokeError(appid, error, 'list', !!options.silent, 'app.read_bundles')
+  return (Array.isArray(data) ? data[0] : undefined) ?? null
 }
