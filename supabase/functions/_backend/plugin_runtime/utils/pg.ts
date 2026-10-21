@@ -288,8 +288,17 @@ function setDatabaseSource(c: Context, source: string): void {
   safeSetResponseHeader(c, 'X-Database-Source', source)
 }
 
+function findReadReplicaRoute(c: Context, dbRegion: string | undefined) {
+  return READ_REPLICA_ROUTES.find(route => route.region === dbRegion && c.env[route.binding])
+}
+
+/** Read replica binding this worker reads from, without selecting or connecting it. */
+export function getReadReplicaBinding(c: Context): string | null {
+  return findReadReplicaRoute(c, getClientDbRegionSB(c))?.binding ?? null
+}
+
 function getReadOnlyDatabaseURL(c: Context, dbRegion: string | undefined): string | null {
-  const selectedRoute = READ_REPLICA_ROUTES.find(route => route.region === dbRegion && c.env[route.binding])
+  const selectedRoute = findReadReplicaRoute(c, dbRegion)
   if (!selectedRoute)
     return null
 

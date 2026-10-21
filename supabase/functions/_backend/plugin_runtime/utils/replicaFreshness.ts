@@ -46,7 +46,9 @@ export const EDGE_CACHE_UNVERIFIED_REPLICA_TTL_SECONDS = 30
  * (pg_stat_subscription); the regional replicas are physical standbys of that
  * subscriber, where pg_stat_subscription is empty, so their lag is the age of
  * the last replayed transaction. A standby whose WAL receiver runs and that
- * replayed everything it received is current: no writes is not lag. Roles
+ * replayed everything it received is current: no writes is not lag. This is
+ * lag behind the subscriber, not the primary (the subscriber's own lag is
+ * not visible from a standby). Roles
  * without pg_read_all_stats see the receiver pid but a NULL status, which
  * still counts as running.
  */
@@ -105,6 +107,7 @@ export function setReplicationLagMemoryEntry(cacheKey: string, status: Replicati
 /** Test helper: forget every known lag figure. */
 export function resetReplicationLagMemory() {
   replicationLagMemoryCache.clear()
+  replicationLagColoMisses.clear()
 }
 
 /** True for a database source that is a read replica (it can be behind the primary). */
@@ -118,41 +121,52 @@ function isMeasuredBehind(lag: ReplicationLagStatus | null) {
   return lag.status === 'lagging' || lag.max_lag_seconds > EDGE_CACHE_MAX_REPLICA_LAG_SECONDS
 }
 
-function capTtl(lag: ReplicationLagStatus | null, ttlSeconds: number) {
-  return isMeasuredBehind(lag) ? Math.min(ttlSeconds, EDGE_CACHE_UNVERIFIED_REPLICA_TTL_SECONDS) : ttlSeconds
-}
+/** Data center lookups that found no lag figure: skip the Cache API read for a while. */
+const REPLICATION_LAG_COLO_MISS_MEMO_MS = 10_000
+const replicationLagColoMisses = new Map<string, number>()
 
 /**
- * TTL for an edge cache entry filled during this request, from this
- * isolate's lag figure only (synchronous: snippet fill headers). Capped to
- * EDGE_CACHE_UNVERIFIED_REPLICA_TTL_SECONDS when the replica is measured more
- * than EDGE_CACHE_MAX_REPLICA_LAG_SECONDS behind; unchanged otherwise.
+ * Lag figure for a source: this isolate's, else the data center's (one Cache
+ * API read, copied into this isolate, no database query), else null.
  */
-export function capEdgeCacheTtlForReplicaLag(c: Context, ttlSeconds: number) {
-  const source = getReplicationLagCacheKey(c)
-  if (!isReadReplicaSource(source))
-    return ttlSeconds
-  return capTtl(getFreshReplicationLagMemoryEntry(source), ttlSeconds)
-}
-
-/**
- * Same rule, falling back to the data center's lag figure when this isolate
- * has none (one Cache API read, no database query). For refills written in
- * the background.
- */
-export async function edgeCacheTtlForReplicaLag(c: Context, ttlSeconds: number) {
-  const source = getReplicationLagCacheKey(c)
-  if (!isReadReplicaSource(source))
-    return ttlSeconds
+async function loadReplicationLag(c: Context, source: string): Promise<ReplicationLagStatus | null> {
   const memory = getFreshReplicationLagMemoryEntry(source)
   if (memory)
-    return capTtl(memory, ttlSeconds)
+    return memory
+  const now = Date.now()
+  if ((replicationLagColoMisses.get(source) ?? 0) > now)
+    return null
   try {
     const helper = new CacheHelper(c)
     const cached = await helper.matchJson<ReplicationLagCacheEntry>(replicationLagCacheRequest(helper, source))
-    return capTtl(cached && cached.expiresAt > Date.now() ? cached : null, ttlSeconds)
+    if (cached && cached.expiresAt > Date.now()) {
+      const status = { status: cached.status, max_lag_seconds: cached.max_lag_seconds }
+      setReplicationLagMemoryEntry(source, status, cached.expiresAt)
+      return status
+    }
   }
   catch {
-    return ttlSeconds
+    // Best effort: no figure means fail open.
   }
+  replicationLagColoMisses.set(source, now + REPLICATION_LAG_COLO_MISS_MEMO_MS)
+  return null
+}
+
+/**
+ * TTL for an edge cache entry built from replica reads: capped to
+ * EDGE_CACHE_UNVERIFIED_REPLICA_TTL_SECONDS when the replica is measured more
+ * than EDGE_CACHE_MAX_REPLICA_LAG_SECONDS behind, unchanged otherwise
+ * (primary reads, no figure, unknown).
+ *
+ * `source` defaults to this request's database source; pass the replica an
+ * answer came from when the request itself read no database (read cache hit).
+ *
+ * Measures the replica against its upstream only: regional standbys cannot
+ * see the EU subscriber's own lag behind the primary.
+ */
+export async function edgeCacheTtlForReplicaLag(c: Context, ttlSeconds: number, source = getReplicationLagCacheKey(c)) {
+  if (!isReadReplicaSource(source))
+    return ttlSeconds
+  const lag = await loadReplicationLag(c, source)
+  return isMeasuredBehind(lag) ? Math.min(ttlSeconds, EDGE_CACHE_UNVERIFIED_REPLICA_TTL_SECONDS) : ttlSeconds
 }

@@ -20,7 +20,7 @@ import { BRES, simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrgCached } from './notifications.ts'
 import { sendNotifToOrgMembersCached } from './org_email_notifications.ts'
-import { closeClient, createLazyPgClient, getAppBlockProviderInfraRequestsPostgres, getAppOwnerPostgres, getDatabaseURL, getDrizzleClient, getLazyPgQueryCount, getPgClient, refreshReplicationLag, requestInfosChannelDevicePostgres, requestInfosChannelPostgres, requestInfosPostgres, requestManifestEntriesPostgres, setReplicationLagHeader, withReadOnlyPgTransientRetry } from './pg.ts'
+import { closeClient, createLazyPgClient, getAppBlockProviderInfraRequestsPostgres, getAppOwnerPostgres, getDatabaseURL, getDrizzleClient, getReadReplicaBinding, getLazyPgQueryCount, getPgClient, refreshReplicationLag, requestInfosChannelDevicePostgres, requestInfosChannelPostgres, requestInfosPostgres, requestManifestEntriesPostgres, setReplicationLagHeader, withReadOnlyPgTransientRetry } from './pg.ts'
 import { usesCurrentEncryptionKeyIdFormat } from './plugin_compatibility.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './plugin_stats.ts'
@@ -703,7 +703,7 @@ export async function updateWithPG(
     // Same contract as the read cache: the answer holds for every device of
     // this (app, platform, defaultChannel) already on this bundle.
     if (readCachePayload) {
-      setSnippetUpdatesFill(c, app_id, readCachePayload, {
+      await setSnippetUpdatesFill(c, app_id, readCachePayload, {
         blockProviderInfraRequests: Boolean(appOwner.block_provider_infra_requests),
         legacyChannelSelfStore: hasChannelSelfStoreBinding(c),
       })
@@ -1007,9 +1007,11 @@ async function upToDateFromReadCache(c: Context, body: AppInfos, appStatus: Awai
   await sendStatsAndDevice(c, device, [{ action: 'noNew', versionName: cachedRead.versionName }], false, deviceDataCollection)
   if (shouldUseUpdatesEdgeCache(c, body.app_id, body.device_id))
     c.header('X-Updates-Cache', 'hit')
-  setSnippetUpdatesFill(c, body.app_id, cachedRead, {
+  await setSnippetUpdatesFill(c, body.app_id, cachedRead, {
     blockProviderInfraRequests: Boolean(appStatus.block_provider_infra_requests),
     legacyChannelSelfStore: hasChannelSelfStoreBinding(c),
+    // No query ran: the read cache entry was filled from this region's replica.
+    replicaSource: getReadReplicaBinding(c),
   })
   return updateError200(c, 'no_new_version_available', 'No new version available')
 }

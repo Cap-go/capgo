@@ -8,7 +8,6 @@ import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
 import { Client, Pool } from 'pg'
 import { closePrimaryReadClient, configureTransactionAccessMode, getPgAccessMode, inheritPgAccessMode, isPrimaryReadSession, readOnlyStartupOptions, restrictPrimaryReadClient } from '../plugin_runtime/utils/pg_transaction_mode.ts'
-import { REPLICA_LAG_QUERY } from '../plugin_runtime/utils/replicaFreshness.ts'
 import { serializePostgresError } from '../plugin_runtime/utils/postgres_error.ts'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
@@ -197,6 +196,30 @@ function toReplicationLagSeconds(value: unknown): number | null {
   const lagSeconds = Number(value)
   return Number.isFinite(lagSeconds) ? lagSeconds : null
 }
+
+/**
+ * Replica lag SQL: logical subscriber (pg_stat_subscription) or physical
+ * standby (replay position / timestamp). Same query as
+ * plugin_runtime/utils/replicaFreshness.ts, duplicated on purpose (runtime
+ * isolation, see plugin_runtime/README.md): keep both in sync.
+ */
+const REPLICA_LAG_QUERY = `
+  SELECT CASE
+    WHEN pg_is_in_recovery() THEN
+      CASE
+        WHEN pg_last_wal_receive_lsn() IS NOT NULL
+          AND pg_last_wal_receive_lsn() = pg_last_wal_replay_lsn()
+          AND EXISTS (SELECT 1 FROM pg_stat_wal_receiver WHERE pid IS NOT NULL AND (status IS NULL OR status = 'streaming'))
+          THEN 0
+        ELSE EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))
+      END
+    ELSE (
+      SELECT MAX(EXTRACT(EPOCH FROM (now() - last_msg_receipt_time)))
+      FROM pg_stat_subscription
+      WHERE last_msg_receipt_time IS NOT NULL
+    )
+  END AS lag_seconds
+`
 
 /**
  * Query replication lag from the REPLICA database (see REPLICA_LAG_QUERY:

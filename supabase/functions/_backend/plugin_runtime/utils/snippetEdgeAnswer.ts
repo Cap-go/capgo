@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import { ALLOWED_STATS_ACTIONS } from '../plugins/stats_actions.ts'
 import { PROVIDER_INFRA_ASNS } from './providerAsns.ts'
-import { capEdgeCacheTtlForReplicaLag } from './replicaFreshness.ts'
+import { edgeCacheTtlForReplicaLag } from './replicaFreshness.ts'
 import { updatesAppCacheTag, updatesVersionsCacheTag } from './updatesCacheTag.ts'
 import { hasUpdatesPurgeTarget, parseEdgeShareBps } from './updatesEdgeCache.ts'
 import { getEnv, isListedLimitedApp } from './utils.ts'
@@ -122,7 +122,7 @@ export function getSnippetEdgeAnswerTtlSeconds(c: Context) {
   return Math.min(Math.max(raw, SNIPPET_EDGE_ANSWER_MIN_TTL_SECONDS), SNIPPET_EDGE_ANSWER_MAX_TTL_SECONDS)
 }
 
-function fillBase(c: Context, appId: string, blockProviderInfraRequests: boolean, planValidUntil: number | null): SnippetFillBase | null {
+async function fillBase(c: Context, appId: string, blockProviderInfraRequests: boolean, planValidUntil: number | null, replicaSource?: string | null): Promise<SnippetFillBase | null> {
   // A replayed request has no snippet in front of it.
   if (getSnippetEdgeReplay(c))
     return null
@@ -139,7 +139,7 @@ function fillBase(c: Context, appId: string, blockProviderInfraRequests: boolean
   if (planTtl < 1)
     return null
   // The answer was read from the local replica: same lag rule as the worker cache.
-  const ttl = capEdgeCacheTtlForReplicaLag(c, planTtl)
+  const ttl = await edgeCacheTtlForReplicaLag(c, planTtl, replicaSource ?? undefined)
   const base: SnippetFillBase = {
     v: 2,
     bps,
@@ -166,9 +166,11 @@ function setFillHeader(c: Context, fill: SnippetUpdatesFill | SnippetStatsFill) 
  * Call right before returning `no_new_version_available` from an answer
  * that holds for every device of (app, platform, defaultChannel) on that
  * bundle: no override, no rollout, valid plan (the read-cache contract).
+ * `replicaSource`: the replica the answer came from when this request read no
+ * database (read cache hit); defaults to the request's database source.
  */
-export function setSnippetUpdatesFill(c: Context, appId: string, answer: SnippetUpdatesAnswer, opts: { blockProviderInfraRequests: boolean, legacyChannelSelfStore: boolean }) {
-  const base = fillBase(c, appId, opts.blockProviderInfraRequests, answer.planValidUntil)
+export async function setSnippetUpdatesFill(c: Context, appId: string, answer: SnippetUpdatesAnswer, opts: { blockProviderInfraRequests: boolean, legacyChannelSelfStore: boolean, replicaSource?: string | null }) {
+  const base = await fillBase(c, appId, opts.blockProviderInfraRequests, answer.planValidUntil, opts.replicaSource)
   if (!base)
     return
   setFillHeader(c, {
@@ -181,8 +183,8 @@ export function setSnippetUpdatesFill(c: Context, appId: string, answer: Snippet
 }
 
 /** Call on an all-ok /stats answer of a cloud app with a valid plan. */
-export function setSnippetStatsFill(c: Context, appId: string, opts: { blockProviderInfraRequests: boolean, planValidUntil: number | null }) {
-  const base = fillBase(c, appId, opts.blockProviderInfraRequests, opts.planValidUntil)
+export async function setSnippetStatsFill(c: Context, appId: string, opts: { blockProviderInfraRequests: boolean, planValidUntil: number | null }) {
+  const base = await fillBase(c, appId, opts.blockProviderInfraRequests, opts.planValidUntil)
   if (!base)
     return
   setFillHeader(c, { ...base, e: 'stats', actions: SNIPPET_EDGE_STATS_ACTIONS })

@@ -413,7 +413,7 @@ async function processStatsEvents(
     }
     if (result.success) {
       if (result.snippetFill)
-        setSnippetStatsFill(c, bodyParsed.app_id, result.snippetFill)
+        await setSnippetStatsFill(c, bodyParsed.app_id, result.snippetFill)
       return c.json(BRES)
     }
     if (result.error === 'need_plan_upgrade') {
@@ -488,7 +488,7 @@ async function processStatsEvents(
   if (firstAppId && results.length > 0 && snippetFill
     && events.every(event => (event as AppStats | undefined)?.app_id === firstAppId)
     && results.every(result => result.status === 'ok')) {
-    setSnippetStatsFill(c, firstAppId, snippetFill)
+    await setSnippetStatsFill(c, firstAppId, snippetFill)
   }
   return c.json({ status: 'ok', results })
 }

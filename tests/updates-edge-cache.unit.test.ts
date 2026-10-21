@@ -169,6 +169,8 @@ describe('updates edge cache', () => {
     try {
       // No lag figure anywhere: fail open, same TTL as before (no extra refills).
       await expect(ttlOf('com.example.unmeasured')).resolves.toBe('public, s-maxage=3600')
+      // That miss is memoized for 10s; start the next case without it.
+      resetReplicationLagMemory()
       // A cold isolate still sees the data center's figure. The OC incident:
       // the replica is minutes behind after the last re-purge.
       const helper = new CacheHelper(c)
