@@ -328,6 +328,8 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       })
       await page.route('**/rpc/verify_getting_started', route => route.fulfill({ json: onboarding }))
       await page.route('**/private/onboarding_progress', route => route.fulfill({ json: { onboarding, hasChannel: path === 'ota', checkErrors: [] } }))
+      // Tall viewport so the passed-over banner + task panel + Skip button fit in one frame.
+      await page.setViewportSize({ width: 1280, height: 1500 })
       await page.goto('/app/com.demo.app/getting-started')
       await page.locator(path === 'ota' ? '[data-test="onboarding-setup-cli"]' : '[data-test="builder-step-prepare_keystore"][data-status="done"]').first().waitFor({ state: 'attached' })
     },
