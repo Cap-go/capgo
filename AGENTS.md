@@ -119,7 +119,10 @@ testing against Cloudflare Workers.
 
 ### Code Quality
 
-- `bun lint` - Lint Vue, TypeScript, and JavaScript files
+- `bun lint` - Lint Vue, TypeScript, and JavaScript files in `src`: oxlint
+  (`.oxlintrc.frontend.json`, the @antfu/eslint-config rule set plus
+  `oxlint-plugin-vize` for templates), then ESLint on `.vue` files only for the
+  template rules oxlint cannot cover yet (allowlist in `eslint.config.js`)
 - `bun lint:fix` - Auto-fix linting issues
 - `bun lint:backend` - Lint Supabase backend files
 - `bun typecheck` - Type-check the CLI and backend with TypeScript 7 `tsc`, and the frontend with vue-tsc
