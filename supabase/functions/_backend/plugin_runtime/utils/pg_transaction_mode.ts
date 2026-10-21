@@ -1,9 +1,14 @@
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
+import { sql } from 'drizzle-orm'
 import type { Client, Pool } from 'pg'
 
 type PgHandle = Client | Pool
 type AccessMode = 'read only' | 'read write'
 const accessModes = new WeakMap<object, AccessMode>()
+// Matches withPgTransaction. The postgres role has no idle-in-transaction
+// timeout, so a transaction stalled on non-SQL work would otherwise pin its
+// Hyperdrive origin connection indefinitely.
+export const TRANSACTION_IDLE_TIMEOUT_MS = 15000
 
 function isDedicatedReadReplica(source: string) {
   return source.startsWith('HYPERDRIVE_CAPGO_READ_') || source === 'local_read_replica'
@@ -38,7 +43,10 @@ export function configureTransactionAccessMode<T extends NodePgDatabase>(databas
     const mode = getPgAccessMode(client)
     if (mode === 'read only' && config?.accessMode === 'read write')
       return Promise.reject(new Error('Cannot start a read-write transaction on a read-only client'))
-    return transaction(run, { ...config, accessMode: mode === 'read only' ? mode : config?.accessMode ?? mode })
+    return transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL idle_in_transaction_session_timeout = ${TRANSACTION_IDLE_TIMEOUT_MS}`))
+      return run(tx)
+    }, { ...config, accessMode: mode === 'read only' ? mode : config?.accessMode ?? mode })
   }
   return database
 }

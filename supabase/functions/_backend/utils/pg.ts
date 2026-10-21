@@ -7,7 +7,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
 import { Client, Pool } from 'pg'
-import { configureTransactionAccessMode, getPgAccessMode, inheritPgAccessMode, readOnlyStartupOptions, setPgAccessMode } from '../plugin_runtime/utils/pg_transaction_mode.ts'
+import { configureTransactionAccessMode, getPgAccessMode, inheritPgAccessMode, readOnlyStartupOptions, setPgAccessMode, TRANSACTION_IDLE_TIMEOUT_MS } from '../plugin_runtime/utils/pg_transaction_mode.ts'
 import { serializePostgresError } from '../plugin_runtime/utils/postgres_error.ts'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { CacheHelper } from './cache.ts'
@@ -478,7 +478,7 @@ export async function withPgTransaction<T>(pgPool: PgClient, run: (client: PgQue
     await client.query(getPgAccessMode(pgPool) === 'read only' ? 'BEGIN READ ONLY' : 'BEGIN READ WRITE')
     try {
       await client.query('SET LOCAL statement_timeout = 10000')
-      await client.query('SET LOCAL idle_in_transaction_session_timeout = 15000')
+      await client.query(`SET LOCAL idle_in_transaction_session_timeout = ${TRANSACTION_IDLE_TIMEOUT_MS}`)
       const result = await run(client)
       await client.query('COMMIT')
       return result

@@ -109,6 +109,20 @@ describe('pooled PostgreSQL transaction access modes', () => {
     }
   })
 
+  it('bounds idle time inside Drizzle transactions without leaking to the session', async () => {
+    const client = new Client({ connectionString })
+    await client.connect()
+    try {
+      await getDrizzleClient(client, { logger: false }).transaction(async (tx) => {
+        expect((await tx.execute(sql`SHOW idle_in_transaction_session_timeout`)).rows[0]).toMatchObject({ idle_in_transaction_session_timeout: '15s' })
+      })
+      expect((await client.query('SHOW idle_in_transaction_session_timeout')).rows[0].idle_in_transaction_session_timeout).toBe('0')
+    }
+    finally {
+      await client.end()
+    }
+  })
+
   it('preserves explicitly read-only Drizzle transaction configuration', async () => {
     const client = new Client({ connectionString })
     await client.connect()
