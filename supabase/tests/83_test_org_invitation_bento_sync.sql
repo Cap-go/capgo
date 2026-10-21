@@ -76,6 +76,15 @@ AS $$
       AND message ->> 'function_type' = 'cloudflare';
 $$;
 
+CREATE FUNCTION pg_temp.all_bento_syncs()
+RETURNS bigint
+LANGUAGE sql
+SET search_path = ''
+AS $$
+    SELECT count(*) FROM pgmq.q_send_email
+    WHERE message -> 'payload' ? 'org_invitation_bento_sync';
+$$;
+
 SELECT tests.create_supabase_user(
     'bento_sync_actor', 'bento-sync-actor@example.com'
 );
@@ -177,11 +186,14 @@ SELECT is(
     0::bigint, 'the current account email is not used for the sync'
 );
 
+CREATE TEMPORARY TABLE bento_sync_baseline AS
+SELECT pg_temp.all_bento_syncs() AS count;
 DELETE FROM public.org_users
 WHERE id = 830002;
 SELECT is(
-    pg_temp.bento_syncs('bento-sync-unsynced@example.com'),
-    0::bigint, 'removing an invite Bento never saw queues no sync'
+    pg_temp.all_bento_syncs(),
+    (SELECT count FROM pg_temp.bento_sync_baseline),
+    'removing an invite Bento never saw queues no sync for any address'
 );
 
 UPDATE public.tmp_users SET cancelled_at = pg_catalog.now()
@@ -225,11 +237,13 @@ SELECT is(
     0::bigint, 'the request row still cascades after the sync is queued'
 );
 
+UPDATE pg_temp.bento_sync_baseline SET count = pg_temp.all_bento_syncs();
 DELETE FROM public.tmp_users
 WHERE id = 830003;
 SELECT is(
-    pg_temp.bento_syncs('bento-sync-unsent@example.com'),
-    0::bigint, 'deleting a never-delivered new-user invite queues no sync'
+    pg_temp.all_bento_syncs(),
+    (SELECT count FROM pg_temp.bento_sync_baseline),
+    'deleting an undelivered new-user invite queues no sync for any address'
 );
 
 -- A resend starts a new generation, which must start its own Bento flow,
