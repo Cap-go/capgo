@@ -828,7 +828,7 @@ const websiteLiveStoreTools: McpTool[] = [
       submit_for_review: z.boolean().optional().describe('Submit each store build to App Store / Play review (default true)'),
       force: z.boolean().optional().describe('Skip the compatibility check and save the website anyway'),
     },
-    annotations: DESTRUCTIVE,
+    annotations: { ...DESTRUCTIVE, openWorldHint: true },
     request: ({ appId: id, ...rest }) => ({ method: 'PUT', path: '/website_live_store', body: compact({ app_id: id, ...rest }) }),
   }),
   apiTool({
@@ -841,7 +841,7 @@ const websiteLiveStoreTools: McpTool[] = [
       from_website: z.boolean().optional().describe('Use the icon from the website web manifest / apple-touch-icon instead'),
       background_color: z.string().regex(/^#[0-9a-f]{6}$/i).optional().describe('Fills transparent areas; iOS icons cannot be transparent'),
     },
-    annotations: DESTRUCTIVE,
+    annotations: { ...DESTRUCTIVE, openWorldHint: true },
     request: ({ appId: id, ...rest }) => ({ method: 'POST', path: '/website_live_store/icon', body: compact({ app_id: id, ...rest }) }),
   }),
   apiTool({

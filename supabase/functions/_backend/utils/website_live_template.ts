@@ -389,14 +389,17 @@ function escapeRegExp(value: string): string {
 
 /** Exact-token replacement: never touch a longer identifier that merely starts with the placeholder. */
 function replaceBundleId(text: string, placeholder: string, value: string): string {
-  return text.replace(new RegExp(`${escapeRegExp(placeholder)}(?![\\w.-])`, 'g'), value)
+  return text.replace(new RegExp(`${escapeRegExp(placeholder)}(?![\\w.-])`, 'g'), () => value)
 }
 
 function replacePlaceholders(text: string, path: string, manifest: WebsiteLiveTemplateManifest, input: WebsiteLiveTemplateInput): string {
   const escape = escaperFor(path)
-  let out = text.replaceAll(manifest.websiteUrl, escape(input.websiteUrl))
+  // Replacer functions: user values must never be read as `$&` / `$$` replacement patterns.
+  const websiteUrl = escape(input.websiteUrl)
+  const appName = escape(input.appName)
+  let out = text.replaceAll(manifest.websiteUrl, () => websiteUrl)
   out = replaceBundleId(out, manifest.bundleId, escape(input.bundleId))
-  out = out.replaceAll(manifest.appName, escape(input.appName))
+  out = out.replaceAll(manifest.appName, () => appName)
   return out
 }
 

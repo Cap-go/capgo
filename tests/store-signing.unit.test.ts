@@ -302,11 +302,13 @@ describe('generateAndroidUploadKeystore', () => {
 })
 
 describe('validatePlayServiceAccountJson', () => {
+  // Google ships PKCS#8 RSA keys; a small key keeps the fixture fast.
+  const rsa = forge.pki.rsa.generateKeyPair({ bits: 512, e: 0x10001 })
   const valid = {
     type: 'service_account',
     project_id: 'proj-1',
     client_email: 'bot@proj-1.iam.gserviceaccount.com',
-    private_key: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n',
+    private_key: forge.pki.privateKeyInfoToPem(forge.pki.wrapRsaPrivateKey(forge.pki.privateKeyToAsn1(rsa.privateKey))),
   }
 
   it('accepts a valid key', () => {
@@ -318,6 +320,7 @@ describe('validatePlayServiceAccountJson', () => {
     ['wrong type', JSON.stringify({ ...valid, type: 'authorized_user' })],
     ['missing email', JSON.stringify({ ...valid, client_email: undefined })],
     ['missing key', JSON.stringify({ ...valid, private_key: '' })],
+    ['malformed key', JSON.stringify({ ...valid, private_key: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n' })],
     ['array', '[]'],
   ])('rejects %s', (_label, text) => {
     expect(() => validatePlayServiceAccountJson(text)).toThrow(expect.objectContaining({ cause: expect.objectContaining({ error: 'invalid_play_service_account' }) }))

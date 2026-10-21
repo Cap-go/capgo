@@ -64,7 +64,7 @@ async function hasWebsiteLivePlan(c: Context<MiddlewareKeyVariables>) {
     .from('plans')
     .select('name')
     .eq('kind', 'website')
-    .not('stripe_id', 'is', null)
+    .neq('stripe_id', '')
     .limit(1)
   if (error)
     throw simpleError('cannot_get_plan', 'Cannot get plan', { error: error.message })

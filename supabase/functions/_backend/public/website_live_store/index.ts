@@ -20,6 +20,7 @@ import {
   fetchTemplateZip,
   fetchWebsiteIcon,
   getIconPreviewUrl,
+  getNextWebsiteLiveVersionCode,
   getPublishSecrets,
   getStoreConfig,
   getWebsiteLiveApp,
@@ -216,18 +217,19 @@ app.put('/', middlewareAuth(), async (c) => {
   const websiteApp = await getWebsiteLiveApp(c, body.app_id)
   const { website_url: websiteUrlInput, force, ...configPatch } = body
   let websiteCheck: Awaited<ReturnType<typeof checkWebsiteLive>> | null = null
-  if (websiteUrlInput) {
-    const websiteUrl = websiteUrlOrThrow(websiteUrlInput)
-    if (!force && (websiteUrl !== websiteApp.website_url || websiteApp.update_mode !== 'website')) {
-      websiteCheck = await checkWebsiteLive(websiteUrl)
-      if (!websiteCheck.compatible)
-        throw simpleError('website_not_compatible', 'This website cannot run as a Web2App app yet', { website_check: websiteCheck })
-      if (!configPatch.app_name && websiteCheck.details.app_name && !hasControlCharacters(websiteCheck.details.app_name) && !(await getStoreConfig(c, body.app_id)).app_name)
-        configPatch.app_name = websiteCheck.details.app_name
-    }
-    await setWebsiteLiveUrl(c, body.app_id, websiteUrl)
+  const websiteUrl = websiteUrlInput ? websiteUrlOrThrow(websiteUrlInput) : null
+  if (websiteUrl && !force && (websiteUrl !== websiteApp.website_url || websiteApp.update_mode !== 'website')) {
+    websiteCheck = await checkWebsiteLive(websiteUrl)
+    if (!websiteCheck.compatible)
+      throw simpleError('website_not_compatible', 'This website cannot run as a Web2App app yet', { website_check: websiteCheck })
+    if (!configPatch.app_name && websiteCheck.details.app_name && !hasControlCharacters(websiteCheck.details.app_name) && !(await getStoreConfig(c, body.app_id)).app_name)
+      configPatch.app_name = websiteCheck.details.app_name
   }
+  // Save the listing first: switching the app to website updates is the last write, so a
+  // failed config write never leaves Web2App enabled with half of the settings.
   await upsertStoreConfig(c, body.app_id, currentUserId(c), configPatch)
+  if (websiteUrl)
+    await setWebsiteLiveUrl(c, body.app_id, websiteUrl)
   return c.json({ ...(await loadStoreState(c, body.app_id)), website_check: websiteCheck })
 })
 
@@ -320,7 +322,7 @@ app.post('/publish', middlewareAuth(), async (c) => {
     throw simpleError('website_live_store_not_ready', 'Finish the store setup before publishing', { missing: platformState.missing })
 
   const websiteApp = await getWebsiteLiveApp(c, body.app_id)
-  const bundleId = assertStoreBundleId(websiteApp.app_id)
+  const bundleId = assertStoreBundleId(websiteApp.app_id, body.platform)
   const config = await getStoreConfig(c, body.app_id)
   const secrets = await getPublishSecrets(c, body.app_id, body.platform)
   const buildCredentials = body.platform === 'ios'
@@ -330,9 +332,10 @@ app.post('/publish', middlewareAuth(), async (c) => {
   await ensureBuildTimePlanAllowed(c, supabaseWithAuth(c, auth), websiteApp.owner_org, body.app_id)
   await assertNativeBuildConcurrencyAvailable(c, { orgId: websiteApp.owner_org, appId: body.app_id, userId })
 
-  const [templateZip, icons] = await Promise.all([
+  const [templateZip, icons, versionCode] = await Promise.all([
     fetchTemplateZip(c),
     loadIconSet(c, config.icon_storage_prefix!, config.icon_background_color),
+    getNextWebsiteLiveVersionCode(c, body.app_id, body.platform),
   ])
   const projectZip = patchWebsiteLiveTemplate(templateZip, {
     bundleId,
@@ -340,7 +343,7 @@ app.post('/publish', middlewareAuth(), async (c) => {
     websiteUrl: websiteApp.website_url!,
     capgoAppId: websiteApp.app_id,
     versionName: config.version_name,
-    versionCode: 1,
+    versionCode,
     icons,
   })
 
@@ -350,7 +353,7 @@ app.post('/publish', middlewareAuth(), async (c) => {
     user_id: userId,
     platform: body.platform,
     build_mode: 'release',
-    build_config: { source: WEBSITE_LIVE_BUILD_SOURCE, template_version: WEBSITE_LIVE_TEMPLATE_VERSION, version_name: config.version_name },
+    build_config: { source: WEBSITE_LIVE_BUILD_SOURCE, template_version: WEBSITE_LIVE_TEMPLATE_VERSION, version_name: config.version_name, version_code: versionCode },
     build_options: websiteLiveBuildOptions(body.platform, config.submit_for_review, Boolean(secrets.android?.playServiceAccountJson)),
     build_credentials: buildCredentials,
     ios_dependency_manager: body.platform === 'ios' ? 'spm' : null,

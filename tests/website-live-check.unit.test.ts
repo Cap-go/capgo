@@ -128,4 +128,56 @@ describe('website live check', () => {
     for (const host of ['app.example.com', 'localhost-app.com', 'internal.example.com'])
       expect(isBlockedWebsiteHost(host)).toBe(false)
   })
+
+  it('blocks IP literals and single-label hosts', () => {
+    for (const host of ['127.0.0.1', '10.0.0.8', '169.254.169.254', '8.8.8.8', '[::1]', '[fd00:ec2::254]', '[::ffff:7f00:1]', 'metadata', ''])
+      expect(isBlockedWebsiteHost(host), host).toBe(true)
+  })
+
+  it('never follows redirects to IP literals, including shorthand forms', async () => {
+    for (const location of ['https://169.254.169.254/latest/meta-data/', 'https://10.0.0.1/', 'https://[::1]/', 'https://2130706433/', 'https://0x7f.1/', 'https://metadata/', 'https://user:pass@app.example.com/']) {
+      const { fetchImpl, requested } = site({ 'https://app.example.com/': { status: 301, headers: { location } } })
+      await expect(fetchPublicWebsite('https://app.example.com/', { accept: '*/*' }, fetchImpl), location).rejects.toThrow('Refusing to fetch')
+      expect(requested).toEqual(['https://app.example.com/'])
+    }
+  })
+
+  it('validates every hop of a redirect chain', async () => {
+    const { fetchImpl, requested } = site({
+      'https://app.example.com/': { status: 302, headers: { location: 'https://www.example.com/' } },
+      'https://www.example.com/': { status: 307, headers: { location: 'https://127.0.0.1/' } },
+    })
+    await expect(fetchPublicWebsite('https://app.example.com/', { accept: '*/*' }, fetchImpl)).rejects.toThrow('Refusing to fetch')
+    expect(requested).toEqual(['https://app.example.com/', 'https://www.example.com/'])
+  })
+
+  it('ignores invalid numeric entities instead of crashing', async () => {
+    const { fetchImpl } = site({ 'https://app.example.com/': { body: '<html><head><title>Acme &#99999999; &#xD800; &#x41;pp</title></head></html>' } })
+    const result = await checkWebsiteLive('https://app.example.com/', fetchImpl)
+    expect(result.details.app_name).toBe('Acme � � App')
+  })
+
+  it('accepts XHTML responses', async () => {
+    const { fetchImpl } = site({ 'https://app.example.com/': { body: SPA, headers: { 'content-type': 'Application/XHTML+XML; charset=utf-8' } } })
+    expect((await checkWebsiteLive('https://app.example.com/', fetchImpl)).compatible).toBe(true)
+    const textPlain = site({ 'https://app.example.com/': { body: SPA, headers: { 'content-type': 'text/plain; x=text/html' } } })
+    expect((await checkWebsiteLive('https://app.example.com/', textPlain.fetchImpl)).compatible).toBe(false)
+  })
+
+  it('treats plain session and sid cookies as server sessions', async () => {
+    for (const cookie of ['session=abc; Path=/', 'sid=abc; Path=/']) {
+      const { fetchImpl } = site({ 'https://app.example.com/': { body: SPA, headers: { 'set-cookie': cookie } } })
+      const result = await checkWebsiteLive('https://app.example.com/', fetchImpl)
+      expect(statusOf(result, 'static_shell'), cookie).toBe('fail')
+    }
+  })
+
+  it('accepts statically generated Nuxt sites and rejects Nuxt SSR', async () => {
+    const generated = site({ 'https://app.example.com/': { body: '<html><head><meta name="viewport" content="width=device-width"></head><body><div id="__nuxt" data-server-rendered="true"></div><script>window.__NUXT__={staticAssetsBase:"/_nuxt/static/1"}</script></body></html>' } })
+    expect(statusOf(await checkWebsiteLive('https://app.example.com/', generated.fetchImpl), 'static_shell')).toBe('pass')
+    const prerendered = site({ 'https://app.example.com/': { body: '<html><body><div id="__nuxt"></div><script type="application/json" id="__NUXT_DATA__" data-ssr="true">[{"prerenderedAt":1}]</script></body></html>' } })
+    expect(statusOf(await checkWebsiteLive('https://app.example.com/', prerendered.fetchImpl), 'static_shell')).toBe('pass')
+    const ssr = site({ 'https://app.example.com/': { body: '<html><body><div id="__nuxt" data-server-rendered="true"></div><script>window.__NUXT__={serverRendered:true}</script></body></html>' } })
+    expect(statusOf(await checkWebsiteLive('https://app.example.com/', ssr.fetchImpl), 'static_shell')).toBe('fail')
+  })
 })

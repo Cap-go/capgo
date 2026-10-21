@@ -616,6 +616,12 @@ export function validatePlayServiceAccountJson(text: string): PlayServiceAccount
     simpleError('invalid_play_service_account', 'Service account JSON is missing client_email')
   if (typeof parsed.private_key !== 'string' || !parsed.private_key.includes('PRIVATE KEY'))
     simpleError('invalid_play_service_account', 'Service account JSON is missing private_key')
+  try {
+    forge.pki.privateKeyFromPem(parsed.private_key)
+  }
+  catch (error) {
+    simpleError('invalid_play_service_account', 'Service account private_key is not a valid PEM private key', {}, error)
+  }
   return {
     clientEmail: parsed.client_email,
     projectId: typeof parsed.project_id === 'string' ? parsed.project_id : '',
