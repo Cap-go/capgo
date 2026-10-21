@@ -6,6 +6,7 @@ import IconLoader from '~icons/lucide/loader-2'
 import IconTriangleAlert from '~icons/lucide/triangle-alert'
 import { authGhostButtonClass, authSecondaryButtonClass } from '~/components/auth/pageStyles'
 import { defaultApiHost } from '~/services/console'
+import { resolveConsoleApiBase } from '~/services/consoleAuth'
 import { replaceDocument } from '~/services/documentNavigation'
 import { openSupport } from '~/services/support'
 import { getAllowedConfirmationHosts, resolveConfirmationUrl } from '~/utils/safeRedirect'
@@ -22,7 +23,7 @@ onMounted(() => {
     const confirmationUrl = resolveConfirmationUrl(route.query, {
       allowedHosts: allowedConfirmationHosts,
       allowLocalDev: import.meta.env.DEV,
-      apiHost: defaultApiHost,
+      apiHost: resolveConsoleApiBase(defaultApiHost),
     })
     if (!confirmationUrl) {
       isRedirecting.value = false

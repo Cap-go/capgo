@@ -51,7 +51,11 @@ function wantsSingle(query: ConsoleQuery) {
   return query.operations.some(({ method }) => method === 'single' || method === 'maybeSingle')
 }
 
-/** Shape rows like PostgREST would for the chain (object for single/maybeSingle, array otherwise). */
+/**
+ * Shape rows like PostgREST would for the chain: an object for single/maybeSingle,
+ * an array otherwise. A `single` with no rows yields null here (PostgREST would
+ * answer PGRST116); use consoleQueryError to simulate that failure.
+ */
 export function consoleQueryRows(query: ConsoleQuery, rows: unknown[]): unknown {
   return wantsSingle(query) ? rows[0] ?? null : rows
 }

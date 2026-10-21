@@ -126,6 +126,8 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
   let current: Session | null = null
   let refreshing: Promise<Result<{ session: Session | null }>> | null = null
   let refreshTimer: ReturnType<typeof setInterval> | undefined
+  // Access token last confirmed by the provider; claims are only trusted after that check.
+  let verifiedToken: string | null = null
 
   function emit(event: AuthChangeEvent, session: Session | null) {
     for (const listener of listeners) {
@@ -395,6 +397,14 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
       // A session kept through a transient refresh failure must not count as signed in once its token expired.
       if (typeof claims.exp === 'number' && claims.exp <= Date.now() / 1000)
         return { data: null, error: new ConsoleAuthError('JWT has expired', 401, 'bad_jwt', 'AuthInvalidJwtError') }
+      // Like the previous client, a locally stored token is only trusted once the
+      // provider has accepted it; one round trip per token, not per call.
+      if (verifiedToken !== token) {
+        const { error: userError } = await getUser(token)
+        if (userError)
+          return { data: null, error: userError }
+        verifiedToken = token
+      }
       return { data: { claims, header: decodeJwtHeader(token) ?? {}, signature: token.split('.')[2] ?? '' }, error: null }
     },
     onAuthStateChange(callback: Listener) {
@@ -437,7 +447,9 @@ export function createConsoleAuthClient(options: ConsoleAuthOptions) {
         if (result.error && ![401, 403, 404].includes(result.error.status))
           error = result.error
       }
-      if (scope !== 'others' && !error) {
+      // Signing out is the user's decision: the local session goes even when the
+      // provider could not be reached, so a reload never restores it.
+      if (scope !== 'others') {
         save(null)
         emit('SIGNED_OUT', null)
       }

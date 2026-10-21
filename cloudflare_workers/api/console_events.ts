@@ -1,3 +1,5 @@
+const MAX_EVENT_BYTES = 16 * 1024
+
 /** Ephemeral org-scoped CLI events fanned out as server-sent events; nothing is persisted. */
 export class ConsoleEvents {
   private readonly subscribers = new Map<ReadableStreamDefaultController<Uint8Array>, () => void>()
@@ -5,7 +7,12 @@ export class ConsoleEvents {
   async fetch(request: Request) {
     const encoder = new TextEncoder()
     if (request.method === 'POST') {
+      // Events are small notifications; refuse anything that could bloat every subscriber queue.
+      if (Number(request.headers.get('content-length') ?? 0) > MAX_EVENT_BYTES)
+        return Response.json({ error: 'event_too_large' }, { status: 413 })
       const body = await request.text()
+      if (body.length > MAX_EVENT_BYTES)
+        return Response.json({ error: 'event_too_large' }, { status: 413 })
       const data = encoder.encode(`data: ${body}\n\n`)
       for (const [subscriber, cleanup] of this.subscribers) {
         if ((subscriber.desiredSize ?? 0) < -10) {
