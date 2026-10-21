@@ -320,8 +320,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="relative h-full pb-8 overflow-y-auto">
-    <div class="mx-auto flex max-w-4xl flex-col gap-6 px-4 pt-6 sm:px-6">
+  <div class="relative pb-8">
+    <div class="flex flex-col gap-6 px-4 md:px-0">
       <header>
         <h1 class="text-2xl font-semibold text-slate-900 dark:text-white">
           {{ t('billing-page-title') }}
