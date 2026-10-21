@@ -122,7 +122,7 @@ testing against Cloudflare Workers.
 - `bun lint` - Lint Vue, TypeScript, and JavaScript files
 - `bun lint:fix` - Auto-fix linting issues
 - `bun lint:backend` - Lint Supabase backend files
-- `bun typecheck` - Run TypeScript type checking with vue-tsc
+- `bun typecheck` - Type-check the CLI and backend with TypeScript 7 `tsc`, and the frontend with vue-tsc
 - `bun types` - Generate TypeScript types from Supabase
 
 ### Database and Backend
@@ -466,6 +466,14 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 - Path aliases: `~/` maps to `src/`
 - Auto-generated types for Vue components and routes
 - Supabase types auto-generated via CLI
+- TypeScript 7 layout (official dual install): `@typescript/native` is
+  `npm:typescript@7.x` and provides `tsc`; `typescript` is aliased to
+  `@typescript/typescript6` so tools that need the classic JS API (vue-tsc,
+  typescript-eslint, eslint-plugin-perfectionist) keep working. Do not point
+  `typescript` at 7.x until those tools support it. `bunfig.toml` uses the
+  hoisted linker so undeclared `typescript` imports resolve to the 6 API.
+- `cli` keeps a real `typescript@6` runtime dependency: the published CLI uses
+  its compiler API to load users' `capacitor.config.ts`.
 
 ### Comments
 
