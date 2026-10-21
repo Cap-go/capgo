@@ -15,7 +15,7 @@ import BillingModal from '~/components/billing/BillingModal.vue'
 import { formatLocalDate } from '~/services/date'
 import { pushEvent } from '~/services/posthog'
 import { formatStripeAmount, getTrialPlan, scheduleTrialPlan } from '~/services/stripe'
-import { getLocalConfig } from '~/services/supabase'
+import { getLocalConfig } from '~/services/console'
 
 const props = defineProps<{
   orgId: string

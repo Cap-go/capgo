@@ -30,7 +30,7 @@ import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { pushEvent } from '~/services/posthog'
 import { formatStripeAmount, getTrialPlan, scheduleTrialPlan } from '~/services/stripe'
-import { getLocalConfig, stripeEnabled } from '~/services/supabase'
+import { getLocalConfig, stripeEnabled } from '~/services/console'
 import { isPendingOrganizationInvite, useOrganizationStore } from '~/stores/organization'
 import {
   getReachedTrialCardMilestones,
