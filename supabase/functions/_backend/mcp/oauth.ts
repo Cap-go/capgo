@@ -251,8 +251,20 @@ export const app = new Hono<MiddlewareKeyVariables>()
 // ---------------------------------------------------------------------------
 app.get('/.well-known/oauth-protected-resource', c => c.json(protectedResourceMetadata(c)))
 app.get(`/.well-known/oauth-protected-resource${MCP_PATH}`, c => c.json(protectedResourceMetadata(c)))
-app.get('/.well-known/oauth-authorization-server', c => c.json(authorizationServerMetadata(c)))
-app.get(`/.well-known/oauth-authorization-server${MCP_PATH}`, c => c.json(authorizationServerMetadata(c)))
+
+/**
+ * RFC 8414 §3.3: metadata is only valid at the issuer's own well-known URL. When the issuer is another origin
+ * (production: https://capgo.app), that origin serves it and this API answers 404 here.
+ */
+function wellKnownAuthorizationServerMetadata(c: McpContext) {
+  if (getIssuer(c) !== getApiOrigin(c))
+    return oauthError(c, 404, 'not_found', `Authorization server metadata is published by the issuer: ${getIssuer(c)}/.well-known/oauth-authorization-server`)
+  return c.json(authorizationServerMetadata(c))
+}
+app.get('/.well-known/oauth-authorization-server', wellKnownAuthorizationServerMetadata)
+app.get(`/.well-known/oauth-authorization-server${MCP_PATH}`, wellKnownAuthorizationServerMetadata)
+// Source the issuer origin (capgo.app) serves at its own /.well-known/oauth-authorization-server.
+app.get(`${MCP_OAUTH_PATH}/metadata`, c => c.json(authorizationServerMetadata(c)))
 
 // OpenAI plugin domain verification: the dashboard issues a token that must be served verbatim
 // (plain text, no JSON) from the MCP hostname before the server can be connected.

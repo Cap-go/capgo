@@ -10,8 +10,16 @@ describe('hosted MCP OAuth issuer', () => {
     vi.unstubAllEnvs()
   })
 
-  it('uses MCP_OAUTH_ISSUER as the issuer while endpoints stay on the API origin', async () => {
-    const response = await apiWorker.fetch(new Request('https://api.capgo.app/.well-known/oauth-authorization-server'))
+  it('does not serve issuer metadata at the API origin well-known URL (RFC 8414 §3.3)', async () => {
+    for (const path of ['/.well-known/oauth-authorization-server', '/.well-known/oauth-authorization-server/mcp']) {
+      const response = await apiWorker.fetch(new Request(`https://api.capgo.app${path}`))
+      expect(response.status).toBe(404)
+    }
+  })
+
+  it('exposes metadata for the issuer origin with endpoints on the API origin', async () => {
+    const response = await apiWorker.fetch(new Request('https://api.capgo.app/mcp/oauth/metadata'))
+    expect(response.status).toBe(200)
     await expect(response.json()).resolves.toMatchObject({
       issuer: 'https://capgo.app',
       authorization_endpoint: 'https://api.capgo.app/mcp/oauth/authorize',
