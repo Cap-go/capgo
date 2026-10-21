@@ -35,17 +35,25 @@ export const MCP_PATH = '/mcp'
 export const MCP_OAUTH_PATH = '/mcp/oauth'
 export const CONSENT_PAGE_PATH = '/oauth/authorize'
 
-/** Public origin of this API (issuer + resource). Uses the request origin so local workers work too. */
-export function getIssuer(c: Context): string {
+/** Public origin of this API (endpoints + resource). Uses the request origin so local workers work too. */
+export function getApiOrigin(c: Context): string {
   return new URL(c.req.url).origin
 }
 
+/**
+ * OAuth issuer identifier (RFC 8414). Production sets MCP_OAUTH_ISSUER=https://capgo.app, which serves this
+ * metadata at its own /.well-known/oauth-authorization-server; the endpoints stay on the API origin.
+ */
+export function getIssuer(c: Context): string {
+  return getEnv(c, 'MCP_OAUTH_ISSUER').trim().replace(/\/+$/, '') || getApiOrigin(c)
+}
+
 export function getResourceUrl(c: Context): string {
-  return `${getIssuer(c)}${MCP_PATH}`
+  return `${getApiOrigin(c)}${MCP_PATH}`
 }
 
 export function getProtectedResourceMetadataUrl(c: Context): string {
-  return `${getIssuer(c)}/.well-known/oauth-protected-resource${MCP_PATH}`
+  return `${getApiOrigin(c)}/.well-known/oauth-protected-resource${MCP_PATH}`
 }
 
 /** RFC 6749 §5.2 / RFC 7591 §3.2.2 error body. These shapes are mandated by the OAuth specs. */
@@ -55,13 +63,13 @@ function oauthError(c: McpContext, status: 400 | 401 | 403 | 404 | 429 | 500 | 5
 }
 
 function authorizationServerMetadata(c: Context) {
-  const issuer = getIssuer(c)
+  const apiOrigin = getApiOrigin(c)
   return {
-    issuer,
-    authorization_endpoint: `${issuer}${MCP_OAUTH_PATH}/authorize`,
-    token_endpoint: `${issuer}${MCP_OAUTH_PATH}/token`,
-    registration_endpoint: `${issuer}${MCP_OAUTH_PATH}/register`,
-    revocation_endpoint: `${issuer}${MCP_OAUTH_PATH}/revoke`,
+    issuer: getIssuer(c),
+    authorization_endpoint: `${apiOrigin}${MCP_OAUTH_PATH}/authorize`,
+    token_endpoint: `${apiOrigin}${MCP_OAUTH_PATH}/token`,
+    registration_endpoint: `${apiOrigin}${MCP_OAUTH_PATH}/register`,
+    revocation_endpoint: `${apiOrigin}${MCP_OAUTH_PATH}/revoke`,
     scopes_supported: [MCP_OAUTH_SCOPE],
     response_types_supported: ['code'],
     response_modes_supported: ['query'],

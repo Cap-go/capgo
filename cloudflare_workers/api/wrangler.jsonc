@@ -29,7 +29,8 @@
         "binding": "AI"
       },
       "vars": {
-        "ENV_NAME": "capgo_api-prod"
+        "ENV_NAME": "capgo_api-prod",
+        "MCP_OAUTH_ISSUER": "https://capgo.app"
       },
       "routes": [
         {
