@@ -57,7 +57,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <BillingModal :title="props.title" :description="props.description" size="lg" @close="emit('close')">
+  <BillingModal :title="props.title" :description="props.description" size="checkout" @close="emit('close')">
     <div v-if="isLoading" class="flex justify-center py-16" data-test="embedded-checkout-loading">
       <span class="d-loading d-loading-spinner d-loading-lg text-blue-500" />
     </div>
