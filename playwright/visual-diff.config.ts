@@ -294,7 +294,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.goto('/app/com.demo.app/getting-started')
       await page.locator('[data-test="dual-onboarding-checklists"], [data-test="builder-checklist"]').first().waitFor()
       if (progress === 'builder')
-        await page.locator('[data-test="builder-step-start_setup"][data-status="done"]').waitFor()
+        await page.locator('[data-test="builder-step-start_setup"][data-status="done"]').waitFor({ state: 'attached' })
     },
   })),
   // Out-of-order setup: a later step is done while an earlier one is still open.
@@ -329,7 +329,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.route('**/rpc/verify_getting_started', route => route.fulfill({ json: onboarding }))
       await page.route('**/private/onboarding_progress', route => route.fulfill({ json: { onboarding, hasChannel: path === 'ota', checkErrors: [] } }))
       await page.goto('/app/com.demo.app/getting-started')
-      await page.locator(path === 'ota' ? '[data-test="onboarding-setup-cli"]' : '[data-test="builder-step-prepare_keystore"][data-status="done"]').first().waitFor()
+      await page.locator(path === 'ota' ? '[data-test="onboarding-setup-cli"]' : '[data-test="builder-step-prepare_keystore"][data-status="done"]').first().waitFor({ state: 'attached' })
     },
   })),
   { slug: 'login', path: '/login/', auth: false },
