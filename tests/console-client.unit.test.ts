@@ -92,6 +92,22 @@ describe('console client transport', () => {
     expect(offline.error).toBeInstanceOf(FunctionsFetchError)
   })
 
+  it('retries read queries after a network drop or a 503, never mutations', async () => {
+    fetchMock
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(jsonResponse({ error: 'booting' }, 503))
+      .mockResolvedValueOnce(jsonResponse({ data: [{ id: 'org-1' }], error: null, count: null, status: 200 }))
+    const read = await client().rpc('get_orgs_v7')
+    expect(read.data).toEqual([{ id: 'org-1' }])
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'booting' }, 503))
+    const write = await client().from('apps').update({ name: 'x' } as any).eq('id', 'app-1')
+    expect(write.error).toBeInstanceOf(FunctionsHttpError)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('omits the bearer when there is no session', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ data: true, error: null, count: null, status: 200 }))
     await client(null).rpc('is_not_deleted', { email_check: 'a@b.c' })

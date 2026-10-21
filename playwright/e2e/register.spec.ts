@@ -229,9 +229,11 @@ test.describe('Registration', () => {
     await continueFromAppNameToIcon(page)
     await Promise.all([
       page.waitForResponse((response) => {
-        if (!response.url().includes('/rest/v1/users') || response.request().method() !== 'PATCH' || !response.ok())
+        // The onboarding step is saved through the console query endpoint (users update).
+        if (!response.url().includes('/private/console/query') || !response.ok())
           return false
-        return (response.request().postData() ?? '').includes('"step":"organization"')
+        const body = response.request().postData() ?? ''
+        return body.includes('"name":"users"') && body.includes('"method":"update"') && body.includes('"step":"organization"')
       }),
       page.click('[data-test="app-onboarding-continue"]'),
     ])

@@ -23,6 +23,20 @@ function resolveBaseURL() {
 }
 
 const EVENTS_MAX_BACKOFF_MS = 30_000
+const QUERY_RETRIES = 2
+const MUTATIONS = new Set(['insert', 'update', 'upsert', 'delete'])
+
+// A request that never reached the API (network drop) or hit a booting/overloaded
+// edge (503) can be replayed safely for reads; mutations are never replayed.
+function isTransientQueryFailure(error: Error): boolean {
+  if (error instanceof FunctionsFetchError)
+    return true
+  return error instanceof FunctionsHttpError && error.context instanceof Response && error.context.status === 503
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
 
 export function createConsoleClient(authClient: Pick<SupabaseClient<Database>, 'auth'>) {
   const baseURL = resolveBaseURL()
@@ -66,7 +80,17 @@ export function createConsoleClient(authClient: Pick<SupabaseClient<Database>, '
     const builder: any = new Proxy({}, {
       get(_target, method: string) {
         if (method === 'then') {
-          execution ??= invoke<any>('private/console/query', { body: request, signal }).then((result) => {
+          execution ??= (async () => {
+            const retries = request.operations.some(operation => MUTATIONS.has(operation.method)) ? 0 : QUERY_RETRIES
+            let result = await invoke<any>('private/console/query', { body: request, signal })
+            for (let attempt = 0; attempt < retries; attempt++) {
+              if (!result.error || !isTransientQueryFailure(result.error) || signal?.aborted)
+                break
+              await sleep(300 * 2 ** attempt)
+              result = await invoke<any>('private/console/query', { body: request, signal })
+            }
+            return result
+          })().then((result) => {
             const throws = request.operations.some(operation => operation.method === 'throwOnError')
             if (result.error) {
               if (throws)

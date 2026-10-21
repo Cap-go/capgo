@@ -143,7 +143,7 @@ function previewOnboarding() {
 }
 
 // This isolated component fixture never sends requests to production.
-window.fetch = async (input, init) => {
+const fixtureFetch: typeof fetch = async (input, init) => {
   const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.origin)
   const method = init?.method?.toUpperCase() ?? 'GET'
   if (url.pathname.endsWith('/users') && method === 'PATCH')
@@ -237,6 +237,44 @@ window.fetch = async (input, init) => {
     status: state.error ? 503 : 200,
     headers: { 'Content-Type': 'application/json' },
   })
+}
+
+// Console data queries arrive as recorded builder chains; translate them back to
+// the PostgREST-style fixture requests above.
+window.fetch = async (input, init) => {
+  const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.origin)
+  if (!url.pathname.endsWith('/private/console/query'))
+    return fixtureFetch(input, init)
+  const query = JSON.parse(String(init?.body))
+  const fixtureURL = new URL(`/${query.kind === 'rpc' ? 'rpc/' : ''}${query.name}`, location.origin)
+  let method = query.kind === 'rpc' ? 'POST' : 'GET'
+  let body = query.kind === 'rpc' ? JSON.stringify(query.args[0]) : undefined
+  const headers = new Headers(init?.headers)
+  for (const { method: operation, args } of query.operations) {
+    if (['eq', 'neq', 'is'].includes(operation)) {
+      fixtureURL.searchParams.set(args[0], `${operation}.${args[1]}`)
+    }
+    else if (operation === 'limit') {
+      fixtureURL.searchParams.set('limit', String(args[0]))
+    }
+    else if (['single', 'maybeSingle'].includes(operation)) {
+      headers.set('Accept', 'application/vnd.pgrst.object+json')
+    }
+    else if (['insert', 'update', 'delete'].includes(operation)) {
+      method = operation === 'insert' ? 'POST' : operation === 'update' ? 'PATCH' : 'DELETE'
+      body = args[0] ? JSON.stringify(args[0]) : undefined
+    }
+  }
+  const response = await fixtureFetch(fixtureURL.href, { ...init, headers, method, body })
+  let data = await response.json().catch(() => null)
+  if (Array.isArray(data) && query.operations.some((op: { method: string }) => ['single', 'maybeSingle'].includes(op.method)))
+    data = data[0] ?? null
+  return new Response(JSON.stringify({
+    data: response.ok ? data : null,
+    error: response.ok ? null : data,
+    status: response.status,
+    count: null,
+  }), { headers: { 'Content-Type': 'application/json' } })
 }
 
 // Supply a fixture-only session. All fetch calls above are intercepted.

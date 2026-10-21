@@ -24,13 +24,13 @@ function collect() {
   const buckets = new Set<string>()
   for (const file of walk(join(root, 'src'), [])) {
     const source = readFileSync(file, 'utf8')
-    for (const match of source.matchAll(/\.storage\s*\.from\(\s*[`'"]([a-z_]+)[`'"]\s*\)/g))
+    for (const match of source.matchAll(/\.storage\s*\.from\(\s*[`'"]([a-z0-9_]+)[`'"]\s*\)/g))
       buckets.add(match[1])
-    for (const match of source.matchAll(/(?<!storage\s{0,8})\.from\(\s*[`'"]([a-z_]+)[`'"]\s*\)/g)) {
+    for (const match of source.matchAll(/(?<!storage\s{0,8})\.from\(\s*[`'"]([a-z0-9_]+)[`'"]\s*\)/g)) {
       if (!/\.storage\s*$/.test(source.slice(Math.max(0, match.index! - 40), match.index!)))
         tables.add(match[1])
     }
-    for (const match of source.matchAll(/\.rpc\(\s*[`'"]([a-z_]+)[`'"]/g))
+    for (const match of source.matchAll(/\.rpc\(\s*[`'"]([a-z0-9_]+)[`'"]/g))
       rpcs.add(match[1])
   }
   return { tables, rpcs, buckets }
