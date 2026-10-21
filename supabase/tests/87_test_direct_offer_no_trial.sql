@@ -3,7 +3,6 @@ BEGIN;
 
 SELECT plan(7);
 
-SELECT tests.authenticate_as_service_role();
 SELECT tests.create_supabase_user('direct_offer_creator', 'direct-offer-creator@test.local');
 SELECT tests.create_supabase_user('standard_trial_creator', 'standard-trial-creator@test.local');
 SELECT tests.create_supabase_user('other_offer_creator', 'other-offer-creator@test.local');
@@ -15,6 +14,8 @@ UPDATE auth.users SET raw_app_meta_data = raw_app_meta_data || '{"offer": "direc
 WHERE id = tests.get_supabase_uid('direct_offer_creator');
 UPDATE auth.users SET raw_app_meta_data = raw_app_meta_data || '{"offer": "Direct "}'::jsonb
 WHERE id = tests.get_supabase_uid('other_offer_creator');
+
+SELECT tests.authenticate_as_service_role();
 
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES
