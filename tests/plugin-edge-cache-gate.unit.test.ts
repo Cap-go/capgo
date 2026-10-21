@@ -48,6 +48,11 @@ vi.mock('../supabase/functions/_backend/plugin_runtime/utils/invalids_ip.ts', ()
   invalidIpInfo: invalidIpInfoMock,
 }))
 
+vi.mock('../supabase/functions/_backend/plugin_runtime/utils/pluginEdgeCacheReads.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../supabase/functions/_backend/plugin_runtime/utils/pluginEdgeCacheReads.ts')>()
+  return { ...actual, getAppOwnerWithEdgeCache: vi.fn(actual.getAppOwnerWithEdgeCache) }
+})
+
 vi.mock('../supabase/functions/_backend/plugin_runtime/utils/updateOracleGuard.ts', () => ({
   isUpdateEnumerationLimited: vi.fn(async () => ({ limited: false })),
   recordUpdateEnumerationMiss: vi.fn(async () => ({ limited: false })),
@@ -239,6 +244,31 @@ describe('plugin edge cache gate (UPDATES_EDGE_CACHE)', () => {
     expect(response.status).toBe(429)
     expect(await response.json()).toMatchObject({ error: 'provider_infrastructure_request_blocked' })
     expect(invalidIpInfoMock).toHaveBeenCalledWith('198.51.100.9', expect.anything())
+  })
+
+  it('retries a replayed /stats whose owner lookup failed instead of marking the app on-prem', async () => {
+    vi.stubEnv('UPDATES_EDGE_CACHE', 'on')
+    const { getAppStatus, setAppStatus } = await import('../supabase/functions/_backend/plugin_runtime/utils/appStatus.ts')
+    const { getAppOwnerWithEdgeCache } = await import('../supabase/functions/_backend/plugin_runtime/utils/pluginEdgeCacheReads.ts')
+    const { markSnippetEdgeReplay } = await import('../supabase/functions/_backend/plugin_runtime/utils/snippetEdgeAnswer.ts')
+    const { app } = await import('../supabase/functions/_backend/plugin_runtime/plugins/stats.ts')
+    vi.mocked(getAppStatus).mockResolvedValue({ status: 'cloud', cacheHit: false, allow_device_custom_id: true, block_provider_infra_requests: false } as any)
+    vi.mocked(getAppOwnerWithEdgeCache).mockResolvedValue({ value: null, hit: false, lookupFailed: true })
+    vi.mocked(setAppStatus).mockClear()
+    try {
+      for (const body of [{ ...baseBody(deviceId(1)), action: 'app_moved_to_foreground' }, [{ ...baseBody(deviceId(1)), action: 'app_moved_to_foreground' }]]) {
+        const request = new Request('http://plugin.example.test/', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        markSnippetEdgeReplay(request, { endpoint: 'stats' })
+        const response = await app.fetch(request, {}, { waitUntil: () => {} } as any)
+        expect(response.status).toBe(503)
+      }
+      expect(setAppStatus).not.toHaveBeenCalled()
+    }
+    finally {
+      vi.mocked(getAppStatus).mockReset()
+      vi.mocked(getAppStatus).mockResolvedValue({ status: 'onprem', cacheHit: true, allow_device_custom_id: true, block_provider_infra_requests: false } as any)
+      vi.mocked(getAppOwnerWithEdgeCache).mockReset()
+    }
   })
 
   it('applies a percentage with the same per-device decision on every endpoint', async () => {

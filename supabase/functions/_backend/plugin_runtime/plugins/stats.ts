@@ -135,8 +135,13 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return { success: false, error: 'need_plan_upgrade', message: PLAN_ERROR }
   }
   // Same plan actions as /updates, so both endpoints share the cached owner entry.
-  const appOwner = edgeCache
-    ? (await getAppOwnerWithEdgeCache(c, app_id, drizzleClient, planActions)).value
+  const ownerLookup = edgeCache ? await getAppOwnerWithEdgeCache(c, app_id, drizzleClient, planActions) : null
+  // A failed lookup is not an on-prem app: a replay answers 503 so the queue
+  // retries it, instead of dropping the stat and caching 'onprem'.
+  if (ownerLookup?.lookupFailed && getSnippetEdgeReplay(c))
+    return { success: false, response: c.json({ error: 'upstream_unavailable', message: 'App owner lookup failed' }, 503) }
+  const appOwner = ownerLookup
+    ? ownerLookup.value
     // Snippet fills must not outlive a trial: they need its end date.
     : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions, { includeTrialAt: getSnippetEdgeAnswerBps(c) > 0 })
   const allowDeviceCustomId = appOwner?.allow_device_custom_id

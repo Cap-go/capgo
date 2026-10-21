@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import snippet from '../cloudflare_workers/snippet/index.js'
+import { PROVIDER_INFRA_ASNS } from '../supabase/functions/_backend/plugin_runtime/utils/providerAsns.ts'
 import { decodeSnippetEdgeStat } from '../supabase/functions/_backend/plugin_runtime/utils/snippetEdgeReplay.ts'
 
 const APP_ID = 'com.edge.app'
@@ -290,6 +291,24 @@ describe('cloudflare snippet edge answers', () => {
     await snippet.fetch(buildRequest('/stats', statsEvent({ device_id: 'not-a-uuid' })))
     await snippet.fetch(buildRequest('/stats', []))
     expect(fetchMock).toHaveBeenCalledTimes(6)
+  })
+
+  it('sends /stats of provider networks to the worker while nothing is learned', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: 'provider_infrastructure_request_blocked' }), { status: 429 }))
+    vi.stubGlobal('fetch', fetchMock)
+    // Every PROVIDER_INFRA_ASNS network, and a request of unknown network.
+    for (const asn of PROVIDER_INFRA_ASNS)
+      expect((await snippet.fetch(buildRequest('/stats', statsEvent(), {}, { asn }))).status).toBe(429)
+    const unknownNetwork = new Request('https://plugin.capgo.app/stats', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(statsEvent()) })
+    Object.defineProperty(unknownNetwork, 'cf', { value: { colo: 'CDG' } })
+    await snippet.fetch(unknownNetwork)
+    expect(fetchMock).toHaveBeenCalledTimes(PROVIDER_INFRA_ASNS.length + 1)
+    // A blocked answer teaches nothing: the next one still goes to the worker.
+    await snippet.fetch(buildRequest('/stats', statsEvent(), {}, { asn: PROVIDER_INFRA_ASNS[0] }))
+    expect(fetchMock).toHaveBeenCalledTimes(PROVIDER_INFRA_ASNS.length + 2)
+    const answered = await snippet.fetch(buildRequest('/stats', statsEvent()))
+    expect(answered.headers.get('X-Capgo-Edge')).toBe('answer')
   })
 
   it('sends the learning share of /stats without a fill to the worker', async () => {
