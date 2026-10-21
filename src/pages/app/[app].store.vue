@@ -115,6 +115,10 @@ const websiteCheck = ref<WebsiteCheck | null>(null)
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
+// The API keeps the current website and app name when they are omitted and
+// cannot clear them, so an emptied field would silently snap back on save.
+const isClearingRequiredDetail = computed(() => (!websiteUrl.value.trim() && !!state.value?.website_url)
+  || (!appName.value.trim() && !!state.value?.config.app_name))
 const hasActiveBuild = computed(() => state.value?.builds.some(build => ACTIVE_BUILD_STATUSES.has(build.status)) ?? false)
 const isWebsiteLive = computed(() => state.value?.update_mode === 'website' && !!state.value?.website_url)
 const iosCredentials = computed(() => state.value?.credentials.ios ?? null)
@@ -137,44 +141,76 @@ async function storeFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers: { ...(await authHeaders()), ...(init.headers ?? {}) },
   })
   const text = await response.text()
-  const json = text ? JSON.parse(text) : null
+  // Gateways can answer with an HTML error page: keep the HTTP error path.
+  let json: any = null
+  try {
+    json = text ? JSON.parse(text) : null
+  }
+  catch {
+    if (response.ok)
+      throw new Error(t('something-went-wrong-try-again-later'))
+  }
   if (!response.ok)
     throw new StoreRequestError(json?.message || json?.error || response.statusText, json?.error ?? null, json?.moreInfo ?? null)
   return json as T
 }
 
-function applyState(next: StoreState) {
-  state.value = next
-  websiteUrl.value = next.website_url ?? ''
-  appName.value = next.config.app_name ?? ''
-  versionName.value = next.config.version_name
-  iconBackgroundColor.value = next.config.icon_background_color
-  submitForReview.value = next.config.submit_for_review
-  const ios = next.credentials.ios?.metadata
-  if (ios) {
-    iosMode.value = ios.mode === 'manual' ? 'manual' : 'automatic'
-    ascKeyId.value = ios.asc_key_id ?? ''
-    ascIssuerId.value = ios.asc_issuer_id ?? ''
+type FormSection = 'details' | 'ios' | 'android'
+const ALL_FORM_SECTIONS: FormSection[] = ['details', 'ios', 'android']
+
+function syncForm(next: StoreState, sections: FormSection[]) {
+  if (sections.includes('details')) {
+    websiteUrl.value = next.website_url ?? ''
+    appName.value = next.config.app_name ?? ''
+    versionName.value = next.config.version_name
+    iconBackgroundColor.value = next.config.icon_background_color
+    submitForReview.value = next.config.submit_for_review
   }
-  const android = next.credentials.android?.metadata
-  if (android?.key_alias)
-    keyAlias.value = android.key_alias
-  syncPolling()
+  if (sections.includes('ios')) {
+    const ios = next.credentials.ios?.metadata
+    iosMode.value = ios?.mode === 'manual' ? 'manual' : 'automatic'
+    ascKeyId.value = ios?.asc_key_id ?? ''
+    ascIssuerId.value = ios?.asc_issuer_id ?? ''
+  }
+  if (sections.includes('android'))
+    keyAlias.value = next.credentials.android?.metadata?.key_alias ?? ''
 }
 
-async function refresh() {
-  if (!appId.value)
+/**
+ * Server state (readiness, credentials, builds) always follows the response.
+ * Form fields only sync for the sections the user just saved, or for all of
+ * them on the first state of an app, so polling, publish and manual refresh
+ * never overwrite unsaved input.
+ * Returns false for a late response that belongs to a previously opened app.
+ */
+function applyState(next: StoreState, sections: FormSection[] = []) {
+  if (next.app_id !== appId.value)
+    return false
+  // The first state of an app fills every field.
+  syncForm(next, state.value ? sections : ALL_FORM_SECTIONS)
+  state.value = next
+  syncPolling()
+  return true
+}
+
+async function refresh(sections: FormSection[] = []) {
+  const requestedAppId = appId.value
+  if (!requestedAppId)
     return
   isLoading.value = true
   loadError.value = ''
   try {
-    applyState(await storeFetch<StoreState>(`?app_id=${encodeURIComponent(appId.value)}`))
+    const next = await storeFetch<StoreState>(`?app_id=${encodeURIComponent(requestedAppId)}`)
+    if (requestedAppId === appId.value)
+      applyState(next, sections)
   }
   catch (error) {
-    loadError.value = error instanceof Error ? error.message : String(error)
+    if (requestedAppId === appId.value)
+      loadError.value = error instanceof Error ? error.message : String(error)
   }
   finally {
-    isLoading.value = false
+    if (requestedAppId === appId.value)
+      isLoading.value = false
   }
 }
 
@@ -211,6 +247,7 @@ function saveDetails(force = false) {
         method: 'PUT',
         body: JSON.stringify({
           app_id: appId.value,
+          // Empty means "keep the current value": clearing is blocked in the UI.
           website_url: websiteUrl.value.trim() || undefined,
           app_name: appName.value.trim() || undefined,
           version_name: versionName.value.trim(),
@@ -219,9 +256,8 @@ function saveDetails(force = false) {
           force: force || undefined,
         }),
       })
-      if (next.website_check)
+      if (applyState(next, ['details']) && next.website_check)
         websiteCheck.value = next.website_check
-      applyState(next)
     }
     catch (error) {
       if (error instanceof StoreRequestError && error.code === 'website_not_compatible' && error.moreInfo?.website_check)
@@ -388,7 +424,7 @@ function saveIosKeys() {
     certificateBase64.value = ''
     certificatePassword.value = ''
     profileBase64.value = ''
-    applyState(response.state)
+    applyState(response.state, ['ios'])
   }, t('store-publish-keys-saved'))
 }
 
@@ -416,8 +452,8 @@ function saveAndroidKeys() {
     keyPassword.value = ''
     storePassword.value = ''
     playServiceAccountJson.value = ''
-    generatedKeystore.value = response.generated_keystore
-    applyState(response.state)
+    if (applyState(response.state, ['android']))
+      generatedKeystore.value = response.generated_keystore
   }, t('store-publish-keys-saved'))
 }
 
@@ -453,7 +489,7 @@ function deleteKeys(platform: StorePlatform) {
         role: 'danger',
         handler: async () => {
           await run(`delete-${platform}`, async () => {
-            applyState(await storeFetch<StoreState>(`/credentials?app_id=${encodeURIComponent(appId.value)}&platform=${platform}`, { method: 'DELETE' }))
+            applyState(await storeFetch<StoreState>(`/credentials?app_id=${encodeURIComponent(appId.value)}&platform=${platform}`, { method: 'DELETE' }), [platform])
             if (platform === 'android')
               generatedKeystore.value = null
           }, t('store-publish-keys-deleted'))
@@ -490,7 +526,9 @@ watch(() => route.params, (params) => {
   const next = Array.isArray(value) ? value[0] : value
   if (next && next !== appId.value) {
     appId.value = next
+    state.value = null
     generatedKeystore.value = null
+    websiteCheck.value = null
     void refresh()
   }
 }, { immediate: true })
@@ -512,7 +550,7 @@ onBeforeUnmount(() => {
           {{ t('store-publish-description') }}
         </p>
       </div>
-      <button type="button" class="self-start d-btn d-btn-sm d-btn-outline" :disabled="isLoading" @click="refresh">
+      <button type="button" class="self-start d-btn d-btn-sm d-btn-outline" :disabled="isLoading" @click="refresh()">
         <span v-if="isLoading" class="d-loading d-loading-spinner d-loading-xs" />
         <IconRefresh v-else class="w-4 h-4" aria-hidden="true" />
         {{ t('refresh') }}
@@ -539,7 +577,7 @@ onBeforeUnmount(() => {
         <div class="grid gap-4 mt-4 md:grid-cols-2">
           <div class="md:col-span-2">
             <label for="store-website-url" class="block mb-1 text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('store-publish-website-url') }}</label>
-            <input id="store-website-url" v-model="websiteUrl" type="url" inputmode="url" class="w-full d-input d-input-bordered" placeholder="https://app.example.com" data-test="store-website-url">
+            <input id="store-website-url" v-model="websiteUrl" type="url" inputmode="url" class="w-full d-input d-input-bordered" placeholder="https://app.example.com" :required="!!state?.website_url" data-test="store-website-url">
             <p v-if="!isWebsiteLive" class="mt-1 text-xs text-amber-700 dark:text-amber-300">
               {{ t('store-publish-website-url-hint') }}
             </p>
@@ -554,14 +592,14 @@ onBeforeUnmount(() => {
                   <span class="text-slate-700 dark:text-slate-200"><span class="font-medium">{{ websiteCheckLabel(check.id) }}:</span> {{ check.detail }}</span>
                 </li>
               </ul>
-              <button v-if="!websiteCheck.compatible" type="button" class="mt-3 d-btn d-btn-outline d-btn-error d-btn-xs" :disabled="busy !== null" data-test="store-save-anyway" @click="saveDetails(true)">
+              <button v-if="!websiteCheck.compatible" type="button" class="mt-3 d-btn d-btn-outline d-btn-error d-btn-xs" :disabled="busy !== null || isClearingRequiredDetail" data-test="store-save-anyway" @click="saveDetails(true)">
                 {{ t('store-publish-save-anyway') }}
               </button>
             </div>
           </div>
           <div>
             <label for="store-app-name" class="block mb-1 text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('store-publish-app-name') }}</label>
-            <input id="store-app-name" v-model="appName" type="text" maxlength="30" class="w-full d-input d-input-bordered" data-test="store-app-name">
+            <input id="store-app-name" v-model="appName" type="text" maxlength="30" class="w-full d-input d-input-bordered" :required="!!state?.config.app_name" data-test="store-app-name">
           </div>
           <div>
             <label for="store-version" class="block mb-1 text-sm font-medium text-slate-700 dark:text-slate-200">{{ t('store-publish-version') }}</label>
@@ -577,7 +615,7 @@ onBeforeUnmount(() => {
             <span v-if="busy === 'check'" class="d-loading d-loading-spinner d-loading-xs" />
             {{ t('store-publish-check-website') }}
           </button>
-          <button type="button" class="d-btn d-btn-primary d-btn-sm" :disabled="busy !== null" data-test="store-save-details" @click="saveDetails()">
+          <button type="button" class="d-btn d-btn-primary d-btn-sm" :disabled="busy !== null || isClearingRequiredDetail" data-test="store-save-details" @click="saveDetails()">
             <span v-if="busy === 'details'" class="d-loading d-loading-spinner d-loading-xs" />
             {{ t('store-publish-save') }}
           </button>

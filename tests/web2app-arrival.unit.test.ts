@@ -58,9 +58,19 @@ describe('web2App arrival query params', () => {
     expect(parseWeb2AppArrival({ to: 'https://evil.example.com/?ref=webnativeapp' })).toBeNull()
   })
 
-  it('forwards only the arrival params', () => {
-    expect(web2AppArrivalQuery({ ref: 'webnativeapp', utm_source: 'x', website: 'app.example.com' })).toEqual({ ref: 'webnativeapp', website: 'app.example.com' })
-    expect(web2AppArrivalQuery({})).toEqual({})
+  it('rejects hosts the API refuses to fetch', () => {
+    for (const website of ['https://app.localhost', 'https://printer.local', 'https://api.internal', 'https://nas.lan', 'https://router.home.arpa'])
+      expect(parseWeb2AppArrival({ website })).toBeNull()
+    expect(parseWeb2AppArrival({ website: 'https://local.example.com' })).toEqual({ websiteUrl: 'https://local.example.com/' })
+  })
+
+  it('forwards a canonical query built from the parsed arrival', () => {
+    expect(web2AppArrivalQuery({ websiteUrl: 'https://app.example.com/' })).toEqual({ ref: 'webnativeapp', website: 'https://app.example.com/' })
+    expect(web2AppArrivalQuery({ websiteUrl: null })).toEqual({ ref: 'webnativeapp' })
+    // An arrival nested in the auth guard `to` redirect survives without storage.
+    const nested = parseWeb2AppArrival({ to: '/dashboard?ref=webnativeapp&website=app.example.com', utm_source: 'x' })
+    expect(nested).not.toBeNull()
+    expect(parseWeb2AppArrival(web2AppArrivalQuery(nested!))).toEqual({ websiteUrl: 'https://app.example.com/' })
   })
 
   it('remembers an arrival across email confirmation for a week', () => {
@@ -87,8 +97,12 @@ describe('web2App arrival query params', () => {
 
   it('carries arrival params from /register into onboarding', () => {
     expect(registerSource).toContain('const web2AppArrival = parseWeb2AppArrival(route.query)')
-    expect(registerSource).toContain('rememberWeb2AppArrival(web2AppArrival)')
+    expect(registerSource).toContain('web2AppArrivalQuery(web2AppArrival)')
     expect(registerSource).toContain(`router.push({ path: '/dashboard', query: web2AppQuery })`)
+    // Stored only once the account exists, never on page load.
+    const sessionSet = registerSource.indexOf('supabase.auth.setSession(registered.session)')
+    expect(sessionSet).toBeGreaterThan(registerSource.indexOf('async function submit('))
+    expect(registerSource.indexOf('rememberWeb2AppArrival(web2AppArrival)')).toBeGreaterThan(sessionSet)
     expect(registerSource).toMatch(/window\.location\.href = `https:\/\/capgo\.app\/register\/\$\{window\.location\.search\}`/)
   })
 })

@@ -277,6 +277,8 @@ type OnboardingUpdateMode = 'capgo' | 'website'
 const updateMode = ref<OnboardingUpdateMode>('capgo')
 const updateModeTouched = ref(false)
 const websiteLiveUrlInput = ref('')
+// Set when the app was created but its Web2App mode could not be saved.
+const websiteModeSaveFailedAppId = ref('')
 // Hidden until the Web2App plan exists (it is created once its Stripe prices exist).
 const hasWebsiteLivePlan = computed(() => main.plans.some(plan => plan.kind === 'website'))
 const showWebsiteLiveChoice = computed(() => props.preOrg && hasWebsiteLivePlan.value && selectedIntent.value !== 'builder')
@@ -2068,7 +2070,7 @@ async function completePreOrgAppCreation(organizationId: string, shouldInvite: b
   clearOnboardingAppDraft(onboardingUserId.value)
   await uploadImportedOrganizationLogo(organizationId)
   removeBeforeUnloadWarning()
-  if (useAppUpdateModeStore().isWebsiteMode(createdApp.value.app_id)) {
+  if (useAppUpdateModeStore().isWebsiteMode(createdApp.value.app_id) || websiteModeSaveFailedAppId.value === createdApp.value.app_id) {
     await finishWebsiteLiveOnboarding(completionProperties)
     return
   }
@@ -2083,6 +2085,9 @@ async function completePreOrgAppCreation(organizationId: string, shouldInvite: b
 
 // Web2App has no CLI setup, channel or first upload: the app overview
 // shows the plugin config, so onboarding ends as soon as the app exists.
+// When the website could not be saved, the app is still in classic mode:
+// land on its settings, where Web2App orgs can add the website again,
+// instead of the full Capgo checklist.
 async function finishWebsiteLiveOnboarding(completionProperties: OnboardingStepCompletionProperties) {
   const app = createdApp.value
   if (!app)
@@ -2104,7 +2109,8 @@ async function finishWebsiteLiveOnboarding(completionProperties: OnboardingStepC
   allowOnboardingDashboardExploration(onboardingUserId.value, app.app_id)
   await persistOnboardingProgress('completed')
   onboardingProgressPersistence.abort()
-  await router.replace(`/app/${encodeURIComponent(app.app_id)}`)
+  const needsWebsiteRecovery = websiteModeSaveFailedAppId.value === app.app_id
+  await router.replace(`/app/${encodeURIComponent(app.app_id)}${needsWebsiteRecovery ? '/settings' : ''}`)
 }
 
 function onOrganizationInviteOpened() {
@@ -2306,6 +2312,7 @@ async function createAppRecord(options?: { nextStep?: 'organization' }): Promise
     const restoredLocalIconSource = localIconPreview.value.startsWith('data:image/') ? localIconPreview.value : ''
     const importedIconSource = canUseStoreImportPreview.value ? storeIconPreview.value : ''
     await uploadIcon(appId, restoredLocalIconSource || importedIconSource)
+    websiteModeSaveFailedAppId.value = ''
     if (isWebsiteLiveSelected.value && normalizedWebsiteLiveUrl.value) {
       const websiteState = { updateMode: 'website' as const, websiteUrl: normalizedWebsiteLiveUrl.value }
       try {
@@ -2320,6 +2327,7 @@ async function createAppRecord(options?: { nextStep?: 'organization' }): Promise
           // The app exists; app settings offer the website again for Web2App orgs.
           console.error('Cannot enable Web2App on onboarding app', updateModeError)
           toast.error(t('website-live-onboarding-save-error'))
+          websiteModeSaveFailedAppId.value = appId
         }
       }
     }
@@ -2380,8 +2388,14 @@ async function createAppRecord(options?: { nextStep?: 'organization' }): Promise
 
 async function createAppAndHandOff() {
   const completionProperties = await createAppRecord()
-  if (completionProperties)
-    await handOffToGettingStarted(completionProperties)
+  if (!completionProperties)
+    return
+  if (createdApp.value && websiteModeSaveFailedAppId.value === createdApp.value.app_id) {
+    removeBeforeUnloadWarning()
+    await finishWebsiteLiveOnboarding(completionProperties)
+    return
+  }
+  await handOffToGettingStarted(completionProperties)
 }
 
 // Once the app exists, setup continues on Getting started inside the

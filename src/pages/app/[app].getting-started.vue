@@ -56,7 +56,8 @@ async function selectSetupFlow(appId: string | undefined) {
   // Web2App apps never install a bundle pipeline, so the full Capgo
   // checklist does not apply: their overview is the setup page.
   const mode = await appUpdateModeStore.load(appId)
-  if (app.value?.app_id !== appId)
+  // The user may have switched apps or left this page while the mode loaded.
+  if (app.value?.app_id !== appId || router.currentRoute.value.name !== '/app/[app].getting-started')
     return
   if (!mode) {
     modeLoadFailedAppId.value = appId

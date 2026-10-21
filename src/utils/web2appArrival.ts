@@ -45,15 +45,14 @@ export function parseWeb2AppArrival(query: QueryLike): Web2AppArrival | null {
     ?? arrivalFromRelativePath(firstQueryValue(query.to))
 }
 
-export function web2AppArrivalQuery(query: QueryLike): Record<string, string> {
-  const forwarded: Record<string, string> = {}
-  const ref = firstQueryValue(query.ref)
-  const website = firstQueryValue(query.website)
-  if (ref)
-    forwarded.ref = ref
-  if (website)
-    forwarded.website = website
-  return forwarded
+/**
+ * Canonical query for a parsed arrival, so an arrival read from a nested `to`
+ * redirect still reaches onboarding without localStorage.
+ */
+export function web2AppArrivalQuery(arrival: Web2AppArrival): Record<string, string> {
+  return arrival.websiteUrl
+    ? { ref: WEB2APP_LEGACY_REF, website: arrival.websiteUrl }
+    : { ref: WEB2APP_LEGACY_REF }
 }
 
 function arrivalStorage(): Storage | null {
@@ -65,7 +64,7 @@ function arrivalStorage(): Storage | null {
   }
 }
 
-// Kept across the email confirmation round trip, which drops the query string.
+// Kept across redirects that drop the query string, such as /onboarding/name.
 export function rememberWeb2AppArrival(arrival: Web2AppArrival, now = Date.now()) {
   try {
     arrivalStorage()?.setItem(WEB2APP_ARRIVAL_STORAGE_KEY, JSON.stringify({ ...arrival, savedAt: now }))

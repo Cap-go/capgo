@@ -24,11 +24,11 @@ const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const isLoading = ref(false)
 
 // Web2App arrivals (for example from the retired WebNativeApp site) keep their
-// website through signup so onboarding can start on the Web2App path.
+// website through signup so onboarding can start on the Web2App path. The
+// arrival is only stored once an account exists, so a visit without signup
+// never forces a later account on this browser onto the Web2App intent.
 const web2AppArrival = parseWeb2AppArrival(route.query)
-const web2AppQuery = web2AppArrival ? web2AppArrivalQuery(route.query) : {}
-if (web2AppArrival)
-  rememberWeb2AppArrival(web2AppArrival)
+const web2AppQuery = web2AppArrival ? web2AppArrivalQuery(web2AppArrival) : {}
 
 if (window.location.host === 'console.capgo.app') {
   // do not allow to register on webapp on production
@@ -45,6 +45,9 @@ async function submit(form: { password: string, email: string }) {
     const { error } = await supabase.auth.setSession(registered.session)
     if (error)
       throw error
+    // Storage survives the /onboarding/name step that drops the query string.
+    if (web2AppArrival)
+      rememberWeb2AppArrival(web2AppArrival)
     router.push({ path: '/dashboard', query: web2AppQuery })
   }
   catch (error) {

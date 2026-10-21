@@ -64,9 +64,23 @@ watch(appId, async (targetAppId) => {
   }
 }, { immediate: true })
 
-watch(appId, (targetAppId) => {
-  if (targetAppId)
-    void appUpdateModeStore.load(targetAppId)
+// The page waits for the update mode so a Web2App deep link to a classic route
+// is redirected before that page mounts and queries bundles, channels or stats.
+// A failed load is not cached, so the next navigation inside the app retries it.
+const isResolvingAppUpdateMode = ref(false)
+watch([appId, () => route.path], async ([targetAppId]) => {
+  if (!targetAppId || appUpdateModeStore.get(targetAppId)) {
+    isResolvingAppUpdateMode.value = false
+    return
+  }
+  isResolvingAppUpdateMode.value = true
+  try {
+    await appUpdateModeStore.load(targetAppId)
+  }
+  finally {
+    if (appId.value === targetAppId)
+      isResolvingAppUpdateMode.value = false
+  }
 }, { immediate: true })
 
 // Web2App apps update from their website: bundles, channels, builds,
@@ -261,6 +275,9 @@ const activeSecondaryTab = computed(() => {
 const isWebsiteModeAllowedRoute = computed(() => isAppOverviewPath.value
   || /^\/app\/[^/]+\/(?:store|settings(?:\/access)?)\/?$/.test(route.path))
 const showWebsiteLiveOverview = computed(() => isWebsiteMode.value && isAppOverviewPath.value)
+// Keep classic pages unmounted until the mode is known and any Web2App redirect lands.
+const isHoldingAppPage = computed(() => isResolvingAppUpdateMode.value
+  || (isWebsiteMode.value && !!appRouteSegment.value && !isWebsiteModeAllowedRoute.value))
 watch([isWebsiteMode, () => route.path], ([websiteMode]) => {
   if (websiteMode && appRouteSegment.value && !isWebsiteModeAllowedRoute.value)
     void router.replace(`/app/${appRouteSegment.value}`)
@@ -321,7 +338,10 @@ function handleSecondaryTab(key: string) {
           class="flex-1 w-full min-h-0 mx-auto"
           :class="showPaymentOverlay ? 'overflow-hidden blur-sm pointer-events-none select-none' : 'overflow-y-auto'"
         >
-          <WebsiteLiveAppOverview v-if="showWebsiteLiveOverview" :app-id="appId" class="w-full" />
+          <div v-if="isHoldingAppPage" class="flex justify-center w-full py-16">
+            <Spinner size="w-10 h-10" />
+          </div>
+          <WebsiteLiveAppOverview v-else-if="showWebsiteLiveOverview" :app-id="appId" class="w-full" />
           <RouterView v-else class="w-full" />
         </div>
         <PaymentRequiredModal v-if="showPaymentOverlay" />
