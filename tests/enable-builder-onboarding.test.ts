@@ -134,7 +134,7 @@ describe('explicit Builder checklist activation', () => {
     expect((await admin.from('apps').select('onboarding').eq('app_id', appId).single()).data!.onboarding).toEqual(first)
   })
 
-  it.concurrent.each([{ todo_list_version: 5 }, { todo_list_version: 4, builder_todo_list_version: '2' }, { todo_list_version: 4, ota_todo_list_version: '2', paths: ['ota'] }])('rejects unsupported versions without changing the app: %j', async (setup) => {
+  it.concurrent.each([{ todo_list_version: 5 }, { todo_list_version: 4, builder_todo_list_version: '2' }, { todo_list_version: 4, ota_todo_list_version: '2', paths: ['ota'] }, { todo_list_version: [4] }, { todo_list_version: 4, builder_todo_list_version: ['1'] }, { todo_list_version: 4, ota_todo_list_version: ['1'], paths: ['ota'] }])('rejects unsupported versions without changing the app: %j', async (setup) => {
     const original = { setup }
     const appId = await fixture(original)
     expect((await requestActivation(appId)).status).toBe(409)

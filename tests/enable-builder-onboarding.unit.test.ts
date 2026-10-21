@@ -72,4 +72,18 @@ describe('explicit Builder checklist activation', () => {
     expect(() => enableBuilderChecklist(original)).toThrow(UnsupportedBuilderOnboardingVersion)
     expect(original).toEqual(snapshot)
   })
+
+  it.concurrent.each(['todo_list_version', 'ota_todo_list_version', 'builder_todo_list_version'])('rejects non-scalar %s values without changing input', (field) => {
+    for (const value of [[], [1], [4], {}, true, false]) {
+      const original = { setup: { todo_list_version: 4, [field]: value } }
+      const snapshot = structuredClone(original)
+      expect(() => enableBuilderChecklist(original)).toThrow(UnsupportedBuilderOnboardingVersion)
+      expect(original).toEqual(snapshot)
+    }
+  })
+
+  it.concurrent('keeps nullish defaults and numeric subversion support', () => {
+    expect(activate({ setup: { todo_list_version: null } }).setup.paths).toEqual(['builder'])
+    expect(activate({ setup: { todo_list_version: 4, ota_todo_list_version: 1, builder_todo_list_version: null, paths: ['ota'] } }).setup.paths).toEqual(['ota', 'builder'])
+  })
 })

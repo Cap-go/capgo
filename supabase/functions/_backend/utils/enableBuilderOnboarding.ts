@@ -15,14 +15,22 @@ function object(value: unknown): JsonObject {
 
 export class UnsupportedBuilderOnboardingVersion extends Error {}
 
+function checklistVersion(value: Json | undefined, fallback: string): string {
+  if (value === null || value === undefined)
+    return fallback
+  if (typeof value !== 'string' && typeof value !== 'number')
+    throw new UnsupportedBuilderOnboardingVersion('Unsupported onboarding checklist version')
+  return String(value)
+}
+
 // Explicit opt-in only: keep legacy records and feature history, and reopen the
 // existing Getting started flow without changing need_onboarding or experiments.
 export function enableBuilderChecklist(value: unknown): JsonObject {
   const onboarding = { ...object(value) }
   const setup = { ...Object.fromEntries(setupKeys.filter(key => key in onboarding).map(key => [key, onboarding[key]])), ...object(onboarding.setup) }
-  const version = String(setup.todo_list_version ?? 2)
+  const version = checklistVersion(setup.todo_list_version, '2')
   if (!['1', '2', '3', '4'].includes(version)
-    || (version === '4' && (String(setup.ota_todo_list_version ?? '1') !== '1' || String(setup.builder_todo_list_version ?? '1') !== '1'))) {
+    || (version === '4' && (checklistVersion(setup.ota_todo_list_version, '1') !== '1' || checklistVersion(setup.builder_todo_list_version, '1') !== '1'))) {
     throw new UnsupportedBuilderOnboardingVersion('Unsupported onboarding checklist version')
   }
 
