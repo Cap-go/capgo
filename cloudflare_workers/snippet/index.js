@@ -30,6 +30,16 @@ const MAX_SUBREQUESTS = 5
 // worker secret SNIPPET_EDGE_ANSWER only stops new fills; the setter script
 // purges the stored ones.
 const EDGE_ANSWERS_ENABLED = true
+// /stats needs no learned fill: the replay runs the full handler (plan,
+// on-prem, provider networks, LIMITED_APPS, unknown actions), so the device
+// answer is all the worker would add. Requests without a fill still reach the
+// worker at STATS_LEARN_SHARE, so it can teach the answers that change what
+// the device does: on-prem / plan-upgrade 429s (the plugin backs off on
+// Retry-After) and the provider networks the worker must check itself.
+// false: back to fill-only answers (sampled devices, no installs or failures).
+const STATS_ANSWER_ALL = true
+const STATS_LEARN_SHARE = 0.05
+const STATS_ACTION_RE = /^\w{1,64}$/
 const EDGE_FILL_HEADER = 'X-Capgo-Edge-Fill'
 const EDGE_IP_LIMIT_HEADER = 'X-Capgo-Edge-Ip-Limit'
 const EDGE_STAT_HEADER = 'X-Capgo-Edge-Stat'
@@ -494,10 +504,20 @@ function isAnswerableStatsVersionBuild(versionBuild) {
 }
 
 /**
- * The stats request schema and an action the worker lists in its fill. The
- * worker never lists installs or failures: rollout auto-pause compares those
- * two live, so they always reach the worker.
+ * The stats request schema and an answerable action. With `actions` (a fill
+ * answer) only the actions the worker lists, never installs or failures.
+ * Without (STATS_ANSWER_ALL) any action: the replay records installs and
+ * failures a Logpush interval later, well inside the rollout auto-pause cron
+ * window, and rejects the actions it does not know.
  */
+function isAnswerableStatsAction(action, actions) {
+  if (typeof action !== 'string')
+    return false
+  if (!actions)
+    return STATS_ACTION_RE.test(action)
+  return action !== 'set' && !action.endsWith('_fail') && actions.includes(action)
+}
+
 function isAnswerableStatsEvent(event, appId, actions) {
   return isPlainObject(event)
     && event.app_id === appId
@@ -506,7 +526,7 @@ function isAnswerableStatsEvent(event, appId, actions) {
     && typeof event.version_name === 'string'
     && typeof event.version_os === 'string'
     && typeof event.is_emulator === 'boolean' && typeof event.is_prod === 'boolean'
-    && typeof event.action === 'string' && event.action !== 'set' && !event.action.endsWith('_fail') && actions.includes(event.action)
+    && isAnswerableStatsAction(event.action, actions)
     && ['defaultChannel', 'channel', 'old_version_name', 'version_code', 'plugin_version'].every(key => isOptionalString(event[key]))
     && isAnswerableStatsVersionBuild(event.version_build)
     && isOptionalString(event.install_source, 64)
@@ -584,9 +604,15 @@ async function tryEdgeAnswer(budget, request, url, endpoint, appId, body, rawBod
 
   if (endpoint === 'stats') {
     const events = Array.isArray(body) ? body : [body]
-    if (events.length === 0 || !isLiveEdgeFill(fill, appId, events[0]?.device_id) || !Array.isArray(fill.actions))
+    if (events.length === 0)
       return null
-    if (!events.every(event => isAnswerableStatsEvent(event, appId, fill.actions)))
+    let actions
+    if (!STATS_ANSWER_ALL) {
+      if (!isLiveEdgeFill(fill, appId, events[0]?.device_id) || !Array.isArray(fill.actions))
+        return null
+      actions = fill.actions
+    }
+    if (!events.every(event => isAnswerableStatsEvent(event, appId, actions)))
       return null
     const statHeader = edgeStatHeader({ e: 'stats', b: rawBody })
     if (!statHeader)
@@ -719,6 +745,13 @@ export default {
             if (answer)
               return answer
           }
+        }
+        // Nothing learned for this app here yet: answer /stats anyway, except
+        // the share left to the worker to learn from.
+        else if (STATS_ANSWER_ALL && endpoint === 'stats' && method === 'POST' && Math.random() >= STATS_LEARN_SHARE) {
+          const answer = await tryEdgeAnswer(budget, request, url, endpoint, appId, body, new TextDecoder().decode(requestBody), {})
+          if (answer)
+            return answer
         }
       }
     }

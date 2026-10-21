@@ -81,6 +81,9 @@ describe('cloudflare snippet edge answers', () => {
 
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {})
+    // /stats without a fill: every request is the learning share, so the
+    // fill tests below reach the worker first.
+    vi.spyOn(Math, 'random').mockReturnValue(0)
     cache = buildCache()
     vi.stubGlobal('caches', { default: cache })
   })
@@ -223,7 +226,7 @@ describe('cloudflare snippet edge answers', () => {
     expect(fetchMock).toHaveBeenCalledTimes(5)
   })
 
-  it('answers /stats batches of known actions and keeps installs and failures live', async () => {
+  it('answers /stats batches of any action once learned, except native versions the worker rejects', async () => {
     const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
       const events = JSON.parse(new TextDecoder().decode(init?.body as ArrayBuffer)) as unknown[]
       return new Response(JSON.stringify({ status: 'ok', results: events.map((_, index) => ({ status: 'ok', index })) }), {
@@ -242,14 +245,75 @@ describe('cloudflare snippet edge answers', () => {
     expect(await answered.json()).toEqual({ status: 'ok', results: [{ status: 'ok', index: 0 }, { status: 'ok', index: 1 }] })
     expect(decodeSnippetEdgeStat(answered.headers.get('X-Capgo-Edge-Stat')!)).toEqual({ e: 'stats', b: JSON.stringify(batch) })
 
-    // Installs, failures, actions the worker does not list and native versions it would reject go to the worker.
-    await snippet.fetch(buildRequest('/stats', [statsEvent({ action: 'set' })]))
-    await snippet.fetch(buildRequest('/stats', [statsEvent({ action: 'download_fail' })]))
-    await snippet.fetch(buildRequest('/stats', [statsEvent({ action: 'unknown_action' })]))
+    // Installs, failures and actions the fill does not list are replayed (the
+    // handler rejects unknown ones); native versions it would reject, or an
+    // action that is not a word, go to the worker.
+    for (const action of ['set', 'download_fail', 'unknown_action']) {
+      const response = await snippet.fetch(buildRequest('/stats', [statsEvent({ action })]))
+      expect(response.headers.get('X-Capgo-Edge')).toBe('answer')
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(1)
     await snippet.fetch(buildRequest('/stats', [statsEvent({ version_build: 'bad-version' })]))
-    expect(fetchMock).toHaveBeenCalledTimes(5)
+    await snippet.fetch(buildRequest('/stats', [statsEvent({ action: 'not an action' })]))
+    expect(fetchMock).toHaveBeenCalledTimes(3)
     await snippet.fetch(buildRequest('/stats', [statsEvent({ version_build: '2.1' })]))
-    expect(fetchMock).toHaveBeenCalledTimes(5)
+    expect(fetchMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('answers /stats of an app it learned nothing about, outside the learning share', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 'ok' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const single = statsEvent({ action: 'set' })
+    const answered = await snippet.fetch(buildRequest('/stats', single))
+    expect(answered.status).toBe(200)
+    expect(answered.headers.get('X-Capgo-Edge')).toBe('answer')
+    expect(await answered.json()).toEqual({ status: 'ok' })
+    expect(decodeSnippetEdgeStat(answered.headers.get('X-Capgo-Edge-Stat')!)).toEqual({ e: 'stats', b: JSON.stringify(single) })
+
+    const batch = [statsEvent({ action: 'download_fail' }), statsEvent({ device_id: OTHER_DEVICE_ID })]
+    const answeredBatch = await snippet.fetch(buildRequest('/stats', batch))
+    expect(await answeredBatch.json()).toEqual({ status: 'ok', results: [{ status: 'ok', index: 0 }, { status: 'ok', index: 1 }] })
+    expect(fetchMock).not.toHaveBeenCalled()
+    // One lookup each, nothing stored.
+    expect(cache.match).toHaveBeenCalledTimes(2)
+    expect(cache.put).not.toHaveBeenCalled()
+
+    // Not answerable: browsers, other app ids in a batch, bad schema, empty batches.
+    await snippet.fetch(buildRequest('/stats', statsEvent(), { Origin: 'https://example.com' }))
+    await snippet.fetch(buildRequest('/stats', [statsEvent(), statsEvent({ app_id: 'com.other.app' })]))
+    await snippet.fetch(buildRequest('/stats', statsEvent({ device_id: 'not-a-uuid' })))
+    await snippet.fetch(buildRequest('/stats', []))
+    expect(fetchMock).toHaveBeenCalledTimes(4)
+  })
+
+  it('sends the learning share of /stats without a fill to the worker', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 'ok' }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(Math, 'random').mockReturnValue(0.049)
+    await snippet.fetch(buildRequest('/stats', statsEvent()))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    vi.spyOn(Math, 'random').mockReturnValue(0.05)
+    const answered = await snippet.fetch(buildRequest('/stats', statsEvent()))
+    expect(answered.headers.get('X-Capgo-Edge')).toBe('answer')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps serving a learned on-prem /stats 429 instead of answering it', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ error: 'on_premise_app', message: 'On-premise app detected', isOnprem: true }), {
+      status: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': '600', 'Cache-Control': 'public, max-age=600' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+    await snippet.fetch(buildRequest('/stats', statsEvent()))
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const cached = await snippet.fetch(buildRequest('/stats', statsEvent()))
+    expect(cached.status).toBe(429)
+    expect(cached.headers.get('X-Capgo-Edge-Stat')).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
   it('answers a single /stats event with the worker body', async () => {

@@ -197,6 +197,14 @@ describe('snippet edge stats replay', () => {
     const huge = { e: 'stats' as const, b: JSON.stringify(Array.from({ length: 60 }, () => ({}))) }
     expect(chunkSnippetEdgeRecords([huge])).toEqual([])
 
+    // Installs and failures write more points than other events.
+    const installs = Array.from({ length: 30 }, () => ({ e: 'stats' as const, b: JSON.stringify({ action: 'set' }) }))
+    expect(chunkSnippetEdgeRecords(installs).map(chunk => chunk.length)).toEqual([28, 2])
+    const failures = Array.from({ length: 45 }, () => ({ e: 'stats' as const, b: JSON.stringify({ action: 'download_fail' }) }))
+    expect(chunkSnippetEdgeRecords(failures).map(chunk => chunk.length)).toEqual([40, 5])
+    const installBatch = { e: 'stats' as const, b: JSON.stringify(Array.from({ length: 20 }, () => ({ action: 'set' }))) }
+    expect(chunkSnippetEdgeRecords([installBatch, installBatch]).map(chunk => chunk.length)).toEqual([1, 1])
+
     const groups = groupForSendBatch(Array.from({ length: 250 }, () => [many[0]!]))
     expect(groups.map(group => group.length)).toEqual([100, 100, 50])
   })

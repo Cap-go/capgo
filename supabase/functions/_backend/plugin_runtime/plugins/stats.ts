@@ -18,7 +18,7 @@ import { getAppOwnerWithEdgeCache, getAppVersionWithEdgeCache } from '../utils/p
 import { getClientIP } from '../utils/rate_limit.ts'
 import { onPremiseAppResponse } from '../utils/rateLimitInfo.ts'
 import { getSnippetEdgeAnswerBps, getSnippetEdgeReplay, setSnippetStatsFill } from '../utils/snippetEdgeAnswer.ts'
-import { planValidUntilMs, shouldUseUpdatesEdgeCache } from '../utils/updatesEdgeCache.ts'
+import { isUpdatesEdgeCacheEnabled, planValidUntilMs, shouldUseUpdatesEdgeCache } from '../utils/updatesEdgeCache.ts'
 import { backgroundTask, INVALID_STRING_APP_ID, isInternalVersionName, isLimited, MISSING_STRING_APP_ID, reverseDomainRegex } from '../utils/utils.ts'
 import { isRunningVersionAction } from './stats_actions.ts'
 
@@ -29,8 +29,10 @@ const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6 = parse('6.14.25')
 type AppStatusResult = Awaited<ReturnType<typeof getAppStatus>>
 
 async function blockProviderInfrastructure(c: Context, shouldBlockProviderInfrastructure = true) {
-  // The snippet answered only devices outside the provider networks.
-  if (!shouldBlockProviderInfrastructure || getSnippetEdgeReplay(c))
+  // Replays too: the snippet answers /stats of apps it learned nothing about,
+  // so it cannot leave every provider network to the worker. The replay
+  // request carries the device IP from Logpush.
+  if (!shouldBlockProviderInfrastructure)
     return null
 
   const requestIp = getClientIP(c)
@@ -328,7 +330,10 @@ app.post('/', async (c) => {
   // One decision per request: a batch follows its first event's device. A
   // request without a device id keeps the live path (no per-device bucket).
   const firstDeviceId = (firstEvent as AppStats).device_id
-  if (typeof firstDeviceId === 'string' && firstDeviceId !== '' && shouldUseUpdatesEdgeCache(c, firstAppId, firstDeviceId))
+  // A replay has no device waiting on it: it always takes the cached reads,
+  // so most replayed events open no database connection.
+  if ((getSnippetEdgeReplay(c) && isUpdatesEdgeCacheEnabled(c))
+    || (typeof firstDeviceId === 'string' && firstDeviceId !== '' && shouldUseUpdatesEdgeCache(c, firstAppId, firstDeviceId)))
     return statsWithEdgeCache(c, events, isBatch, appStatus, appStatusByAppId, requestIp)
 
   // Plugin hot path must never hit primary. Device custom_id lives in Cloudflare

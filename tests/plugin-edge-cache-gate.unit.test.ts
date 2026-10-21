@@ -43,6 +43,11 @@ vi.mock('../supabase/functions/_backend/plugin_runtime/utils/plugin_stats.ts', (
   sendStatsAndDevice: vi.fn(() => Promise.resolve()),
 }))
 
+const invalidIpInfoMock = vi.fn(async () => ({ blocked: false, provider: null as string | null }))
+vi.mock('../supabase/functions/_backend/plugin_runtime/utils/invalids_ip.ts', () => ({
+  invalidIpInfo: invalidIpInfoMock,
+}))
+
 vi.mock('../supabase/functions/_backend/plugin_runtime/utils/updateOracleGuard.ts', () => ({
   isUpdateEnumerationLimited: vi.fn(async () => ({ limited: false })),
   recordUpdateEnumerationMiss: vi.fn(async () => ({ limited: false })),
@@ -188,6 +193,52 @@ describe('plugin edge cache gate (UPDATES_EDGE_CACHE)', () => {
     await app.fetch(new Request(`http://plugin.example.test/?${query}`, { method: 'GET' }), {}, { waitUntil: () => {} } as any)
     expect(createLazyPgClientMock).not.toHaveBeenCalled()
     expect(getPgClientMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('takes the cached path for every replayed /stats while the edge cache is on', async () => {
+    const { updatesEdgeCacheBucket } = await import('../supabase/functions/_backend/plugin_runtime/utils/updatesEdgeCache.ts')
+    const { markSnippetEdgeReplay } = await import('../supabase/functions/_backend/plugin_runtime/utils/snippetEdgeAnswer.ts')
+    const { app } = await import('../supabase/functions/_backend/plugin_runtime/plugins/stats.ts')
+    let device = deviceId(0)
+    for (let i = 0; updatesEdgeCacheBucket(APP_ID, device) < 1; i++)
+      device = deviceId(i)
+    const replay = (share: string) => {
+      vi.stubEnv('UPDATES_EDGE_CACHE', share)
+      getPgClientMock.mockClear()
+      createLazyPgClientMock.mockClear()
+      const request = new Request('http://plugin.example.test/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...baseBody(device), action: 'app_moved_to_foreground' }),
+      })
+      markSnippetEdgeReplay(request, { endpoint: 'stats' })
+      return app.fetch(request, {}, { waitUntil: () => {} } as any)
+    }
+    // Outside a 0.01% share, yet replayed through the cached reads.
+    await replay('0.01%')
+    expect(createLazyPgClientMock).toHaveBeenCalledTimes(1)
+    expect(getPgClientMock).not.toHaveBeenCalled()
+    await replay('off')
+    expect(createLazyPgClientMock).not.toHaveBeenCalled()
+    expect(getPgClientMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('blocks replayed /stats from provider networks of apps that block them', async () => {
+    const { getAppStatus } = await import('../supabase/functions/_backend/plugin_runtime/utils/appStatus.ts')
+    const { markSnippetEdgeReplay } = await import('../supabase/functions/_backend/plugin_runtime/utils/snippetEdgeAnswer.ts')
+    const { app } = await import('../supabase/functions/_backend/plugin_runtime/plugins/stats.ts')
+    vi.mocked(getAppStatus).mockResolvedValueOnce({ status: 'cloud', cacheHit: true, allow_device_custom_id: true, block_provider_infra_requests: true } as any)
+    invalidIpInfoMock.mockResolvedValueOnce({ blocked: true, provider: 'cloud-provider' })
+    const request = new Request('http://plugin.example.test/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'cf-connecting-ip': '198.51.100.9' },
+      body: JSON.stringify({ ...baseBody(deviceId(1)), action: 'app_moved_to_foreground' }),
+    })
+    markSnippetEdgeReplay(request, { endpoint: 'stats' })
+    const response = await app.fetch(request, {}, { waitUntil: () => {} } as any)
+    expect(response.status).toBe(429)
+    expect(await response.json()).toMatchObject({ error: 'provider_infrastructure_request_blocked' })
+    expect(invalidIpInfoMock).toHaveBeenCalledWith('198.51.100.9', expect.anything())
   })
 
   it('applies a percentage with the same per-device decision on every endpoint', async () => {
