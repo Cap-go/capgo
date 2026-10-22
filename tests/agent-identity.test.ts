@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { fetchTestRequest, getAuthHeaders, getEndpointUrl, ORG_ID, USER_EMAIL } from './test-utils.ts'
+import { executeSQL, fetchTestRequest, getAuthHeaders, getEndpointUrl, ORG_ID, USER_EMAIL } from './test-utils.ts'
 
 // auth.md agent registration lives next to the hosted MCP OAuth server, on the Cloudflare API worker only.
 const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
@@ -109,6 +109,10 @@ describe.skipIf(!USE_CLOUDFLARE)('auth.md service_auth agent registration', () =
       const apps = await fetchTestRequest(getEndpointUrl('/app/'), { headers: { authorization: `Bearer ${tokenJson.access_token}` } })
       expect(apps.status).toBe(200)
 
+      // The email is not kept once the key was handed over.
+      const [stored] = await executeSQL(`SELECT status, login_hint FROM public.agent_identity_registrations WHERE id = $1`, [registration.registration_id.slice(4)])
+      expect(stored).toMatchObject({ status: 'exchanged', login_hint: '' })
+
       // The claim_token is single use.
       const replay = await poll(registration.claim_token)
       await expect(replay.json()).resolves.toMatchObject({ error: 'invalid_grant' })
@@ -158,5 +162,27 @@ describe.skipIf(!USE_CLOUDFLARE)('auth.md service_auth agent registration', () =
     expect(deny.status, await deny.clone().text()).toBe(200)
     const denied = await poll(registration.claim_token)
     await expect(denied.json()).resolves.toMatchObject({ error: 'access_denied' })
+  })
+
+  it('revokes the key of an approved registration that expired before the agent collected it', async () => {
+    const registration = await register()
+    const { id: keyId, key: apikey } = await createUserKey()
+    try {
+      const verify = await postJson('/private/agent_identity/verify', { claim_attempt_token: registration.attemptToken, user_code: registration.claim.user_code }, jwtHeaders)
+      expect(verify.status).toBe(200)
+      const approve = await postJson('/private/agent_identity/approve', { claim_attempt_token: registration.attemptToken, apikey }, jwtHeaders)
+      expect(approve.status).toBe(200)
+      // Simulate an agent that never polled: the registration expired more than a day ago.
+      await executeSQL(`UPDATE public.agent_identity_registrations SET expires_at = now() - interval '2 days' WHERE id = $1`, [registration.registration_id.slice(4)])
+
+      await register() // any new registration runs the cleanup
+      const keys = await executeSQL(`SELECT id FROM public.apikeys WHERE id = $1`, [keyId])
+      expect(keys).toHaveLength(0)
+      const rows = await executeSQL(`SELECT id FROM public.agent_identity_registrations WHERE id = $1`, [registration.registration_id.slice(4)])
+      expect(rows).toHaveLength(0)
+    }
+    finally {
+      await deleteUserKey(keyId)
+    }
   })
 })

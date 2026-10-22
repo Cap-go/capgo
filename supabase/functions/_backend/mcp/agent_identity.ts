@@ -109,6 +109,12 @@ app.post(AGENT_IDENTITY_PATH, async (c) => {
   const created = await insertWithIpLimit(c, 'agent_identity_registrations', ipHash, REGISTRATION_RATE_LIMIT, async (tx) => {
     // Key generation runs only after the per-IP limit passed, so rejected floods cost no crypto work.
     const [keys, attempt, claimTokenHash] = await Promise.all([createClaimKeyPair(claimToken), newClaimAttempt(), sha256Hex(claimToken)])
+    // An approved registration the agent never collected left a live key behind: revoke it with the row.
+    await tx.query(
+      `DELETE FROM public.apikeys WHERE id IN (
+         SELECT apikey_id FROM public.agent_identity_registrations
+         WHERE status = 'approved' AND apikey_id IS NOT NULL AND expires_at < now() - interval '1 day')`,
+    )
     await tx.query(`DELETE FROM public.agent_identity_registrations WHERE status <> 'exchanged' AND expires_at < now() - interval '1 day'`)
     // IP hashes only feed the hourly registration limit: drop them once they are a day old.
     await tx.query(`UPDATE public.agent_identity_registrations SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at < now() - interval '1 day'`)
@@ -228,7 +234,8 @@ export async function handleAgentClaimGrant(c: McpContext, params: Record<string
          FOR UPDATE
        )
        UPDATE public.agent_identity_registrations r
-       SET status = 'exchanged', exchanged_at = now(), encrypted_token = NULL, encrypted_private_key = ''
+       -- The email is only needed until the claim completes; the apikey_id link stays for revocation.
+       SET status = 'exchanged', exchanged_at = now(), encrypted_token = NULL, encrypted_private_key = '', login_hint = ''
        FROM target
        WHERE r.id = target.id
        RETURNING r.id, target.encrypted_token, target.encrypted_private_key,
