@@ -37,7 +37,7 @@ beforeAll(async () => {
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, github = false, summaryPath = '', workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, earlyCompletion = false, immediateCompletion = false, waitForWorkers = false, trialAlreadyShown = false, debug = false, columns = 80, colorEnv = {} } = {}) {
+function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, github = false, summaryPath = '', noticeWriteFailure = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, earlyCompletion = false, immediateCompletion = false, waitForWorkers = false, trialAlreadyShown = false, debug = false, columns = 80, colorEnv = {} } = {}) {
   const source = `
     import assert from 'node:assert/strict'
     import { performance } from 'node:perf_hooks'
@@ -69,6 +69,13 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
       const checks = [...getPendingOnboardingChecks()]
       for (const [worker] of checks) worker.ref()
       await Promise.all(checks.map(([, check]) => check.completion))
+    }
+    if (${noticeWriteFailure}) {
+      const write = process.stdout.write.bind(process.stdout)
+      process.stdout.write = (chunk, ...args) => {
+        if (String(chunk).startsWith('::notice::')) throw new Error('synthetic notice write failure')
+        return write(chunk, ...args)
+      }
     }
     console.log('pending-attempts:' + JSON.stringify([...getPendingOnboardingChecks().values()].map(check => check.attemptId)))
     let foregroundInterrupts = 0
@@ -390,6 +397,7 @@ test.concurrent('GitHub Actions preserves machine modes and ignores unavailable 
     const result = await run({ commandPath: 'bundle list', ci: true, tty: false, github: true, summaryPath, workers: ['notice.mjs'], waitForWorkers: true }).completion
     assert.equal(result.code, 0, result.text)
     assert.match(result.output, /^::notice::/m)
+    assert.equal((result.text.match(/Finish setting up live updates/g) ?? []).length, 1, 'a summary failure must not duplicate an already printed notice')
   }
 }, 12_000)
 
@@ -414,4 +422,13 @@ test.concurrent('GitHub plan notices retain organization-level trial deduplicati
     assert.equal(result.code, 0, result.text)
     assert.equal((result.output.match(/^::notice::/gm) ?? []).length, trialAlreadyShown ? 0 : 1)
   }
+}, 12_000)
+
+
+test.concurrent('GitHub annotation write failure falls back to the existing setup message', async () => {
+  const result = await run({ commandPath: 'bundle list', ci: true, tty: false, github: true, noticeWriteFailure: true, workers: ['notice.mjs'], waitForWorkers: true }).completion
+  assert.equal(result.code, 0, result.text)
+  assert.doesNotMatch(result.output, /^::notice::/m)
+  assert.match(result.text, /Finish setting up live updates/)
+  assert.match(result.text, /Continue your checklist/)
 }, 12_000)

@@ -1696,12 +1696,12 @@ applyRawCommandAnalyticsOptOut(process.argv)
 void (async () => {
   try {
     await program.parseAsync()
-    const analyticsStarted = Date.now()
-    setupDebug('analytics before wait started')
-    await flushAnalytics()
-    setupDebug('analytics before wait finished', { duration_ms: Date.now() - analyticsStarted })
     if (currentActionCommand)
       await waitForOnboardingChecks(currentActionCommand, currentCommandPath)
+    const analyticsStarted = Date.now()
+    setupDebug('analytics after wait started')
+    await flushAnalytics()
+    setupDebug('analytics after wait finished', { duration_ms: Date.now() - analyticsStarted })
   }
   catch (error: unknown) {
     if (typeof error === 'object' && error !== null && 'code' in error) {

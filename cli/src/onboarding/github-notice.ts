@@ -10,9 +10,11 @@ function escapeMarkdown(text: string): string {
 export function renderGitHubNotice(text: string): boolean {
   if (process.env.GITHUB_ACTIONS !== 'true')
     return false
+  let noticeWritten = false
   try {
     const escaped = text.replaceAll('%', '%25').replaceAll('\r', '%0D').replaceAll('\n', '%0A')
     process.stdout.write(`::notice::${escaped}\n`)
+    noticeWritten = true
     const summary = process.env.GITHUB_STEP_SUMMARY
     if (summary) {
       const markdown = text.trim().split('\n').map((line, index) => `${index === 0 ? '### ' : ''}${escapeMarkdown(line)}`).join('  \n')
@@ -23,5 +25,5 @@ export function renderGitHubNotice(text: string): boolean {
     // Optional reporting must never fail an otherwise successful deployment.
     setupDebug('GitHub notice output unavailable')
   }
-  return true
+  return noticeWritten
 }
