@@ -139,6 +139,7 @@ const props = defineProps<{
   // View persisted setup without automatically leaving a finished checklist
   // or restarting the user's onboarding run.
   showChecklist?: boolean
+  hideFooter?: boolean
   initialChecklistPath?: ChecklistPath
   // An existing user creating another organization runs the same first-run
   // flow from the start, ignoring any saved onboarding progress.
@@ -3535,6 +3536,7 @@ defineExpose({
           :user-id="onboardingUserId"
           :initial-onboarding="createdApp.onboarding"
           :initial-path="props.initialChecklistPath"
+          :hide-footer="hideFooter"
           :hiding="isHidingSplash"
           :leaving="isHandingOff"
           @path-changed="activeChecklistPath = $event"
@@ -3587,6 +3589,7 @@ defineExpose({
           :app-id="createdApp.app_id"
           :initial-onboarding="createdApp.onboarding"
           :command="builderCliCommand"
+          :hide-footer="hideFooter"
           :hiding="isHidingSplash"
           :leaving="isHandingOff"
           @copy-command="copyBuilderCliCommand"
@@ -3602,6 +3605,7 @@ defineExpose({
           :app-id="createdApp.app_id"
           :initial-onboarding="createdApp.onboarding"
           :command="cliCommand"
+          :hide-footer="hideFooter"
           :hiding="isHidingSplash"
           :leaving="isHandingOff"
           @copy-command="copyCliCommand"

@@ -7,12 +7,12 @@ import AppOnboardingBuilderChecklist from '../../src/components/dashboard/AppOnb
 import AppOnboardingCliSteps from '../../src/components/dashboard/AppOnboardingCliSteps.vue'
 import AppOnboardingFlow from '../../src/components/dashboard/AppOnboardingFlow.vue'
 import AppOnboardingSetupChecklist from '../../src/components/dashboard/AppOnboardingSetupChecklist.vue'
-import BuilderIntroduction from '../../src/components/dashboard/BuilderIntroduction.vue'
 import ChannelIntroduction from '../../src/components/dashboard/ChannelIntroduction.vue'
 import GettingStartedNav from '../../src/components/dashboard/GettingStartedNav.vue'
 import OnboardingExploreBanner from '../../src/components/dashboard/OnboardingExploreBanner.vue'
 import OnboardingExploreReminder from '../../src/components/dashboard/OnboardingExploreReminder.vue'
 import DialogV2 from '../../src/components/DialogV2.vue'
+import BuildTable from '../../src/components/tables/BuildTable.vue'
 import { i18n } from '../../src/modules/i18n'
 import { install as installOnboardingSetupNavigation } from '../../src/modules/onboarding-setup'
 import GettingStartedPage from '../../src/pages/app/[app].getting-started.vue'
@@ -212,6 +212,8 @@ window.fetch = async (input, init) => {
     return new Response(JSON.stringify(previewOnboarding()), { headers: { 'Content-Type': 'application/json' } })
   }
   if (url.pathname.endsWith(`/app/${previewAppId}/onboarding/builder`)) {
+    if (method === 'GET')
+      return new Response(JSON.stringify({ canEnable: true }), { headers: { 'Content-Type': 'application/json' } })
     state.builderActivationRequests.push({ method: init?.method, appId: previewAppId })
     if (state.builderActivationDelayMs)
       await new Promise(resolve => setTimeout(resolve, state.builderActivationDelayMs))
@@ -221,6 +223,8 @@ window.fetch = async (input, init) => {
     state.outcome = 'in_progress'
     return new Response(JSON.stringify({ onboarding: previewOnboarding() }), { headers: { 'Content-Type': 'application/json' } })
   }
+  if (url.pathname.endsWith('/build_requests'))
+    return new Response(JSON.stringify([]), { headers: { 'Content-Type': 'application/json', 'Content-Range': '*/0' } })
   if (url.pathname.includes('/rpc/')) {
     return new Response(JSON.stringify(state.channelPermissions), { headers: { 'Content-Type': 'application/json' } })
   }
@@ -349,6 +353,14 @@ organization.setCurrentOrganization = (orgId) => {
 }
 organization.awaitInitialLoad = async () => true
 organization.getAppsByOrgId = orgId => orgId === previewOrganization.gid ? [{ app_id: previewAppId, owner_org: orgId, name: 'My Capacitor app', icon_url: '', need_onboarding: true, onboarding: previewOnboarding() }] : []
+if (builderIntroView) {
+  const builderApp = ref({ app_id: previewAppId, owner_org: previewOrganization.gid, name: 'My Capacitor app', icon_url: '', need_onboarding: true, onboarding: previewOnboarding() })
+  organization.getAppByAppId = appId => appId === previewAppId ? builderApp.value as any : undefined
+  organization.updateAppOnboarding = (appId, onboarding) => {
+    if (appId === previewAppId && onboarding)
+      builderApp.value.onboarding = onboarding as ReturnType<typeof previewOnboarding>
+  }
+}
 app.use(i18n)
 const router = createRouter({
   history: createWebHistory(),
@@ -362,7 +374,7 @@ const router = createRouter({
           },
         }) },
         // A resume id renders the setup UI the way Getting started embeds it.
-        { path: '/:pathMatch(.*)*', component: defineComponent({ setup: () => () => builderIntroView ? h(BuilderIntroduction, { appId: previewAppId, entitlement: 'plan' }) : h(AppOnboardingFlow, { onboarding: true, setupAppId: params.get('resume') ?? undefined }) }) },
+        { path: '/:pathMatch(.*)*', component: defineComponent({ setup: () => () => builderIntroView ? h(BuildTable, { appId: previewAppId }) : h(AppOnboardingFlow, { onboarding: true, setupAppId: params.get('resume') ?? undefined }) }) },
       ]
     : [{ path: '/:pathMatch(.*)*', component: { render: () => null } }],
 })
