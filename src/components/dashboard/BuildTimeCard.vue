@@ -9,6 +9,8 @@ import { useConsole } from '~/services/console'
 
 const props = defineProps({
   appId: { type: String, default: '' },
+  // When set, aggregate build time across every app of the organization instead of one app.
+  orgId: { type: String, default: '' },
   useBillingPeriod: { type: Boolean, default: false },
   accumulated: { type: Boolean, default: false },
   reloadTrigger: { type: Number, default: 0 },
@@ -28,7 +30,7 @@ const { isLoading, result } = useBuildCardStats<BuildTimeResult>(props, emit, {
     const rows = await fetchAllRows<BuildLogRow>((from, to) => capgo
       .from('build_logs')
       .select('created_at, billable_seconds')
-      .eq('app_id', props.appId)
+      .eq(props.orgId ? 'org_id' : 'app_id', props.orgId || props.appId)
       .gte('created_at', window.startISO)
       .lte('created_at', window.endISO)
       .order('created_at')
@@ -70,7 +72,7 @@ const hasData = computed(() => totalMinutes.value > 0)
     :has-data="hasData"
   >
     <BuildTimeChart
-      :key="`${appId}:${JSON.stringify(minutesPerDay)}`"
+      :key="`${orgId || appId}:${JSON.stringify(minutesPerDay)}`"
       :data="minutesPerDay"
       :use-billing-period="useBillingPeriod"
       :accumulated="accumulated"

@@ -1298,27 +1298,6 @@ anti-fraud behaviors documented in
 [docs/billing-usage-retention.md](docs/billing-usage-retention.md). Do not
 change them without a product decision.
 
-## Graphify
-
-The project-scoped Graphify skill lives at `.agents/skills/graphify/SKILL.md`.
-Use it for questions about architecture, file relationships, dead code, used
-code, and where code is used.
-
-Rules:
-- When the user types `/graphify`, follow the project skill before doing
-  anything else.
-- `graphify-out/graph.json` is committed and refreshed by a
-  `chore(auto-sync)` commit after each release. Prefer `graphify query "<question>"`, `graphify affected "<node>"`,
-  `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` before broad
-  source searches.
-- Use `bun run graphify:generate` to refresh the committed code graph. The
-  generator is deterministic AST/code extraction and does not require LLM API
-  keys.
-- For deterministic unused export checks, keep using `bun run lint:deadcode`
-  alongside Graphify's graph queries.
-- After code changes that should update the repository graph, run
-  `bun run graphify:generate` and commit the resulting `graphify-out/` changes.
-
 ## Cursor Cloud specific instructions
 
 These notes capture non-obvious caveats for running the stack in the Cursor

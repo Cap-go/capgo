@@ -27,7 +27,7 @@ async function cancelBuildOnDisconnect(
         'Content-Type': 'application/json',
         'x-api-key': builderApiKey,
       },
-      body: JSON.stringify({ app_id: appId }),
+      body: JSON.stringify({ app_id: appId, reason: 'client_disconnected' }),
     })
 
     if (response.ok) {
