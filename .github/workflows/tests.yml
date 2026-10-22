@@ -1295,7 +1295,7 @@ jobs:
       - name: Install CLI dependencies
         run: bun install --filter ./cli
       - name: Test init command probes on Windows
-        run: node --experimental-strip-types cli/test/test-init-command-execution.mjs
+        run: bun run --cwd cli test:init-command-execution
       - name: Test init command execution on Windows
         run: bun run --cwd cli test:init-guardrails
       - name: Install test_upload dependencies

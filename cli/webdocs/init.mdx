@@ -15,7 +15,7 @@ npx @capgo/cli@latest init
 ```
 
 This includes adding code for updates, building, uploading your app, and verifying update functionality.
-Install your preferred package manager and make sure it is available on `PATH`. Windows npm, npx, pnpm, and Yarn command shims are supported during setup.
+Install your preferred package manager and make sure it is available on `PATH`. Windows npm, npx, pnpm, and Yarn 2+ command shims are supported during setup. Yarn Classic is unsupported because the runner requires `yarn dlx`.
 Capgo bundles are web assets and can be fetched by anyone who knows the URL. Use encryption for banking, regulated, or other high-security apps.
 During the iOS run-on-device step, choose a physical iPhone/iPad or simulator. If you choose a physical device, the CLI lets you connect, unlock, and check again before it launches the app.
 

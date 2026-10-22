@@ -136,7 +136,7 @@
     "test:channel-add-exists": "bun test/test-channel-add-exists.mjs",
     "test:wait-log": "bun test/test-wait-log.mjs",
     "test:init-guardrails": "bun test/test-init-guardrails.mjs",
-    "test:init-command-execution": "node --experimental-strip-types test/test-init-command-execution.mjs",
+    "test:init-command-execution": "bun test/test-init-command-execution.mjs",
     "test:init-upload-recovery": "bun test/test-init-upload-monorepo-recovery.mjs",
     "test:init-replay": "bun test/test-init-replay.mjs",
     "test:init-telemetry": "bun test/test-init-telemetry.mjs",
