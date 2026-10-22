@@ -527,17 +527,24 @@ export async function getCreditPricingSteps(orgId?: string): Promise<CreditPrici
   }
 }
 
-export async function getUsageCreditDeductions(orgId: string): Promise<UsageCreditLedgerRow[]> {
+/**
+ * Overage deductions of an organization, newest first. Pass `since` (the billing
+ * cycle start) to load only deductions processed in the current cycle instead of
+ * the whole history: a cycle's deductions are never processed before it starts.
+ */
+export async function getUsageCreditDeductions(orgId: string, since?: string): Promise<UsageCreditLedgerRow[]> {
   if (!orgId)
     return []
 
   try {
-    const { data, error } = await useConsole()
+    let query = useConsole()
       .from('usage_credit_ledger')
       .select('*')
       .eq('org_id', orgId)
       .eq('transaction_type', 'deduction')
-      .order('occurred_at', { ascending: false })
+    if (since)
+      query = query.gte('occurred_at', since)
+    const { data, error } = await query.order('occurred_at', { ascending: false })
 
     if (error)
       throw new Error(error.message)

@@ -33,7 +33,8 @@ const capgo = useConsole()
 const packageId = ref<string>('')
 const id = ref<number>(0)
 const loading = ref(true)
-const deviceIds = ref<string[]>([])
+// Whether any device is forced to this channel; the table pages them through the API.
+const hasDevices = ref(false)
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const deviceIdInput = ref('')
 const role = ref<OrganizationRole | null>(null)
@@ -184,15 +185,12 @@ async function getDeviceIds() {
   if (!channel.value)
     return
   try {
-    const { data: dataDevices } = await capgo
+    const { count } = await capgo
       .from('channel_devices')
-      .select('device_id')
+      .select('device_id', { count: 'exact', head: true })
       .eq('channel_id', id.value)
       .eq('app_id', channel.value.app_id)
-    if (dataDevices && dataDevices.length)
-      deviceIds.value = dataDevices.map(d => d.device_id)
-    else
-      deviceIds.value = []
+    hasDevices.value = (count ?? 0) > 0
   }
   catch (error) {
     console.error(error)
@@ -294,7 +292,7 @@ watchEffect(async () => {
     <div v-else-if="channel">
       <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-sm md:rounded-xl border-slate-200 dark:bg-slate-800/60 dark:border-white/10">
-          <DeviceTable v-if="deviceIds.length > 0" :app-id="channel.version.app_id" :ids="deviceIds" :channel="channel" :device-data-collection="deviceDataCollection" show-add-button @add-device="AddDevice" />
+          <DeviceTable v-if="hasDevices" :app-id="channel.version.app_id" :override-channel-id="channel.id" :channel="channel" :device-data-collection="deviceDataCollection" show-add-button @add-device="AddDevice" />
           <template v-else-if="!dialogStore.showDialog">
             <div class="flex min-h-96 items-center justify-center px-6 py-10 text-center">
               <div class="flex max-w-2xl flex-col items-center">

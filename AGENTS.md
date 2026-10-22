@@ -934,6 +934,31 @@ Also applies to dialog/Teleport content, admin filters, and hidden utility input
 - Generated database types live in `src/types/database.types.ts` (copied to
   the backend by `scripts/getTypes.mjs`).
 
+## Console Query Performance
+
+Every console query now pays a round trip through the Capgo API, and every row
+it returns is serialized twice. Keep each one bounded and cheap:
+
+- **Bound every list.** Use `.range()` or `.limit()`; a read that returns a
+  table's history (audit logs, deploys, ledger, devices) must page in the
+  database, not in the browser. PostgREST also truncates silently at
+  `max_rows` (1000), so an unbounded read is wrong as well as slow.
+- **Scope and filter in the database.** Filter by app, channel or bundle (JSON
+  paths like `.eq('old_record->>version', ...)` work) instead of loading rows to
+  filter client-side.
+- **Aggregate in the database.** Charts and counters get a `SECURITY INVOKER`
+  SQL function returning buckets (see `get_bundle_upload_daily_counts`), not
+  raw rows bucketed in the browser.
+- **Prefer `count: 'estimated'`** on tables that grow without bound; exact counts
+  are fine for per-app sets.
+- **Resolve id lists on the server.** Never download ids only to post them back
+  (see the device `overrides`/`overrideChannelId` filters).
+- **Wrap function calls in RLS policies** in a scalar subquery,
+  `(SELECT public.fn())`, so Postgres evaluates them once per statement instead
+  of once per row. `supabase/tests/88_test_console_query_performance.sql`
+  guards `verify_mfa()`.
+- **No sequential awaits in loops** for independent queries; use `Promise.all`.
+
 ## Auth Redirect Guardrails
 
 - We intentionally route auth email links through `/confirm-signup` to avoid

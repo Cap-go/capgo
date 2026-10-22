@@ -101,12 +101,12 @@ async function getUsage(orgId: string) {
   }
   detailPlanUsage = roundUsagePercents(detailPlanUsage)
 
-  const creditDeductions = await getUsageCreditDeductions(orgId)
-
   const nowEndOfDay = dayjs().endOf('day')
   const billingStart = organizationStore.currentOrganization?.subscription_start
     ? dayjs(organizationStore.currentOrganization.subscription_start).startOf('day')
     : null
+
+  const creditDeductions = await getUsageCreditDeductions(orgId, billingStart?.toISOString())
   const billingEndRaw = organizationStore.currentOrganization?.subscription_end
     ? dayjs(organizationStore.currentOrganization.subscription_end).endOf('day')
     : null

@@ -1,6 +1,7 @@
 import type { DurableObjectNamespace } from '@cloudflare/workers-types'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
+import { decodeJwt } from 'jose'
 import { z } from 'zod'
 import { CONSOLE_RPCS, CONSOLE_TABLES } from '../utils/console_query_allowlist.ts'
 import { parseBody, quickError, useCors } from '../utils/hono.ts'
@@ -23,6 +24,19 @@ const querySchema = z.object({
 const MAX_IMAGE_BYTES = 50 * 1024 * 1024
 const imagePathSchema = z.string().min(1).max(1024).refine(path => path.split('/').every(segment => segment !== '.' && segment !== '..'))
 
+/** A bearer user session (role authenticated with a subject); the anon or service key never qualifies. */
+export function isUserSessionToken(authorization: string): boolean {
+  if (!authorization.startsWith('Bearer '))
+    return false
+  try {
+    const claims = decodeJwt(authorization.slice(7))
+    return claims.role === 'authenticated' && typeof claims.sub === 'string' && claims.sub.length > 0
+  }
+  catch {
+    return false
+  }
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 app.use('*', useCors)
 app.route('/auth', consoleAuthProxy)
@@ -37,9 +51,11 @@ app.post('/query', async (c) => {
 
   const authorization = c.req.header('authorization')
   if (authorization) {
-    const rejection = await middlewareAuth(c, async () => {})
-    if (rejection)
-      return rejection
+    // PostgREST verifies the token signature and expiry on the replayed query,
+    // so only the claims shape is checked here. Verifying it a second time would
+    // cost an auth-server round trip per console query for symmetric keys.
+    if (!isUserSessionToken(authorization))
+      return quickError(401, 'invalid_jwt', 'Invalid JWT')
   }
   else if (!(request.kind === 'rpc' && request.name === 'is_not_deleted')) {
     // Only the pre-login deleted-account probe may run as anon.
@@ -47,7 +63,7 @@ app.post('/query', async (c) => {
   }
 
   // Always use the caller's authenticated role. Never reconstruct queries with a service key.
-  const client = authorization ? supabaseClient(c, c.get('authorization')!) : emptySupabase(c)
+  const client = authorization ? supabaseClient(c, authorization) : emptySupabase(c)
   let query: any = request.kind === 'table'
     ? client.from(request.name as any)
     : client.rpc(request.name as any, ...request.args as [any, any])

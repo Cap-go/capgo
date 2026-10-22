@@ -336,9 +336,11 @@ async function fetchAuditLogs() {
   try {
     await loadMembers()
 
+    // Estimated: exact up to PostgREST's row cap, planner estimate beyond it, so a
+    // large organization's audit trail is never counted row by row per page.
     let query = capgo
       .from('audit_logs')
-      .select('*', { count: 'exact' })
+      .select('*', { count: 'estimated' })
       .eq('org_id', props.orgId)
       .order('created_at', { ascending: false })
 

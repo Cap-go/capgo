@@ -29,6 +29,8 @@ type BundleCompareOp = VersionCompareOp | 'in'
 const props = defineProps<{
   appId: string
   ids?: string[]
+  /** Only devices forced to this channel; resolved by the API, never downloaded. */
+  overrideChannelId?: number
   versionName?: string
   showAddButton?: boolean
   channel?: unknown
@@ -302,6 +304,7 @@ function getQuerySignature() {
     override: filters.value.Override,
     customIdMode: filters.value.CustomId,
     ids: props.ids ? [...props.ids].sort().join(',') : '',
+    overrideChannelId: props.overrideChannelId ?? '',
     // Stable mode identity — not rolling ISO bounds that move every millisecond.
     dateRange: getTableDateRangeSignature(dateRangeMode.value, dateRange.value),
   })
@@ -361,27 +364,14 @@ async function loadChannelNames() {
   channelNames.value = names
 }
 
-async function getDevicesID() {
-  let req = capgo
-    .from('channel_devices')
-    .select('device_id')
-    .eq('app_id', props.appId)
-
-  if (props.ids)
-    req = req.in('device_id', props.ids)
-
-  const { data } = await req
-
-  const channelDev = data?.map(d => d.device_id) ?? []
-  return [...channelDev]
-}
-
-async function resolveDeviceIds() {
-  if (filters.value.Override)
-    return await getDevicesID()
-  if (props.ids)
-    return props.ids
-  return []
+// Override filters are resolved by the API from channel_devices; the console
+// never downloads every forced device id just to post them back.
+function getDeviceIdsFilterBody() {
+  return {
+    ...(props.ids?.length ? { devicesId: props.ids } : {}),
+    ...(filters.value.Override ? { overrides: true } : {}),
+    ...(props.overrideChannelId !== undefined ? { overrideChannelId: props.overrideChannelId } : {}),
+  }
 }
 
 async function countDevices(options?: { includeDateRange?: boolean }) {
@@ -390,7 +380,6 @@ async function countDevices(options?: { includeDateRange?: boolean }) {
     return 0
 
   const currentJwt = currentSession.session.access_token
-  const deviceIds = await resolveDeviceIds()
   const searchTerm = getSearchTerm()
 
   try {
@@ -404,7 +393,7 @@ async function countDevices(options?: { includeDateRange?: boolean }) {
         count: true,
         appId: props.appId,
         ...getDevicesFilterBody(),
-        devicesId: deviceIds.length > 0 ? deviceIds : undefined,
+        ...getDeviceIdsFilterBody(),
         search: searchTerm,
         order: getActiveOrder(columns.value),
         customIdMode: filters.value.CustomId,
@@ -544,7 +533,6 @@ onUnmounted(() => {
 })
 
 async function fetchDevicesPage(cursor: string | undefined | null) {
-  const ids = await resolveDeviceIds()
   const searchTerm = getSearchTerm()
 
   const { data: currentSession } = await capgo.auth.getSession()!
@@ -561,7 +549,7 @@ async function fetchDevicesPage(cursor: string | undefined | null) {
     body: JSON.stringify({
       appId: props.appId,
       ...getDevicesFilterBody(),
-      devicesId: ids.length ? ids : undefined,
+      ...getDeviceIdsFilterBody(),
       search: searchTerm,
       order: getActiveOrder(columns.value),
       cursor: cursor ?? undefined,
@@ -796,7 +784,6 @@ async function exportDevices(format: 'csv' | 'json') {
       toast.error(t('not-logged-in'))
       return
     }
-    const ids = await resolveDeviceIds()
     const response = await fetch(`${defaultApiHost}/private/devices/export`, {
       method: 'POST',
       headers: {
@@ -806,7 +793,7 @@ async function exportDevices(format: 'csv' | 'json') {
       body: JSON.stringify({
         appId: props.appId,
         ...getDevicesFilterBody(),
-        devicesId: ids.length ? ids : undefined,
+        ...getDeviceIdsFilterBody(),
         search: getSearchTerm(),
         order: getActiveOrder(columns.value),
         customIdMode: filters.value.CustomId,

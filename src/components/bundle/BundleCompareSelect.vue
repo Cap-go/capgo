@@ -182,8 +182,8 @@ async function loadPreferredCompareVersions() {
   // otherwise leave the channel with no baseline. Keeping a small lookback lets
   // us fall back to the next older non-deleted deployment instead.
   const PREFERRED_LOOKBACK = 20
-  const candidatesByChannel: Array<Array<{ versionId: number, deployedAt: string | null }>> = []
-  for (const channelId of channelIds) {
+  // One lookback query per channel, run together rather than one after another.
+  const lookbacks = await Promise.all([...channelIds].map(async (channelId) => {
     const cutoff = deployedAtByChannel.get(channelId)
     let query = capgo
       .from('deploy_history')
@@ -195,13 +195,16 @@ async function loadPreferredCompareVersions() {
     if (cutoff)
       query = query.lt('created_at', cutoff)
 
-    const { data, error } = await query
+    return await query
       .order('created_at', { ascending: false })
       .limit(PREFERRED_LOOKBACK)
+  }))
 
-    if (requestId !== preferredCompareRequestId)
-      return
+  if (requestId !== preferredCompareRequestId)
+    return
 
+  const candidatesByChannel: Array<Array<{ versionId: number, deployedAt: string | null }>> = []
+  for (const { data, error } of lookbacks) {
     if (error) {
       console.error('Failed to load previous deploy history', error)
       continue

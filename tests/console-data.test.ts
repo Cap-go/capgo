@@ -75,6 +75,22 @@ describe('[POST] /private/console/query', () => {
     expect(response.status).toBe(400)
   })
 
+  it('refuses tokens that are not user sessions before replaying anything', async () => {
+    const forge = (claims: Record<string, unknown>) => `Bearer ${Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.sig`
+    const anonRole = await query({ kind: 'table', name: 'apps', args: [], operations: [{ method: 'select', args: ['id'] }] }, { Authorization: forge({ role: 'anon' }) })
+    expect(anonRole.status).toBe(401)
+    const garbage = await query({ kind: 'table', name: 'apps', args: [], operations: [{ method: 'select', args: ['id'] }] }, { Authorization: 'Bearer not-a-jwt' })
+    expect(garbage.status).toBe(401)
+  })
+
+  it('lets the database reject a forged user token instead of trusting its claims', async () => {
+    const forged = `Bearer ${Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url')}.${Buffer.from(JSON.stringify({ role: 'authenticated', sub: USER_ID, exp: Math.floor(Date.now() / 1000) + 600 })).toString('base64url')}.forged`
+    const response = await query({ kind: 'table', name: 'users', args: [], operations: [{ method: 'select', args: ['id'] }] }, { Authorization: forged })
+    const body = await response.json() as QueryResponse
+    expect(body.data).toBeNull()
+    expect(body.error).not.toBeNull()
+  })
+
   it('requires a session for table queries', async () => {
     const response = await query({ kind: 'table', name: 'apps', args: [], operations: [{ method: 'select', args: ['id'] }] })
     expect(response.status).toBe(401)

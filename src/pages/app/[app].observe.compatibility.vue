@@ -322,13 +322,18 @@ async function loadAppInfo() {
   }
 }
 
+const COMPATIBILITY_EVENTS_LIMIT = 500
+
 async function loadEvents() {
   try {
+    // Newest events only: older ones are history, and every row also drives
+    // channel and bundle lookups below.
     const { data, error } = await capgo
       .from('compatibility_events')
       .select('*')
       .eq('app_id', id.value)
       .order('created_at', { ascending: false })
+      .limit(COMPATIBILITY_EVENTS_LIMIT)
 
     if (error) {
       console.error('[Compatibility] Error loading events:', error)
@@ -497,22 +502,23 @@ function openDependencyDiff(event: CompatibilityEventRow) {
 
 async function acknowledgeEvents(eventIds: number[], note: string) {
   try {
-    for (const eventId of eventIds) {
-      const { error } = await capgo.rpc('acknowledge_compatibility_event', {
-        event_id: eventId,
-        note,
-      })
+    // Independent acknowledgements, sent together instead of one round trip each.
+    const results = await Promise.all(eventIds.map(eventId => capgo.rpc('acknowledge_compatibility_event', {
+      event_id: eventId,
+      note,
+    })))
+    const failed = results.find(result => result.error)
 
-      if (error) {
-        // The reason was already validated in the dialog handler, so an error
-        // here is an RPC/network/server failure — not a missing reason.
-        console.error('[Compatibility] Error accepting event:', error)
-        toast.error(t('something-went-wrong-try-again-later'))
-        return
-      }
+    if (failed) {
+      // The reason was already validated in the dialog handler, so an error
+      // here is an RPC/network/server failure — not a missing reason.
+      console.error('[Compatibility] Error accepting event:', failed.error)
+      toast.error(t('something-went-wrong-try-again-later'))
     }
-
-    toast.success(t('compatibility-status-resolved'))
+    else {
+      toast.success(t('compatibility-status-resolved'))
+    }
+    // Reload either way so partially accepted groups show their real state.
     await loadEvents()
     await loadLookups()
   }

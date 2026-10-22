@@ -312,13 +312,24 @@ async function fetchBundleHistory() {
   }
 
   // Fetch removals from audit_logs
-  // When a channel's version changes FROM this bundle TO another bundle, that's a removal
-  const { data: auditData, error: auditError } = await capgo
-    .from('audit_logs')
-    .select('*')
-    .eq('table_name', 'channels')
-    .eq('operation', 'UPDATE')
-    .contains('changed_fields', ['version'])
+  // When a channel's version changes FROM this bundle TO another bundle, that's a removal.
+  // Scope to this app's channels and match the old bundle in the database, so only real
+  // removals come back instead of every channel change the caller can read.
+  const { data: appChannels } = await capgo
+    .from('channels')
+    .select('id')
+    .eq('app_id', props.appId)
+  const appChannelIds = (appChannels ?? []).map(channel => String(channel.id))
+  const { data: auditData, error: auditError } = appChannelIds.length
+    ? await capgo
+        .from('audit_logs')
+        .select('id, record_id, user_id, created_at, old_record')
+        .eq('table_name', 'channels')
+        .in('record_id', appChannelIds)
+        .eq('operation', 'UPDATE')
+        .contains('changed_fields', ['version'])
+        .eq('old_record->>version', String(bundleId))
+    : { data: [], error: null }
 
   if (auditError) {
     console.error('Error fetching audit logs:', auditError)

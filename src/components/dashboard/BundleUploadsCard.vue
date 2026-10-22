@@ -22,10 +22,7 @@ import { ensureMinDelay } from '~/utils/minDelay'
 import BundleUploadsChart from './BundleUploadsChart.vue'
 import ChartCard from './ChartCard.vue'
 
-type BundleUploadRow = Pick<
-  Database['public']['Tables']['app_versions']['Row'],
-  'app_id' | 'created_at' | 'deleted' | 'external_url' | 'r2_path' | 'user_id'
->
+type UploadDailyCount = Database['public']['Functions']['get_bundle_upload_daily_counts']['Returns'][number]
 
 const props = defineProps({
   useBillingPeriod: {
@@ -61,7 +58,7 @@ const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 
 // Per-org cache for raw API data: Map<orgId, cachedData>
-const cacheByOrg = new Map<string, any[]>()
+const cacheByOrg = new Map<string, UploadDailyCount[]>()
 // Track current org for change detection
 const currentCacheOrgId = ref<string | null>(null)
 // Cache for single app name to avoid refetching
@@ -92,13 +89,6 @@ const effectiveTotal = computed(() => isDemoMode.value ? calculateDemoTotal(demo
 const effectiveLastDayEvolution = computed(() => isDemoMode.value ? calculateDemoEvolution(demoBundleData.value) : lastDayEvolution.value)
 
 const hasData = computed(() => effectiveTotal.value > 0 || isDemoMode.value)
-
-function isSyntheticDefaultVersion(bundle: BundleUploadRow) {
-  return bundle.deleted
-    && !bundle.r2_path
-    && !bundle.external_url
-    && !bundle.user_id
-}
 
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
@@ -166,7 +156,7 @@ async function calculateStats(forceRefetch = false) {
     }
 
     // Check per-org cache - only use cache if not forcing refetch
-    let data: any[] | null = null
+    let data: UploadDailyCount[] | null = null
     let error = null
     const cachedData = currentOrgId ? cacheByOrg.get(currentOrgId) : null
 
@@ -174,15 +164,14 @@ async function calculateStats(forceRefetch = false) {
       data = cachedData
     }
     else {
-      // Fetch series window (billing cycle or last 30 UTC days)
-      const query = useConsole()
-        .from('app_versions')
-        .select('created_at, app_id, deleted, r2_path, external_url, user_id')
-        .gte('created_at', last30DaysStart.toISOString())
-        .lt('created_at', last30DaysEnd.toISOString())
-        .in('app_id', targetAppIds)
-
-      const result = await query
+      // Per-day upload counts for the series window (billing cycle or last 30 UTC
+      // days), aggregated in the database instead of downloading every bundle.
+      const result = await useConsole()
+        .rpc('get_bundle_upload_daily_counts', {
+          p_app_ids: targetAppIds,
+          p_start: last30DaysStart.toISOString(),
+          p_end: last30DaysEnd.toISOString(),
+        })
       data = result.data
       error = result.error
 
@@ -200,30 +189,16 @@ async function calculateStats(forceRefetch = false) {
         bundleDataByApp30Days[appId] = Array.from({ length: dayCount }).fill(0) as number[]
       })
 
-      // Track total separately (don't use ref during loop)
       let totalCount = 0
-
-      // Map each bundle to the correct day and app
-      data
-        .filter((bundle: BundleUploadRow) => bundle.created_at !== null && bundle.app_id !== null && !isSyntheticDefaultVersion(bundle))
-        .forEach((bundle: any) => {
-          if (bundle.created_at && bundle.app_id) {
-            const bundleDate = new Date(bundle.created_at)
-
-            // Calculate days since start of series window
-            const daysDiff = Math.floor((bundleDate.getTime() - last30DaysStart.getTime()) / (1000 * 60 * 60 * 24))
-
-            if (daysDiff >= 0 && daysDiff < dayCount) {
-              dailyCounts30Days[daysDiff]++
-              totalCount++
-
-              // Also track by app
-              if (bundleDataByApp30Days[bundle.app_id]) {
-                bundleDataByApp30Days[bundle.app_id][daysDiff]++
-              }
-            }
-          }
-        })
+      for (const row of data) {
+        if (row.day_index < 0 || row.day_index >= dayCount)
+          continue
+        const uploads = Number(row.uploads)
+        dailyCounts30Days[row.day_index] += uploads
+        totalCount += uploads
+        if (bundleDataByApp30Days[row.app_id])
+          bundleDataByApp30Days[row.app_id][row.day_index] += uploads
+      }
 
       // Filter data based on billing period mode
       if (props.useBillingPeriod) {
