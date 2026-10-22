@@ -147,15 +147,12 @@ async function fetchLinkedVersionIds(c: Context<MiddlewareKeyVariables>, apikey:
  */
 async function softDeleteBatch(
   c: Context<MiddlewareKeyVariables>,
-  apikey: Database['public']['Tables']['apikeys']['Row'],
+  pgClient: Awaited<ReturnType<typeof getPgClient>>,
+  effectiveApikey: string,
   appId: string,
   ids: number[],
   ignoreChannel: boolean,
 ): Promise<number[]> {
-  const effectiveApikey = apikey.key ?? c.get('capgkey')
-  if (!effectiveApikey)
-    throw simpleError('cannot_delete_bundle', 'You can\'t access this app', { app_id: appId })
-  const pgClient = await getPgClient(c)
   let dbClient: Awaited<ReturnType<typeof checkoutPgClient>> | null = null
   let transactionStarted = false
   try {
@@ -169,7 +166,9 @@ async function softDeleteBatch(
       'SELECT public.lock_channel_bundle_lifecycle(id, NULL) FROM pg_catalog.unnest($1::bigint[]) AS t(id) ORDER BY id',
       [ids],
     )
-    // Same caller identity the delete-permission trigger checks on the REST path.
+    // Attribute the write to the caller's API key in the audit log (get_apikey_header). This
+    // direct connection runs as an internal role, so the delete-permission trigger does not
+    // re-check it: cleanupBundles' checkPermission('bundle.delete') is the authorization.
     await dbClient.query(
       'SELECT set_config(\'request.headers\', $1, true)',
       [JSON.stringify({ capgkey: effectiveApikey })],
@@ -208,7 +207,6 @@ async function softDeleteBatch(
   }
   finally {
     releasePgClient(pgClient, dbClient)
-    await closeClient(c, pgClient)
   }
 }
 
@@ -238,21 +236,32 @@ export async function cleanupBundles(c: Context<MiddlewareKeyVariables>, bodyRaw
   if (body.dry_run === true || !plan.removed.length)
     return c.json({ ...plan, dry_run: body.dry_run === true })
 
-  // Soft-delete in batches, each its own locked transaction (see softDeleteBatch).
+  const effectiveApikey = apikey.key ?? c.get('capgkey')
+  if (!effectiveApikey)
+    throw simpleError('cannot_delete_bundle', 'You can\'t access this app', { app_id: body.app_id })
+
+  // Soft-delete in batches, each its own locked transaction (see softDeleteBatch), sharing
+  // one connection pool.
   const removedIds = new Set<number>()
-  for (let i = 0; i < plan.removed.length; i += DELETE_BATCH_SIZE) {
-    const ids = plan.removed.slice(i, i + DELETE_BATCH_SIZE).map(row => row.id)
-    let deleted: number[]
-    try {
-      deleted = await softDeleteBatch(c, apikey, body.app_id, ids, ignoreChannel)
+  const pgClient = await getPgClient(c)
+  try {
+    for (let i = 0; i < plan.removed.length; i += DELETE_BATCH_SIZE) {
+      const ids = plan.removed.slice(i, i + DELETE_BATCH_SIZE).map(row => row.id)
+      let deleted: number[]
+      try {
+        deleted = await softDeleteBatch(c, pgClient, effectiveApikey, body.app_id, ids, ignoreChannel)
+      }
+      catch (error) {
+        if (error instanceof HTTPException)
+          throw error
+        quickError(500, 'cannot_delete_version', 'Cannot delete bundles', { error: (error as Error)?.message, removed_ids: [...removedIds] })
+      }
+      for (const id of deleted)
+        removedIds.add(id)
     }
-    catch (error) {
-      if (error instanceof HTTPException)
-        throw error
-      quickError(500, 'cannot_delete_version', 'Cannot delete bundles', { error: (error as Error)?.message, removed_ids: [...removedIds] })
-    }
-    for (const id of deleted)
-      removedIds.add(id)
+  }
+  finally {
+    await closeClient(c, pgClient)
   }
 
   const removed = plan.removed.filter(row => removedIds.has(row.id))
