@@ -21,6 +21,15 @@ function isConsoleReadUrl(url: URL) {
   }
 }
 
+function decodePathname(pathname: string) {
+  try {
+    return decodeURIComponent(pathname)
+  }
+  catch {
+    return pathname
+  }
+}
+
 export function resolveImagePath(raw?: string | null) {
   if (!raw)
     return { normalized: '', shouldSign: false }
@@ -34,10 +43,12 @@ export function resolveImagePath(raw?: string | null) {
     // A URL this console signed earlier carries the storage path; re-sign from it.
     if (isConsoleReadUrl(url))
       return { normalized: url.searchParams.get('path')!.replace(/^\/+/, ''), shouldSign: true }
-    const match = STORAGE_URL_REGEX.exec(url.pathname)
+    // Match the decoded pathname so an encoded storage route still goes through
+    // signing; the key comes out of that single decode.
+    const match = STORAGE_URL_REGEX.exec(decodePathname(url.pathname))
     if (match?.[1]) {
       return {
-        normalized: decodeURIComponent(match[1]).replace(/^\/+/, ''),
+        normalized: match[1].replace(/^\/+/, ''),
         shouldSign: true,
       }
     }

@@ -25,6 +25,18 @@ describe('resolveImagePath', () => {
     })
   })
 
+  it('signs storage URLs whose route is percent-encoded, decoding the key once', async () => {
+    const { resolveImagePath } = await import('../src/services/storage.ts')
+    expect(resolveImagePath('https://db.example.com/storage/v1/object/public/%69mages/org%2Flogo%2520x.png')).toEqual({
+      normalized: 'org/logo%20x.png',
+      shouldSign: true,
+    })
+    expect(resolveImagePath('https://db.example.com/storage/v1/object/public/images/org/logo%20x.png')).toEqual({
+      normalized: 'org/logo x.png',
+      shouldSign: true,
+    })
+  })
+
   it('leaves a foreign URL that only looks like the relay untouched', async () => {
     const { resolveImagePath } = await import('../src/services/storage.ts')
     const foreign = 'https://images.example.org/private/console/images/read?path=org%2Flogo.png&token=t'
