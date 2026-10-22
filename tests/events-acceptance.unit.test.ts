@@ -192,6 +192,59 @@ describe('/private/events durable acceptance', () => {
     expect(sendTracking).not.toHaveBeenCalled()
     expect(recordBento).not.toHaveBeenCalled()
   })
+
+  it('maps Checkout Started to the user:checkout_started Bento event when billing can be updated', async () => {
+    const response = await request({
+      event: 'Checkout Started',
+      org_id: 'org-a',
+      tags: {
+        product_id: 'prod_team',
+        plan_name: 'Team',
+        recurrence: 'month',
+        checkout_source: 'plans_upgrade',
+        current_plan_name: 'Maker',
+        plan_price: 49,
+        plan_price_monthly: 49,
+        plan_price_yearly: 490,
+      },
+    })
+    expect(response.status).toBe(200)
+    expect(checkPermission).toHaveBeenCalledWith(expect.anything(), 'org.update_billing', { orgId: 'org-a' })
+    expect(sendTracking.mock.calls[0][1]).toMatchObject({
+      event: 'Checkout Started',
+      sentToBento: true,
+      bento: {
+        event: 'user:checkout_started',
+        audience: 'billing',
+        data: {
+          org_id: 'org-a',
+          org_name: 'Example org',
+          product_id: 'prod_team',
+          plan_name: 'Team',
+          plan_type: 'monthly',
+          recurrence: 'month',
+          checkout_source: 'plans_upgrade',
+          current_plan_name: 'Maker',
+          plan_price: 49,
+          plan_price_monthly: 49,
+          plan_price_yearly: 490,
+        },
+      },
+    })
+  })
+
+  it('rejects Checkout Started when the caller cannot update billing', async () => {
+    checkPermission.mockImplementation(async (_c, permission) => permission !== 'org.update_billing')
+    expect((await request({ event: 'Checkout Started', org_id: 'org-a' })).status).toBe(403)
+    expect(queueSend).not.toHaveBeenCalled()
+    expect(sendTracking).not.toHaveBeenCalled()
+  })
+
+  it('rejects Checkout Started without a verified organization', async () => {
+    expect((await request({ event: 'Checkout Started' })).status).toBe(403)
+    expect(queueSend).not.toHaveBeenCalled()
+    expect(sendTracking).not.toHaveBeenCalled()
+  })
 })
 
 describe('queue persistence boundary', () => {
