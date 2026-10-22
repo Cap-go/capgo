@@ -78,7 +78,7 @@ async function refreshPendingOnboardingApp() {
     app: data,
     organizationAppCount: singleOrganization?.app_count ?? 0,
     organizationCount: selectableOrganizations.value.length,
-  }) ?? (candidateAppId && data?.need_onboarding ? data.app_id : '')
+  }) ?? ''
 }
 
 watch([
