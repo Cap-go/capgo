@@ -341,7 +341,7 @@ Object.defineProperty(useMainStore(pinia), 'user', { value: { id: '00000000-0000
 Object.defineProperty(useMainStore(pinia), 'auth', { value: { id: '00000000-0000-4000-8000-000000000001' } })
 useMainStore(pinia).awaitInitialLoad = async () => true
 const organization = useOrganizationStore(pinia)
-const previewOrganization = { gid: '00000000-0000-4000-8000-000000000002', name: 'Preview organization' }
+const previewOrganization = { gid: '00000000-0000-4000-8000-000000000002', name: 'Preview organization', ...(builderIntroView ? { paying: true } : {}) }
 const selectedOrganization = ref(params.get('wrongOrg') === '1' ? { gid: '00000000-0000-4000-8000-000000000099' } : previewOrganization)
 preview.selectedOrgId.value = selectedOrganization.value.gid
 Object.defineProperty(organization, 'currentOrganization', { get: () => selectedOrganization.value })
