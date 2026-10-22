@@ -216,6 +216,21 @@ function statusLabel(status: string | undefined) {
               </span>
             </button>
           </li>
+          <li class="px-3 py-4" data-test="setup-checklist-cicd-step">
+            <p class="text-xs font-medium text-slate-500 dark:text-slate-400">
+              {{ t('setup-checklist-optional-next-step') }}
+            </p>
+            <p class="mt-2 text-base font-medium leading-6 text-slate-800 dark:text-slate-200">
+              {{ t('setup-checklist-cicd-title') }}
+            </p>
+            <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              {{ t('setup-checklist-cicd-description') }}
+            </p>
+            <a href="https://capgo.app/docs/getting-started/cicd-integration/" target="_blank" rel="noopener noreferrer" class="d-btn d-btn-ghost mt-3 h-auto min-h-11 max-w-full gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-sky-700 whitespace-normal focus-visible:ring-2 focus-visible:ring-azure-500 focus-visible:ring-offset-2 dark:text-azure-300 dark:focus-visible:ring-offset-slate-900">
+              <IconFileText class="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>{{ t('setup-checklist-cicd-guide') }}</span>
+            </a>
+          </li>
         </ol>
       </nav>
 
