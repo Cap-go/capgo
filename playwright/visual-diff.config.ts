@@ -449,8 +449,10 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     auth: true,
     prepare: async (page) => {
       // Show the waiting state: the seeded org already owns apps.
-      await page.route('**/rest/v1/apps?select=app_id%2Cname*', route => route.fulfill({ json: [] }))
-      await page.reload()
+      // Match the prompt page's own app lookup whether or not the select list is percent-encoded.
+      await page.route(url => url.pathname.endsWith('/rest/v1/apps') && /^app_id,name$/.test(url.searchParams.get('select') ?? ''), route => route.fulfill({ json: [] }))
+      // The first load may already have found the seeded app and moved on, so open the page again.
+      await page.goto('/onboarding/ai')
       if (process.env.VISUAL_DIFF_PHASE === 'after')
         await page.locator('[data-test="onboarding-ai-waiting"]').waitFor()
     },
