@@ -652,8 +652,8 @@ app.post('/', middlewareAuth(), async (c) => {
     timestamp: Date.parse(identity.occurred_at),
   })
 
-  if (trackedBody.event === PLAN_CHECKOUT_STARTED_EVENT && verifiedOrgId) {
-    if (!(await checkPermission(c, 'org.update_billing', { orgId: verifiedOrgId }))) {
+  if (trackedBody.event === PLAN_CHECKOUT_STARTED_EVENT) {
+    if (!verifiedOrgId || !(await checkPermission(c, 'org.update_billing', { orgId: verifiedOrgId }))) {
       throw quickError(403, 'no_permission', 'You cannot send checkout events for this organization')
     }
   }

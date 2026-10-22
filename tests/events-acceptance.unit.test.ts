@@ -239,6 +239,12 @@ describe('/private/events durable acceptance', () => {
     expect(queueSend).not.toHaveBeenCalled()
     expect(sendTracking).not.toHaveBeenCalled()
   })
+
+  it('rejects Checkout Started without a verified organization', async () => {
+    expect((await request({ event: 'Checkout Started' })).status).toBe(403)
+    expect(queueSend).not.toHaveBeenCalled()
+    expect(sendTracking).not.toHaveBeenCalled()
+  })
 })
 
 describe('queue persistence boundary', () => {
