@@ -83,26 +83,12 @@ jobs:
           if [ "$start_run" -lt 1 ]; then
             start_run=1
           fi
-          pending=0
-          # At most 27 deletes in five batches, each bounded to 50 seconds.
           for run in $(seq "$start_run" "$GITHUB_RUN_NUMBER"); do
             for attempt in 1 2 3; do
               bundle="${BASE_VERSION}-pr.${PR_NUMBER}.${run}.${attempt}"
-              (
-                delete_status=0
-                timeout --kill-after=5s 45s bunx "$CAPGO_CLI" bundle delete "$bundle" "$APP_ID" --apikey "$CAPGO_TOKEN" 2>/dev/null || delete_status=$?
-                if [ "$delete_status" -eq 124 ] || [ "$delete_status" -eq 137 ]; then
-                  echo "::warning::Timed out deleting preview bundle ${bundle}"
-                fi
-              ) &
-              pending=$((pending + 1))
-              if [ "$pending" -eq 6 ]; then
-                wait
-                pending=0
-              fi
+              bunx "$CAPGO_CLI" bundle delete "$bundle" "$APP_ID" --apikey "$CAPGO_TOKEN" 2>/dev/null || true
             done
           done
-          wait
       - name: Upload bundle to the PR channel
         env:
           CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
