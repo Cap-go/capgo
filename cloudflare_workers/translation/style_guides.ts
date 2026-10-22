@@ -20,7 +20,7 @@ const FRENCH_STYLE_GUIDE = `French (France) style guide:
 Glossary (English -> French, mandatory):
 - AI -> IA (agents IA); AI agent -> agent IA
 - bundle -> bundle (le bundle, les bundles)
-- build (noun) -> build (le build); cloud build -> build cloud; Native Build (Capgo product) stays Native Build; build time -> temps de build; to build an app -> compiler
+- build (noun) -> build (le build); cloud build -> build cloud; native build (generic) -> build natif; Native Build (Capgo product name) stays Native Build; build time -> temps de build; to build an app -> compiler
 - channel -> canal (pl. canaux). Never "chaîne".
 - release (noun) -> release or version; never "mise à jour" when it means a version
 - live update(s) -> live update(s) or "mise à jour OTA". Never "mise à jour en direct".

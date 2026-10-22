@@ -28,8 +28,6 @@ extend-exclude = [
   "src/typed-router.d.ts",
   "src/components.d.ts",
   "supabase/tests/00-supabase_test_helpers.sql",
-  # French glossary for the translation worker (appareil, sur, ...).
-  "cloudflare_workers/translation/style_guides.ts",
 
   # Database and Supabase
   "supabase/.branches/",
@@ -70,6 +68,9 @@ extend-exclude = [
 ]
 
 [default.extend-words]
+# French words in the translation style guides.
+appareil = "appareil"
+sur = "sur"
 # Add custom words that should be ignored
 # Format: incorrectword = "correctword" or incorrectword = "incorrectword" to accept as-is
 capgo = "capgo"
