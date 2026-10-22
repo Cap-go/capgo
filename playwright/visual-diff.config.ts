@@ -289,10 +289,14 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.route('**/rest/v1/build_requests?*', route => route.fulfill({ json: [], headers: { 'content-range': '*/0' } }))
       await page.route('**/app/com.demo.app/onboarding/builder', route => route.fulfill({ json: { canEnable: true } }))
       await page.reload()
-      if (process.env.VISUAL_DIFF_PHASE === 'before')
-        await page.getByRole('heading', { name: 'Start a native build', exact: true }).waitFor({ state: 'visible' })
-      else
-        await page.locator('[data-test="builder-introduction"]').waitFor({ state: 'visible' })
+      const introduction = page.locator('[data-test="builder-introduction"]')
+      if (process.env.VISUAL_DIFF_PHASE === 'after') {
+        await introduction.waitFor({ state: 'visible' })
+        return
+      }
+      // The base can already include the introduction after the Builder PR merges.
+      await page.getByRole('heading', { name: 'Start a native build', exact: true })
+        .or(introduction).waitFor({ state: 'visible' })
     },
   },
   ...[
@@ -683,6 +687,24 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
   { slug: 'org-settings-team', path: '/settings/organization/members', auth: true },
   { slug: 'org-settings-billing', path: '/settings/organization/plans', auth: true },
   { slug: 'channels', path: '/app/com.demo.app/channels', auth: true },
+  {
+    slug: 'channels-empty',
+    path: '/app/com.demo.app/channels',
+    auth: true,
+    prepare: async (page) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await page.route('**/rest/v1/channels?*', route => route.fulfill({ json: [], headers: { 'content-range': '*/0' } }))
+      await page.reload()
+      const introduction = page.locator('[data-test="channel-introduction"]')
+      if (process.env.VISUAL_DIFF_PHASE === 'after') {
+        await introduction.waitFor({ state: 'visible' })
+        return
+      }
+      // The base can leave the loaded empty table visible while create permission resolves.
+      await introduction
+        .or(page.getByRole('cell', { name: 'No elements found', exact: true })).waitFor({ state: 'visible' })
+    },
+  },
   {
     slug: 'devices',
     path: '/app/com.demo.app/devices',

@@ -107,16 +107,16 @@ function syncRoutingPaths() {
 }
 
 function renderedPathPoints(path: SVGPathElement) {
-  const stage = element('.csa-stage')
+  const canvas = element('.csa-routing-canvas')
   const matrix = path.getScreenCTM()
   const svg = path.ownerSVGElement
 
-  if (!stage || !matrix || !svg)
+  if (!canvas || !matrix || !svg)
     return []
 
-  const stageRect = stage.getBoundingClientRect()
-  const stageOriginX = stageRect.left + stage.clientLeft
-  const stageOriginY = stageRect.top + stage.clientTop
+  const canvasRect = canvas.getBoundingClientRect()
+  const canvasOriginX = canvasRect.left + canvas.clientLeft
+  const canvasOriginY = canvasRect.top + canvas.clientTop
   const pathLength = path.getTotalLength()
   const svgPoint = svg.createSVGPoint()
 
@@ -127,8 +127,8 @@ function renderedPathPoints(path: SVGPathElement) {
     const screenPoint = svgPoint.matrixTransform(matrix)
 
     return {
-      x: screenPoint.x - stageOriginX,
-      y: screenPoint.y - stageOriginY,
+      x: screenPoint.x - canvasOriginX,
+      y: screenPoint.y - canvasOriginY,
     }
   })
 }
@@ -660,7 +660,7 @@ const { continueOnboarding, goBack, replay } = useOnboardingChannelAnimation({
       </div>
     </section>
 
-    <footer v-if="embedded" class="flex items-center justify-between border-t border-slate-200 bg-white px-5 py-3 sm:px-6 dark:border-white/10 dark:bg-slate-950">
+    <footer v-if="embedded" class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-5 py-3 sm:px-6 dark:border-white/10 dark:bg-slate-950">
       <button
         type="button"
         class="d-btn d-btn-ghost d-btn-square h-10 min-h-10 w-10 shrink-0"
@@ -671,9 +671,12 @@ const { continueOnboarding, goBack, replay } = useOnboardingChannelAnimation({
       >
         <IconArrowLeft class="h-4 w-4" aria-hidden="true" />
       </button>
-      <button type="button" class="d-btn d-btn-primary h-12 min-h-12 shrink-0 px-5" data-test="channel-self-assign-continue" @click="continueOnboarding">
-        {{ t('continue') }}
-      </button>
+      <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
+        <slot name="secondary-action" />
+        <button type="button" class="d-btn d-btn-primary h-12 min-h-12 shrink-0 px-5" data-test="channel-self-assign-continue" @click="continueOnboarding">
+          {{ t('continue') }}
+        </button>
+      </div>
     </footer>
   </main>
 </template>
