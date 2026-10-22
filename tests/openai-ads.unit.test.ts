@@ -2,7 +2,8 @@ import type { Context } from 'hono'
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { buildOpenAIRegistrationEvent, normalizeOpenAIName, trackOpenAIRegistration } from '../supabase/functions/_backend/utils/openai_ads.ts'
+import { buildOpenAIRegistrationEvent, buildOpenAISubscriptionEvent, getOpenAISubscriptionSourceUrl, normalizeOpenAICurrency, normalizeOpenAIName, trackOpenAIRegistration, trackOpenAISubscription } from '../supabase/functions/_backend/utils/openai_ads.ts'
+import { getInvoicePayment, trackOpenAIFirstPayment } from '../supabase/functions/_backend/utils/openai_ads_first_payment.ts'
 
 const envValues: Record<string, string> = {}
 
@@ -139,5 +140,148 @@ describe('openai ads conversions api', () => {
     finally {
       vi.useRealTimers()
     }
+  })
+
+  describe('subscription_created (first payment)', () => {
+    const orgId = '0f2c1a3b-1111-4222-8333-444455556666'
+    const paidAt = '2026-10-19T11:30:00.000Z'
+    const input = {
+      orgId,
+      user: record,
+      paidAt,
+      planId: 'Solo',
+      amount: 1400,
+      currency: 'usd',
+      sourceUrl: 'https://console.capgo.app/settings/organization/plans',
+    }
+
+    it('builds a plan_enrollment event with a per-org id and the registration user hashes', async () => {
+      const userIdHash = sha('6aa76066-55ef-4238-ade6-0b32334a4097')
+      const registration = await buildOpenAIRegistrationEvent(record, now)
+      const event = await buildOpenAISubscriptionEvent(input, now)
+      expect(event).toEqual({
+        id: `subscription_${sha(orgId)}`,
+        type: 'subscription_created',
+        timestamp_ms: Date.parse(paidAt),
+        source_url: 'https://console.capgo.app/settings/organization/plans',
+        action_source: 'web',
+        user: registration!.user,
+        data: { type: 'plan_enrollment', plan_id: 'Solo', amount: 1400, currency: 'USD' },
+      })
+      expect(event!.user.external_ids_sha256).toEqual([userIdHash])
+    })
+
+    it('maps amount and currency: both or neither, integer minor units, uppercase ISO code', async () => {
+      const data = async (overrides: Record<string, unknown>) => (await buildOpenAISubscriptionEvent({ ...input, ...overrides }, now))!.data
+      expect(await data({ amount: 0, currency: 'eur' })).toEqual({ type: 'plan_enrollment', plan_id: 'Solo', amount: 0, currency: 'EUR' })
+      expect(await data({ amount: 1400, currency: null })).toEqual({ type: 'plan_enrollment', plan_id: 'Solo' })
+      expect(await data({ amount: undefined, currency: 'usd' })).toEqual({ type: 'plan_enrollment', plan_id: 'Solo' })
+      expect(await data({ amount: 14.5 })).toEqual({ type: 'plan_enrollment', plan_id: 'Solo' })
+      expect(await data({ amount: -1 })).toEqual({ type: 'plan_enrollment', plan_id: 'Solo' })
+      expect(await data({ planId: '' })).toEqual({ type: 'plan_enrollment', amount: 1400, currency: 'USD' })
+      expect(normalizeOpenAICurrency(' jpy ')).toBe('JPY')
+      expect(normalizeOpenAICurrency('dollars')).toBeNull()
+    })
+
+    it('reads the amount actually paid from a paid invoice only', () => {
+      expect(getInvoicePayment({ status: 'paid', amount_paid: 11880, currency: 'usd' })).toEqual({ amount: 11880, currency: 'USD' })
+      expect(getInvoicePayment({ status: 'open', amount_paid: 0, currency: 'usd' })).toEqual({})
+      expect(getInvoicePayment(null)).toEqual({})
+    })
+
+    it('uses the console plans page as source url', () => {
+      envValues.WEBAPP_URL = 'https://console.capgo.app/'
+      expect(getOpenAISubscriptionSourceUrl(createContext())).toBe('https://console.capgo.app/settings/organization/plans')
+      envValues.WEBAPP_URL = 'http://localhost:5173'
+      expect(getOpenAISubscriptionSourceUrl(createContext())).toBe('https://console.capgo.app/settings/organization/plans')
+      delete envValues.WEBAPP_URL
+      expect(getOpenAISubscriptionSourceUrl(createContext())).toBe('https://console.capgo.app/settings/organization/plans')
+    })
+
+    it('does nothing without OPENAI_ADS_API_KEY, not even lookups', async () => {
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+      const loadUser = vi.fn()
+      const retrieveInvoice = vi.fn()
+      expect(await trackOpenAISubscription(createContext(), input)).toBe(false)
+      expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent: null }, { loadUser, retrieveInvoice })).toBe(false)
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(loadUser).not.toHaveBeenCalled()
+      expect(retrieveInvoice).not.toHaveBeenCalled()
+    })
+
+    it('skips first payments older than 7 days', async () => {
+      envValues.OPENAI_ADS_API_KEY = 'test-key'
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+      vi.useFakeTimers({ now, toFake: ['Date'] })
+      try {
+        expect(await trackOpenAISubscription(createContext(), { ...input, paidAt: '2026-10-11T12:00:00.000Z' })).toBe(false)
+      }
+      finally {
+        vi.useRealTimers()
+      }
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('sends the first payment with the invoice amount and retries with the same id', async () => {
+      envValues.OPENAI_ADS_API_KEY = 'test-key'
+      envValues.WEBAPP_URL = 'https://console.capgo.app'
+      vi.useFakeTimers({ now, toFake: ['Date'] })
+      const fetchMock = vi.fn()
+        .mockResolvedValueOnce(new Response('busy', { status: 503 }))
+        .mockResolvedValueOnce(new Response('{}', { status: 200 }))
+      vi.stubGlobal('fetch', fetchMock)
+      const retrieveInvoice = vi.fn(async () => ({ status: 'paid' as const, amount_paid: 1400, currency: 'usd' }))
+      const stripeEvent = { type: 'customer.subscription.created', data: { object: { latest_invoice: 'in_first' } } } as any
+      try {
+        expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent }, {
+          loadUser: async () => record,
+          retrieveInvoice,
+          retryDelaysMs: [0],
+        })).toBe(true)
+      }
+      finally {
+        vi.useRealTimers()
+      }
+      expect(retrieveInvoice).toHaveBeenCalledWith('in_first')
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      const events = fetchMock.mock.calls.map(call => JSON.parse((call[1] as RequestInit).body as string).events[0])
+      expect(new Set(events.map(event => event.id))).toEqual(new Set([`subscription_${sha(orgId)}`]))
+      expect(events[0]).toMatchObject({
+        type: 'subscription_created',
+        timestamp_ms: Date.parse(paidAt),
+        source_url: 'https://console.capgo.app/settings/organization/plans',
+        data: { type: 'plan_enrollment', plan_id: 'Solo', amount: 1400, currency: 'USD' },
+      })
+    })
+
+    it('still reports the conversion without a value when the invoice lookup fails, and never throws', async () => {
+      envValues.OPENAI_ADS_API_KEY = 'test-key'
+      vi.useFakeTimers({ now, toFake: ['Date'] })
+      const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))
+      vi.stubGlobal('fetch', fetchMock)
+      const stripeEvent = { type: 'customer.subscription.updated', data: { object: { latest_invoice: 'in_first' } } } as any
+      try {
+        expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent }, {
+          loadUser: async () => record,
+          retrieveInvoice: async () => { throw new Error('stripe down') },
+        })).toBe(true)
+        expect(JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string).events[0].data).toEqual({ type: 'plan_enrollment', plan_id: 'Solo' })
+
+        expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent }, {
+          loadUser: async () => { throw new Error('db down') },
+          retrieveInvoice: async () => ({ status: 'paid' as const, amount_paid: 1400, currency: 'usd' }),
+        })).toBe(false)
+        expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent }, {
+          loadUser: async () => null,
+          retrieveInvoice: async () => ({ status: 'paid' as const, amount_paid: 1400, currency: 'usd' }),
+        })).toBe(false)
+      }
+      finally {
+        vi.useRealTimers()
+      }
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+    })
   })
 })
