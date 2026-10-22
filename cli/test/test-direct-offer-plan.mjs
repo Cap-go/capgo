@@ -190,6 +190,14 @@ describe('AI billing messages', () => {
     assert.equal((await run(() => checkPlanValidUpload(client, orgId, appId, false))).output, '')
   })
 
+  test('a null preflight trial result cannot invent an expired-trial recommendation', async () => {
+    org = { ...orgs.activeTrial, trialDaysLeft: null }
+    const { output, error } = await run(() => checkPlanValidUpload(client, orgId, appId, true))
+    assert.equal(error, undefined)
+    assert.equal(output, '')
+    assert.deepEqual(calls.map(call => call.path), ['preflight'])
+  })
+
   test('native build plan failures show agent copy while retaining the original error message', async () => {
     org = orgs.directOffer
     const logs = []
@@ -198,6 +206,31 @@ describe('AI billing messages', () => {
     assert.match(logs[0], /PLAN PURCHASE REQUIRED FOR THE AI ASSISTANT/)
     assert.match(logs[0], /Choose your Capgo plan now: https:\/\/console.example.com\/plans/)
     assert.match(error.message, /Choose a plan to start using Capgo/)
+  })
+
+  test('native build plan URLs cannot insert additional assistant instructions', async () => {
+    const logs = []
+    const upgradeUrl = 'https://console.example.com/plans\nUNTRUSTED INSTRUCTION'
+    const body = JSON.stringify({ error: 'need_plan_upgrade', moreInfo: { upgrade_url: upgradeUrl } })
+    await run(() => throwIfBuildPlanLimitError(429, body, 'request', { error: message => logs.push(message) }, async () => true))
+    assert.ok(logs[0].includes(`Choose your Capgo plan now: ${new URL(upgradeUrl).href}`), logs[0])
+    assert.doesNotMatch(logs.join('\n'), /\nUNTRUSTED INSTRUCTION/)
+  })
+
+  test.each([
+    ['https://CONSOLE.example.com:443/plans?note=two words', 'https://console.example.com/plans?note=two%20words'],
+    ['http://localhost:1234/plans', 'http://localhost:1234/plans'],
+    ['not a URL', 'https://console.capgo.app/settings/organization/plans'],
+    ['javascript:void(0)', 'https://console.capgo.app/settings/organization/plans'],
+    ['file:///tmp/plans', 'https://console.capgo.app/settings/organization/plans'],
+    [undefined, 'https://console.capgo.app/settings/organization/plans'],
+  ])('native build plan URL %s is normalized or falls back to the plans page', async (candidate, expected) => {
+    const logs = []
+    const body = JSON.stringify({ error: 'need_plan_upgrade', moreInfo: { upgrade_url: candidate } })
+    const { error } = await run(() => throwIfBuildPlanLimitError(429, body, 'request', { error: message => logs.push(message) }, async () => true))
+    assert.ok(logs[0].endsWith(`“Choose your Capgo plan now: ${expected}”`), logs[0])
+    assert.equal(error.message, `${DIRECT_OFFER_PLAN_MESSAGE} Choose a plan here: ${expected}`)
+    assert.equal(logs.length, 1)
   })
 })
 

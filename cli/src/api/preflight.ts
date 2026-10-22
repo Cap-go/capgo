@@ -227,8 +227,8 @@ export async function runCliPreflight(
     const message = isAgentInvocation()
       ? formatAgentPlanRecommendation({
           plansUrl: url,
-          trialState: result.trialDaysLeft < 0 ? 'expired' : 'active',
-          trialMessage: result.trialDaysLeft < 0 ? 'Their trial has ended.' : `The user’s Capgo trial expires in ${result.trialDaysLeft} days.`,
+          trialState: 'active',
+          trialMessage: `The user’s Capgo trial expires in ${result.trialDaysLeft} days.`,
         })
       : `WARNING !!\nTrial expires in ${result.trialDaysLeft} days, upgrade here: ${url}\n`
     if (!renderGitHubNotice(message))

@@ -258,7 +258,15 @@ export async function throwIfBuildPlanLimitError(
     return
 
   const config = await getRemoteConfig()
-  const upgradeUrl = body?.moreInfo?.upgrade_url || `${config.hostWeb}/settings/organization/plans`
+  let upgradeUrl = `${config.hostWeb}/settings/organization/plans`
+  try {
+    const url = new URL(body?.moreInfo?.upgrade_url ?? '')
+    if (url.protocol === 'http:' || url.protocol === 'https:')
+      upgradeUrl = url.href
+  }
+  catch {
+    // Keep the default plans link for malformed server responses.
+  }
   // Orgs created without a free trial (direct offer) get "choose a plan" copy, not "upgrade".
   const directOffer = errorCode === 'need_plan_upgrade' && !!isDirectOffer && await isDirectOffer()
   const message = directOffer
