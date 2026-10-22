@@ -163,6 +163,22 @@ describe('checkout recovery Bento signals', () => {
     await expect(startCheckout()).resolves.toEqual({ url: 'https://pay.capgo.test/pay' })
   })
 
+  it.each(['prod_test', 'prod_current'])('sends available metadata when %s lookup fails', async (failedProductId) => {
+    mockedPlanLookup.mockResolvedValueOnce({ data: { stripe_id: 'prod_test' }, error: null })
+      .mockImplementation((filter: string) => Promise.resolve({
+        data: filter.includes(failedProductId) ? null : { name: 'Available plan' },
+        error: filter.includes(failedProductId) ? new Error('metadata unavailable') : null,
+      }))
+    await startCheckout()
+    expect(mockedSendEventToTracking).toHaveBeenCalledOnce()
+    const bento = mockedSendEventToTracking.mock.calls[0][1].bento
+    expect(bento.event).toBe('user:checkout_started')
+    expect(bento.data).toMatchObject({
+      plan_name: failedProductId === 'prod_test' ? '' : 'Available plan',
+      current_plan_name: failedProductId === 'prod_current' ? '' : 'Available plan',
+    })
+  })
+
   it('skips the signal when the customer organization cannot be resolved', async () => {
     mockedOrgLookup.mockResolvedValue({ data: null, error: new Error('lookup failed') })
     await expect(startCheckout()).resolves.toEqual({ url: 'https://pay.capgo.test/pay' })

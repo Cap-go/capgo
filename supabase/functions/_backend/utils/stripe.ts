@@ -994,7 +994,7 @@ async function notifyCheckoutStarted(c: Context, customerId: string, sessionId: 
       currentProductId ? findPlanByProductId(c, currentProductId) : undefined,
     ])
     if (planResult?.error || currentPlanResult?.error)
-      throw planResult?.error ?? currentPlanResult?.error
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Checkout plan metadata lookup failed; sending available fields', error: planResult?.error ?? currentPlanResult?.error })
     const plan = planResult?.data
     const bento = buildPlanCheckoutStartedBentoEvent({
       event: PLAN_CHECKOUT_STARTED_EVENT,
