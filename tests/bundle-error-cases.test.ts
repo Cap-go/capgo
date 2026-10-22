@@ -168,7 +168,7 @@ describe('[DELETE] /bundle - Error Cases', () => {
     expect(data.error).toBe('cannot_delete_bundle')
   })
 
-  it('should return 404 when the version to delete does not exist', async () => {
+  it('should return 400 when version cannot be deleted', async () => {
     const response = await fetch(`${BASE_URL}/bundle`, {
       method: 'DELETE',
       headers,
@@ -177,9 +177,9 @@ describe('[DELETE] /bundle - Error Cases', () => {
         version: 'nonexistent-version',
       }),
     })
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('error_version_not_found')
+    expect(data.error).toBe('cannot_delete_version')
   })
 
   it('should handle invalid JSON body', async () => {

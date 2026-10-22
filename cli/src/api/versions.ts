@@ -271,10 +271,8 @@ export async function deleteSpecificVersion(
     return
 
   const payload = await readCapgoCliApiErrorPayload(error)
-  if (payload?.error === 'error_version_not_found')
-    throwMissingVersion(appid, bundle, silent)
-  // Older backends answer `cannot_delete_version` for both a missing bundle and a DB failure:
-  // one filtered lookup tells them apart. If the lookup fails too, report the delete error.
+  // The API answers `cannot_delete_version` for both a missing bundle and a DB failure: one
+  // filtered lookup tells them apart. If the lookup fails too, report the delete error.
   if (payload?.error === 'cannot_delete_version') {
     const existing = await fetchSingleBundle(appid, { version: bundle }, { ...http, silent: true }).catch(() => undefined)
     if (existing === null)
