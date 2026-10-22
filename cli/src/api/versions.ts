@@ -266,6 +266,10 @@ export async function deleteSpecificVersion(
   const payload = await readCapgoCliApiErrorPayload(error)
   if (payload?.error === 'error_version_not_found')
     throwMissingVersion(appid, bundle, silent)
+  // Older backends answer `cannot_delete_version` for both a missing bundle and a DB failure:
+  // one filtered lookup tells them apart.
+  if (payload?.error === 'cannot_delete_version' && !(await fetchSingleBundle(appid, { version: bundle }, http)))
+    throwMissingVersion(appid, bundle, silent)
   if (payload?.error !== 'cannot_delete_linked_version')
     await throwBundleHttpInvokeError(appid, error, 'delete', silent, 'bundle.delete')
 
