@@ -17,12 +17,14 @@ export interface PlanCheckoutStartedBentoInput {
 }
 
 function normalizeRecurrence(recurrence: string | undefined) {
-  if (recurrence === 'month' || recurrence === 'year')
+  if (recurrence === 'month' || recurrence === 'year' || recurrence === 'one_time')
     return recurrence
   return 'unknown'
 }
 
 function recurrenceToPlanType(recurrence: string) {
+  if (recurrence === 'one_time')
+    return 'one_time'
   if (recurrence === 'year')
     return 'yearly'
   if (recurrence === 'month')

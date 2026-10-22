@@ -6,9 +6,10 @@ const mockedEnv: Record<string, string> = {
   WEBAPP_URL: 'https://capgo.test',
   STRIPE_SECRET_KEY: 'sk_test_123',
 }
-const { mockedSupabaseAdmin, mockedOrgLookup, mockedSendEventToTracking } = vi.hoisted(() => ({
+const { mockedSupabaseAdmin, mockedOrgLookup, mockedPlanLookup, mockedSendEventToTracking } = vi.hoisted(() => ({
   mockedSupabaseAdmin: vi.fn(),
   mockedOrgLookup: vi.fn(),
+  mockedPlanLookup: vi.fn(),
   mockedSendEventToTracking: vi.fn(),
 }))
 
@@ -61,7 +62,8 @@ function createPriceList(recurringInterval = 'month', type = 'recurring') {
 }
 
 function mockBillingAccountLookup(billingAccount = 'ee') {
-  mockedOrgLookup.mockResolvedValue({ data: { id: 'org_123', name: 'Demo Org' }, error: null })
+  mockedOrgLookup.mockResolvedValue({ data: { id: 'org_123', name: 'Demo Org', stripe_info: { product_id: 'prod_current' } }, error: null })
+  mockedPlanLookup.mockResolvedValue({ data: null, error: null })
   mockedSupabaseAdmin.mockReturnValue({
     from: vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
@@ -72,12 +74,7 @@ function mockBillingAccountLookup(billingAccount = 'ee') {
             error: null,
           }),
         }),
-        or: vi.fn().mockReturnValue({
-          maybeSingle: vi.fn().mockResolvedValue({
-            data: null,
-            error: null,
-          }),
-        }),
+        or: vi.fn().mockImplementation((filter: string) => ({ maybeSingle: () => mockedPlanLookup(filter) })),
       }),
     }),
   })
@@ -90,37 +87,45 @@ afterEach(() => {
   mockedEnv.STRIPE_SECRET_KEY = 'sk_test_123'
   mockedSupabaseAdmin.mockReset()
   mockedOrgLookup.mockReset()
+  mockedPlanLookup.mockReset()
   mockedSendEventToTracking.mockReset()
   vi.restoreAllMocks()
 })
 
 describe('checkout recovery Bento signals', () => {
-  beforeEach(() => mockBillingAccountLookup())
+  beforeEach(() => {
+    mockBillingAccountLookup()
+    mockedPlanLookup.mockImplementation((filter: string) => Promise.resolve({
+      data: filter.includes('prod_current') ? { name: 'Maker' } : { name: 'Team', stripe_id: 'prod_test', price_m: 99, price_y: 999 },
+      error: null,
+    }))
+  })
 
-  async function startCheckout(credits = false, embedded = false, failure?: Error) {
+  async function startCheckout(credits = false, embedded = false, failure?: Error, recurrence = 'month') {
     mockedEnv.STRIPE_PUBLISHABLE_KEY = 'pk_test_123'
     const createSession = vi.fn().mockResolvedValue({ id: 'cs_test_recovery', url: 'https://pay.capgo.test/pay', client_secret: 'secret' })
     if (failure)
       createSession.mockRejectedValue(failure)
     vi.mocked(Stripe).mockImplementation(function () {
       return {
-        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList('month', credits ? 'one_time' : 'recurring') }) },
+        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList(recurrence, credits ? 'one_time' : 'recurring') }) },
         checkout: { sessions: { create: createSession } },
       }
     } as any)
     const { createCheckout, createOneTimeCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
     return credits
       ? createOneTimeCheckout(createContext(), 'cus_123', 'prod_test', 50, '/app/success', '/app/cancel', 'untrusted_reference', undefined, undefined, embedded)
-      : createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', { embedded })
+      : createCheckout(createContext(), 'cus_123', recurrence, 'prod_test', '/app/success', '/app/cancel', { embedded })
   }
 
   it.each([
-    { credits: false, embedded: false },
-    { credits: false, embedded: true },
-    { credits: true, embedded: false },
-    { credits: true, embedded: true },
-  ])('sends the existing event for $credits credits / $embedded embedded checkout', async ({ credits, embedded }) => {
-    await startCheckout(credits, embedded)
+    { credits: false, embedded: false, recurrence: 'month' },
+    { credits: false, embedded: true, recurrence: 'month' },
+    { credits: false, embedded: true, recurrence: 'year' },
+    { credits: true, embedded: false, recurrence: 'one_time' },
+    { credits: true, embedded: true, recurrence: 'one_time' },
+  ])('sends the existing event for $credits credits / $embedded embedded / $recurrence checkout', async ({ credits, embedded, recurrence }) => {
+    await startCheckout(credits, embedded, undefined, recurrence)
 
     expect(mockedSendEventToTracking).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({
       groups: { organization: 'org_123' },
@@ -133,7 +138,13 @@ describe('checkout recovery Bento signals', () => {
           org_id: 'org_123',
           org_name: 'Demo Org',
           product_id: 'prod_test',
-          recurrence: credits ? 'one_time' : 'month',
+          recurrence,
+          plan_name: credits ? '' : 'Team',
+          plan_type: credits ? 'one_time' : recurrence === 'year' ? 'yearly' : 'monthly',
+          current_plan_name: 'Maker',
+          plan_price: credits ? 0 : recurrence === 'year' ? 999 : 99,
+          plan_price_monthly: credits ? 0 : 99,
+          plan_price_yearly: credits ? 0 : 999,
           checkout_source: credits ? 'credits' : 'plans',
           checkout_session_id: 'cs_test_recovery',
         }),

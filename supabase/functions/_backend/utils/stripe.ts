@@ -2,10 +2,12 @@ import type { Context } from 'hono'
 import type { BillingAccount } from './stripe_billing.ts'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
+import { buildPlanCheckoutStartedBentoEvent, PLAN_CHECKOUT_STARTED_EVENT } from './checkout_tracking.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import {
   BillingAccountUnavailableError,
+  findPlanByProductId,
   getBillingAccountForCustomer,
   getPlanPriceId,
   getStripePublishableKey,
@@ -980,33 +982,43 @@ async function notifyCheckoutStarted(c: Context, customerId: string, sessionId: 
   try {
     const { data: org, error } = await supabaseAdmin(c)
       .from('orgs')
-      .select('id, name')
+      .select('id, name, stripe_info(product_id)')
       .eq('customer_id', customerId)
       .single()
     if (error || !org)
       throw error ?? new Error('Checkout organization not found')
 
+    const currentProductId = org.stripe_info?.product_id
+    const [planResult, currentPlanResult] = await Promise.all([
+      recurrence === 'one_time' ? undefined : findPlanByProductId(c, productId),
+      currentProductId ? findPlanByProductId(c, currentProductId) : undefined,
+    ])
+    if (planResult?.error || currentPlanResult?.error)
+      throw planResult?.error ?? currentPlanResult?.error
+    const plan = planResult?.data
+    const bento = buildPlanCheckoutStartedBentoEvent({
+      event: PLAN_CHECKOUT_STARTED_EVENT,
+      orgId: org.id,
+      orgName: org.name,
+      productId,
+      planName: plan?.name ?? undefined,
+      recurrence,
+      checkoutSource: recurrence === 'one_time' ? 'credits' : 'plans',
+      currentPlanName: currentPlanResult?.data?.name ?? undefined,
+      planPrice: (recurrence === 'year' ? plan?.price_y : plan?.price_m) ?? undefined,
+      planPriceMonthly: plan?.price_m ?? undefined,
+      planPriceYearly: plan?.price_y ?? undefined,
+    })
+    if (!bento)
+      return
+    bento.data.checkout_session_id = sessionId
     await sendEventToTracking(c, {
       channel: 'usage',
-      event: 'Checkout Started',
+      event: PLAN_CHECKOUT_STARTED_EVENT,
       user_id: c.get('auth')?.userId,
       groups: { organization: org.id },
       sentToBento: true,
-      bento: {
-        event: 'user:checkout_started',
-        preferenceKey: 'credit_usage',
-        audience: 'billing',
-        cron: '* * * * *',
-        uniqId: `checkout_started:${productId}:${recurrence}`,
-        data: {
-          org_id: org.id,
-          org_name: org.name,
-          product_id: productId,
-          recurrence,
-          checkout_source: recurrence === 'one_time' ? 'credits' : 'plans',
-          checkout_session_id: sessionId,
-        },
-      },
+      bento,
     }, { posthog: false })
   }
   catch (error) {

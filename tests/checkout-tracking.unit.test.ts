@@ -44,6 +44,12 @@ describe('buildPlanCheckoutStartedBentoEvent', () => {
     expect(buildPlanCheckoutStartedBentoEvent({ ...base, orgId: undefined })).toBeUndefined()
   })
 
+  it.concurrent('preserves the one-time recurrence for credit checkouts', () => {
+    const r = buildPlanCheckoutStartedBentoEvent({ ...base, recurrence: 'one_time', checkoutSource: 'credits' })
+    expect(r!.uniqId).toBe('checkout_started:prod_demo:one_time')
+    expect(r!.data).toMatchObject({ recurrence: 'one_time', plan_type: 'one_time', checkout_source: 'credits' })
+  })
+
   it.concurrent('normalizes missing optional fields', () => {
     const r = buildPlanCheckoutStartedBentoEvent({
       ...base,
