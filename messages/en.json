@@ -584,7 +584,7 @@
   "setup-checklist-auto-progress": "Progress updates from guided setup and activity detected for this app.",
   "setup-checklist-return-current": "Back to the current task",
   "setup-checklist-return-checklist": "Back to setup checklist",
-  "setup-checklist-ai-action": "Copy AI setup prompt",
+  "setup-checklist-ai-action": "Copy AI prompt",
   "setup-checklist-ai-agent-description": "Paste one prompt into Claude Code, Cursor, Codex, or any coding agent opened in your app project. It finishes the remaining tasks for you, and this checklist updates as it goes.",
   "setup-checklist-ai-agent-title": "Let your AI agent do the rest",
   "setup-checklist-ai-description": "Paste the AI setup prompt into your coding assistant in your app project.",
