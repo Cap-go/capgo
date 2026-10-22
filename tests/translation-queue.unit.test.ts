@@ -39,7 +39,8 @@ interface QueueStoreStatement {
 // Enough D1 for one queue step: a pending catalog entry, batch claims, and translation memory.
 function createQueueStoreMock(memory: Map<string, string>) {
   const writes: QueueStoreStatement[] = []
-  const memoryRows = (params: unknown[]) => params.slice(1)
+  // Rows only match the pipeline that wrote them (draft-model, review disabled).
+  const memoryRows = (params: unknown[]) => (params[1] === 'draft-model' ? params.slice(2) : [])
     .filter((hash): hash is string => typeof hash === 'string' && memory.has(hash))
     .map(hash => ({ source_hash: hash, translated: memory.get(hash) }))
   const statement = (sql: string, params: unknown[] = []) => ({
@@ -98,7 +99,7 @@ async function runQueueStep(memory: Map<string, string>, ai: { run: ReturnType<t
     ack: vi.fn(),
     body: {
       batchIndex: 0,
-      checksum: await __translationWorkerTestUtils__.currentSourceChecksum(),
+      checksum: await __translationWorkerTestUtils__.currentSourceChecksum({ TRANSLATION_REVIEW_MODEL: 'none' }),
       model: 'draft-model',
       targetLanguage: 'fr',
     },
@@ -176,15 +177,19 @@ describe('translation queue helpers', () => {
   })
 
   it.concurrent('applies the review pass and keeps drafts when the review fails', async () => {
-    const batch: [string, string, string][] = [['channel', 'Channel', ''], ['save', 'Save', '']]
+    const batch: [string, string, string][] = [['channel', 'Channel', ''], ['observe', 'Observe', ''], ['save', 'Save', '']]
     const reviewedAi = {
       run: vi.fn()
-        .mockResolvedValueOnce({ response: JSON.stringify({ translations: { channel: 'Chaîne', save: 'Enregistrer' } }) })
-        .mockResolvedValueOnce({ response: JSON.stringify({ translations: { channel: 'Canal', save: 'Save' } }) }),
+        .mockResolvedValueOnce({ response: JSON.stringify({ translations: { channel: 'Chaîne', observe: 'Observer', save: 'Enregistrer' } }) })
+        .mockResolvedValueOnce({ response: JSON.stringify({ translations: { channel: 'Canal', observe: 'Observe' } }) }),
     }
+    // A review back to the English source is kept; a missing review entry keeps the draft.
     await expect(__translationWorkerTestUtils__.translateBatch(reviewedAi, 'translator', 'fr', batch, 'reviewer'))
       .resolves
-      .toEqual({ channel: 'Canal', save: 'Enregistrer' })
+      .toEqual({
+        messages: { channel: 'Canal', observe: 'Observe', save: 'Enregistrer' },
+        remembered: { channel: 'Canal', observe: 'Observe' },
+      })
     expect(reviewedAi.run).toHaveBeenLastCalledWith('reviewer', expect.objectContaining({
       messages: expect.arrayContaining([
         expect.objectContaining({ role: 'user', content: expect.stringContaining('"draft":"Chaîne"') }),
@@ -196,9 +201,10 @@ describe('translation queue helpers', () => {
         .mockResolvedValueOnce({ response: JSON.stringify({ translations: { channel: 'Canal', save: 'Enregistrer' } }) })
         .mockRejectedValue(new Error('review unavailable')),
     }
+    // Unreviewed drafts are served but not remembered, so a later catalog change reviews them.
     await expect(__translationWorkerTestUtils__.translateBatch(failingReviewAi, 'translator', 'fr', batch, 'reviewer'))
       .resolves
-      .toEqual({ channel: 'Canal', save: 'Enregistrer' })
+      .toEqual({ messages: { channel: 'Canal', observe: 'Observe', save: 'Enregistrer' }, remembered: {} })
   })
 
   it.concurrent('reviews with DeepSeek V4.1 Flash by default and lets env override or disable it', () => {
@@ -531,17 +537,29 @@ describe('translation queue helpers', () => {
   })
 
   it('does not remember strings that fell back to English', async () => {
-    const memory = await rememberAllMessagesExcept(['account'])
+    const memory = await rememberAllMessagesExcept(['account', 'password'])
     const ai = {
-      run: vi.fn(async () => ({ response: JSON.stringify({ translations: { account: 'Account' } }) })),
+      run: vi.fn(async () => ({ response: JSON.stringify({ translations: { password: 'Password' } }) })),
     }
 
     const { writes } = await runQueueStep(memory, ai)
 
-    expect(writes.some(item => item.sql.includes('INSERT INTO translation_memory'))).toBe(false)
+    // A missing answer falls back to English and is not remembered; a valid answer equal
+    // to the source (a name kept in English) is.
+    expect(readyCatalogWrite(writes)?.account).toBe('Account')
+    const remembered = writes.filter(item => item.sql.includes('INSERT INTO translation_memory'))
+    expect(remembered.map(item => item.params[2])).toEqual(['Password'])
   })
 
-  it.concurrent('keys translation memory by text, context and pipeline', async () => {
+  it.concurrent('changes the catalog checksum when the translation or review model changes', async () => {
+    const checksum = await __translationWorkerTestUtils__.currentSourceChecksum({})
+
+    expect(checksum).toBe(await __translationWorkerTestUtils__.currentSourceChecksum({}))
+    expect(checksum).not.toBe(await __translationWorkerTestUtils__.currentSourceChecksum({ TRANSLATION_REVIEW_MODEL: 'none' }))
+    expect(checksum).not.toBe(await __translationWorkerTestUtils__.currentSourceChecksum({ TRANSLATION_MODEL: '@cf/custom/model' }))
+  })
+
+  it.concurrent('keys translation memory by text and context', async () => {
     const hash = await __translationWorkerTestUtils__.translationMemoryHash('Save', 'button')
 
     expect(hash).toBe(await __translationWorkerTestUtils__.translationMemoryHash('Save', 'button'))

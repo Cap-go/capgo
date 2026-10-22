@@ -16,7 +16,7 @@ const FRENCH_STYLE_GUIDE = `French (France) style guide:
 - Address the user with "vous". Use sentence case (capitalise only the first word and proper nouns), never English Title Case.
 - Buttons, menu items and actions use the infinitive ("Supprimer le canal", "Ajouter un webhook").
 - Get gender and agreement right (cette application, cet appareil, ce montant, des canaux). Use natural word order ("les 12 derniers mois", not "Derniers 12 mois").
-- Typography: space before : ; ? ! ; decimal comma (4,2 Mo); prices as "0,05 $"; GB/GiB -> Go, MB -> Mo.
+- Typography: space before : ; ? ! ; decimal comma (4,2 Mo); prices as "0,05 $"; GB -> Go, GiB -> Gio, MB -> Mo.
 Glossary (English -> French, mandatory):
 - AI -> IA (agents IA); AI agent -> agent IA
 - bundle -> bundle (le bundle, les bundles)

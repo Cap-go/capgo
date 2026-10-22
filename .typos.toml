@@ -28,6 +28,8 @@ extend-exclude = [
   "src/typed-router.d.ts",
   "src/components.d.ts",
   "supabase/tests/00-supabase_test_helpers.sql",
+  # French glossary for the translation worker (appareil, sur, ...).
+  "cloudflare_workers/translation/style_guides.ts",
 
   # Database and Supabase
   "supabase/.branches/",
