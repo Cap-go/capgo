@@ -85,11 +85,23 @@ describe('deleteSpecificVersion', () => {
     expect(calls).toHaveLength(1)
   })
 
+  it('reports a missing bundle on older backends after one filtered lookup', async () => {
+    const { calls, invoke } = recordingInvoke([
+      { data: null, error: makeBundleApiError({ error: 'cannot_delete_version', message: 'Cannot delete version' }, 400) },
+      { data: [], error: null },
+    ])
+    await expect(deleteSpecificVersion(client, 'com.test.app', '9.9.9', { silent: true, apikey: 'key', invoke }))
+      .rejects
+      .toThrow('App version com.test.app@9.9.9 doesn\'t exist')
+    expect(calls).toHaveLength(2)
+    expect(new URL(calls[1].path, 'https://example.test/').searchParams.get('version')).toBe('9.9.9')
+  })
+
   it('does not report a backend failure as a missing bundle', async () => {
-    const { invoke } = recordingInvoke([{
-      data: null,
-      error: makeBundleApiError({ error: 'cannot_delete_version', message: 'Cannot delete version' }, 400),
-    }])
+    const { invoke } = recordingInvoke([
+      { data: null, error: makeBundleApiError({ error: 'cannot_delete_version', message: 'Cannot delete version' }, 400) },
+      { data: [bundleRow], error: null },
+    ])
     await expect(deleteSpecificVersion(client, 'com.test.app', '1.2.3', { silent: true, apikey: 'key', invoke }))
       .rejects
       .toThrow(/Could not delete bundle for app com\.test\.app/)
