@@ -25,9 +25,8 @@ export interface OrgInvitation {
   invite_magic_string: string | null
 }
 
-// Lock the private send record so concurrent queue deliveries serialize.
 // Every join starts from its primary key; this is an internal low-volume path.
-export async function selectOrgInvitationForUpdate(client: PgQueryClient, invitationId: string): Promise<OrgInvitation | undefined> {
+export async function selectOrgInvitation(client: PgQueryClient, invitationId: string, forUpdate = false): Promise<OrgInvitation | undefined> {
   const { rows } = await client.query<OrgInvitation>(`
     SELECT r.id, r.org_user_id, r.tmp_user_id, r.sent_at::text AS sent_at,
       r.bento_synced_at::text AS bento_synced_at, r.bento_email, u.id AS recipient_user_id,
@@ -52,9 +51,15 @@ export async function selectOrgInvitationForUpdate(client: PgQueryClient, invita
     LEFT JOIN public.users u ON u.id = ou.user_id
     JOIN public.orgs o ON o.id = COALESCE(t.org_id, ou.org_id)
     WHERE r.id = $1
-    FOR UPDATE OF r
+    ${forUpdate ? 'FOR UPDATE OF r' : ''}
   `, [invitationId])
   return rows[0]
+}
+
+// Email delivery and durable Bento-target preparation serialize on
+// the request row. Bento's network call uses only the subscriber lock.
+export function selectOrgInvitationForUpdate(client: PgQueryClient, invitationId: string): Promise<OrgInvitation | undefined> {
+  return selectOrgInvitation(client, invitationId, true)
 }
 
 export function orgInvitationLink(c: Context, invitation: OrgInvitation): string {

@@ -139,10 +139,17 @@ describe.each(['new', 'existing'] as const)('%s-account invitation delivery with
     }
   })
 
-  it.concurrent('reconciles a close that waits for in-flight Bento enrollment', async () => {
+  it.concurrent.each(['accept', 'revoke'])('closes %s without waiting for Bento enrollment', async (action) => {
     const fixture = await createFixture(kind)
-    const applicationName = `invitation-close-${fixture.orgId}`
-    const closePool = new Pool({ connectionString: POSTGRES_URL, application_name: applicationName })
+    const closePool = new Pool({ connectionString: POSTGRES_URL, max: 1 })
+    const closeSql = {
+      new: action === 'accept'
+        ? 'DELETE FROM public.tmp_users WHERE id = $1'
+        : 'UPDATE public.tmp_users SET cancelled_at = CURRENT_TIMESTAMP WHERE id = $1',
+      existing: action === 'accept'
+        ? 'UPDATE public.org_users SET is_invite = false WHERE id = $1'
+        : 'DELETE FROM public.org_users WHERE id = $1',
+    }[kind]
     let releaseBento!: () => void
     let enteredBento!: () => void
     const entered = new Promise<void>((resolve) => { enteredBento = resolve })
@@ -157,23 +164,18 @@ describe.each(['new', 'existing'] as const)('%s-account invitation delivery with
       })
       sending = Promise.resolve(fixture.post(queued.id))
       await entered
-      closing = closePool.query(kind === 'new'
-        ? 'DELETE FROM public.tmp_users WHERE id = $1'
-        : 'UPDATE public.org_users SET is_invite = false WHERE id = $1', [fixture.inviteId])
-      await vi.waitFor(async () => {
-        const activity = await executeSQL<{ wait_event_type: string }>(
-          'SELECT wait_event_type FROM pg_catalog.pg_stat_activity WHERE application_name = $1', [applicationName],
-        )
-        expect(activity.some(row => row.wait_event_type === 'Lock')).toBe(true)
-      })
-      releaseBento()
-      expect((await sending).status).toBe(200)
+      // The close must finish while Bento remains blocked. A statement
+      // timeout makes retaining a network-held request lock fail this test.
+      await closePool.query("SET statement_timeout = '1s'")
+      closing = closePool.query(closeSql, [fixture.inviteId])
       await closing
       const jobs = await executeSQL<{ count: string }>(`
         SELECT count(*) FROM pgmq.q_send_email
         WHERE message->'payload'->'org_invitation_bento_sync'->>'email' = $1
       `, [fixture.email])
       expect(jobs[0]!.count).toBe('1')
+      releaseBento()
+      expect((await sending).status).toBe(200)
       expect((await fixture.sync()).status).toBe(200)
       expect(bentoEvents.filter(event => event.type === '$update_fields' && event.email === fixture.email).at(-1)?.fields)
         .toEqual({ capgo_open_invites: '' })
@@ -182,55 +184,6 @@ describe.each(['new', 'existing'] as const)('%s-account invitation delivery with
       releaseBento()
       await Promise.allSettled([sending, closing])
       await closePool.end()
-      await fixture.cleanup()
-    }
-  })
-
-  it.concurrent.each(['0', '5s', '50ms'])('bounds close waits and restores lock_timeout=%s', async (lockTimeout) => {
-    const fixture = await createFixture(kind)
-    const pool = new Pool({ connectionString: POSTGRES_URL, max: 2 })
-    const locker = await pool.connect()
-    const closer = await pool.connect()
-    const closeSql = kind === 'new'
-      ? 'DELETE FROM public.tmp_users WHERE id = $1'
-      : 'UPDATE public.org_users SET is_invite = false WHERE id = $1'
-    try {
-      const queued = await fixture.state()
-      expect((await fixture.post(queued.id)).status).toBe(200)
-      await locker.query('BEGIN')
-      await locker.query('SELECT id FROM public.org_invitation_email_requests WHERE id = $1 FOR UPDATE', [queued.id])
-      await closer.query('SELECT pg_catalog.set_config(\'lock_timeout\', $1, false)', [lockTimeout])
-      // A statement timeout distinguishes an unbounded wait or a relaxed
-      // caller timeout from the expected lock-timeout error.
-      await closer.query('SELECT pg_catalog.set_config(\'statement_timeout\', $1, false)', [lockTimeout === '50ms' ? '500ms' : '4s'])
-      await closer.query('BEGIN')
-      await expect(closer.query(closeSql, [fixture.inviteId])).rejects.toMatchObject({ code: '55P03' })
-      await closer.query('ROLLBACK')
-      expect((await closer.query('SHOW lock_timeout')).rows[0]!.lock_timeout).toBe(lockTimeout)
-      const pending = await closer.query(kind === 'new'
-        ? 'SELECT id FROM public.tmp_users WHERE id = $1'
-        : 'SELECT id FROM public.org_users WHERE id = $1 AND is_invite', [fixture.inviteId])
-      expect(pending.rowCount).toBe(1)
-      expect((await closer.query(`
-        SELECT count(*) FROM pgmq.q_send_email
-        WHERE message->'payload'->'org_invitation_bento_sync'->>'email' = $1
-      `, [fixture.email])).rows[0]!.count).toBe('0')
-
-      await locker.query('ROLLBACK')
-      await closer.query('BEGIN')
-      await closer.query(closeSql, [fixture.inviteId])
-      expect((await closer.query('SHOW lock_timeout')).rows[0]!.lock_timeout).toBe(lockTimeout)
-      await closer.query('COMMIT')
-      expect((await closer.query(`
-        SELECT count(*) FROM pgmq.q_send_email
-        WHERE message->'payload'->'org_invitation_bento_sync'->>'email' = $1
-      `, [fixture.email])).rows[0]!.count).toBe('1')
-    }
-    finally {
-      await Promise.allSettled([locker.query('ROLLBACK'), closer.query('ROLLBACK')])
-      locker.release()
-      closer.release()
-      await pool.end()
       await fixture.cleanup()
     }
   })

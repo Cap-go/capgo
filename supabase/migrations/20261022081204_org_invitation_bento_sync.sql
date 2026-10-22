@@ -8,8 +8,9 @@
 -- Execution model: field syncs are queued once per invitation close (accept,
 -- cancel, rescind, removal) or resend of a Bento-tracked invitation, on the
 -- existing send_email queue. Each trigger probe locks one request row through
--- its unique invitation FK, so a close waits for an in-flight Bento enrollment
--- and then sees its bento_email. The sender reads open invitations through the
+-- its unique invitation FK to observe committed target preparation. Bento's
+-- network call holds only a subscriber advisory lock, so closes can commit
+-- and queue reconciliation before it finishes. The sender reads through the
 -- partial bento_email index below. No cron task or queue is added.
 
 DROP TABLE IF EXISTS public.bento_evaluation_runs;
@@ -167,19 +168,12 @@ SET search_path = ''
 AS $$
 DECLARE
     v_bento_email text;
-    v_lock_timeout text := pg_catalog.current_setting('lock_timeout');
 BEGIN
     -- Only delivered invitations prepared for Bento enrollment need a field
     -- rewrite, including uncertain acceptance after a lost response.
-    -- Lock the request row unconditionally: an in-flight Bento enrollment
-    -- holds it, so this waits and then reads its committed bento_email.
+    -- Synchronize with the short transaction that commits bento_email before
+    -- enrollment. Its later network call does not hold this request-row lock.
     -- BEFORE DELETE runs ahead of the request row's ON DELETE CASCADE.
-    -- Bound close latency without extending a stricter caller timeout.
-    -- A timeout rolls back the close; retrying after enrollment is safe.
-    IF v_lock_timeout::interval = interval '0 seconds'
-        OR v_lock_timeout::interval > interval '2 seconds' THEN
-        PERFORM pg_catalog.set_config('lock_timeout', '2s', true);
-    END IF;
     IF TG_TABLE_NAME = 'tmp_users' THEN
         SELECT request.bento_email INTO v_bento_email
         FROM public.org_invitation_email_requests AS request
@@ -191,7 +185,6 @@ BEGIN
         WHERE request.org_user_id = OLD.id
         FOR UPDATE;
     END IF;
-    PERFORM pg_catalog.set_config('lock_timeout', v_lock_timeout, true);
 
     IF v_bento_email IS NOT NULL THEN
         PERFORM public.queue_org_invitation_bento_sync(v_bento_email);

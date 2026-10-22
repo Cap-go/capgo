@@ -113,7 +113,7 @@ function mockInvitation(overrides: Partial<typeof invitation> = {}, openInvites 
     }
     if (query.includes('r.bento_email = $1'))
       return { rows: openInvites.map(id => ({ id })) }
-    if (query.includes('FOR UPDATE OF r'))
+    if (query.includes('SELECT r.id,'))
       return { rows: [row] }
     return { rows: [], rowCount: 1 }
   })
@@ -187,6 +187,12 @@ describe('send_email queue handler', () => {
     const targetCommit = queryMock.mock.calls.findIndex(([query], index) => index > sqlIndex('SET bento_email') && query === 'COMMIT')
     expect(targetCommit).toBeGreaterThan(sqlIndex('SET bento_email'))
     expect(queryMock.mock.invocationCallOrder[targetCommit]).toBeLessThan(trackBentoEventsMock.mock.invocationCallOrder[0]!)
+    const subscriberLock = sqlIndex('pg_advisory_xact_lock')
+    const enrollmentRead = queryMock.mock.calls.findIndex(([query], index) => index > subscriberLock && query.includes('SELECT r.id,'))
+    expect(enrollmentRead).toBeGreaterThan(subscriberLock)
+    expect(queryMock.mock.calls[enrollmentRead]![0]).not.toContain('FOR UPDATE')
+    expect(queryMock.mock.invocationCallOrder[enrollmentRead]).toBeLessThan(trackBentoEventsMock.mock.invocationCallOrder[0]!)
+    expect(queryMock.mock.calls.slice(subscriberLock).some(([query]) => query.includes('FOR UPDATE'))).toBe(false)
     expect(releaseMock).toHaveBeenCalledTimes(3)
   })
 

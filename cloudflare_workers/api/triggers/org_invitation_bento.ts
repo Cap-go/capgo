@@ -7,7 +7,7 @@ import { isBentoConfigured, trackBentoEvents, updateBentoFields } from '../../..
 import { cloudlog } from '../../../supabase/functions/_backend/utils/logging.ts'
 import { closeClient, getPgClient, withPgTransaction } from '../../../supabase/functions/_backend/utils/pg.ts'
 import { escapeHtml } from '../email_templates/render.ts'
-import { orgInvitationLink, selectOrgInvitationForUpdate } from './org_invitation_email.ts'
+import { orgInvitationLink, selectOrgInvitation, selectOrgInvitationForUpdate } from './org_invitation_email.ts'
 
 // Bento owns reminder timing: the flow triggered by this event waits, then
 // sends a reminder only while the invite id is still in OPEN_INVITES_FIELD.
@@ -63,8 +63,9 @@ export function buildInviteSentEvent(invitation: OrgInvitation, inviteLink: stri
 
 // Starts the Bento reminder flow for a sent generation. The field update
 // rides on the same event so the flow never sees the invite as closed. The
-// request row stays locked until the marker commits, so a concurrent close
-// waits and then queues its own field sync.
+// subscriber lock orders the event before any concurrent close's field sync.
+// The request row is never held across Bento's network call, so closes can
+// commit and queue reconciliation while enrollment is still in flight.
 // The marker suppresses confirmed repeats, but Bento and Postgres cannot
 // commit atomically: an ambiguous failure can enroll the generation again.
 export async function startOrgInvitationBentoFlow(c: Context<MiddlewareKeyVariables>, invitationId: string) {
@@ -75,29 +76,29 @@ export async function startOrgInvitationBentoFlow(c: Context<MiddlewareKeyVariab
     // Commit the target before contacting Bento. If acceptance is ambiguous
     // or the later marker rolls back, a close still knows which subscriber
     // needs reconciliation. Retries keep this identity after email changes.
-    const prepared = await withPgTransaction(pgPool, async (client) => {
+    const email = await withPgTransaction(pgPool, async (client) => {
       const invitation = await selectOrgInvitationForUpdate(client, invitationId)
       if (!invitation?.sent_at || invitation.bento_synced_at || !invitation.is_pending)
-        return false
+        return null
       const email = (invitation.bento_email ?? invitation.email).trim().toLowerCase()
       await client.query('UPDATE public.org_invitation_email_requests SET bento_email = $2 WHERE id = $1', [invitationId, email])
-      return true
+      return email
     })
-    if (!prepared)
+    if (!email)
       return
     await withPgTransaction(pgPool, async (client) => {
-      // Same lock and timeout budget as the email sender; serializes retries.
-      await client.query('SET LOCAL idle_in_transaction_session_timeout = 60000')
-      const invitation = await selectOrgInvitationForUpdate(client, invitationId)
+      // Serialize subscriber writes and confirmed retries without locking the
+      // request row while the provider is processing the event.
+      await client.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED; SET LOCAL idle_in_transaction_session_timeout = 60000')
+      await lockBentoSubscriber(client, email)
+      const invitation = await selectOrgInvitation(client, invitationId)
       if (!invitation?.sent_at || invitation.bento_synced_at || !invitation.is_pending) {
         cloudlog({ requestId: c.get('requestId'), message: 'organization invitation Bento flow skipped', invitationId })
         return
       }
-
-      const email = invitation.bento_email!
-      await lockBentoSubscriber(client, email)
       const openInvites = await readOpenInvites(client, email, invitation.id)
-      // A fresh read after the locks; the invite may have closed meanwhile.
+      // READ COMMITTED takes fresh snapshots after the subscriber lock, so a
+      // queued close or a previous enrollment's marker cannot be missed.
       if (!openInvites.includes(invitation.id)) {
         cloudlog({ requestId: c.get('requestId'), message: 'organization invitation closed before Bento flow', invitationId })
         return
@@ -112,7 +113,7 @@ export async function startOrgInvitationBentoFlow(c: Context<MiddlewareKeyVariab
       await client.query(`
         UPDATE public.org_invitation_email_requests
         SET bento_synced_at = pg_catalog.clock_timestamp(), bento_email = $2
-        WHERE id = $1
+        WHERE id = $1 AND bento_email = $2
       `, [invitationId, email])
     })
   }
@@ -128,7 +129,7 @@ export async function syncOrgInvitationBentoField(c: Context<MiddlewareKeyVariab
   const pgPool = await getPgClient(c)
   try {
     await withPgTransaction(pgPool, async (client) => {
-      await client.query('SET LOCAL idle_in_transaction_session_timeout = 60000')
+      await client.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED; SET LOCAL idle_in_transaction_session_timeout = 60000')
       await lockBentoSubscriber(client, email)
       const openInvites = await readOpenInvites(client, email, null)
       const accepted = await updateBentoFields(c, email, { [OPEN_INVITES_FIELD]: openInvites.join(' ') }, AbortSignal.timeout(10_000))
