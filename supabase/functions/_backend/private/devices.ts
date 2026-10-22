@@ -57,8 +57,11 @@ const versionCompareOpSchema = z.enum(VERSION_COMPARE_OPS)
 const MAX_VERSION_NAMES = 50
 const EXPORT_FORMATS = ['csv', 'json'] as const
 const DEFAULT_EXPORT_LIMIT = 10_000
-// Same ceiling the console had when it listed override ids itself (PostgREST max rows).
-const MAX_OVERRIDE_DEVICE_IDS = 1000
+// PostgREST returns at most 1000 rows per request, so overrides are paged. The ids
+// end up in the device query itself, so beyond the ceiling the request is refused
+// rather than silently showing a subset.
+const OVERRIDE_PAGE_SIZE = 1000
+const MAX_OVERRIDE_DEVICE_IDS = 5000
 const devicesBodyShape = {
   appId: appIdSchema,
   count: z.boolean().optional(),
@@ -163,19 +166,27 @@ async function parseAuthorizedDevicesBody(c: Context<MiddlewareKeyVariables>, sc
 async function resolveOverrideDeviceIds(c: Context<MiddlewareKeyVariables>, body: DataDevice): Promise<string[] | undefined> {
   if (!body.overrides && body.overrideChannelId === undefined)
     return undefined
-  let query = supabaseWithAuth(c, c.get('auth')!)
-    .from('channel_devices')
-    .select('device_id')
-    .eq('app_id', body.appId)
-  if (body.overrideChannelId !== undefined)
-    query = query.eq('channel_id', body.overrideChannelId)
+  const client = supabaseWithAuth(c, c.get('auth')!)
   const requested = body.devicesId ?? body.deviceIds
-  if (requested?.length)
-    query = query.in('device_id', requested)
-  const { data, error } = await query.order('device_id').limit(MAX_OVERRIDE_DEVICE_IDS)
-  if (error)
-    throw simpleError('cannot_read_device_overrides', 'Cannot read device overrides', { error })
-  return (data ?? []).map(row => row.device_id)
+  const ids: string[] = []
+  for (let from = 0; ; from += OVERRIDE_PAGE_SIZE) {
+    let query = client
+      .from('channel_devices')
+      .select('device_id')
+      .eq('app_id', body.appId)
+    if (body.overrideChannelId !== undefined)
+      query = query.eq('channel_id', body.overrideChannelId)
+    if (requested?.length)
+      query = query.in('device_id', requested)
+    const { data, error } = await query.order('device_id').range(from, from + OVERRIDE_PAGE_SIZE - 1)
+    if (error)
+      throw simpleError('cannot_read_device_overrides', 'Cannot read device overrides', { error })
+    ids.push(...(data ?? []).map(row => row.device_id))
+    if (ids.length > MAX_OVERRIDE_DEVICE_IDS)
+      throw simpleError('too_many_device_overrides', `Filtering by forced devices supports up to ${MAX_OVERRIDE_DEVICE_IDS} devices`, { app_id: body.appId })
+    if (!data || data.length < OVERRIDE_PAGE_SIZE)
+      return ids
+  }
 }
 
 function toReadDevicesParams(body: z.infer<typeof devicesBodySchema>, limit?: number): { params: ReadDevicesParams, customIdMode: boolean } {

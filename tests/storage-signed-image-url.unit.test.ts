@@ -4,6 +4,7 @@ const mockCreateSignedUrl = vi.fn()
 const mockFrom = vi.fn(() => ({ createSignedUrl: mockCreateSignedUrl }))
 
 vi.mock('../src/services/console.ts', () => ({
+  defaultApiHost: 'https://api.example.com',
   useConsole: () => ({
     storage: {
       from: mockFrom,
@@ -22,6 +23,12 @@ describe('resolveImagePath', () => {
       normalized: 'org/logo with spaces%.png',
       shouldSign: true,
     })
+  })
+
+  it('leaves a foreign URL that only looks like the relay untouched', async () => {
+    const { resolveImagePath } = await import('../src/services/storage.ts')
+    const foreign = 'https://images.example.org/private/console/images/read?path=org%2Flogo.png&token=t'
+    expect(resolveImagePath(foreign)).toEqual({ normalized: foreign, shouldSign: false })
   })
 })
 

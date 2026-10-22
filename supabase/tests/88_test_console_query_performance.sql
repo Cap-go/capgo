@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(10);
+SELECT plan(12);
 
 -- The 2FA guard is evaluated once per statement (InitPlan), not once per row.
 SELECT
@@ -143,6 +143,22 @@ SELECT
         ),
         (SELECT name FROM public.channels WHERE id = 1),
         'deploy counts carry the channel name'
+    );
+
+SELECT
+    throws_ok(
+        $$SELECT * FROM public.get_bundle_upload_daily_counts(ARRAY['com.demo.app']::varchar[], now() - interval '400 days', now())$$,
+        '22023',
+        'invalid_window',
+        'a window longer than one billing cycle is refused'
+    );
+
+SELECT
+    throws_ok(
+        $$SELECT * FROM public.get_deploy_daily_counts((SELECT array_agg('app.' || g)::varchar[] FROM generate_series(1, 1001) g), now() - interval '1 day', now())$$,
+        '22023',
+        'too_many_apps',
+        'more than 1000 apps per request is refused'
     );
 
 SELECT tests.clear_authentication();

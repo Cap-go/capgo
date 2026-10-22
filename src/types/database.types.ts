@@ -3970,6 +3970,10 @@ export type Database = {
             Args: { p_binding_id: string; p_error_code: string }
             Returns: undefined
           }
+      assert_console_daily_window: {
+        Args: { p_app_ids: string[]; p_end: string; p_start: string }
+        Returns: undefined
+      }
       assert_effective_super_admin_group_member_removal: {
         Args: { p_group_id: string; p_user_id: string }
         Returns: undefined

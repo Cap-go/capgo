@@ -118,8 +118,7 @@ async function loadPendingInvitations() {
 }
 
 async function acceptInvitation(invitation: Organization): Promise<void> {
-  // Accept without a prior org_users read — the RPC is the source of truth
-  // (#3847). A pre-read was an extra round trip and could race the invite row.
+  // The RPC is the source of truth for accepting an invitation.
   const { data, error } = await capgo.rpc('accept_invitation_to_org', {
     org_id: invitation.gid,
   })

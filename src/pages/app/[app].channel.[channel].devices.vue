@@ -185,11 +185,17 @@ async function getDeviceIds() {
   if (!channel.value)
     return
   try {
-    const { count } = await capgo
+    const { count, error } = await capgo
       .from('channel_devices')
       .select('device_id', { count: 'exact', head: true })
       .eq('channel_id', id.value)
       .eq('app_id', channel.value.app_id)
+    // A failed check must not pretend the channel has no forced devices.
+    if (error) {
+      console.error('Cannot check forced devices', error)
+      toast.error(t('something-went-wrong-try-again-later'))
+      return
+    }
     hasDevices.value = (count ?? 0) > 0
   }
   catch (error) {

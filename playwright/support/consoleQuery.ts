@@ -75,7 +75,14 @@ export async function routeConsoleQuery(page: Page, name: string, handler: (rout
     const query = parseConsoleQuery(route.request())
     if (!query || query.name !== name)
       return route.fallback()
-    await handler(route, query)
+    try {
+      await handler(route, query)
+    }
+    catch (error) {
+      // Fail the request so the spec reports the handler error instead of hanging.
+      await route.abort().catch(() => {})
+      throw error
+    }
   })
 }
 

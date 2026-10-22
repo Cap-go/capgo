@@ -1,4 +1,5 @@
-import { useConsole } from './console'
+import { defaultApiHost, useConsole } from './console'
+import { resolveConsoleApiBase } from './consoleAuth'
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7
 const SIGNED_URL_CACHE_MAX_AGE_MS = 15 * 60 * 1000
@@ -6,6 +7,19 @@ const MAX_CACHE_ENTRIES = 500
 const STORAGE_URL_REGEX = /\/storage\/v1\/object(?:\/(?:public|sign))?\/images\/(.+)$/
 const CONSOLE_READ_PATH = '/private/console/images/read'
 const signedUrlCache = new Map<string, { url: string, expiresAt: number }>()
+
+// Only our own image relay URLs carry a storage path worth re-signing; an external
+// URL that merely ends with the same path is left alone.
+function isConsoleReadUrl(url: URL) {
+  if (!url.pathname.endsWith(CONSOLE_READ_PATH) || !url.searchParams.get('path') || !url.searchParams.get('token'))
+    return false
+  try {
+    return url.origin === new URL(resolveConsoleApiBase(defaultApiHost)).origin
+  }
+  catch {
+    return false
+  }
+}
 
 export function resolveImagePath(raw?: string | null) {
   if (!raw)
@@ -18,7 +32,7 @@ export function resolveImagePath(raw?: string | null) {
   try {
     const url = new URL(trimmed)
     // A URL this console signed earlier carries the storage path; re-sign from it.
-    if (url.pathname.endsWith(CONSOLE_READ_PATH) && url.searchParams.get('path'))
+    if (isConsoleReadUrl(url))
       return { normalized: url.searchParams.get('path')!.replace(/^\/+/, ''), shouldSign: true }
     const match = STORAGE_URL_REGEX.exec(url.pathname)
     if (match?.[1]) {
