@@ -89,8 +89,17 @@ export function getSetupNotice(appId: string, progress: AppTodoProgress, webHost
   const todo = (list: string) => `npx @capgo/cli@latest app todo --list ${list}`
   const build = (platform?: string) => `npx @capgo/cli@latest build init${platform ? ` --platform ${platform}` : ''}`
   setupDebug('checklists evaluated', { ota_available: !!ota, builder_available: !!builder, ota_complete: otaComplete, builder_complete: finishedBuilder.length > 0 })
+  const billing = readBilling(progress.billing, webHost)
+  // Direct-offer orgs (no free trial, never paid) cannot upload or build until
+  // they subscribe: choosing a plan is their first step, before setup.
+  if (!completed.length && billing?.trialSkipped) {
+    const secondary = [
+      ...(ota ? [otaStarted ? 'finish setting up live updates' : 'set up live updates'] : []),
+      ...(builder ? [builderStarted ? 'continue setting up cloud builds' : 'explore cloud builds with Capgo Builder'] : []),
+    ]
+    return { kind: 'plan', appId, completed, billing, secondary }
+  }
   if (completed.length) {
-    const billing = readBilling(progress.billing, webHost)
     if (!billing) {
       const data = onboardingRecord(progress.billing)
       setupDebug('billing evaluated', { available: data.status === 'available', is_paying: data.isPaying === true, has_credits: data.hasCredits === true })
@@ -169,15 +178,26 @@ export function formatSetupNotice(notice: SetupNotice | undefined, now = Date.no
         ...(notice.product === 'live updates' ? ['Open your checklist to continue:'] : []),
         notice.action,
       ]
-    : [
-        notice.secondary.length ? `${notice.completed.join(' and ')} are set up` : 'Your Capgo setup is complete',
-        '',
-        ...(notice.billing.trialEndsAt && !trialSkipped ? [remainingTrial(notice.billing.trialEndsAt, now)] : []),
-        planAction,
-        '',
-        `View plans: ${notice.billing.plansUrl}`,
-      ]
-  return [...primary, ...(notice.secondary.length ? ['', `You can also ${notice.secondary.join(' or ')}.`] : [])].join('\n')
+    : notice.completed.length
+      ? [
+          notice.secondary.length ? `${notice.completed.join(' and ')} are set up` : 'Your Capgo setup is complete',
+          '',
+          ...(notice.billing.trialEndsAt && !trialSkipped ? [remainingTrial(notice.billing.trialEndsAt, now)] : []),
+          planAction,
+          '',
+          `View plans: ${notice.billing.plansUrl}`,
+        ]
+      // Plan-first notice (direct offer, setup not finished yet).
+      : [
+          planAction,
+          '',
+          `View plans: ${notice.billing.plansUrl}`,
+        ]
+  const planFirst = notice.kind === 'plan' && !notice.completed.length
+  const secondaryLine = planFirst
+    ? `Then ${notice.secondary.join(' and ')}.`
+    : `You can also ${notice.secondary.join(' or ')}.`
+  return [...primary, ...(notice.secondary.length ? ['', secondaryLine] : [])].join('\n')
 }
 
 export function reconcileSetupProgress(progress: AppTodoProgress, reported: readonly LocalOnboardingStep[]): AppTodoProgress {
