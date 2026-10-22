@@ -40,7 +40,6 @@ import { resolveAutoBumpLevelFromAi } from './auto-bump-ai'
 import { maybePromptBuilderCta, shouldBlockIncompatibleUpload } from './builder-cta'
 import { checkIndexPosition, searchInDirectory } from './check'
 import { summarizeUploadCompatibility } from './compatibility'
-import { finalizeUploadedBundle } from './finalize-upload'
 import { isManifestUploadAutoEnabled, MANIFEST_UPLOAD_PROTOCOL_VERSION, manifestUploadFileHashFormat, requestManifestUpload } from './manifest-upload'
 import { PartialUploadValidationError, prepareBundlePartialFiles, prepareManifestUploadEntries, uploadPartial } from './partial'
 import { clackUploadReporter, getUploadReporter, runWithUploadReporter } from './reporter'
@@ -2159,15 +2158,7 @@ async function uploadBundleInternalWithReporter(preAppid: string, options: Optio
     if (options.verbose)
       log.info(`[Verbose] Updating version record with storage provider...`)
 
-    await finalizeUploadedBundle({
-      apikey,
-      appId: appid,
-      bundle,
-      apiHost: options.apiHost,
-      reporter: getUploadReporter(),
-    }, async () => {
-      await persistVersionData(apikey, versionData, 'update', options)
-    })
+    await persistVersionData(apikey, versionData, 'update', options)
 
     if (options.verbose)
       log.info(`[Verbose] Version record updated successfully`)
