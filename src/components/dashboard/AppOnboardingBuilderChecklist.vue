@@ -96,7 +96,7 @@ const currentStep = computed(() => steps.value.find(step => step.status !== 'don
 const selectedStep = computed(() => steps.value.find(step => step.id === selectedId.value) ?? currentStep.value ?? steps.value.at(-1))
 const isFirstStep = computed(() => selectedStep.value?.index === 0)
 const canSkipSelected = computed(() => !!selectedStep.value && isOpenOnboardingStepStatus(selectedStep.value.status))
-const checklistOpen = ref(false)
+const checklistOpen = ref(true)
 const skipping = ref(false)
 const completed = computed(() => steps.value.length > 0
   && steps.value.every(step => step.status === 'done' || step.status === 'skipped')

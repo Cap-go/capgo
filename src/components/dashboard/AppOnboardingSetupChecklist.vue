@@ -78,7 +78,7 @@ const waitingMessageKey = computed(() => {
 const completed = computed(() => hasDualOnboardingChecklists(rawOnboarding.value)
   ? steps.value.length > 0 && doneCount.value === steps.value.length
   : onboarding.value.outcome === 'completed')
-const checklistOpen = ref(false)
+const checklistOpen = ref(true)
 const channelFlowOpen = ref(false)
 
 watch(() => props.appId, () => {
