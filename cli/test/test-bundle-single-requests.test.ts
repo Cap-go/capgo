@@ -70,18 +70,7 @@ describe('deleteSpecificVersion', () => {
     expect(calls).toEqual([{ path: 'bundle', method: 'DELETE', body: { app_id: 'com.test.app', version: '1.2.3' } }])
   })
 
-  it('reports a missing bundle without listing bundles', async () => {
-    const { calls, invoke } = recordingInvoke([{
-      data: null,
-      error: makeBundleApiError({ error: 'error_version_not_found', message: 'Version not found' }, 404),
-    }])
-    await expect(deleteSpecificVersion(client, 'com.test.app', '9.9.9', { silent: true, apikey: 'key', invoke }))
-      .rejects
-      .toThrow('App version com.test.app@9.9.9 doesn\'t exist')
-    expect(calls).toHaveLength(1)
-  })
-
-  it('reports a missing bundle on older backends after one filtered lookup', async () => {
+  it('reports a missing bundle after one filtered lookup', async () => {
     const { calls, invoke } = recordingInvoke([
       { data: null, error: makeBundleApiError({ error: 'cannot_delete_version', message: 'Cannot delete version' }, 400) },
       { data: [], error: null },

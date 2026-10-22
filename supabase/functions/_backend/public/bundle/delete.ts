@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { BRES, quickError, simpleError } from '../../utils/hono.ts'
+import { BRES, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
@@ -44,11 +44,9 @@ export async function deleteBundle(c: Context<MiddlewareKeyVariables>, body: Get
       .eq('app_id', body.app_id)
       .eq('name', body.version)
       .eq('deleted', false)
-      .maybeSingle()
-    if (versionError)
+      .single()
+    if (versionError || !version)
       throw simpleError('cannot_delete_version', 'Cannot delete version', { supabaseError: versionError })
-    if (!version)
-      quickError(404, 'error_version_not_found', 'Version not found', { app_id: body.app_id, version: body.version })
 
     const linkedVersionIds = await getLinkedChannelVersionIds(c, apikey, body.app_id)
     if (linkedVersionIds.has(version.id))
