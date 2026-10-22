@@ -93,7 +93,7 @@ function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPa
           return setupStyle(['bold', 'cyan'], line)
         if (line.startsWith('Your trial'))
           return setupStyle('yellow', line)
-        return line.startsWith('You can also') ? setupStyle('dim', line) : line
+        return line.startsWith('You can also') || line.startsWith('Then ') ? setupStyle('dim', line) : line
       }).join('\n')
       if (!renderGitHubNotice(text))
         box(styledText, '', setupBoxOptions)

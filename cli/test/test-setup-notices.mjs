@@ -296,3 +296,44 @@ test('completed OTA gives a started Builder checklist a continue mention', () =>
   progress.onboarding.setup.steps.builder.ios.start_setup.status = 'done'
   assert.match(message(progress), /You can also continue setting up cloud builds\./)
 })
+
+test('direct-offer orgs that never paid see the plan first, before setup', () => {
+  const progress = fixture(['ota'])
+  progress.billing.trialEndsAt = '2025-12-01T00:00:05Z'
+  progress.billing.orgCreatedAt = '2025-12-01T00:00:00Z'
+  progress.billing.hasPaid = false
+  const notice = getSetupNotice(appId, progress, 'https://console.example.com')
+  assert.equal(notice?.kind, 'plan')
+  const text = message(progress)
+  assert.equal(text.split('\n')[0], 'Choose a plan to start using Capgo. 14-day money-back guarantee. Cancel anytime.')
+  assert.ok(text.includes('View plans: https://console.example.com/settings/organization/plans?oid='), text)
+  assert.ok(text.includes('Then finish setting up live updates.'), text)
+  assert.doesNotMatch(text, /trial|is set up|are set up|setup is complete/i)
+})
+
+test('trial orgs, churned orgs, paying orgs and orgs with credits keep the setup notice first', () => {
+  const variants = [
+    billing => billing,
+    billing => Object.assign(billing, { trialEndsAt: '2025-12-01T00:00:05Z', orgCreatedAt: '2025-12-01T00:00:00Z', hasPaid: true }),
+    billing => Object.assign(billing, { trialEndsAt: '2025-12-01T00:00:05Z', orgCreatedAt: '2025-12-01T00:00:00Z', hasPaid: false, isPaying: true }),
+    billing => Object.assign(billing, { trialEndsAt: '2025-12-01T00:00:05Z', orgCreatedAt: '2025-12-01T00:00:00Z', hasPaid: false, hasCredits: true }),
+  ]
+  for (const variant of variants) {
+    const progress = fixture(['ota'])
+    variant(progress.billing)
+    assert.equal(getSetupNotice(appId, progress, 'https://console.example.com')?.kind, 'setup')
+  }
+})
+
+test('the plan-first notice keeps the unreliable-snapshot guards', () => {
+  const direct = (progress) => {
+    Object.assign(progress.billing, { trialEndsAt: '2025-12-01T00:00:05Z', orgCreatedAt: '2025-12-01T00:00:00Z', hasPaid: false })
+    return progress
+  }
+  const withErrors = direct(fixture(['ota']))
+  withErrors.checkErrors = ['add_channel']
+  assert.equal(getSetupNotice(appId, withErrors, 'https://console.example.com'), undefined)
+  const dualPending = direct(fixture(['ota', 'builder']))
+  dualPending.onboarding.setup.steps.ota.login_cli_mcp.status = 'pending'
+  assert.equal(getSetupNotice(appId, dualPending, 'https://console.example.com'), undefined)
+})

@@ -121,6 +121,7 @@ declare module 'vue' {
     NativePlatformTrendChart: typeof import('./components/dashboard/NativePlatformTrendChart.vue')['default']
     NativeReleaseStatsPanel: typeof import('./components/dashboard/NativeReleaseStatsPanel.vue')['default']
     Navbar: typeof import('./components/Navbar.vue')['default']
+    OnboardingChoosePlanStep: typeof import('./components/dashboard/OnboardingChoosePlanStep.vue')['default']
     OnboardingExploreBanner: typeof import('./components/dashboard/OnboardingExploreBanner.vue')['default']
     OnboardingExploreReminder: typeof import('./components/dashboard/OnboardingExploreReminder.vue')['default']
     OnboardingProfile: typeof import('./components/OnboardingProfile.vue')['default']
