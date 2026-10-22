@@ -394,9 +394,7 @@ watch(
     if (requestId !== pageLoadRequestId.value)
       return
     loading.value = false
-    const loadedVersion = version.value
-    if (!loadedVersion?.name)
-      displayStore.NavTitle = t('bundle')
+    // getVersion already sets NavTitle from the summary row (or 'bundle' on miss).
     displayStore.defaultBack = `/app/${packageId.value}/bundles`
   },
   { immediate: true },
