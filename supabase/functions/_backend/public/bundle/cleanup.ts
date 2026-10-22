@@ -139,8 +139,8 @@ async function fetchLinkedVersionIds(c: Context<MiddlewareKeyVariables>, apikey:
 }
 
 /**
- * Soft-deletes one batch in a single transaction. Each bundle's lifecycle lock (the same
- * `pg_advisory_xact_lock(version_id)` channel promotion takes) is held while the channel links
+ * Soft-deletes one batch in a single transaction. Each bundle's lifecycle lock (taken through
+ * `lock_channel_bundle_lifecycle`, like channel promotion) is held while the channel links
  * are checked and the rows updated, so a concurrent promotion either commits first and keeps
  * its bundle, or waits and then sees it deleted. With `ignoreChannel`, linked bundles are
  * deleted too and the unlink_channels_from_deleted_version trigger clears their links.
@@ -162,10 +162,11 @@ async function softDeleteBatch(
     dbClient = await checkoutPgClient(pgClient)
     await beginWriteTransaction(dbClient)
     transactionStarted = true
-    // Sorted so concurrent cleanups take the locks in the same order (PG evaluates volatile
-    // output expressions after ORDER BY).
+    // Follow the shared lifecycle-lock protocol (row FOR UPDATE, then advisory lock, per bundle
+    // in id order) so cleanup cannot deadlock with a channel promotion. PG evaluates volatile
+    // output expressions after ORDER BY, so the bundles are locked in sorted order.
     await dbClient.query(
-      'SELECT pg_catalog.pg_advisory_xact_lock(id) FROM pg_catalog.unnest($1::bigint[]) AS t(id) ORDER BY id',
+      'SELECT public.lock_channel_bundle_lifecycle(id, NULL) FROM pg_catalog.unnest($1::bigint[]) AS t(id) ORDER BY id',
       [ids],
     )
     // Same caller identity the delete-permission trigger checks on the REST path.
