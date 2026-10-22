@@ -1,6 +1,7 @@
 import type Stripe from 'stripe'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:net'
+import type { Emulator } from 'emulate'
 import { createEmulator } from 'emulate'
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createCheckout, createOneTimeCheckout, getCreditCheckoutDetails, getStripe } from '../supabase/functions/_backend/utils/stripe.ts'
@@ -149,7 +150,7 @@ async function startStripeEmulatorWithRetry(maxAttempts = 5) {
 }
 
 describe('stripe emulator integration', () => {
-  let emulator: Awaited<ReturnType<typeof createEmulator>> | undefined
+  let emulator: Emulator | undefined
   let stripeApiBaseUrl = ''
 
   beforeAll(async () => {

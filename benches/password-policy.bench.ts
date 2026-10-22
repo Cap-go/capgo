@@ -1,4 +1,4 @@
-import { bench, describe } from 'vitest'
+import { describe, test } from 'vitest'
 import {
   getEffectivePasswordMinLength,
   getPasswordPolicyValidationErrors,
@@ -6,32 +6,44 @@ import {
 } from '../supabase/functions/_backend/utils/password_policy.ts'
 
 describe('getPasswordUtf8ByteLength', () => {
-  bench('ascii password', () => {
-    getPasswordUtf8ByteLength('MyP@ssw0rd!2024')
+  test('ascii password', async ({ bench }) => {
+    await bench('ascii password', () => {
+      getPasswordUtf8ByteLength('MyP@ssw0rd!2024')
+    }).run()
   })
 
-  bench('multibyte password (emoji + accented)', () => {
-    getPasswordUtf8ByteLength('Pässwörd🔑✨SecüreKey!')
+  test('multibyte password (emoji + accented)', async ({ bench }) => {
+    await bench('multibyte password (emoji + accented)', () => {
+      getPasswordUtf8ByteLength('Pässwörd🔑✨SecüreKey!')
+    }).run()
   })
 
-  bench('long ASCII password (72 bytes)', () => {
-    getPasswordUtf8ByteLength('A'.repeat(72))
+  test('long ASCII password (72 bytes)', async ({ bench }) => {
+    await bench('long ASCII password (72 bytes)', () => {
+      getPasswordUtf8ByteLength('A'.repeat(72))
+    }).run()
   })
 })
 
 describe('getEffectivePasswordMinLength', () => {
-  bench('with valid min length', () => {
-    getEffectivePasswordMinLength(10)
+  test('with valid min length', async ({ bench }) => {
+    await bench('with valid min length', () => {
+      getEffectivePasswordMinLength(10)
+    }).run()
   })
 
-  bench('with undefined', () => {
-    getEffectivePasswordMinLength(undefined)
+  test('with undefined', async ({ bench }) => {
+    await bench('with undefined', () => {
+      getEffectivePasswordMinLength(undefined)
+    }).run()
   })
 
-  bench('with edge values', () => {
-    getEffectivePasswordMinLength(3)
-    getEffectivePasswordMinLength(100)
-    getEffectivePasswordMinLength(Number.NaN)
+  test('with edge values', async ({ bench }) => {
+    await bench('with edge values', () => {
+      getEffectivePasswordMinLength(3)
+      getEffectivePasswordMinLength(100)
+      getEffectivePasswordMinLength(Number.NaN)
+    }).run()
   })
 })
 
@@ -43,19 +55,27 @@ describe('getPasswordPolicyValidationErrors', () => {
     require_special: true,
   }
 
-  bench('valid password against strict policy', () => {
-    getPasswordPolicyValidationErrors('MyStr0ng!Pass', strictPolicy)
+  test('valid password against strict policy', async ({ bench }) => {
+    await bench('valid password against strict policy', () => {
+      getPasswordPolicyValidationErrors('MyStr0ng!Pass', strictPolicy)
+    }).run()
   })
 
-  bench('invalid password (all rules fail)', () => {
-    getPasswordPolicyValidationErrors('abc', strictPolicy)
+  test('invalid password (all rules fail)', async ({ bench }) => {
+    await bench('invalid password (all rules fail)', () => {
+      getPasswordPolicyValidationErrors('abc', strictPolicy)
+    }).run()
   })
 
-  bench('empty policy', () => {
-    getPasswordPolicyValidationErrors('simplepassword', {})
+  test('empty policy', async ({ bench }) => {
+    await bench('empty policy', () => {
+      getPasswordPolicyValidationErrors('simplepassword', {})
+    }).run()
   })
 
-  bench('multibyte password validation', () => {
-    getPasswordPolicyValidationErrors('Pässwörd🔑1!', strictPolicy)
+  test('multibyte password validation', async ({ bench }) => {
+    await bench('multibyte password validation', () => {
+      getPasswordPolicyValidationErrors('Pässwörd🔑1!', strictPolicy)
+    }).run()
   })
 })

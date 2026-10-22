@@ -1,40 +1,56 @@
-import { bench, describe } from 'vitest'
+import { describe, test } from 'vitest'
 import { normalizeAnalyticsLimit } from '../supabase/functions/_backend/utils/cloudflare.ts'
 
 describe('normalizeAnalyticsLimit', () => {
-  bench('valid number within range', () => {
-    normalizeAnalyticsLimit(500)
+  test('valid number within range', async ({ bench }) => {
+    await bench('valid number within range', () => {
+      normalizeAnalyticsLimit(500)
+    }).run()
   })
 
-  bench('number exceeding max', () => {
-    normalizeAnalyticsLimit(100_000)
+  test('number exceeding max', async ({ bench }) => {
+    await bench('number exceeding max', () => {
+      normalizeAnalyticsLimit(100_000)
+    }).run()
   })
 
-  bench('negative number', () => {
-    normalizeAnalyticsLimit(-10)
+  test('negative number', async ({ bench }) => {
+    await bench('negative number', () => {
+      normalizeAnalyticsLimit(-10)
+    }).run()
   })
 
-  bench('zero', () => {
-    normalizeAnalyticsLimit(0)
+  test('zero', async ({ bench }) => {
+    await bench('zero', () => {
+      normalizeAnalyticsLimit(0)
+    }).run()
   })
 
-  bench('non-number types', () => {
-    normalizeAnalyticsLimit('500')
-    normalizeAnalyticsLimit(null)
-    normalizeAnalyticsLimit(undefined)
-    normalizeAnalyticsLimit({})
+  test('non-number types', async ({ bench }) => {
+    await bench('non-number types', () => {
+      normalizeAnalyticsLimit('500')
+      normalizeAnalyticsLimit(null)
+      normalizeAnalyticsLimit(undefined)
+      normalizeAnalyticsLimit({})
+    }).run()
   })
 
-  bench('float truncation', () => {
-    normalizeAnalyticsLimit(99.7)
+  test('float truncation', async ({ bench }) => {
+    await bench('float truncation', () => {
+      normalizeAnalyticsLimit(99.7)
+    }).run()
   })
 
-  bench('nan and infinity', () => {
-    normalizeAnalyticsLimit(Number.NaN)
-    normalizeAnalyticsLimit(Number.POSITIVE_INFINITY)
+  test('nan and infinity', async ({ bench }) => {
+    await bench('nan and infinity', () => {
+      normalizeAnalyticsLimit(Number.NaN)
+      normalizeAnalyticsLimit(Number.POSITIVE_INFINITY)
+    }).run()
   })
 
-  bench('with custom fallback', () => {
-    normalizeAnalyticsLimit('invalid', 250)
+  test('with custom fallback', async ({ bench }) => {
+    await bench('with custom fallback', () => {
+      normalizeAnalyticsLimit('invalid', 250)
+    }).run()
   })
 })

@@ -1,7 +1,7 @@
 import type { Compatibility } from '../cli/src/utils.ts'
 import { Buffer } from 'node:buffer'
 import { parse } from '@std/semver'
-import { bench, describe } from 'vitest'
+import { describe, test } from 'vitest'
 import { getChecksum } from '../cli/src/checksum.ts'
 import { getCompatibilityDetails, isCompatible, isDeprecatedPluginVersion, regexSemver } from '../cli/src/utils.ts'
 import { autoBumpVersion, getVersionSuggestions } from '../cli/src/versionHelpers.ts'
@@ -59,51 +59,67 @@ const compatibilityMatrix: Compatibility[] = [
 const checksumPayload = Buffer.alloc(128 * 1024, 'capgo-benchmark-payload')
 
 describe('cli version helpers', () => {
-  bench('validate bundle semver candidates', () => {
-    for (const version of bundleVersions) {
-      const isExpectedInvalid = version === 'invalid-version'
-      const isValid = regexSemver.test(version)
-      if (!isExpectedInvalid && !isValid)
-        throw new Error(`Expected valid semver fixture: ${version}`)
-      if (isExpectedInvalid && isValid)
-        throw new Error(`Expected invalid semver fixture: ${version}`)
-    }
+  test('validate bundle semver candidates', async ({ bench }) => {
+    await bench('validate bundle semver candidates', () => {
+      for (const version of bundleVersions) {
+        const isExpectedInvalid = version === 'invalid-version'
+        const isValid = regexSemver.test(version)
+        if (!isExpectedInvalid && !isValid)
+          throw new Error(`Expected valid semver fixture: ${version}`)
+        if (isExpectedInvalid && isValid)
+          throw new Error(`Expected invalid semver fixture: ${version}`)
+      }
+    }).run()
   })
 
-  bench('auto bump bundle versions', () => {
-    for (const version of bundleVersions)
-      autoBumpVersion(version)
+  test('auto bump bundle versions', async ({ bench }) => {
+    await bench('auto bump bundle versions', () => {
+      for (const version of bundleVersions)
+        autoBumpVersion(version)
+    }).run()
   })
 
-  bench('suggest replacement bundle versions', () => {
-    for (const version of bundleVersions)
-      getVersionSuggestions(version)
+  test('suggest replacement bundle versions', async ({ bench }) => {
+    await bench('suggest replacement bundle versions', () => {
+      for (const version of bundleVersions)
+        getVersionSuggestions(version)
+    }).run()
   })
 
-  bench('classify updater support windows', () => {
-    for (const version of updaterVersions)
-      isDeprecatedPluginVersion(parse(version))
+  test('classify updater support windows', async ({ bench }) => {
+    await bench('classify updater support windows', () => {
+      for (const version of updaterVersions)
+        isDeprecatedPluginVersion(parse(version))
+    }).run()
   })
 })
 
 describe('cli compatibility helpers', () => {
-  bench('classify native package compatibility - getCompatibilityDetails', () => {
-    for (const entry of compatibilityMatrix)
-      getCompatibilityDetails(entry)
+  test('classify native package compatibility - getCompatibilityDetails', async ({ bench }) => {
+    await bench('classify native package compatibility - getCompatibilityDetails', () => {
+      for (const entry of compatibilityMatrix)
+        getCompatibilityDetails(entry)
+    }).run()
   })
 
-  bench('classify native package compatibility - isCompatible', () => {
-    for (const entry of compatibilityMatrix)
-      isCompatible(entry)
+  test('classify native package compatibility - isCompatible', async ({ bench }) => {
+    await bench('classify native package compatibility - isCompatible', () => {
+      for (const entry of compatibilityMatrix)
+        isCompatible(entry)
+    }).run()
   })
 })
 
 describe('cli checksum helpers', () => {
-  bench('sha256 checksum for medium bundle payload', async () => {
-    await getChecksum(checksumPayload, 'sha256')
+  test('sha256 checksum for medium bundle payload', async ({ bench }) => {
+    await bench('sha256 checksum for medium bundle payload', async () => {
+      await getChecksum(checksumPayload, 'sha256')
+    }).run()
   })
 
-  bench('crc32 checksum for medium bundle payload', async () => {
-    await getChecksum(checksumPayload, 'crc32')
+  test('crc32 checksum for medium bundle payload', async ({ bench }) => {
+    await bench('crc32 checksum for medium bundle payload', async () => {
+      await getChecksum(checksumPayload, 'crc32')
+    }).run()
   })
 })

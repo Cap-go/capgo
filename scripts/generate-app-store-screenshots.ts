@@ -372,6 +372,7 @@ function verifyScreenshotSize(path: string, expectedWidth: number, expectedHeigh
 async function ensureLocalStack() {
   if (!(await isTcpReady(stripePort))) {
     startProcess('stripe-emulator', ['bun', 'run', 'stripe:emulator'], {
+      STRIPE_EMULATOR_HOSTNAME: '0.0.0.0',
       STRIPE_EMULATOR_PORT: String(stripePort),
     })
     await waitForTcp(stripePort, 60_000, 'Stripe emulator')

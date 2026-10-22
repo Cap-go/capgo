@@ -3,7 +3,7 @@ import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
-import { useDark, useNow } from '@vueuse/core'
+import { useDark, useIntervalFn, useNow } from '@vueuse/core'
 import dayjs from 'dayjs'
 import { computed, h, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -111,7 +111,7 @@ const scopePickerQuery = ref('')
 const supabase = useSupabase()
 const keys = ref<ApiKeyRow[]>([])
 const hasLoadedKeys = ref(false)
-const now = useNow({ interval: 60_000 })
+const now = useNow({ scheduler: cb => useIntervalFn(cb, 60_000) })
 const cliLoginCommand = 'npx @capgo/cli@latest login'
 const showCliLoginGuidance = computed(() =>
   hasLoadedKeys.value && shouldShowCliLoginGuidance(keys.value, now.value),

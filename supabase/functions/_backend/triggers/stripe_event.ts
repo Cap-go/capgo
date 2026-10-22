@@ -228,7 +228,7 @@ function getPaidAtUpdate(
 
 function toStripeInfoUpdate(data: StripeData['data']): StripeInfoUpdate {
   const updateData = Object.fromEntries(
-    Object.entries(data).filter(([_, value]) => value !== undefined),
+    Object.entries(data).filter(([, value]) => value !== undefined),
   ) as StripeInfoUpdate
   if (data.status === 'past_due')
     updateData.status = 'succeeded'
@@ -237,7 +237,7 @@ function toStripeInfoUpdate(data: StripeData['data']): StripeInfoUpdate {
 
 function compactMetadata(metadata: Record<string, string | undefined>) {
   return Object.fromEntries(
-    Object.entries(metadata).filter(([_, value]) => value !== undefined),
+    Object.entries(metadata).filter(([, value]) => value !== undefined),
   ) as Record<string, string>
 }
 

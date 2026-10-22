@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ChartData, ChartOptions } from 'chart.js'
 import type { ReleaseLiveChannel, ReleaseLiveDeployment, ReleaseLiveResponse } from '~/composables/useReleaseLive'
-import { useDark, useDocumentVisibility, useNow } from '@vueuse/core'
+import { useDark, useDocumentVisibility, useIntervalFn, useNow } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { Bar } from 'vue-chartjs'
 import { useI18n } from 'vue-i18n'
@@ -42,7 +42,7 @@ registerDashboardCharts()
 const { t } = useI18n()
 const isDark = useDark()
 const visibility = useDocumentVisibility()
-const now = useNow({ interval: 1000 })
+const now = useNow({ scheduler: cb => useIntervalFn(cb, 1000) })
 // Toolbar segments: a muted label plus a borderless native select and our own chevron.
 const segmentClass = 'relative flex flex-1 sm:flex-none items-center min-w-0 h-9 gap-1.5 pl-3 pr-7 text-xs font-medium rounded-md bg-white shadow-sm cursor-pointer focus-within:ring-2 focus-within:ring-primary/40 dark:bg-gray-700'
 const segmentSelectClass = 'min-w-0 sm:max-w-48 flex-1 appearance-none truncate bg-transparent p-0 border-0 text-xs font-medium text-gray-900 cursor-pointer focus:outline-none focus:ring-0 disabled:cursor-not-allowed dark:text-white'
