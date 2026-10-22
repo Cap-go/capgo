@@ -98,6 +98,8 @@ test.describe('Actionable onboarding setup checklist', () => {
     const optionalStep = page.locator('[data-test="setup-checklist-cicd-step"]')
     const cicdGuide = optionalStep.getByRole('link', { name: 'CI/CD integration guide', exact: true })
     const cicdHref = 'https://capgo.app/docs/getting-started/cicd-integration/'
+    await expect(page.locator('[data-test="onboarding-setup-cli"] nav ol > li')).toHaveCount(7)
+    await expect(page.locator('ol [data-test="setup-checklist-cicd-step"]')).toHaveCount(0)
     await expect(optionalStep).toContainText('Optional next step')
     await expect(optionalStep).toContainText('Automate updates with CI/CD')
     await expect(optionalStep.locator('button, input')).toHaveCount(0)
