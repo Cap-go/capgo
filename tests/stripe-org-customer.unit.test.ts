@@ -91,6 +91,8 @@ function mockSupabase(options: {
   insertError?: { code?: string, message?: string } | null
   updateError?: { message?: string } | null
   deleteError?: { message?: string } | null
+  appMetadata?: Record<string, unknown>
+  userLookupError?: Error
 }) {
   const orgState = { customer_id: options.orgCustomerId }
   const stripeInfoInsert = vi.fn(async () => ({ error: options.insertError ?? null }))
@@ -105,6 +107,13 @@ function mockSupabase(options: {
   })
 
   supabaseAdminMock.mockImplementation(() => ({
+    auth: {
+      admin: {
+        getUserById: async () => options.userLookupError
+          ? { data: { user: null }, error: options.userLookupError }
+          : { data: { user: { app_metadata: options.appMetadata ?? {} } }, error: null },
+      },
+    },
     from: (table: string) => {
       if (table === 'orgs') {
         return {
@@ -189,6 +198,44 @@ describe('createStripeCustomer', () => {
 
     expect(planName).toBe('Solo')
     expect(createCustomerMock).not.toHaveBeenCalled()
+  })
+
+  it('gives direct-offer creators a zero-length trial', async () => {
+    const { stripeInfoInsert } = mockSupabase({ orgCustomerId: LOCAL_ID, appMetadata: { offer: 'direct' } })
+    const before = Date.now()
+
+    await createStripeCustomer(createContext(), createOrg(LOCAL_ID))
+
+    const inserted = (stripeInfoInsert.mock.calls[0] as unknown as [{ trial_at: string }])[0]
+    const trialAt = Date.parse(inserted.trial_at)
+    expect(trialAt).toBeGreaterThanOrEqual(before)
+    expect(trialAt).toBeLessThanOrEqual(Date.now())
+  })
+
+  it('fails before creating a Stripe customer when the direct-offer lookup fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const { stripeInfoInsert } = mockSupabase({ orgCustomerId: LOCAL_ID, userLookupError: new Error('auth unavailable') })
+
+      await expect(createStripeCustomer(createContext(), createOrg(LOCAL_ID))).rejects.toThrow('auth unavailable')
+
+      expect(createCustomerMock).not.toHaveBeenCalled()
+      expect(stripeInfoInsert).not.toHaveBeenCalled()
+    }
+    finally {
+      consoleError.mockRestore()
+    }
+  })
+
+  it('keeps the 15-day trial for creators without the direct offer', async () => {
+    const { stripeInfoInsert } = mockSupabase({ orgCustomerId: LOCAL_ID, appMetadata: { offer: 'other' } })
+
+    await createStripeCustomer(createContext(), createOrg(LOCAL_ID))
+
+    const inserted = (stripeInfoInsert.mock.calls[0] as unknown as [{ trial_at: string }])[0]
+    const days = (Date.parse(inserted.trial_at) - Date.now()) / (24 * 60 * 60 * 1000)
+    expect(days).toBeGreaterThan(14.9)
+    expect(days).toBeLessThan(15.1)
   })
 
   it('creates a real customer when the org only has a local fake id', async () => {
@@ -370,6 +417,7 @@ describe('createStripeCustomer', () => {
     })
 
     supabaseAdminMock.mockImplementation(() => ({
+      auth: { admin: { getUserById: async () => ({ data: { user: { app_metadata: {} } }, error: null }) } },
       from: (table: string) => {
         if (table === 'orgs') {
           return {

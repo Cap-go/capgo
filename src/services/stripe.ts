@@ -246,12 +246,34 @@ export interface BillingInvoice {
   pdfUrl: string | null
 }
 
+// The onboarding plan that starts (and is first charged) when the free trial ends.
+export interface TrialPlan {
+  planName: string
+  productId: string
+  amount: number
+  currency: string
+  interval: 'month'
+  startsAt: string
+  scheduled: boolean
+}
+
+// Solo / Maker / Team choices shown when saving a card to auto-start a plan.
+export interface TrialPlanOption {
+  productId: string
+  planName: string
+  amount: number
+  currency: string
+}
+
 export interface BillingOverview {
   publishableKey: string
   card: BillingCard | null
+  // Charged automatically when the default card fails a renewal.
+  backupCard: BillingCard | null
   subscription: BillingSubscription | null
   invoices: BillingInvoice[]
   openInvoice: { id: string, amountDue: number, currency: string } | null
+  trialPlan: TrialPlan | null
 }
 
 export const CANCEL_REASONS = [
@@ -292,6 +314,26 @@ export function getBillingOverview(orgId: string) {
   return callBilling<BillingOverview>('overview', { orgId })
 }
 
+export function getTrialPlan(orgId: string) {
+  return callBilling<{ card: BillingCard | null, plan: TrialPlan | null, plans: TrialPlanOption[] }>('trial-plan', { orgId })
+}
+
+export async function scheduleTrialPlan(orgId: string, productId?: string) {
+  const datafastAttribution = await getDatafastAttribution()
+  const affonsoReferral = await getAffonsoReferral()
+  return callBilling<{ plan: TrialPlan }>('trial-plan/schedule', {
+    orgId,
+    ...(productId ? { productId } : {}),
+    affonsoReferral,
+    datafastVisitorId: datafastAttribution.visitorId,
+    datafastSessionId: datafastAttribution.sessionId,
+  })
+}
+
+export function cancelTrialPlan(orgId: string) {
+  return callBilling<{ plan: TrialPlan | null }>('trial-plan/cancel', { orgId })
+}
+
 export function createCardSetupIntent(orgId: string) {
   return callBilling<IntentSecret>('setup-intent', { orgId })
 }
@@ -301,8 +343,12 @@ export function getInvoicePaymentIntent(orgId: string) {
 }
 
 // intentId is the confirmed SetupIntent (new card) or PaymentIntent (invoice paid with a new card).
-export function saveDefaultPaymentMethod(orgId: string, intentId: string) {
-  return callBilling<{ card: BillingCard | null }>('payment-method', { orgId, intentId })
+export function savePaymentMethod(orgId: string, intentId: string, role: 'default' | 'backup' = 'default') {
+  return callBilling<{ card: BillingCard | null }>('payment-method', { orgId, intentId, role })
+}
+
+export function removeBackupCard(orgId: string, paymentMethodId: string) {
+  return callBilling<{ card: BillingCard | null, backupCard: BillingCard | null }>('remove-backup-card', { orgId, paymentMethodId })
 }
 
 export function cancelSubscriptionWithReason(orgId: string, reason: CancelReason, comment: string) {

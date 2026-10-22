@@ -1,6 +1,14 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
 
 const fixture = '/playwright/fixtures/onboarding-setup.html?view=flow&assignment=both-builder&resume=com.example.onboarding-preview&step=setup'
+
+async function openBuilderTask(page: Page, id: string) {
+  const toggle = page.locator('[data-test="builder-checklist-toggle"]')
+  if (await toggle.getAttribute('aria-expanded') === 'false')
+    await toggle.click()
+  await page.locator(`[data-test="builder-step-${id}"] button`).click()
+}
 
 test('chooses a goal, switches plain tabs, preserves instructions and places dismissal at the bottom', async ({ page }) => {
   await page.goto(fixture)
@@ -17,7 +25,7 @@ test('chooses a goal, switches plain tabs, preserves instructions and places dis
   await page.locator('[data-test="builder-platform-android"]').click()
   await expect(page.locator('[data-test="builder-checklist-command"]')).toContainText('build init -a ')
   await expect(page.locator('[data-test="builder-checklist-command"]')).toContainText('--platform android')
-  await page.locator('[data-test="builder-step-prepare_keystore"] button').click()
+  await openBuilderTask(page, 'prepare_keystore')
   await page.getByRole('tab', { name: 'Live Updates', exact: true }).click()
   await expect(page.locator('[data-test="setup-checklist-instructions"] h2')).toHaveText('Install Capgo Updater')
   await page.getByRole('tab', { name: 'Builder', exact: true }).focus()
@@ -93,7 +101,7 @@ test('returns from Explore dashboard to saved progress in the existing setup rou
 test('preserves inspected tasks across Builder platforms and continues the unfinished platform', async ({ page }) => {
   await page.clock.install()
   await page.goto(`${fixture}&otaComplete=1&builderProgress=ios&builderComplete=android`)
-  await page.locator('[data-test="builder-step-start_setup"] button').click()
+  await openBuilderTask(page, 'start_setup')
   await page.locator('[data-test="builder-platform-android"]').click()
   await expect(page.getByRole('button', { name: 'Continue Builder', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Continue Builder', exact: true }).click()
@@ -108,7 +116,7 @@ test('preserves inspected tasks across Builder platforms and continues the unfin
   })
   await page.clock.runFor(5000)
   await expect(page.locator('[data-test="builder-step-prepare_certificate"]')).toContainText('Current task')
-  await page.locator('[data-test="builder-step-start_setup"] button').click()
+  await openBuilderTask(page, 'start_setup')
   await page.locator('[data-test="builder-platform-android"]').click()
   await page.locator('[data-test="builder-platform-ios"]').click()
   await expect(page.locator('[data-test="builder-checklist-instructions"] h2')).toHaveText('Start guided Builder setup')
@@ -138,7 +146,7 @@ test('keeps AI setup available for later tasks and copies the active checklist p
   expect(prompt).not.toContain('start_capgo_builder_onboarding')
 
   await page.getByRole('tab', { name: 'Builder', exact: true }).click()
-  await page.locator('[data-test="builder-step-prepare_keystore"] button').click()
+  await openBuilderTask(page, 'prepare_keystore')
   const taskActions = page.locator('[data-test="builder-checklist-task-actions"]')
   await expect(taskActions.locator('button, a')).toHaveCount(3)
   const actionPositions = await taskActions.locator('button, a').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().top))
@@ -208,7 +216,7 @@ test('persists the displayed platform while preserving inspection during the fir
   })
   await page.getByRole('tab', { name: 'Builder', exact: true }).click()
   await expect(page.locator('[data-test="builder-platform-android"]')).toHaveAttribute('aria-pressed', 'true')
-  await page.locator('[data-test="builder-step-successful_cloud_build"] button').click()
+  await openBuilderTask(page, 'successful_cloud_build')
   await page.evaluate(() => {
     const state = (window as any).onboardingSetupPreview.state
     state.builderSteps.ios.start_setup.status = 'done'

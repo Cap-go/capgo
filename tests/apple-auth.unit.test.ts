@@ -1,11 +1,11 @@
 import { exportJWK, generateKeyPair, SignJWT } from 'jose'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mocks = vi.hoisted(() => ({ pg: vi.fn(), connect: vi.fn(), close: vi.fn(), rpc: vi.fn(), exchange: vi.fn(), signOut: vi.fn(), updateUser: vi.fn(), getUser: vi.fn(), from: vi.fn() }))
+const mocks = vi.hoisted(() => ({ pg: vi.fn(), connect: vi.fn(), close: vi.fn(), rpc: vi.fn(), exchange: vi.fn(), signOut: vi.fn(), updateUser: vi.fn(), updateUserById: vi.fn(), getUser: vi.fn(), from: vi.fn() }))
 vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({ getPgClient: mocks.connect, closeClient: mocks.close }))
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   emptySupabaseWithClientIP: () => ({ auth: { signInWithIdToken: mocks.exchange, signOut: mocks.signOut, updateUser: mocks.updateUser, getUser: mocks.getUser }, rpc: mocks.rpc }),
-  supabaseAdmin: () => ({ rpc: mocks.rpc, from: mocks.from }),
+  supabaseAdmin: () => ({ rpc: mocks.rpc, from: mocks.from, auth: { admin: { updateUserById: mocks.updateUserById } } }),
 }))
 const { app } = await import('../supabase/functions/_backend/auth/apple.ts')
 const user = { id: '11111111-1111-4111-8111-111111111111', email: 'apple-signin@example.com', identities: [{ provider: 'apple', identity_data: { sub: 'verified-subject' } }], user_metadata: {}, factors: [{ status: 'verified' }] }
@@ -104,6 +104,7 @@ beforeEach(() => {
   mocks.exchange.mockResolvedValue({ data: { user, session: { access_token: 'supabase-access', refresh_token: 'supabase-refresh' } }, error: null })
   mocks.getUser.mockResolvedValue({ data: { user }, error: null })
   mocks.updateUser.mockResolvedValue({ data: { user }, error: null })
+  mocks.updateUserById.mockReset().mockResolvedValue({ data: { user }, error: null })
   mocks.signOut.mockResolvedValue({ error: null })
   mocks.from.mockImplementation(() => ({
     upsert: (value: any, options: any) => ({ select: async () => {
@@ -231,11 +232,11 @@ describe('shared Apple endpoint', () => {
   })
 })
 
-async function oauth(redirect = 'https://console.example.com/login', reauthenticate = false) {
+async function oauth(redirect = 'https://console.example.com/login', reauthenticate = false, extraMetadata: Record<string, string> = {}) {
   const verifier = 'v'.repeat(43)
   const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)))
   const challenge = btoa(String.fromCharCode(...hash)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
-  const response = await request('/start', { redirect_uri: redirect, code_challenge: challenge, client_state: 's'.repeat(43), reauthenticate, registration_metadata: { signup_source: 'website', registration_device_type: 'mobile', role: 'admin' } }, reauthenticate ? { Authorization: 'Bearer current-session' } : {})
+  const response = await request('/start', { redirect_uri: redirect, code_challenge: challenge, client_state: 's'.repeat(43), reauthenticate, registration_metadata: { signup_source: 'website', registration_device_type: 'mobile', role: 'admin', ...extraMetadata } }, reauthenticate ? { Authorization: 'Bearer current-session' } : {})
   expect(response.status).toBe(200)
   const result = await response.json() as { authorization_url: string }
   const authUrl = new URL(result.authorization_url)
@@ -275,6 +276,20 @@ describe('android/browser OAuth backend transport', () => {
     expect(mocks.updateUser.mock.calls[0][0].data).not.toHaveProperty('role')
     expect((await request('/exchange', { code, code_verifier: flow.verifier, captcha_token: 'captcha' })).status).toBe(400)
     expect((await flow.callback()).status).toBe(400)
+  })
+  it('stores the direct offer in server-only app metadata for new users', async () => {
+    const flow = await oauth('https://console.example.com/login', false, { offer: 'direct' })
+    const fragment = new URLSearchParams(new URL((await flow.callback()).headers.get('location')!).hash.slice(1))
+    const exchanged = await request('/exchange', { code: fragment.get('apple_code'), code_verifier: flow.verifier, captcha_token: 'captcha' })
+    expect(exchanged.status).toBe(200)
+    expect(mocks.updateUserById).toHaveBeenCalledWith(user.id, { app_metadata: { offer: 'direct' } })
+    expect(mocks.updateUser.mock.calls[0][0].data).not.toHaveProperty('offer')
+  })
+  it('does not store any other offer value', async () => {
+    const flow = await oauth('https://console.example.com/login', false, { offer: 'Direct' })
+    const fragment = new URLSearchParams(new URL((await flow.callback()).headers.get('location')!).hash.slice(1))
+    expect((await request('/exchange', { code: fragment.get('apple_code'), code_verifier: flow.verifier, captcha_token: 'captcha' })).status).toBe(200)
+    expect(mocks.updateUserById).not.toHaveBeenCalled()
   })
   it('rejects invalid state and unallowlisted redirect before recording callback names', async () => {
     const response = await request('/start', { redirect_uri: 'https://attacker.example/callback', code_challenge: 'x'.repeat(43), client_state: 's'.repeat(43) })

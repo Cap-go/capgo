@@ -7,6 +7,7 @@ import AssistantChat from '~/components/assistant/AssistantChat.vue'
 import OnboardingExploreBanner from '~/components/dashboard/OnboardingExploreBanner.vue'
 import OnboardingExploreReminder from '~/components/dashboard/OnboardingExploreReminder.vue'
 import PastDueBanner from '~/components/dashboard/PastDueBanner.vue'
+import TrialCardPrompt from '~/components/dashboard/TrialCardPrompt.vue'
 import LogAsDialogField from '~/components/LogAsDialogField.vue'
 import { useEdgeSwipeBack } from '~/composables/useEdgeSwipeBack'
 import { isNativeChromeEnabled, useNativeChrome } from '~/composables/useNativeChrome'
@@ -116,6 +117,7 @@ useEdgeSwipeBack(contentShell, {
       </main>
     </div>
     <LogAsDialogField />
+    <TrialCardPrompt />
   </div>
   <!-- Below lg the sidebar is an overlay drawer, so the safe areas take the content color instead of the sidebar color. -->
   <div v-else class="flex h-full overflow-hidden bg-slate-100 dark:bg-slate-900 lg:bg-slate-800 lg:dark:bg-slate-800 pt-safe safe-areas">
@@ -152,5 +154,6 @@ useEdgeSwipeBack(contentShell, {
       </div>
     </div>
     <AssistantChat />
+    <TrialCardPrompt />
   </div>
 </template>

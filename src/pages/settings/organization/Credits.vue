@@ -15,6 +15,7 @@ import ScaleIcon from '~icons/heroicons/scale'
 import UserGroupIcon from '~icons/heroicons/user-group'
 import CardFormModal from '~/components/billing/CardFormModal.vue'
 import EmbeddedCheckoutModal from '~/components/billing/EmbeddedCheckoutModal.vue'
+import TrialPlanOfferModal from '~/components/billing/TrialPlanOfferModal.vue'
 import CreditsOnlyTip from '~/components/CreditsOnlyTip.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { creditPricingMetricOrder, formatCreditPricingPrice, formatCreditPricingTierLabel } from '~/services/creditPricing'
@@ -86,6 +87,7 @@ const creditUsdRate = ref(1)
 const isStartingCheckout = ref(false)
 const embeddedCheckout = ref<{ clientSecret: string, publishableKey: string, sessionId: string } | null>(null)
 const showCardModal = ref(false)
+const showTrialPlanOffer = ref(false)
 const isCompletingTopUp = ref(false)
 const isProcessingCheckout = computed(() => isStartingCheckout.value || isCompletingTopUp.value)
 const currentPage = ref(1)
@@ -613,6 +615,8 @@ async function openCardForm() {
 
 async function onCardSaved() {
   showCardModal.value = false
+  // Trial orgs that add a card here are offered to start their plan when the trial ends.
+  showTrialPlanOffer.value = !!currentOrganization.value && !currentOrganization.value.paying && (currentOrganization.value.trial_left ?? 0) > 0
   await loadAutoTopUpSettings()
 }
 
@@ -1294,6 +1298,13 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
       mode="setup"
       @close="showCardModal = false"
       @saved="onCardSaved"
+    />
+    <TrialPlanOfferModal
+      v-if="showTrialPlanOffer && currentOrganization?.gid"
+      :org-id="currentOrganization.gid"
+      source="credits"
+      @close="showTrialPlanOffer = false"
+      @scheduled="showTrialPlanOffer = false"
     />
     <RbacPermissionOnlyModal
       v-if="showAdminModal"
