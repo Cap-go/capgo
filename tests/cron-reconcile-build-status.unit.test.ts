@@ -108,6 +108,23 @@ describe('cron_reconcile_build_status', () => {
     expect(bodies.every(body => body.bodyUsed)).toBe(true)
   })
 
+  it('tells the builder a timed-out build is stopped for its build time limit, not by a user', async () => {
+    configureSupabase([staleBuild('slow', Date.now() - HOUR)])
+    const cancels: Array<{ url: string, body: string }> = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = String(input)
+      if (url.endsWith('/cancel')) {
+        cancels.push({ url, body: String(init?.body) })
+        return new Response('{}', { status: 200 })
+      }
+      return new Response(JSON.stringify({ job: { status: 'running', started_at: Date.now() - HOUR, completed_at: null } }), { status: 200 })
+    })
+
+    await runReconcile()
+
+    expect(cancels).toEqual([{ url: 'https://builder.test/jobs/job-slow/cancel', body: JSON.stringify({ reason: 'timeout' }) }])
+  })
+
   it('keeps retrying recent missing jobs and other builder errors, draining their bodies', async () => {
     const updates = configureSupabase([
       staleBuild('recent', Date.now() - 10 * 60 * 1000),
