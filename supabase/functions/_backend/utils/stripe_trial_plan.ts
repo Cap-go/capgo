@@ -6,7 +6,7 @@ import { syncBentoSubscriberTags, trackBentoEvent } from './bento.ts'
 import { TRIAL_CARD_BENTO_TAG } from './billing_bento_tags.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { closeClient, getPgClient, withPgTransaction } from './pg.ts'
+import { checkoutPgClient, closeClient, getPgClient, releasePgClient, TRANSACTION_IDLE_TIMEOUT_MS } from './pg.ts'
 import type { BillingAccount } from './stripe_billing.ts'
 import { findPlanByProductId, getPlanPriceId, getPlanProductId, isAutomaticTaxEnabled, TRIAL_PLAN_SCHEDULE_METADATA_KEY } from './stripe_billing.ts'
 import { supabaseAdmin } from './supabase.ts'
@@ -363,46 +363,51 @@ export async function scheduleTrialPlan(
   if (!await ensureDefaultPaymentMethod(ctx))
     throw simpleError('missing_payment_method', 'Add a card before starting the plan')
 
-  const existing = await findPendingTrialPlanSchedule(ctx.stripe, ctx.customerId)
-  const existingPrice = existing?.phases[0]?.items[0]?.price
-  const existingPriceId = typeof existingPrice === 'string' ? existingPrice : existingPrice?.id
-  const needsReplacement = !!existing && !!existingPriceId && existingPriceId !== state.priceId
-  let notifiedNewSchedule = false
-
-  if (!existing || needsReplacement) {
-    await ensureCustomerTaxAddress(ctx)
-    const metadata = attributionMetadata(attribution)
-    if (Object.keys(metadata).length)
-      await ctx.stripe.customers.update(ctx.customerId, { metadata })
-    // Create the replacement before canceling any pending schedule so a Stripe failure
-    // leaves the previously confirmed automatic start intact.
-    const schedule = await ctx.stripe.subscriptionSchedules.create({
-      customer: ctx.customerId,
-      start_date: Math.floor(state.startsAt.getTime() / 1000),
-      end_behavior: 'release',
-      default_settings: {
-        automatic_tax: { enabled: isAutomaticTaxEnabled(ctx.billingAccount) },
-        collection_method: 'charge_automatically',
-      },
-      // Phase metadata lands on the subscription so the webhook can recognize it.
-      phases: [{ items: [{ price: state.priceId, quantity: 1 }], metadata: { ...metadata, org_id: orgId, [TRIAL_PLAN_SCHEDULE_METADATA_KEY]: 'true' } }],
-      metadata: { [TRIAL_PLAN_SCHEDULE_METADATA_KEY]: 'true', org_id: orgId },
-    })
-    cloudlog({ requestId: c.get('requestId'), message: 'trial plan scheduled', orgId, scheduleId: schedule.id, startsAt: state.startsAt.toISOString(), productId: state.productId })
-    if (needsReplacement) {
-      await cancelPendingTrialPlanSchedulesExcept(
-        c,
-        ctx.stripe,
-        ctx.customerId,
-        schedule.id,
-        'trial plan schedule replaced by plan change',
-      )
+  // Same lock as Start now: a schedule created next to a started-now subscription would
+  // charge the org a second time when the trial ends.
+  const notifiedNewSchedule = await withTrialPlanLock(c, ctx.customerId, async () => {
+    if (await findLiveSubscription(ctx.stripe, ctx.customerId))
+      throw simpleError('trial_plan_already_subscribed', 'This organization already has a subscription')
+    const existing = await findPendingTrialPlanSchedule(ctx.stripe, ctx.customerId)
+    const existingPrice = existing?.phases[0]?.items[0]?.price
+    const existingPriceId = typeof existingPrice === 'string' ? existingPrice : existingPrice?.id
+    const needsReplacement = !!existing && !!existingPriceId && existingPriceId !== state.priceId
+    const createsSchedule = !existing || needsReplacement
+    if (createsSchedule) {
+      await ensureCustomerTaxAddress(ctx)
+      const metadata = attributionMetadata(attribution)
+      if (Object.keys(metadata).length)
+        await ctx.stripe.customers.update(ctx.customerId, { metadata })
+      // Create the replacement before canceling any pending schedule so a Stripe failure
+      // leaves the previously confirmed automatic start intact.
+      const schedule = await ctx.stripe.subscriptionSchedules.create({
+        customer: ctx.customerId,
+        start_date: Math.floor(state.startsAt.getTime() / 1000),
+        end_behavior: 'release',
+        default_settings: {
+          automatic_tax: { enabled: isAutomaticTaxEnabled(ctx.billingAccount) },
+          collection_method: 'charge_automatically',
+        },
+        // Phase metadata lands on the subscription so the webhook can recognize it.
+        phases: [{ items: [{ price: state.priceId, quantity: 1 }], metadata: { ...metadata, org_id: orgId, [TRIAL_PLAN_SCHEDULE_METADATA_KEY]: 'true' } }],
+        metadata: { [TRIAL_PLAN_SCHEDULE_METADATA_KEY]: 'true', org_id: orgId },
+      })
+      cloudlog({ requestId: c.get('requestId'), message: 'trial plan scheduled', orgId, scheduleId: schedule.id, startsAt: state.startsAt.toISOString(), productId: state.productId })
+      if (needsReplacement) {
+        await cancelPendingTrialPlanSchedulesExcept(
+          c,
+          ctx.stripe,
+          ctx.customerId,
+          schedule.id,
+          'trial plan schedule replaced by plan change',
+        )
+      }
     }
-    notifiedNewSchedule = true
-  }
-  // No idempotency key (it would replay a canceled schedule): drop duplicates from concurrent
-  // submits instead, on every call so a retry repairs a cleanup that failed earlier.
-  await cancelDuplicateTrialPlanSchedules(c, ctx.stripe, ctx.customerId)
+    // No idempotency key (it would replay a canceled schedule): drop duplicates from concurrent
+    // submits instead, on every call so a retry repairs a cleanup that failed earlier.
+    await cancelDuplicateTrialPlanSchedules(c, ctx.stripe, ctx.customerId)
+    return createsSchedule
+  })
 
   const summary = await getTrialPlanSummary(c, ctx)
   if (!summary)
@@ -479,16 +484,63 @@ export function isTrialPlanStartedNow(subscription: Pick<Stripe.Subscription, 'm
   return subscription.metadata?.[TRIAL_PLAN_STARTED_NOW_METADATA_KEY] === 'true'
 }
 
-// Serializes Start now per Stripe customer for the duration of the Stripe calls.
-async function withStartNowLock<T>(c: Context, customerId: string, run: () => Promise<T>): Promise<T> {
-  const pool = await getPgClient(c)
+interface LockQueryClient { query: (queryText: string, values?: unknown[]) => Promise<unknown> }
+
+// Holds a transaction-scoped advisory lock on `client` while `run` calls Stripe. `run` never
+// uses the connection, so a heartbeat keeps the transaction from going idle: otherwise
+// idle_in_transaction_session_timeout would end the session and release the lock mid-charge.
+// The lock guards no writes, so a failed heartbeat or COMMIT after `run` succeeded is logged
+// and the Stripe result is still returned.
+export async function holdTrialPlanLock<T>(
+  c: Context,
+  client: LockQueryClient,
+  customerId: string,
+  run: () => Promise<T>,
+  heartbeatMs = Math.floor(TRANSACTION_IDLE_TIMEOUT_MS / 3),
+): Promise<{ result: T, connectionLost: boolean }> {
+  await client.query('BEGIN READ WRITE; SET LOCAL statement_timeout = 10000')
+  let connectionLost = false
+  let heartbeat: ReturnType<typeof setInterval> | undefined
   try {
-    return await withPgTransaction(pool, async (client) => {
-      await client.query('SELECT pg_catalog.pg_advisory_xact_lock(hashtextextended($1, 0))', [`trial_start_now:${customerId}`])
-      return await run()
-    })
+    await client.query('SELECT pg_catalog.pg_advisory_xact_lock(hashtextextended($1, 0))', [`trial_plan:${customerId}`])
+    heartbeat = setInterval(() => {
+      client.query('SELECT 1').catch((error) => {
+        connectionLost = true
+        clearInterval(heartbeat)
+        cloudlogErr({ requestId: c.get('requestId'), message: 'trial plan lock heartbeat failed', customerId, error })
+      })
+    }, heartbeatMs)
+    const result = await run()
+    clearInterval(heartbeat)
+    try {
+      await client.query('COMMIT')
+    }
+    catch (error) {
+      connectionLost = true
+      cloudlogErr({ requestId: c.get('requestId'), message: 'trial plan lock commit failed', customerId, error })
+    }
+    return { result, connectionLost }
+  }
+  catch (error) {
+    clearInterval(heartbeat)
+    await client.query('ROLLBACK').catch(() => {})
+    throw error
+  }
+}
+
+// Serializes every trial plan charge (Start now and the trial-end schedule) per Stripe customer.
+async function withTrialPlanLock<T>(c: Context, customerId: string, run: () => Promise<T>): Promise<T> {
+  const pool = await getPgClient(c)
+  let client: Awaited<ReturnType<typeof checkoutPgClient>> | null = null
+  let broken = false
+  try {
+    client = await checkoutPgClient(pool)
+    const { result, connectionLost } = await holdTrialPlanLock(c, client, customerId, run)
+    broken = connectionLost
+    return result
   }
   finally {
+    releasePgClient(pool, client, broken)
     closeClient(c, pool)
   }
 }
@@ -518,27 +570,48 @@ export async function startTrialPlanNow(
   if (!paymentMethodId)
     throw simpleError('missing_payment_method', 'Add a card before starting the plan')
 
-  const price = await ctx.stripe.prices.retrieve(state.priceId)
-  const { subscription, reused } = await withStartNowLock(c, ctx.customerId, () => createStartNowSubscription(ctx.stripe, {
-    customerId: ctx.customerId,
-    orgId,
-    priceId: state.priceId,
-    paymentMethodId,
-    automaticTax: isAutomaticTaxEnabled(ctx.billingAccount),
-    metadata,
-  }))
+  const { subscription, reused } = await withTrialPlanLock(c, ctx.customerId, async () => {
+    const created = await createStartNowSubscription(ctx.stripe, {
+      customerId: ctx.customerId,
+      orgId,
+      priceId: state.priceId,
+      paymentMethodId,
+      automaticTax: isAutomaticTaxEnabled(ctx.billingAccount),
+      metadata,
+    })
+    // The plan already started: a pending trial-end schedule would bill a second subscription.
+    // Cleaning up under the lock means no schedule can be created after it. The webhook
+    // repeats this for the new subscription, so a failure here is retried there.
+    try {
+      await cancelAllPendingTrialPlanSchedules(c, ctx.stripe, ctx.customerId, `trial plan schedule replaced by start now ${created.subscription.id}`)
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'trial plan start now schedule cleanup failed', orgId, subscriptionId: created.subscription.id, error })
+    }
+    return created
+  })
   cloudlog({ requestId: c.get('requestId'), message: reused ? 'trial plan already started now' : 'trial plan started now', orgId, subscriptionId: subscription.id, productId: state.productId })
-  // The plan already started: a pending trial-end schedule would bill a second subscription.
-  // The webhook repeats this for the new subscription, so a failure here is retried there.
-  try {
-    await cancelAllPendingTrialPlanSchedules(c, ctx.stripe, ctx.customerId, `trial plan schedule replaced by start now ${subscription.id}`)
-  }
-  catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'trial plan start now schedule cleanup failed', orgId, subscriptionId: subscription.id, error })
+  // A reused subscription may be on another plan than this request picked: report what Stripe
+  // bills and put the org's selected product back to it.
+  const subscribedPrice = subscription.items?.data[0]?.price
+  const subscribedPriceId = typeof subscribedPrice === 'string' ? subscribedPrice : subscribedPrice?.id
+  const price = await ctx.stripe.prices.retrieve(reused && subscribedPriceId ? subscribedPriceId : state.priceId)
+  let planName = state.planName
+  let planProductId = state.productId
+  if (price.id !== state.priceId) {
+    planProductId = typeof price.product === 'string' ? price.product : price.product.id
+    const { data: plan } = await findPlanByProductId(c, planProductId)
+    planName = plan?.name ?? ''
+    const { error } = await supabaseAdmin(c)
+      .from('stripe_info')
+      .update({ product_id: planProductId })
+      .eq('customer_id', ctx.customerId)
+    if (error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'trial plan start now product restore failed', orgId, subscriptionId: subscription.id, error })
   }
   const summary: TrialPlanSummary = {
-    planName: state.planName,
-    productId: state.productId,
+    planName,
+    productId: planProductId,
     amount: price.unit_amount ?? 0,
     currency: price.currency,
     interval: 'month',

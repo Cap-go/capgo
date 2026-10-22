@@ -9,6 +9,7 @@ import {
   createStartNowSubscription,
   findPendingTrialPlanSchedule,
   getTrialPlanStartDate,
+  holdTrialPlanLock,
   settleTrialPlanFirstInvoice,
 } from '../supabase/functions/_backend/utils/stripe_trial_plan.ts'
 
@@ -363,5 +364,48 @@ describe('start trial plan now', () => {
     })
     const stripe = { subscriptions: { create, list: vi.fn(async () => ({ data: [] })) } } as unknown as Stripe
     await expect(createStartNowSubscription(stripe, input)).rejects.toThrow('rate limited')
+  })
+})
+
+describe('trial plan lock', () => {
+  function fakeLockClient(failOn?: string) {
+    const queries: string[] = []
+    const query = vi.fn(async (text: string) => {
+      queries.push(text)
+      if (failOn && text.startsWith(failOn))
+        throw new Error('connection terminated')
+      return { rows: [] }
+    })
+    return { client: { query }, queries }
+  }
+
+  it('locks per customer and keeps the transaction busy while Stripe is slow', async () => {
+    vi.useFakeTimers()
+    try {
+      const { client, queries } = fakeLockClient()
+      const run = vi.fn(() => new Promise<string>(resolve => setTimeout(() => resolve('sub_now'), 40_000)))
+      const held = holdTrialPlanLock(context, client, 'cus_1', run, 5_000)
+      await vi.advanceTimersByTimeAsync(40_000)
+      await expect(held).resolves.toEqual({ result: 'sub_now', connectionLost: false })
+      expect(client.query).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_xact_lock'), ['trial_plan:cus_1'])
+      expect(queries.filter(text => text === 'SELECT 1').length).toBeGreaterThanOrEqual(7)
+      expect(queries.at(-1)).toBe('COMMIT')
+    }
+    finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('returns the Stripe result when the connection drops before COMMIT', async () => {
+    const { client } = fakeLockClient('COMMIT')
+    await expect(holdTrialPlanLock(context, client, 'cus_1', async () => 'sub_now')).resolves.toEqual({ result: 'sub_now', connectionLost: true })
+  })
+
+  it('rolls back and rethrows when the guarded call fails', async () => {
+    const { client, queries } = fakeLockClient()
+    await expect(holdTrialPlanLock(context, client, 'cus_1', async () => {
+      throw new Error('card_declined')
+    })).rejects.toThrow('card_declined')
+    expect(queries.at(-1)).toBe('ROLLBACK')
   })
 })
