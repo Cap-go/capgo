@@ -1,6 +1,8 @@
+import type { NoticeOutputOptions } from '../onboarding/setup-notice-policy'
 import type { CapgoClient } from '../utils'
 import { log } from '@clack/prompts'
 import { renderGitHubNotice } from '../onboarding/github-notice'
+import { shouldPrintNotice } from '../onboarding/setup-notice-policy'
 import { markTrialNoticeShown } from '../onboarding/trial-notice-state'
 import { formatPlanRequiredMessage } from '../shared/direct-offer'
 import { CliUserError } from '../shared/cli-user-error'
@@ -45,8 +47,7 @@ export interface CliPreflightResult {
   warnings: Array<{ message: string, fatal: boolean }>
 }
 
-export interface CliPreflightOptions {
-  silent?: boolean
+export interface CliPreflightOptions extends NoticeOutputOptions {
   /** Print the unpaid-trial reminder (default true). */
   warnTrial?: boolean
   /** Message for `app_not_found`; defaults to the `app add` hint. */
@@ -219,7 +220,7 @@ export async function runCliPreflight(
   }
 
   printWarnings(data?.warnings ?? [])
-  if (result.trialDaysLeft !== null && options.warnTrial !== false) {
+  if (result.trialDaysLeft !== null && options.warnTrial !== false && shouldPrintNotice(options)) {
     const orgId = result.orgId ?? request.orgId
     const message = `WARNING !!\nTrial expires in ${result.trialDaysLeft} days, upgrade here: ${await plansUrl(orgId)}\n`
     if (!renderGitHubNotice(message))

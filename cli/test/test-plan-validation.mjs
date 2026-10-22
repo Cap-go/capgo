@@ -5,8 +5,9 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { setNoticeOutputOptions } from '../src/onboarding/setup-notice-policy.ts'
 import { wasTrialNoticeShown } from '../src/onboarding/trial-notice-state.ts'
-import { checkPlanValid, checkPlanValidUpload } from '../src/api/preflight.ts'
+import { checkPlanValid, checkPlanValidUpload, runCliPreflight } from '../src/api/preflight.ts'
 import * as utils from '../src/utils.ts'
 
 console.log('🧪 Testing plan validation through the backend preflight...\n')
@@ -111,6 +112,34 @@ await test('GitHub Actions publishes the existing preflight trial warning to bot
     if (previous.summary === undefined) delete process.env.GITHUB_STEP_SUMMARY
     else process.env.GITHUB_STEP_SUMMARY = previous.summary
     rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+await test('preflight trial reminders honor every machine-output guard in GitHub Actions', async () => {
+  const previous = process.env.GITHUB_ACTIONS
+  const write = process.stdout.write
+  let output = ''
+  try {
+    process.env.GITHUB_ACTIONS = 'true'
+    process.stdout.write = chunk => { output += chunk; return true }
+    fetchHandler = () => Response.json({ ...okBody, org_id: 'machine-output-org', trial_days_left: 3 })
+    for (const github of ['false', 'true']) {
+      process.env.GITHUB_ACTIONS = github
+      for (const options of [{ json: true }, { quiet: true }, { silent: true }, { outputText: true }, { format: 'json' }]) {
+        await runCliPreflight(makeClient(), { orgId: 'org-id', appId: 'com.example.app', plan: 'upload' }, options)
+        setNoticeOutputOptions(options)
+        await checkPlanValidUpload(makeClient(), 'org-id', 'com.example.app')
+        setNoticeOutputOptions({})
+      }
+    }
+    assertEquals(output, '', 'trial reminders cannot contaminate machine output')
+    assert(!wasTrialNoticeShown('machine-output-org'), 'suppressed output must not hide a later human-facing reminder')
+  }
+  finally {
+    process.stdout.write = write
+    setNoticeOutputOptions({})
+    if (previous === undefined) delete process.env.GITHUB_ACTIONS
+    else process.env.GITHUB_ACTIONS = previous
   }
 })
 

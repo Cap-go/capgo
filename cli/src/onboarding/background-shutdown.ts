@@ -7,7 +7,7 @@ import { flushAnalytics, trackEvent } from '../analytics/track'
 import { getPendingOnboardingChecks, takeSetupNotices } from './background-workers'
 import { renderGitHubNotice } from './github-notice'
 import { setupDebug } from './setup-diagnostics'
-import { ONBOARDING_CHECK_GRACE_MS as gracePeriodMs, shouldEvaluateSetupNotice } from './setup-notice-policy'
+import { ONBOARDING_CHECK_GRACE_MS as gracePeriodMs, shouldEvaluateSetupNotice, shouldPrintNotice } from './setup-notice-policy'
 import { formatSetupNotice } from './setup-notices'
 import { markTrialNoticeShown, wasTrialNoticeShown } from './trial-notice-state'
 
@@ -69,7 +69,7 @@ const interactiveCommands = new Set([
 function shouldWaitForOnboardingChecks(commandPath: string, options: Record<string, unknown>): boolean {
   return (isCI || (!!process.stdin.isTTY && !!process.stdout.isTTY))
     && interactiveCommands.has(commandPath)
-    && !options.json && !options.outputText && !options.quiet && !options.silent && !options.format
+    && shouldPrintNotice(options)
 }
 
 function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPath: string): void {
