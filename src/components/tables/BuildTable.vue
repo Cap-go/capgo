@@ -3,12 +3,13 @@ import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconEye from '~icons/heroicons/eye'
 import BuilderIntroduction from '~/components/dashboard/BuilderIntroduction.vue'
+import { hasSupportedBuilderTodoList } from '~/services/builderOnboardingChecklist'
 import { invokeCapgoApi } from '~/services/capgoApi'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -48,9 +49,11 @@ const buildCountsReady = ref(false)
 let reloadSequence = 0
 let dataSequence = 0
 const platformBuildCounts = ref<Record<Platform, number>>({ ios: 0, android: 0 })
-const showSetupFlow = computed(() => showSteps.value || (totalAllBuilds.value === 0 && builderAccessReady.value))
-const isTableLoading = computed(() => isLoading.value || (elements.value.length === 0 && !buildCountsReady.value) || (totalAllBuilds.value === 0 && !builderAccessReady.value))
 const organizationStore = useOrganizationStore()
+const hasBuilderChecklist = computed(() => hasSupportedBuilderTodoList(organizationStore.getAppByAppId(props.appId)?.onboarding))
+const showSetupFlow = computed(() => showSteps.value || (totalAllBuilds.value === 0 && (hasBuilderChecklist.value || builderAccessReady.value)))
+const isTableLoading = computed(() => isLoading.value || (elements.value.length === 0 && !buildCountsReady.value) || (totalAllBuilds.value === 0 && !builderAccessReady.value))
+const AppOnboardingFlow = defineAsyncComponent(() => import('~/components/dashboard/AppOnboardingFlow.vue'))
 const builderEntitlement = computed(() => {
   const org = organizationStore.getOrgByAppId(props.appId)
   return org?.paying ? 'plan' as const : (org?.trial_left ?? 0) > 0 ? 'trial' as const : null
@@ -406,8 +409,16 @@ watch(showSetupFlow, (newValue) => {
 
 <template>
   <div>
+    <AppOnboardingFlow
+      v-if="totalAllBuilds === 0 && hasBuilderChecklist"
+      :key="props.appId"
+      :setup-app-id="props.appId"
+      initial-checklist-path="builder"
+      show-checklist
+      onboarding
+    />
     <BuilderIntroduction
-      v-if="totalAllBuilds === 0 && canEnableBuilder"
+      v-else-if="totalAllBuilds === 0 && canEnableBuilder"
       :key="props.appId"
       :app-id="props.appId"
       :entitlement="builderEntitlement"
