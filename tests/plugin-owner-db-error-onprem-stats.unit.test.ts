@@ -31,10 +31,14 @@ function ownerLookupFailingDrizzle() {
   } as any
 }
 
-vi.mock('../supabase/functions/_backend/plugin_runtime/utils/logging.ts', () => ({
-  cloudlog: vi.fn(),
-  cloudlogErr: vi.fn(),
-}))
+vi.mock('../supabase/functions/_backend/plugin_runtime/utils/logging.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../supabase/functions/_backend/plugin_runtime/utils/logging.ts')>()
+  return {
+    ...actual,
+    cloudlog: vi.fn(),
+    cloudlogErr: vi.fn(),
+  }
+})
 
 vi.mock('../supabase/functions/_backend/plugin_runtime/utils/appStatus.ts', () => ({
   getAppStatus: vi.fn(() => Promise.resolve({
@@ -107,6 +111,30 @@ function createContext() {
   } as any
 }
 
+const statsEventBody = {
+  platform: 'android',
+  device_id: 'ac4135b3-fda6-449e-b0fe-88680ab67105',
+  app_id: 'com.trial.app',
+  version_build: '1.0.0',
+  version_name: '1.0.0',
+  plugin_version: '8.51.0',
+  version_os: '17',
+  action: 'app_moved_to_foreground',
+  custom_id: '',
+  is_emulator: false,
+  is_prod: true,
+}
+
+async function fetchStatsLikeProduction(request: Request, context: ReturnType<typeof createContext>) {
+  const { createAllCatch, createHono } = await import('../supabase/functions/_backend/plugin_runtime/utils/hono.ts')
+  const { app } = await import('../supabase/functions/_backend/plugin_runtime/plugins/stats.ts')
+  const { version } = await import('../supabase/functions/_backend/plugin_runtime/utils/version.ts')
+  const wrapper = createHono('stats', version)
+  wrapper.route('/', app)
+  createAllCatch(wrapper, 'stats')
+  return wrapper.fetch(request, context, { waitUntil: () => {} } as any)
+}
+
 describe('/stats owner lookup DB errors', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -123,27 +151,40 @@ describe('/stats owner lookup DB errors', () => {
   })
 
   it('does not sticky-cache onprem when owner lookup fails', async () => {
-    const { app } = await import('../supabase/functions/_backend/plugin_runtime/plugins/stats.ts')
-    const response = await app.fetch(new Request('http://localhost/', {
+    const response = await fetchStatsLikeProduction(new Request('http://localhost/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        platform: 'android',
-        device_id: 'ac4135b3-fda6-449e-b0fe-88680ab67105',
-        app_id: 'com.trial.app',
-        version_build: '1.0.0',
-        version_name: '1.0.0',
-        plugin_version: '8.51.0',
-        version_os: '17',
-        action: 'app_moved_to_foreground',
-        custom_id: '',
-        is_emulator: false,
-        is_prod: true,
-      }),
-    }), createContext(), { waitUntil: () => {} } as any)
+      body: JSON.stringify(statsEventBody),
+    }), createContext())
 
-    expect(response.status).toBeGreaterThanOrEqual(500)
+    expect(response.status).toBe(503)
     expect(ownerLookupLimitMock).toHaveBeenCalled()
+    const text = await response.text()
+    expect(text).not.toContain('on_premise_app')
+    expect(setAppStatusMock).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'com.trial.app',
+      'onprem',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    )
+  })
+
+  it('batch stats rethrows owner DB errors instead of per-event on_premise_app', async () => {
+    const response = await fetchStatsLikeProduction(new Request('http://localhost/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([
+        { ...statsEventBody, action: 'app_moved_to_foreground' },
+        { ...statsEventBody, action: 'app_moved_to_background' },
+      ]),
+    }), createContext())
+
+    expect(response.status).toBe(503)
+    expect(ownerLookupLimitMock).toHaveBeenCalled()
+    const text = await response.text()
+    expect(text).not.toContain('on_premise_app')
     expect(setAppStatusMock).not.toHaveBeenCalledWith(
       expect.anything(),
       'com.trial.app',
