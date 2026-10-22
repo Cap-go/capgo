@@ -84,7 +84,12 @@ jobs:
             start_run=1
           fi
           delete_preview_bundle() {
-            timeout --kill-after=2s 33s bunx "$CAPGO_CLI" bundle delete "$1" "$APP_ID" --apikey "$CAPGO_TOKEN" 2>/dev/null || true
+            local delete_status=0
+            timeout --kill-after=2s 33s bunx "$CAPGO_CLI" bundle delete "$1" "$APP_ID" --apikey "$CAPGO_TOKEN" 2>/dev/null || delete_status=$?
+            if [ "$delete_status" -eq 124 ] || [ "$delete_status" -eq 137 ]; then
+              echo "::notice::PR preview cleanup timed out for bundle $1 (exit $delete_status)"
+            fi
+            return 0
           }
           for run in $(seq "$start_run" "$GITHUB_RUN_NUMBER"); do
             for attempt in 1 2 3; do
