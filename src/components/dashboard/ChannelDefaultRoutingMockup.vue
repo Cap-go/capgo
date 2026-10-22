@@ -433,16 +433,18 @@ const {
         </div>
       </section>
 
-      <footer v-if="props.embedded" class="flex items-center justify-between border-t border-slate-200 bg-white px-5 py-3 sm:px-6 dark:border-white/10 dark:bg-slate-950">
-        <span class="h-10 w-10 shrink-0" aria-hidden="true" />
-        <button
-          type="button"
-          class="d-btn d-btn-primary h-12 min-h-12 shrink-0 px-5"
-          data-test="channel-default-routing-continue"
-          @click="continueOnboarding"
-        >
-          {{ t('continue') }}
-        </button>
+      <footer v-if="props.embedded" class="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-5 py-3 sm:px-6 dark:border-white/10 dark:bg-slate-950">
+        <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
+          <slot name="secondary-action" />
+          <button
+            type="button"
+            class="d-btn d-btn-primary h-12 min-h-12 shrink-0 px-5"
+            data-test="channel-default-routing-continue"
+            @click="continueOnboarding"
+          >
+            {{ t('continue') }}
+          </button>
+        </div>
       </footer>
     </div>
   </main>
