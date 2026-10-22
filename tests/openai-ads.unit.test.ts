@@ -287,10 +287,13 @@ describe('openai ads conversions api', () => {
       vi.stubGlobal('fetch', fetchMock)
       const stripeEvent = { type: 'customer.subscription.updated', data: { object: { latest_invoice: 'in_first' } } } as any
       try {
+        const stripeDown = vi.fn(async () => { throw new Error('stripe down') })
         expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent }, {
           loadUser: async () => record,
-          retrieveInvoice: async () => { throw new Error('stripe down') },
+          retrieveInvoice: stripeDown,
+          invoiceRetryDelaysMs: [0, 0],
         })).toBe(false)
+        expect(stripeDown).toHaveBeenCalledTimes(3)
         // An incomplete subscription: paid_at is set but the invoice is still open.
         expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent }, {
           loadUser: async () => record,
@@ -320,6 +323,29 @@ describe('openai ads conversions api', () => {
         vi.useRealTimers()
       }
       expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('retries a transient invoice lookup failure before giving up', async () => {
+      envValues.OPENAI_ADS_API_KEY = 'test-key'
+      vi.useFakeTimers({ now, toFake: ['Date'] })
+      const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))
+      vi.stubGlobal('fetch', fetchMock)
+      const retrieveInvoice = vi.fn()
+        .mockRejectedValueOnce(new Error('stripe blip'))
+        .mockResolvedValueOnce({ status: 'paid', amount_paid: 1400, currency: 'usd' })
+      const stripeEvent = { type: 'customer.subscription.created', data: { object: { status: 'active', latest_invoice: 'in_first' } } } as any
+      try {
+        expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent }, {
+          loadUser: async () => record,
+          retrieveInvoice,
+          invoiceRetryDelaysMs: [0, 0],
+        })).toBe(true)
+      }
+      finally {
+        vi.useRealTimers()
+      }
+      expect(retrieveInvoice).toHaveBeenCalledTimes(2)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
     })
   })
 })

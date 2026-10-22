@@ -23,8 +23,11 @@ export interface OpenAIFirstPaymentDeps {
   loadUser: (userId: string) => Promise<OpenAIAdsUserRecord | null>
   retrieveInvoice: (invoiceId: string) => Promise<InvoicePayment>
   retryDelaysMs?: number[]
+  invoiceRetryDelaysMs?: number[]
 }
 
+// Short waits keep the lookup plus the send inside the background-task budget.
+const DEFAULT_INVOICE_RETRY_DELAYS_MS = [500, 1_500]
 // Matches the API's 7-day limit: an older first payment can no longer be reported.
 const RECOVERY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -89,14 +92,24 @@ async function loadInvoicePayment(c: Context, stripeEvent: Stripe.Event | null |
   const ref = getLatestInvoiceRef(stripeEvent)
   if (!ref)
     return null
-  try {
-    // Always read the live invoice: the event copy can predate the payment.
-    return getInvoicePayment(await deps.retrieveInvoice(typeof ref === 'string' ? ref : ref.id))
+  const invoiceId = typeof ref === 'string' ? ref : ref.id
+  const retryDelaysMs = deps.invoiceRetryDelaysMs ?? DEFAULT_INVOICE_RETRY_DELAYS_MS
+  // paid_at is already committed, so this is the only chance to report the
+  // conversion: retry a transient Stripe failure a bounded number of times.
+  for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+    try {
+      // Always read the live invoice: the event copy can predate the payment.
+      return getInvoicePayment(await deps.retrieveInvoice(invoiceId))
+    }
+    catch (error) {
+      if (attempt === retryDelaysMs.length) {
+        cloudlogErr({ requestId: c.get('requestId'), message: 'OpenAI Ads subscription: invoice lookup failed', invoiceId, attempt: attempt + 1, error: serializeError(error) })
+        return null
+      }
+      await new Promise(resolve => setTimeout(resolve, retryDelaysMs[attempt]))
+    }
   }
-  catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'OpenAI Ads subscription: invoice lookup failed', error: serializeError(error) })
-    return null
-  }
+  return null
 }
 
 /**
