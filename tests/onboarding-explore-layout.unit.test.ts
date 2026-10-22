@@ -56,6 +56,7 @@ describe('dashboard exploration banner eligibility', () => {
   it.each([
     { scenario: 'first app created in this session', orgCount: 1, cachedCount: 0, indexedCount: 1, liveCount: 1, show: true },
     { scenario: 'one pending app after reload', orgCount: 1, cachedCount: 1, indexedCount: 1, liveCount: 1, show: true },
+    { scenario: 'sole org app differs from the route app', orgCount: 1, cachedCount: 1, indexedCount: 1, liveCount: 1, routeAppId: 'com.example.different', show: false },
     { scenario: 'one remaining app after deletion with a stale index', orgCount: 1, cachedCount: 1, indexedCount: 2, liveCount: 1, show: true },
     { scenario: 'second app created in this session', orgCount: 1, cachedCount: 1, indexedCount: 2, liveCount: 2, show: false },
     { scenario: 'second app before the index refreshes', orgCount: 1, cachedCount: 1, indexedCount: 1, liveCount: 2, show: false },
@@ -63,7 +64,8 @@ describe('dashboard exploration banner eligibility', () => {
     { scenario: 'multiple organizations with a route app', orgCount: 2, cachedCount: 1, indexedCount: 1, liveCount: 1, show: false },
     { scenario: 'multiple apps with a route app', orgCount: 1, cachedCount: 2, indexedCount: 2, liveCount: 2, show: false },
     { scenario: 'org count includes an app absent from the index', orgCount: 1, cachedCount: 2, indexedCount: 1, liveCount: 2, show: false },
-  ])('$scenario', async ({ orgCount, cachedCount, indexedCount, liveCount, show }) => {
+  ])('$scenario', async ({ orgCount, cachedCount, indexedCount, liveCount, routeAppId = state.app.app_id, show }) => {
+    state.route = { path: `/app/${routeAppId}`, params: { app: routeAppId } }
     state.organizations = Array.from({ length: orgCount }, (_, i) => ({ gid: `example-org-${i}`, app_count: cachedCount }))
     state.indexedApps = Array.from({ length: indexedCount }, (_, i) => ({ app_id: `com.example.app${i}` }))
     const limit = vi.fn(async () => ({
