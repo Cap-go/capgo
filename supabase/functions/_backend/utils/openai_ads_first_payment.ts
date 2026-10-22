@@ -24,10 +24,13 @@ export interface OpenAIFirstPaymentDeps {
   retrieveInvoice: (invoiceId: string) => Promise<InvoicePayment>
   retryDelaysMs?: number[]
   invoiceRetryDelaysMs?: number[]
+  budgetMs?: number
 }
 
 // Short waits keep the lookup plus the send inside the background-task budget.
 const DEFAULT_INVOICE_RETRY_DELAYS_MS = [500, 1_500]
+// One budget for the invoice lookup and the send (Workers keep ~30 s after the response).
+const FIRST_PAYMENT_BUDGET_MS = 25_000
 // How old paid_at may be when a later webhook recovers the conversion. The
 // event is timestamped with the payment, so the API's 7-day limit does not
 // apply to paid_at; the window only keeps orgs that paid long ago (and start a
@@ -116,7 +119,7 @@ function getLatestInvoiceRef(stripeEvent: Stripe.Event | null | undefined): Invo
   return subscription.latest_invoice ?? null
 }
 
-async function loadInvoicePayment(c: Context, stripeEvent: Stripe.Event | null | undefined, deps: OpenAIFirstPaymentDeps) {
+async function loadInvoicePayment(c: Context, stripeEvent: Stripe.Event | null | undefined, deps: OpenAIFirstPaymentDeps, deadlineMs: number) {
   const ref = getLatestInvoiceRef(stripeEvent)
   if (!ref)
     return null
@@ -130,7 +133,8 @@ async function loadInvoicePayment(c: Context, stripeEvent: Stripe.Event | null |
       return getInvoicePayment(await deps.retrieveInvoice(invoiceId))
     }
     catch (error) {
-      if (attempt === retryDelaysMs.length) {
+      // Leave the rest of the shared budget to the send.
+      if (attempt === retryDelaysMs.length || Date.now() + retryDelaysMs[attempt] > deadlineMs - 10_000) {
         cloudlogErr({ requestId: c.get('requestId'), message: 'OpenAI Ads subscription: invoice lookup failed', invoiceId, attempt: attempt + 1, error: serializeError(error) })
         return null
       }
@@ -149,9 +153,10 @@ export async function trackOpenAIFirstPayment(c: Context, input: OpenAIFirstPaym
   try {
     if (!isOpenAIAdsConfigured(c))
       return false
+    const deadlineMs = Date.now() + (deps.budgetMs ?? FIRST_PAYMENT_BUDGET_MS)
     const [user, payment] = await Promise.all([
       deps.loadUser(input.ownerUserId),
-      loadInvoicePayment(c, input.stripeEvent, deps),
+      loadInvoicePayment(c, input.stripeEvent, deps, deadlineMs),
     ])
     if (!payment) {
       // No proof of payment (unpaid, missing or unreadable invoice): never report a conversion that did not happen.
@@ -169,7 +174,7 @@ export async function trackOpenAIFirstPayment(c: Context, input: OpenAIFirstPaym
       planId: input.planId,
       ...payment,
       sourceUrl: getOpenAISubscriptionSourceUrl(c),
-    }, { retryDelaysMs: deps.retryDelaysMs })
+    }, { retryDelaysMs: deps.retryDelaysMs, deadlineMs })
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'OpenAI Ads subscription event error', orgId: input.orgId, error: serializeError(error) })

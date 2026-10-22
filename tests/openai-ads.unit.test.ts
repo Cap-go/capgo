@@ -380,5 +380,22 @@ describe('openai ads conversions api', () => {
       expect(retrieveInvoice).toHaveBeenCalledTimes(2)
       expect(fetchMock).toHaveBeenCalledTimes(1)
     })
+
+    it('shares one deadline between the invoice lookup and the send', async () => {
+      envValues.OPENAI_ADS_API_KEY = 'test-key'
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+      const stripeEvent = { type: 'customer.subscription.created', data: { object: { status: 'active', latest_invoice: 'in_first' } } } as any
+      // The lookup used up the budget: no send starts after the deadline.
+      expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt: new Date().toISOString(), planId: 'Solo', stripeEvent }, {
+        loadUser: async () => record,
+        retrieveInvoice: async () => {
+          await new Promise(resolve => setTimeout(resolve, 30))
+          return { status: 'paid' as const, amount_paid: 1400, currency: 'usd' }
+        },
+        budgetMs: 20,
+      })).toBe(false)
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
   })
 })

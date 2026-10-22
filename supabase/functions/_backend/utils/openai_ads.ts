@@ -31,7 +31,11 @@ export interface OpenAIAdsEvent {
   data: Record<string, string | number>
 }
 
-interface SendOptions { retryDelaysMs?: number[] }
+interface SendOptions {
+  retryDelaysMs?: number[]
+  /** Epoch ms after which no attempt starts and no request runs, shared with work done before the send. */
+  deadlineMs?: number
+}
 
 export async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
@@ -167,6 +171,7 @@ async function postOpenAIAdsEvent(
   logContext: Record<string, unknown>,
   retryDelaysMs: number[],
   now: number,
+  deadlineMs: number | undefined,
 ): Promise<boolean> {
   if (now - event.timestamp_ms > MAX_EVENT_AGE_MS) {
     cloudlog({ requestId: c.get('requestId'), message: `OpenAI Ads ${label} skipped: event older than 7 days`, ...logContext })
@@ -178,6 +183,12 @@ async function postOpenAIAdsEvent(
   const body = JSON.stringify({ events: [event] })
 
   for (let attempt = 0; attempt <= retryDelaysMs.length; attempt++) {
+    // A shared deadline caps the request timeout and stops further attempts.
+    const remainingMs = deadlineMs === undefined ? OPENAI_ADS_TIMEOUT_MS : deadlineMs - Date.now()
+    if (remainingMs < 1_000) {
+      cloudlogErr({ requestId: c.get('requestId'), message: `OpenAI Ads ${label} event skipped: background budget exhausted`, ...logContext, attempt: attempt + 1 })
+      return false
+    }
     const isLastAttempt = attempt === retryDelaysMs.length
     try {
       const response = await fetch(url.toString(), {
@@ -187,7 +198,7 @@ async function postOpenAIAdsEvent(
           'Content-Type': 'application/json',
         },
         body,
-        signal: AbortSignal.timeout(OPENAI_ADS_TIMEOUT_MS),
+        signal: AbortSignal.timeout(Math.min(OPENAI_ADS_TIMEOUT_MS, remainingMs)),
       })
       if (response.ok) {
         await response.body?.cancel().catch(() => {})
@@ -220,7 +231,7 @@ async function trackOpenAIAdsEvent(
   label: string,
   logContext: Record<string, unknown>,
   build: (now: number) => Promise<OpenAIAdsEvent | null>,
-  { retryDelaysMs = DEFAULT_RETRY_DELAYS_MS }: SendOptions,
+  { retryDelaysMs = DEFAULT_RETRY_DELAYS_MS, deadlineMs }: SendOptions,
 ): Promise<boolean> {
   try {
     const config = getOpenAIAdsConfig(c)
@@ -232,7 +243,7 @@ async function trackOpenAIAdsEvent(
       cloudlog({ requestId: c.get('requestId'), message: `OpenAI Ads ${label} skipped: unknown event time`, ...logContext })
       return false
     }
-    return await postOpenAIAdsEvent(c, config, event, label, logContext, retryDelaysMs, now)
+    return await postOpenAIAdsEvent(c, config, event, label, logContext, retryDelaysMs, now, deadlineMs)
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: `OpenAI Ads ${label} event error`, ...logContext, error: serializeError(error) })
