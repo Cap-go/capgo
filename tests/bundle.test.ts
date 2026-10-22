@@ -127,7 +127,7 @@ describe('[POST] /bundle/metadata operations', () => {
 })
 
 describe('[DELETE] /bundle operations', () => {
-  it('invalid version', async () => {
+  it('unknown version', async () => {
     const response = await fetch(`${BASE_URL}/bundle`, {
       method: 'DELETE',
       headers,
@@ -136,8 +136,9 @@ describe('[DELETE] /bundle operations', () => {
         version: 'invalid_version',
       }),
     })
-    await response.arrayBuffer()
-    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(404)
+    expect(data.error).toBe('error_version_not_found')
   })
 
   it('invalid app_id', async () => {
