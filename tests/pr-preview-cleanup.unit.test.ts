@@ -46,6 +46,7 @@ describe('PR preview bundle cleanup', () => {
     expect(h.events.slice(0, h.events.findIndex(event => event.startsWith('DELETE')))).toEqual([
       'GET /bundle 0', 'GET /bundle 1', 'GET /bundle 2', 'GET /bundle 3',
       'GET /channel 0', 'GET /channel 1', 'GET /channel 2',
+      'GET /channel 0', 'GET /channel 1', 'GET /channel 2',
     ])
   })
 
@@ -113,13 +114,20 @@ describe('PR preview bundle cleanup', () => {
     expect(maximum).toBe(4)
   })
 
-  it.concurrent.each([408, 429, 500, 502, 503, 504])('retries transient HTTP %i with visible backoff', async (status) => {
-    const h = harness()
-    h.fetch.mockResolvedValueOnce(Response.json({ error: 'temporarily_unavailable' }, { status, headers: { 'Retry-After': '2' } }))
-    expect(await cleanupPreviewBundles(config, h)).toMatchObject({ failed: 0 })
+  it.concurrent.each([408, 429, 500, 502, 503, 504])('retries transient DELETE HTTP %i with visible backoff', async (status) => {
+    const h = harness([[bundle(1)]])
+    const original = h.fetch.getMockImplementation()!
+    let deletes = 0
+    h.fetch.mockImplementation((url, init) => init.method === 'DELETE' && ++deletes === 1
+      ? Promise.resolve(Response.json({ error: 'temporarily_unavailable' }, { status, headers: { 'Retry-After': '2' } }))
+      : original(url, init))
+    expect(await cleanupPreviewBundles(config, h)).toMatchObject({ deleted: 1, failed: 0 })
     expect(h.sleep).toHaveBeenCalledWith(2000)
     expect(h.log).toHaveBeenCalledWith(expect.stringContaining(`HTTP ${status}`))
-    expect(h.fetch).toHaveBeenCalledTimes(3)
+    expect(deletes).toBe(2)
+    const bodies = h.fetch.mock.calls.filter(([, init]) => init.method === 'DELETE').map(([, init]) => init.body)
+    const expectedBody = JSON.stringify({ app_id: config.appId, version: version(1) })
+    expect(bodies).toEqual([expectedBody, expectedBody])
   })
 
   it.concurrent.each([400, 401, 403, 404, 422])('does not retry permanent HTTP %i failures', async (status) => {
@@ -171,6 +179,52 @@ describe('PR preview bundle cleanup', () => {
       : original(url, init))
     await expect(cleanupPreviewBundles(config, h)).rejects.toThrow('HTTP 403')
     expect(h.fetch.mock.calls.every(([, init]) => init.method === 'GET')).toBe(true)
+  })
+
+  it.concurrent('refreshes every channel page before DELETE, including new links beyond the server row cap', async () => {
+    const h = harness([[bundle(1)]])
+    const original = h.fetch.getMockImplementation()!
+    const channels = Array.from({ length: 1001 }, (_, i) => channel(i + 1, i === 1000 ? 1 : null))
+    let inventories = 0
+    h.fetch.mockImplementation((url, init) => {
+      if (url.pathname !== '/channel')
+        return original(url, init)
+      const page = Number(url.searchParams.get('page'))
+      if (page === 0)
+        inventories++
+      return Promise.resolve(Response.json(inventories === 1 ? [] : channels.slice(page * 50, (page + 1) * 50)))
+    })
+    expect(await cleanupPreviewBundles(config, h)).toMatchObject({ protected: 1, deleted: 0, failed: 0 })
+    expect(h.fetch.mock.calls.some(([, init]) => init.method === 'DELETE')).toBe(false)
+    expect(h.fetch.mock.calls.some(([url]) => url.pathname === '/channel' && url.searchParams.get('page') === '21')).toBe(true)
+  })
+
+  it.concurrent('refreshes channel links again before scheduling the next delete batch', async () => {
+    const h = harness([Array.from({ length: 6 }, (_, i) => bundle(i + 1))])
+    const original = h.fetch.getMockImplementation()!
+    let deletes = 0
+    h.fetch.mockImplementation((url, init) => {
+      if (init.method === 'DELETE')
+        deletes++
+      if (url.pathname === '/channel' && deletes > 0 && url.searchParams.get('page') === '0')
+        return Promise.resolve(Response.json([channel(1, 5)]))
+      return original(url, init)
+    })
+    expect(await cleanupPreviewBundles(config, h)).toMatchObject({ protected: 1, deleted: 5, failed: 0 })
+    expect(h.fetch.mock.calls.filter(([, init]) => init.method === 'DELETE').map(([, init]) => JSON.parse(String(init.body)).version)).not.toContain(version(5))
+  })
+
+  it.concurrent('stops before deleting when the fresh channel inventory fails', async () => {
+    const h = harness([[bundle(1)]])
+    const original = h.fetch.getMockImplementation()!
+    let inventories = 0
+    h.fetch.mockImplementation((url, init) => {
+      if (url.pathname === '/channel' && ++inventories === 2)
+        return Promise.resolve(Response.json({ error: 'denied' }, { status: 403 }))
+      return original(url, init)
+    })
+    await expect(cleanupPreviewBundles(config, h)).rejects.toThrow('HTTP 403')
+    expect(h.fetch.mock.calls.some(([, init]) => init.method === 'DELETE')).toBe(false)
   })
 
   it.concurrent('keeps server-guarded bundles if a channel links after the snapshot', async () => {

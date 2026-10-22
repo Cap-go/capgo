@@ -164,13 +164,17 @@ export async function cleanupPreviewBundles(config: Config, overrides: Partial<D
     if (bundlePr === pr && (bundleRun < run || (bundleRun === run && bundleAttempt < attempt)))
       candidates.set(row.name, { id: id(row.id), name: row.name })
   })
-  const linked = new Set<number>()
-  await list('channel', (row) => {
-    if (row.version !== null)
-      linked.add(id(object(row.version).id))
-    if (row.rollout_version !== null)
-      linked.add(id(row.rollout_version))
-  })
+  async function linkedChannelVersions() {
+    const linked = new Set<number>()
+    await list('channel', (row) => {
+      if (row.version !== null)
+        linked.add(id(object(row.version).id))
+      if (row.rollout_version !== null)
+        linked.add(id(row.rollout_version))
+    })
+    return linked
+  }
+  const linked = await linkedChannelVersions()
   const selected = [...candidates.values()].filter((bundle) => {
     if (!linked.has(bundle.id))
       return true
@@ -179,45 +183,55 @@ export async function cleanupPreviewBundles(config: Config, overrides: Partial<D
   })
   summary.candidates = selected.length
   deps.log(`Snapshot: scanned=${summary.scanned}, linked=${summary.linked}, candidates=${selected.length}`)
-  let next = 0
-  async function worker() {
-    while (next < selected.length && deps.now() < deadline) {
-      const bundle = selected[next++]!
-      try {
-        const result = object(await request('bundle', {}, bundle.name))
-        if (result.status !== 'ok')
-          throw new Error('DELETE /bundle: expected status=ok')
-        summary.deleted++
-        deps.log(`Deleted ${bundle.name}`)
+  async function deleteBundle(bundle: Bundle) {
+    try {
+      const result = object(await request('bundle', {}, bundle.name))
+      if (result.status !== 'ok')
+        throw new Error('DELETE /bundle: expected status=ok')
+      summary.deleted++
+      deps.log(`Deleted ${bundle.name}`)
+    }
+    catch (error) {
+      if (error instanceof ApiError && error.code === 'cannot_delete_linked_version') {
+        // The existing server guard can also reject links added after our recheck.
+        summary.protected++
+        deps.log(`Preserved ${bundle.name}: ${errorMessage(error)}`)
+        return
       }
-      catch (error) {
-        if (error instanceof ApiError && error.code === 'cannot_delete_linked_version') {
-          // Channel changes since the snapshot remain protected by the existing server guard.
-          summary.protected++
-          deps.log(`Preserved ${bundle.name}: ${errorMessage(error)}`)
-          continue
-        }
-        // A DELETE may commit before its response is lost. A retry then reports missing.
-        if (error instanceof TypeError || (error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)) || (error instanceof ApiError && error.code === 'cannot_delete_version')) {
-          try {
-            const rows = await request('bundle', { version: bundle.name })
-            if (Array.isArray(rows) && rows.length === 0) {
-              summary.absent++
-              deps.log(`Confirmed absent ${bundle.name} after ${errorMessage(error)}`)
-              continue
-            }
-          }
-          catch (lookupError) {
-            deps.log(`Cannot confirm absence of ${bundle.name}: ${errorMessage(lookupError)}`)
+      // A DELETE may commit before its response is lost. A retry then reports missing.
+      if (error instanceof TypeError || (error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name)) || (error instanceof ApiError && error.code === 'cannot_delete_version')) {
+        try {
+          const rows = await request('bundle', { version: bundle.name })
+          if (Array.isArray(rows) && rows.length === 0) {
+            summary.absent++
+            deps.log(`Confirmed absent ${bundle.name} after ${errorMessage(error)}`)
+            return
           }
         }
-        summary.failed++
-        deps.log(`Failed ${bundle.name}: ${errorMessage(error)}`)
+        catch (lookupError) {
+          deps.log(`Cannot confirm absence of ${bundle.name}: ${errorMessage(lookupError)}`)
+        }
       }
+      summary.failed++
+      deps.log(`Failed ${bundle.name}: ${errorMessage(error)}`)
     }
   }
-  // Promise.all is bounded to four workers, independent of inventory size.
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, selected.length) }, worker))
+  let next = 0
+  while (next < selected.length && deps.now() < deadline) {
+    // Recheck every channel page before each batch. The server's fallback guard
+    // has a row cap, so it cannot replace this complete, fresh inventory.
+    const currentLinks = await linkedChannelVersions()
+    const batch = selected.slice(next, next + CONCURRENCY)
+    next += batch.length
+    await Promise.all(batch.map(async (bundle) => {
+      if (currentLinks.has(bundle.id)) {
+        summary.protected++
+        deps.log(`Preserved ${bundle.name}: linked since snapshot`)
+        return
+      }
+      await deleteBundle(bundle)
+    }))
+  }
   summary.unfinished = selected.length - next
   deps.log(`Cleanup summary: ${Object.entries(summary).map(([key, value]) => `${key}=${value}`).join(', ')}`)
   if (summary.failed || summary.unfinished)
