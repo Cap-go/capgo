@@ -30,12 +30,14 @@ const RECOVERY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
 
 /**
  * Payment proof from the subscription's latest invoice. Only a `paid` invoice
- * with money collected counts: paid_at is also set for a subscription created
- * `incomplete` (for example while 3-D Secure is pending), which is not a
- * payment yet, and a $0 invoice (free trial period, full discount) is no revenue.
+ * counts: paid_at is also set for a subscription created `incomplete` (for
+ * example while 3-D Secure is pending), which is not a payment yet. A paid $0
+ * invoice (promotion code covering the first period) is a real enrollment and
+ * is reported with amount 0: it is the org's only first-payment moment, since
+ * paid_at is already set when the discount ends.
  */
 export function getInvoicePayment(invoice: InvoicePayment | null | undefined): { amount: number, currency: string } | null {
-  if (!invoice || invoice.status !== 'paid' || typeof invoice.amount_paid !== 'number' || invoice.amount_paid <= 0 || !invoice.currency)
+  if (!invoice || invoice.status !== 'paid' || typeof invoice.amount_paid !== 'number' || invoice.amount_paid < 0 || !invoice.currency)
     return null
   return { amount: invoice.amount_paid, currency: invoice.currency.toUpperCase() }
 }
@@ -77,6 +79,9 @@ function getLatestInvoiceRef(stripeEvent: Stripe.Event | null | undefined): Invo
   if (!stripeEvent?.type.startsWith('customer.subscription.'))
     return null
   const subscription = stripeEvent.data.object as Stripe.Subscription
+  // A Stripe trial's $0 invoice is not a payment.
+  if (subscription.status === 'trialing')
+    return null
   return subscription.latest_invoice ?? null
 }
 

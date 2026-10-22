@@ -190,7 +190,8 @@ describe('openai ads conversions api', () => {
     it('reads the amount actually paid from a paid invoice only', () => {
       expect(getInvoicePayment({ status: 'paid', amount_paid: 11880, currency: 'usd' })).toEqual({ amount: 11880, currency: 'USD' })
       expect(getInvoicePayment({ status: 'open', amount_paid: 0, currency: 'usd' })).toBeNull()
-      expect(getInvoicePayment({ status: 'paid', amount_paid: 0, currency: 'usd' })).toBeNull()
+      // A promotion code covering the first period: a real enrollment, worth 0.
+      expect(getInvoicePayment({ status: 'paid', amount_paid: 0, currency: 'usd' })).toEqual({ amount: 0, currency: 'USD' })
       expect(getInvoicePayment(null)).toBeNull()
     })
 
@@ -294,6 +295,12 @@ describe('openai ads conversions api', () => {
         expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent }, {
           loadUser: async () => record,
           retrieveInvoice: async () => ({ status: 'open' as const, amount_paid: 0, currency: 'usd' }),
+        })).toBe(false)
+        // A Stripe trial's $0 invoice is not a payment.
+        const trialing = { type: 'customer.subscription.created', data: { object: { status: 'trialing', latest_invoice: 'in_trial' } } } as any
+        expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent: trialing }, {
+          loadUser: async () => record,
+          retrieveInvoice: async () => ({ status: 'paid' as const, amount_paid: 0, currency: 'usd' }),
         })).toBe(false)
         expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent: null }, {
           loadUser: async () => record,
