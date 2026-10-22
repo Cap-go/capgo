@@ -176,6 +176,12 @@ async function returnFromOrganizationToAppName(page: Page) {
 
 test.describe('Registration', () => {
   test.beforeEach(async ({ page }) => {
+    // These tests cover the manual wizard. New users first choose AI or manual setup;
+    // the AI path has its own spec (ai-onboarding.spec.ts).
+    await page.addLocatorHandler(page.locator('[data-test="onboarding-setup-mode"]'), async () => {
+      await page.locator('[data-test="onboarding-setup-mode-manual"]').click()
+      await expect(page.locator('[data-test="onboarding-setup-mode"]')).toHaveCount(0)
+    })
     await page.goto('/register/')
   })
 
@@ -338,6 +344,10 @@ test.describe('Registration', () => {
     await continuePastChannelOnboardingIfShown(page)
     await expect(page.locator('[data-test="onboarding-technical-invite"]')).toBeVisible()
     await expect(page).toHaveURL(/\/app\/[^/]+\/getting-started$/)
+    // New manual signups see one next step, without task counts or the full list.
+    await expect(page.locator('[data-test="setup-checklist-instructions"]')).toContainText('Your next step')
+    await expect(page.locator('[data-test="setup-checklist-progress"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="setup-checklist-toggle"]')).toHaveCount(0)
   })
 
   test('should collect first and last names before the goal on the About you step on mobile', async ({ page }) => {
@@ -416,8 +426,9 @@ test.describe('Registration', () => {
       await page.reload()
       await expect(page.locator('[data-test="onboarding-resume-restart"]')).toBeVisible()
       await page.click('[data-test="onboarding-resume-restart"]')
-      await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toBeVisible()
-      await continuePastProfileWelcome(page)
+      // Restart lands directly on an empty About you form; there is no welcome screen anymore.
+      await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toHaveCount(0)
+      await expect(page.locator('[data-test="onboarding-name-step"]')).toBeVisible()
       await expect(firstName).toHaveValue('')
       await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('')
       await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeDisabled()

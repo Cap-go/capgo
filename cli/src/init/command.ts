@@ -3757,6 +3757,25 @@ async function handleMissingBuildScript(buildCommand: string, appId: string, pla
   return await exitAfterFinishingReplay('cancelled', 0)
 }
 
+/**
+ * Updater release that matches the project's Capacitor major, or the reason Capgo cannot be
+ * installed (Capacitor below 5, an unparsable version, an unknown package manager). Used by the
+ * MCP live-update flow, which must stop instead of installing an incompatible @latest.
+ */
+export async function resolveCompatibleUpdaterInstall(packageJsonPath: string, pm: PackageManagerInfo): Promise<{ ok: true, version: string } | { ok: false, error: string }> {
+  try {
+    const dependencies = await getAllPackagesDependencies(undefined, packageJsonPath)
+    const blocker = getUpdaterInstallBlocker(dependencies, pm)
+    if (blocker)
+      return { ok: false, error: blocker }
+    const coreVersion = normalizeConcreteVersion(dependencies.get('@capacitor/core'))!
+    return { ok: true, version: getUpdaterVersionToInstall(coreVersion, false).versionToInstall }
+  }
+  catch (error) {
+    return { ok: false, error: `Cannot read the project's dependencies: ${formatError(error)}` }
+  }
+}
+
 async function getCompatibleUpdaterVersionForPackage(packageJsonPath: string, pm: PackageManagerInfo): Promise<string> {
   try {
     const dependencies = await getAllPackagesDependencies(undefined, packageJsonPath)
