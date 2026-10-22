@@ -80,7 +80,7 @@ describe('auth.md agent identity endpoints', () => {
       identity_types_supported: ['service_auth', 'identity_assertion'],
       identity_assertion: {
         assertion_types_supported: ['verified_email'],
-        credential_types_supported: ['access_token'],
+        credential_types_supported: ['urn:ietf:params:oauth:token-type:access_token'],
       },
     })
   })
@@ -97,6 +97,18 @@ describe('auth.md agent identity endpoints', () => {
     expect(response.status).toBe(400)
     expect(response.headers.get('cache-control')).toBe('no-store')
     await expect(response.json()).resolves.toMatchObject({ error })
+  })
+
+  it.each([
+    [{ type: 'service_auth', login_hint: 'nope' }, 'login_hint'],
+    [{ type: 'identity_assertion', assertion_type: 'verified_email', assertion: 'nope' }, 'assertion'],
+  ])('names the invalid email field for %j', async (body, field) => {
+    const response = await postJson('/agent/identity', body)
+    expect(response.status).toBe(400)
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'invalid_login_hint',
+      error_description: `${field} must be the user's email address`,
+    })
   })
 
   it('requires claim_token and email at the claim endpoint', async () => {

@@ -57,7 +57,7 @@ export function agentAuthMetadata(c: Context) {
     identity_types_supported: ['service_auth', 'identity_assertion'],
     identity_assertion: {
       assertion_types_supported: [LEGACY_VERIFIED_EMAIL_ASSERTION],
-      credential_types_supported: ['access_token'],
+      credential_types_supported: ['urn:ietf:params:oauth:token-type:access_token'],
     },
   }
 }
@@ -116,7 +116,7 @@ app.post(AGENT_IDENTITY_PATH, async (c) => {
     return agentError(c, 400, 'invalid_request', 'type must be service_auth')
   const loginHint = normalizeLoginHint(legacyVerifiedEmail ? params.assertion : params.login_hint)
   if (!loginHint)
-    return agentError(c, 400, 'invalid_login_hint', 'login_hint must be the user\'s email address')
+    return agentError(c, 400, 'invalid_login_hint', `${legacyVerifiedEmail ? 'assertion' : 'login_hint'} must be the user's email address`)
 
   const webAppUrl = getWebAppUrl(c)
   if (!webAppUrl) {
