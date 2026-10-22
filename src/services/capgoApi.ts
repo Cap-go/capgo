@@ -7,6 +7,11 @@ export interface CapgoApiInvokeOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   body?: BodyInit | Record<string, unknown> | null
   headers?: Record<string, string>
+  /**
+   * Opt into a dated `capgo_api` contract (e.g. `2026-10-22`). Omit to keep the
+   * default version so older backends and other clients stay compatible.
+   */
+  apiVersion?: string
   /** Call without an Authorization header when there is no user session (public bootstrap endpoints). */
   allowAnonymous?: boolean
   /** Prefer caller-provided client for session/auth context. */
@@ -140,6 +145,14 @@ export async function getCapgoApiErrorCode(error: unknown): Promise<string | und
   return typeof code === 'string' ? code : undefined
 }
 
+/** The backend's own error name (`simpleError`'s first argument), ignoring nested provider codes. */
+export async function getCapgoApiErrorName(error: unknown): Promise<string | undefined> {
+  if (!(error instanceof FunctionsHttpError) || !(error.context instanceof Response))
+    return undefined
+  const body = await error.context.clone().json().catch(() => null) as { error?: unknown } | null
+  return typeof body?.error === 'string' ? body.error : undefined
+}
+
 /**
  * Call the Capgo API (VITE_API_HOST) with a { data, error } result shape.
  * Cloud, self-host and local builds all use this single transport; the
@@ -156,6 +169,8 @@ export async function invokeCapgoApi<T = any>(
   const headers: Record<string, string> = {
     ...options.headers,
   }
+  if (options.apiVersion && !Object.keys(headers).some(key => key.toLowerCase() === 'capgo_api'))
+    headers.capgo_api = options.apiVersion
 
   const hasAuthHeader = Object.keys(headers).some(key => key.toLowerCase() === 'authorization')
   if (!hasAuthHeader) {

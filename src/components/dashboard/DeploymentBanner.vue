@@ -28,6 +28,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconInfo from '~icons/lucide/info'
+import { BUNDLE_PICKER_COLUMNS } from '~/services/bundleColumns'
 import { useConsole } from '~/services/console'
 import { checkPermissions } from '~/services/permissions'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -167,7 +168,7 @@ async function loadData() {
     // Only fetch non-deleted bundles ordered by creation date (newest first)
     const { data: bundles } = await capgo
       .from('app_versions')
-      .select('*')
+      .select(BUNDLE_PICKER_COLUMNS)
       .eq('app_id', props.appId)
       .eq('deleted', false)
       .neq('name', 'unknown')
@@ -175,7 +176,7 @@ async function loadData() {
       .order('created_at', { ascending: false })
       .limit(1)
 
-    latestBundle.value = bundles?.[0] ?? null
+    latestBundle.value = (bundles?.[0] ?? null) as Database['public']['Tables']['app_versions']['Row'] | null
   }
   catch (error) {
     // Errors are logged but don't block the UI

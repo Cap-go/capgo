@@ -106,6 +106,21 @@ export async function listMembersInternal(orgId: string, options: OptionsBase, s
   }
   await runCliPreflight(client, { orgId, permission: 'org.read_members' }, { silent, permissionDeniedMessage: `Insufficient permissions to list members of organization ${orgId}` })
 
+  // Members and their 2FA status do not depend on the org row: fetch all three at once.
+  const membersRequest = invokeCapgoCliApi<Array<{
+    uid: string
+    email: string
+    role: string
+    is_tmp: boolean
+  }>>(`organization/members?orgId=${encodeURIComponent(orgId)}`, {
+    apikey: enrichedOptions.apikey!,
+    method: 'GET',
+    body: undefined,
+    apiHost: enrichedOptions.apiHost,
+  })
+  const membersStatusRequest = fetchCliMembers2faStatus(enrichedOptions.apikey!, orgId, httpOptions)
+    .then(data => ({ data, error: null }), (error: unknown) => ({ data: null, error }))
+
   let orgData: Awaited<ReturnType<typeof fetchCliOrganization>>
   try {
     orgData = await fetchCliOrganization(enrichedOptions.apikey!, orgId, httpOptions)
@@ -122,18 +137,7 @@ export async function listMembersInternal(orgId: string, options: OptionsBase, s
   if (!silent)
     log.info(`Getting members of "${orgData.name}" from Capgo`)
 
-  // Get members via HTTP
-  const { data: members, error: membersError } = await invokeCapgoCliApi<Array<{
-    uid: string
-    email: string
-    role: string
-    is_tmp: boolean
-  }>>(`organization/members?orgId=${encodeURIComponent(orgId)}`, {
-    apikey: enrichedOptions.apikey!,
-    method: 'GET',
-    body: undefined,
-    apiHost: enrichedOptions.apiHost,
-  })
+  const { data: members, error: membersError } = await membersRequest
 
   if (membersError) {
     if (!silent)
@@ -141,11 +145,8 @@ export async function listMembersInternal(orgId: string, options: OptionsBase, s
     throw new Error(`Cannot get organization members: ${formatError(membersError)}`)
   }
 
-  let membersStatus: Array<{ user_id: string, '2fa_enabled': boolean }> | null = null
-  try {
-    membersStatus = await fetchCliMembers2faStatus(enrichedOptions.apikey!, orgId, httpOptions)
-  }
-  catch (statusError) {
+  const { data: membersStatus, error: statusError } = await membersStatusRequest
+  if (statusError) {
     if (!silent) {
       const message = formatError(statusError)
       if (message.includes('NO_RIGHTS')) {

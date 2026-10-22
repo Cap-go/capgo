@@ -117,24 +117,9 @@ async function loadPendingInvitations() {
   }
 }
 
-async function acceptInvitation(invitation: Organization): Promise<string> {
-  const userId = getCurrentUserId()
-  if (!userId)
-    throw new Error('missing_user')
-
-  const { data: pendingMembership, error: pendingMembershipError } = await capgo
-    .from('org_users')
-    .select('id')
-    .eq('org_id', invitation.gid)
-    .eq('user_id', userId)
-    .eq('is_invite', true)
-    .maybeSingle()
-
-  if (pendingMembershipError)
-    throw pendingMembershipError
-  if (!pendingMembership)
-    throw new Error('NO_INVITE')
-
+async function acceptInvitation(invitation: Organization): Promise<void> {
+  // Accept without a prior org_users read — the RPC is the source of truth
+  // (#3847). A pre-read was an extra round trip and could race the invite row.
   const { data, error } = await capgo.rpc('accept_invitation_to_org', {
     org_id: invitation.gid,
   })
@@ -143,8 +128,6 @@ async function acceptInvitation(invitation: Organization): Promise<string> {
     throw error
   if (data !== 'OK')
     throw new Error(typeof data === 'string' ? data : 'FAILED_TO_ACCEPT_INVITATION')
-
-  return String(pendingMembership.id)
 }
 
 async function declineInvitation(invitation: Organization): Promise<string> {

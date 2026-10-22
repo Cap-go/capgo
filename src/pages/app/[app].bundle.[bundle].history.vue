@@ -4,6 +4,7 @@ import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import { BUNDLE_SUMMARY_COLUMNS } from '~/services/bundleColumns'
 import { useConsole } from '~/services/console'
 import { useDisplayStore } from '~/stores/display'
 
@@ -24,7 +25,7 @@ async function getVersion() {
   try {
     const { data, error } = await capgo
       .from('app_versions')
-      .select()
+      .select(BUNDLE_SUMMARY_COLUMNS)
       .eq('app_id', packageId.value)
       .eq('id', id.value)
       .single()

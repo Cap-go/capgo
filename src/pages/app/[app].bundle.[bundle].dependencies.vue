@@ -10,6 +10,7 @@ import IconCheckCircle from '~icons/heroicons/check-circle'
 import IconPuzzle from '~icons/heroicons/puzzle-piece'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import { BUNDLE_SUMMARY_COLUMNS } from '~/services/bundleColumns'
 import { comparePackages, hasPlatformChecksumMetadataDrift, summarizeCompatibility } from '~/services/bundleCompatibility'
 import { useConsole } from '~/services/console'
 import { useDisplayStore } from '~/stores/display'
@@ -284,7 +285,7 @@ async function getVersion() {
   try {
     const { data, error } = await capgo
       .from('app_versions')
-      .select()
+      .select(`${BUNDLE_SUMMARY_COLUMNS}, native_packages`)
       .eq('app_id', packageId.value)
       .eq('id', id.value)
       .single()

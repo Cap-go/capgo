@@ -65,4 +65,17 @@ describe('console never talks to Supabase', () => {
     for (const field of ['dependencies', 'devDependencies', 'optionalDependencies'])
       expect(Object.keys(pkg[field] ?? {})).not.toContain('@capgo/capacitor-supabase')
   })
+
+  // Same prism as CLI GET /bundle?fields=summary: list/picker paths must not pull
+  // the large manifest / native_packages columns via select('*') or bare select().
+  it('keeps app_versions list queries on light columns', () => {
+    const heavy = /\.from\(\s*['"]app_versions['"]\s*\)[\s\S]{0,120}?\.select\(\s*(?:\(\s*\)|['"]\*['"])/
+    const offenders: string[] = []
+    for (const file of walk(join(root, 'src'), []).filter(path => /\.(?:ts|vue)$/.test(path))) {
+      const source = readFileSync(file, 'utf8')
+      if (heavy.test(source))
+        offenders.push(relative(root, file))
+    }
+    expect(offenders).toEqual([])
+  })
 })

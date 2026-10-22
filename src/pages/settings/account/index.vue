@@ -82,11 +82,8 @@ async function ensureRecentEmailVerification() {
 }
 
 async function checkOrganizationImpact() {
-  // Wait for organizations and main store to load
-  await Promise.all([
-    organizationStore.awaitInitialLoad(),
-    main.awaitInitialLoad(),
-  ])
+  // Dashboard statistics never load for accounts without organizations.
+  await organizationStore.awaitInitialLoad()
 
   // Get all organizations where user is super_admin
   const superAdminOrgs = organizationStore.organizations.filter(org => isSuperAdminRole(org.role))

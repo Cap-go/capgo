@@ -28,7 +28,7 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
   }
 
   const client = await createCapgoClient(options.apikey, options.apiHost)
-  await check2FAComplianceForApp(client, appId, silent)
+  const preflight = await check2FAComplianceForApp(client, appId, silent)
 
   const httpOptions = {
     apikey: options.apikey,
@@ -54,7 +54,7 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
     ? await hasCliPermission(client, options.apikey, 'bundle.delete', { appId })
     : false
 
-  const orgId = await getOrganizationId(options.apikey, appId, { apiHost: options.apiHost })
+  const orgId = preflight?.orgId ?? await getOrganizationId(options.apikey, appId, { apiHost: options.apiHost })
 
   if (options.deleteBundle && !canDeleteBundle) {
     if (!silent)

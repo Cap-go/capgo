@@ -15,6 +15,7 @@ import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconWarning from '~icons/lucide/alert-triangle'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import { BUNDLE_PICKER_COLUMNS } from '~/services/bundleColumns'
 import { channelUpdatePackageErrorKey } from '~/services/channelUpdatePackageError'
 import { checkCompatibilityNativePackages, defaultApiHost, isCompatible, useConsole } from '~/services/console'
 import { formatDate, formatLocalDate } from '~/services/date'
@@ -919,9 +920,9 @@ async function openSelectVersion(startInSearch = false) {
   if (!channel.value)
     return
 
-  // Fetch versions when dialog opens
+  // Fetch versions when dialog opens — light columns only (no manifest / native_packages).
   const { data, error } = await capgo.from('app_versions')
-    .select('*')
+    .select(BUNDLE_PICKER_COLUMNS)
     .eq('app_id', channel.value.app_id)
     .eq('deleted', false)
     .neq('id', channel.value.version.id)
@@ -934,7 +935,7 @@ async function openSelectVersion(startInSearch = false) {
     return
   }
 
-  bundleLinkVersions.value = data ?? []
+  bundleLinkVersions.value = (data ?? []) as Database['public']['Tables']['app_versions']['Row'][]
   bundleLinkSearchVal.value = ''
   bundleLinkSearchMode.value = startInSearch
 
@@ -1110,7 +1111,7 @@ async function refreshFilteredVersions() {
 
   if (bundleLinkSearchVal.value && bundleLinkSearchVal.value.trim()) {
     const { data, error } = await capgo.from('app_versions')
-      .select('*')
+      .select(BUNDLE_PICKER_COLUMNS)
       .eq('app_id', channel.value.app_id)
       .eq('deleted', false)
       .neq('id', channel.value.version.id)
@@ -1121,11 +1122,11 @@ async function refreshFilteredVersions() {
       console.error(error)
       toast.error(t('error-fetching-versions'))
     }
-    bundleLinkVersions.value = data ?? []
+    bundleLinkVersions.value = (data ?? []) as Database['public']['Tables']['app_versions']['Row'][]
   }
   else {
     const { data, error } = await capgo.from('app_versions')
-      .select('*')
+      .select(BUNDLE_PICKER_COLUMNS)
       .eq('app_id', channel.value.app_id)
       .eq('deleted', false)
       .neq('id', channel.value.version.id)
@@ -1135,7 +1136,7 @@ async function refreshFilteredVersions() {
       console.error(error)
       toast.error(t('error-fetching-versions'))
     }
-    bundleLinkVersions.value = data ?? []
+    bundleLinkVersions.value = (data ?? []) as Database['public']['Tables']['app_versions']['Row'][]
   }
 }
 

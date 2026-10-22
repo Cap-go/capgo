@@ -23,7 +23,7 @@ import {
   savePaymentMethodFromIntent,
   scheduleSubscriptionCancel,
 } from '../utils/stripe_in_app.ts'
-import { cancelTrialPlan, getTrialPlanSummary, listSchedulableTrialPlans, scheduleTrialPlan } from '../utils/stripe_trial_plan.ts'
+import { cancelTrialPlan, getTrialPlanSummary, listSchedulableTrialPlans, scheduleTrialPlan, startTrialPlanNow } from '../utils/stripe_trial_plan.ts'
 import { supabaseClient } from '../utils/supabase.ts'
 
 // In-app billing: replaces the Stripe billing portal and hosted invoice page.
@@ -124,6 +124,17 @@ app.post('/trial-plan/schedule', middlewareAuth, async (c) => {
     datafastSessionId: optionalString(body.datafastSessionId),
   }, optionalString(body.productId))
   return c.json({ plan })
+})
+
+// Start the trial plan today and charge the saved card instead of waiting for the trial end.
+app.post('/trial-plan/start-now', middlewareAuth, async (c) => {
+  const body = await parseBody<TrialPlanBody>(c)
+  const ctx = await resolveBillingContext(c, body.orgId, 'org.update_billing')
+  return c.json(await startTrialPlanNow(c, ctx, body.orgId!, {
+    affonsoReferral: optionalString(body.affonsoReferral),
+    datafastVisitorId: optionalString(body.datafastVisitorId),
+    datafastSessionId: optionalString(body.datafastSessionId),
+  }, optionalString(body.productId)))
 })
 
 app.post('/trial-plan/cancel', middlewareAuth, async (c) => {

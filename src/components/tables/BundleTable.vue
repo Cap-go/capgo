@@ -13,6 +13,7 @@ import { toast } from 'vue-sonner'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
 import IconTrash from '~icons/heroicons/trash'
 import BundleChannelsPopover from '~/components/tables/BundleChannelsPopover.vue'
+import { BUNDLE_SUMMARY_COLUMNS } from '~/services/bundleColumns'
 import { fetchLinkedChannelsForVersion, formatBundleListChannels, formatLinkedChannel, mergeBundleListChannels, unlinkLinkedChannels } from '~/services/bundleLinkedChannels'
 import { findChannelsWithoutPromotionPermission, formatChannelPromotionTargets } from '~/services/channelPromotion'
 import { useConsole } from '~/services/console'
@@ -218,9 +219,11 @@ async function getData() {
       }
     }
 
+    // Same light projection as GET /bundle?fields=summary — never pull manifest /
+    // native_packages for the list page (those arrays can be megabytes per row).
     let req = capgo
       .from('app_versions')
-      .select('*', { count: 'exact' })
+      .select(BUNDLE_SUMMARY_COLUMNS, { count: 'exact' })
       .eq('app_id', props.appId)
       .neq('storage_provider', 'revert_to_builtin')
       .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)

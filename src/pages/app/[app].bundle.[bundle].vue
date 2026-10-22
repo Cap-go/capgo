@@ -17,6 +17,7 @@ import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconPencil from '~icons/lucide/pencil'
+import { BUNDLE_SUMMARY_COLUMNS } from '~/services/bundleColumns'
 import { fetchLinkedChannelsForVersion, formatLinkedChannel, unlinkLinkedChannels } from '~/services/bundleLinkedChannels'
 import { findChannelsWithoutPromotionPermission, formatChannelPromotionTargets } from '~/services/channelPromotion'
 import { channelUpdatePackageErrorKey } from '~/services/channelUpdatePackageError'
@@ -539,7 +540,7 @@ async function getVersion() {
   try {
     const { data } = await capgo
       .from('app_versions')
-      .select()
+      .select(`${BUNDLE_SUMMARY_COLUMNS}, native_packages`)
       .eq('app_id', packageId.value)
       .eq('id', id.value)
       .single()

@@ -17,6 +17,16 @@ test('shows live Builder progress while keeping platform tasks separate', async 
   await expect(page.locator('[data-test="builder-checklist-choose-platform"]')).toBeVisible()
 
   await page.locator('[data-test="builder-platform-ios"]').click()
+  const toggle = page.locator('[data-test="builder-checklist-toggle"]')
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(toggle).toHaveText('Hide steps')
+  await expect(page.locator('[data-test="builder-step-prepare_certificate"]')).toBeVisible()
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(toggle).toHaveText('Show all 6 steps')
+  await expect(page.locator('[data-test="builder-step-prepare_certificate"]')).toBeHidden()
+  await toggle.click()
+  await expect(page.locator('[data-test="builder-step-prepare_certificate"]')).toBeVisible()
   await expect(page.locator('[data-test^="builder-step-"] button')).toContainText([
     'Start guided Builder setup',
     'Choose where the build goes',
@@ -59,6 +69,16 @@ test('shows live Builder progress while keeping platform tasks separate', async 
   await page.locator('[data-test="builder-platform-ios"]').click()
   await expect(page.locator('[data-test="builder-step-start_setup"]')).toHaveAttribute('data-status', 'done')
   await expect(page.locator('[data-test="builder-step-choose_destination"]')).toContainText('Current task')
+  await openBuilderTask(page, 'prepare_certificate')
+  await page.setViewportSize({ width: 320, height: 844 })
+  const returnButton = page.getByRole('button', { name: 'Back to the current task', exact: true })
+  await returnButton.evaluate(element => element.style.fontSize = '28px')
+  const actionsBox = await page.locator('[data-test="builder-checklist-task-actions"]').boundingBox()
+  const returnBox = await returnButton.boundingBox()
+  expect(returnBox!.x).toBeGreaterThanOrEqual(actionsBox!.x)
+  expect(returnBox!.x + returnBox!.width).toBeLessThanOrEqual(actionsBox!.x + actionsBox!.width)
+  expect(await returnButton.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320)
   expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.appWrites)).toEqual([])
 })
 
@@ -119,7 +139,7 @@ for (const assignment of ['both-builder', 'both-ota']) {
 test('asks to finish or explicitly skip a Builder step passed over by out-of-order setup', async ({ page }) => {
   await page.clock.install()
   await page.goto(`${fixture}&platform=android`)
-  await expect(page.locator('[data-test="builder-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.locator('[data-test="builder-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'true')
 
   await page.evaluate(() => {
     (window as any).onboardingSetupPreview.state.builderSteps.android.prepare_keystore = { status: 'done' }
