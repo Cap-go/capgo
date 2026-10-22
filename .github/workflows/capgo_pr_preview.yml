@@ -83,12 +83,19 @@ jobs:
           if [ "$start_run" -lt 1 ]; then
             start_run=1
           fi
+          delete_preview_bundle() {
+            timeout 35s bunx "$CAPGO_CLI" bundle delete "$1" "$APP_ID" --apikey "$CAPGO_TOKEN" 2>/dev/null || true
+          }
           for run in $(seq "$start_run" "$GITHUB_RUN_NUMBER"); do
             for attempt in 1 2 3; do
               bundle="${BASE_VERSION}-pr.${PR_NUMBER}.${run}.${attempt}"
-              bunx "$CAPGO_CLI" bundle delete "$bundle" "$APP_ID" --apikey "$CAPGO_TOKEN" 2>/dev/null || true
+              delete_preview_bundle "$bundle" &
+              if [ "$(jobs -pr | wc -l)" -ge 4 ]; then
+                wait -n || true
+              fi
             done
           done
+          wait
       - name: Upload bundle to the PR channel
         env:
           CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
