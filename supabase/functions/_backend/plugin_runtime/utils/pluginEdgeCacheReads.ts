@@ -43,9 +43,9 @@ export async function getAppOwnerWithEdgeCache(
   }
   catch (error: unknown) {
     rethrowConnectError(error)
+    logPgError(c, 'getAppOwnerPostgres', error, { appId, planActions: actions })
     if (options?.rethrowReadOnlyConnectionErrors)
       rethrowReadOnlyPgConnectionError(error)
-    logPgError(c, 'getAppOwnerPostgres', error, { appId, planActions: actions })
     throw error
   }
 }

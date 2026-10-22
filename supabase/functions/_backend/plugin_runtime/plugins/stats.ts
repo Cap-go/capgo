@@ -18,6 +18,7 @@ import { getAppOwnerWithEdgeCache, getAppVersionWithEdgeCache } from '../utils/p
 import { getClientIP } from '../utils/rate_limit.ts'
 import { onPremiseAppResponse } from '../utils/rateLimitInfo.ts'
 import { getSnippetEdgeAnswerBps, getSnippetEdgeReplay, setSnippetStatsFill } from '../utils/snippetEdgeAnswer.ts'
+import { isDatabaseOriginError } from '../utils/pg_errors.ts'
 import { planValidUntilMs, shouldUseUpdatesEdgeCache } from '../utils/updatesEdgeCache.ts'
 import { backgroundTask, INVALID_STRING_APP_ID, isInternalVersionName, isLimited, MISSING_STRING_APP_ID, reverseDomainRegex } from '../utils/utils.ts'
 import { isRunningVersionAction } from './stats_actions.ts'
@@ -474,6 +475,8 @@ async function processStatsEvents(
       }
     }
     catch (e) {
+      if (isDatabaseOriginError(e))
+        throw e
       const err = e as Error & { cause?: { error?: string } }
       results.push({
         status: 'error',

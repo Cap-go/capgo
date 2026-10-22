@@ -1452,8 +1452,8 @@ export async function getAppOwnerPostgres(
     return await queryAppOwnerPostgres(c, appId, drizzleClient, actions, options)
   }
   catch (e: unknown) {
-    // Rethrow: null means "app missing" and sticky-caches on_premise_app. Database
-    // failures must surface as 503 via onError, not as a cacheable 429.
+    // Rethrow: null means "app missing" and sticky-caches on_premise_app. Transient
+    // database errors become 503 via onError; other failures are never cached as on-prem.
     logPgError(c, 'getAppOwnerPostgres', e, {
       appId,
       planActions: actions,
