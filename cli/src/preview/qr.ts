@@ -106,22 +106,18 @@ export async function assertAppAllowsPreview(options: CapgoPreviewHttpOptions, a
     throw new Error(`Preview is disabled for app ${appId}. Enable it with: npx @capgo/cli@latest app set ${appId} --preview`)
 }
 
-async function listBundles(options: CapgoPreviewHttpOptions, appId: string): Promise<BundleRow[]> {
-  const all: BundleRow[] = []
-  let page = 0
-  while (true) {
-    const { data, error } = await previewInvoke<BundleRow[]>(options, `bundle?app_id=${encodeURIComponent(appId)}&page=${page}`)
-    if (error)
-      throw new Error(`Cannot load bundles for ${appId}: ${await formatCapgoCliInvokeError(error)}`, { cause: error })
-    const batch = Array.isArray(data) ? data : []
-    if (!batch.length)
-      break
-    all.push(...batch.map(row => ({ id: row.id, name: row.name })))
-    if (batch.length < 50)
-      break
-    page += 1
-  }
-  return all
+/** One filtered GET /bundle: an id or name lookup never lists every bundle. */
+async function findBundle(options: CapgoPreviewHttpOptions, appId: string, filter: { id: number } | { version: string }): Promise<BundleRow | null> {
+  const params = new URLSearchParams({ app_id: appId, fields: 'summary' })
+  if ('id' in filter)
+    params.set('id', String(filter.id))
+  else
+    params.set('version', filter.version)
+  const { data, error } = await previewInvoke<BundleRow[]>(options, `bundle?${params.toString()}`)
+  if (error)
+    throw new Error(`Cannot load bundles for ${appId}: ${await formatCapgoCliInvokeError(error)}`, { cause: error })
+  const row = Array.isArray(data) ? data[0] : undefined
+  return row ? { id: row.id, name: row.name } : null
 }
 
 async function listChannels(options: CapgoPreviewHttpOptions, appId: string): Promise<ChannelRow[]> {
@@ -166,11 +162,9 @@ export async function resolveBundlePreviewTarget(
   bundleRef: string,
 ): Promise<PreviewQrTarget | null> {
   const numericId = parseSafeIntegerRef(bundleRef, 0)
-  // Fetch once: id and name lookups previously each called listBundles.
-  const bundles = await listBundles(options, appId)
   const bundle = numericId === undefined
-    ? bundles.find(row => row.name === bundleRef) ?? null
-    : bundles.find(row => row.id === numericId) ?? bundles.find(row => row.name === bundleRef) ?? null
+    ? await findBundle(options, appId, { version: bundleRef })
+    : await findBundle(options, appId, { id: numericId }) ?? await findBundle(options, appId, { version: bundleRef })
 
   if (!bundle)
     return null

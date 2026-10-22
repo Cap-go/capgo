@@ -37,9 +37,11 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', async importOriginal => ({
 }))
 
 vi.mock('../supabase/functions/_backend/utils/rate_limit.ts', () => ({
+  setAPIKeyRateLimitHeaders: vi.fn(),
+  setFailedAuthRateLimitPolicyHeader: vi.fn(),
   isAPIKeyRateLimited: vi.fn(async () => ({ limited: false })),
   isIPRateLimited: vi.fn(async () => ({ limited: false })),
-  recordAPIKeyUsage: vi.fn(async () => undefined),
+  recordAPIKeyUsage: vi.fn(async () => ({ count: 1 })),
   recordFailedAuth: recordFailedAuthMock,
 }))
 

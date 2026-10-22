@@ -4,7 +4,7 @@ import type { Compatibility } from '../utils'
 import { intro, log, outro } from '@clack/prompts'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { findChannel } from '../api/channels'
-import { getActiveAppVersions, getVersionData } from '../api/versions'
+import { getLatestAppVersion, getVersionData, getVersionDataById } from '../api/versions'
 import { sendUpdateNotificationsForChannels } from '../notifications/send-update'
 import { printPreviewQrForResolvedTarget, resolveChannelPreviewTarget } from '../preview/qr'
 import { CliUserError } from '../shared/cli-user-error'
@@ -149,8 +149,9 @@ export async function setChannelInternal(channel: string, appId: string, options
   }
 
   const client = await createCapgoClient(options.apikey, options.apiHost)
-  await check2FAComplianceForApp(client, appId, silent)
-  const userId = await resolveUserIdFromApiKey(client, options.apikey)
+  // The preflight already resolves the key's user and the app's org: no extra lookups.
+  const preflight = await check2FAComplianceForApp(client, appId, silent)
+  const userId = preflight?.userId ?? await resolveUserIdFromApiKey(client, options.apikey)
 
   const {
     bundle,
@@ -307,7 +308,7 @@ export async function setChannelInternal(channel: string, appId: string, options
   if (hasBundlePromotion || disableUnlinksRollout)
     await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'channel.promote_bundle', silent, true, existingChannel.id)
 
-  const orgId = await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
+  const orgId = preflight?.orgId ?? await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
 
   const channelPayload: ChannelInsert = {
     created_by: userId,
@@ -372,12 +373,10 @@ export async function setChannelInternal(channel: string, appId: string, options
   }
 
   if (latestRemote) {
-    const versions = await getActiveAppVersions(options.apikey!, appId, {
+    const data = await getLatestAppVersion(options.apikey!, appId, {
       silent,
-      apikey: options.apikey!,
       apiHost: options.apiHost,
     })
-    const data = versions[0]
     if (!data) {
       if (!silent)
         log.error('Cannot find latest remote version')
@@ -499,12 +498,10 @@ export async function setChannelInternal(channel: string, appId: string, options
       throw new Error('Cannot promote rollout without a rollout target')
 
     if (channelPayload.rollout_version == null && !options.ignoreMetadataCheck) {
-      const versions = await getActiveAppVersions(options.apikey!, appId, {
+      const data = await getVersionDataById(options.apikey!, appId, rolloutVersion, {
         silent,
-        apikey: options.apikey!,
         apiHost: options.apiHost,
       })
-      const data = versions.find(v => v.id === rolloutVersion)
       if (!data)
         throw new Error('Cannot find rollout version to promote')
 
@@ -712,12 +709,10 @@ export async function setChannelInternal(channel: string, appId: string, options
       channelBody.version = typeof channelPayload.version === 'number' ? undefined : channelPayload.version
     // POST channel expects version as version name string; resolve from id when needed
     if (typeof channelPayload.version === 'number') {
-      const versions = await getActiveAppVersions(options.apikey!, appId, {
+      const matched = await getVersionDataById(options.apikey!, appId, channelPayload.version, {
         silent: true,
-        apikey: options.apikey!,
         apiHost: options.apiHost,
       })
-      const matched = versions.find(v => v.id === channelPayload.version)
       if (!matched) {
         if (!silent)
           log.error('Cannot set channel because no bundle version could be resolved')
@@ -756,12 +751,10 @@ export async function setChannelInternal(channel: string, appId: string, options
       channelBody.allow_prod = channelPayload.allow_prod
     if (channelPayload.rollout_version !== undefined) {
       if (typeof channelPayload.rollout_version === 'number') {
-        const versions = await getActiveAppVersions(options.apikey!, appId, {
+        const matched = await getVersionDataById(options.apikey!, appId, channelPayload.rollout_version, {
           silent: true,
-          apikey: options.apikey!,
           apiHost: options.apiHost,
         })
-        const matched = versions.find(v => v.id === channelPayload.rollout_version)
         if (!matched) {
           if (!silent)
             log.error('Cannot set channel because no rollout bundle version could be resolved')
