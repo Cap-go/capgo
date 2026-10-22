@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
 import { parse } from 'yaml'
 
-it('bounds preview cleanup concurrency and duration while tolerating missing bundles', () => {
+it.each([1, 124, 137])('bounds preview cleanup and reports timeouts (delete status %i)', (deleteStatus) => {
   const workflow = parse(readFileSync(new URL('../.github/workflows/capgo_pr_preview.yml', import.meta.url), 'utf8'))
   const step = workflow.jobs.deploy.steps.find((step: { name?: string }) => step.name === 'Delete orphaned PR preview bundles')
   const output = execFileSync('bash', ['-c', `
@@ -16,7 +16,7 @@ it('bounds preview cleanup concurrency and duration while tolerating missing bun
       printf 'start %s\n' "$4"
       sleep 0.05
       printf 'end %s\n' "$4"
-      return 1
+      return "$MOCK_DELETE_STATUS"
     }
     ${step.run}
   `], {
@@ -30,6 +30,7 @@ it('bounds preview cleanup concurrency and duration while tolerating missing bun
       CAPGO_CLI: '@capgo/cli@latest',
       CAPGO_TOKEN: 'fake-preview-token',
       APP_ID: 'com.example.preview',
+      MOCK_DELETE_STATUS: String(deleteStatus),
     },
   })
 
@@ -59,4 +60,6 @@ it('bounds preview cleanup concurrency and duration while tolerating missing bun
   expect(peak).toBeLessThanOrEqual(6)
   expect(timeouts).toEqual(Array.from({ length: 27 }, () => '--kill-after=5s 45s'))
   expect(Math.ceil(bundles.length / 6) * 50).toBeLessThan(step['timeout-minutes'] * 60)
+  const warnings = output.split('\n').filter(line => line.startsWith('::warning::'))
+  expect(warnings).toHaveLength(deleteStatus === 1 ? 0 : 27)
 })
