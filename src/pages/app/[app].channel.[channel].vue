@@ -547,10 +547,7 @@ const showSearchAndActions = computed(() => {
   return !bundleLinkSearchMode.value
 })
 
-/**
- * Check a bundle's native packages against a channel and ask the user to accept a mismatch.
- * Returns false when the user cancels.
- */
+/** Load native_packages for a picker row only when the user links that bundle. */
 async function loadBundleNativePackagesForLink(bundle: BundlePickerRow) {
   // Picker rows stay light (no native_packages). Load them only when linking so
   // compatibility still sees real deps instead of an empty array.
@@ -568,6 +565,10 @@ async function loadBundleNativePackagesForLink(bundle: BundlePickerRow) {
   return data
 }
 
+/**
+ * Check a bundle's native packages against a channel and ask the user to accept a mismatch.
+ * Returns false when the user cancels.
+ */
 async function confirmBundleCompatibleWithChannel(
   appVersion: Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'app_id' | 'native_packages'>,
   channelName: string,
