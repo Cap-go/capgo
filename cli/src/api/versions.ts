@@ -290,14 +290,24 @@ export async function deleteSpecificVersion(
   const payload = await readCapgoCliApiErrorPayload(error)
   if (payload?.error === 'bundle_not_found')
     throwMissingVersion(appid, bundle, silent)
-  const bundleId = payload?.moreInfo?.bundle_id
-  if (payload?.error !== 'bundle_linked' || typeof bundleId !== 'number')
+  let bundleId = payload?.error === 'bundle_linked' ? payload.moreInfo?.bundle_id : undefined
+  // Backends before the 2026-10-22 contract refuse a linked bundle without its id.
+  if (payload?.error === 'cannot_delete_linked_version') {
+    const row = await fetchSingleBundle(appid, { version: bundle }, http)
+    if (!row)
+      throwMissingVersion(appid, bundle, silent)
+    bundleId = row.id
+  }
+  if (typeof bundleId !== 'number')
     await throwBundleHttpInvokeError(appid, error, 'delete', silent, 'bundle.delete')
 
   await checkVersionNotUsedInChannel(client, appid, { id: bundleId as number, name: bundle }, { silent, autoUnlink, apikey, apiHost })
   error = await deleteBundleByName(appid, bundle, http)
-  if (error)
-    await throwBundleHttpInvokeError(appid, error, 'delete', silent, 'bundle.delete')
+  if (!error)
+    return
+  if ((await readCapgoCliApiErrorPayload(error))?.error === 'bundle_not_found')
+    throwMissingVersion(appid, bundle, silent)
+  await throwBundleHttpInvokeError(appid, error, 'delete', silent, 'bundle.delete')
 }
 
 export interface CleanupBundleRow {

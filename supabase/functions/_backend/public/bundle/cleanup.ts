@@ -210,20 +210,22 @@ async function softDeleteBatch(
   }
 }
 
-/** Locked soft-delete of `ids` (see softDeleteBatch) on a pool of its own. Returns the deleted ids. */
-export async function softDeleteBundles(
-  c: Context<MiddlewareKeyVariables>,
-  effectiveApikey: string,
-  appId: string,
-  ids: number[],
-  ignoreChannel: boolean,
-): Promise<number[]> {
-  const pgClient = await getPgClient(c)
-  try {
-    return await softDeleteBatch(c, pgClient, effectiveApikey, appId, ids, ignoreChannel)
-  }
-  finally {
-    await closeClient(c, pgClient)
+const DEADLOCK_RETRIES = 3
+
+/**
+ * With ignore_channel, the unlink trigger locks channel rows after the bundle locks, which can
+ * deadlock with a promotion holding the channel row. Postgres aborts one side; a batch is its
+ * own transaction and only touches still-active rows, so retrying it is safe.
+ */
+async function softDeleteBatchWithRetry(...args: Parameters<typeof softDeleteBatch>): Promise<number[]> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await softDeleteBatch(...args)
+    }
+    catch (error) {
+      if ((error as { code?: string })?.code !== '40P01' || attempt >= DEADLOCK_RETRIES)
+        throw error
+    }
   }
 }
 
@@ -266,7 +268,7 @@ export async function cleanupBundles(c: Context<MiddlewareKeyVariables>, bodyRaw
       const ids = plan.removed.slice(i, i + DELETE_BATCH_SIZE).map(row => row.id)
       let deleted: number[]
       try {
-        deleted = await softDeleteBatch(c, pgClient, effectiveApikey, body.app_id, ids, ignoreChannel)
+        deleted = await softDeleteBatchWithRetry(c, pgClient, effectiveApikey, body.app_id, ids, ignoreChannel)
       }
       catch (error) {
         if (error instanceof HTTPException)

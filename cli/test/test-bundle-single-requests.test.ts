@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test'
 import { checkVersionNotUsedInChannel } from '../src/api/channels.ts'
 import { cleanupAppVersions, deleteSpecificVersion, getLatestAppVersion, getVersionData, getVersionDataById } from '../src/api/versions.ts'
 import { CliUserError } from '../src/shared/cli-user-error.ts'
+import { invokeCapgoCliApi } from '../src/utils.ts'
 
 interface InvokeCall {
   path: string
@@ -11,7 +12,7 @@ interface InvokeCall {
   apiVersion?: string
 }
 
-function makeBundleApiError(payload: { error: string, message: string }, status: number) {
+function makeBundleApiError(payload: { error: string, message: string, moreInfo?: Record<string, unknown> }, status: number) {
   const response = new Response(JSON.stringify(payload), { status })
   return Object.assign(new Error('Edge Function returned a non-2xx status code'), { context: response })
 }
@@ -169,3 +170,80 @@ describe('checkVersionNotUsedInChannel', () => {
     expect(url.searchParams.get('linked_version_id')).toBe('7')
   })
 })
+
+/** Serves the channel calls `checkVersionNotUsedInChannel` makes: one linked channel, then the unlink POST. */
+async function withLinkedChannelApi<T>(fn: (target: CapgoClient, requests: { method: string, path: string, body: unknown }[]) => Promise<T>) {
+  const requests: { method: string, path: string, body: unknown }[] = []
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input))
+    requests.push({ method: init?.method ?? 'GET', path: url.pathname, body: init?.body ? JSON.parse(String(init.body)) : undefined })
+    const body = url.pathname.endsWith('/private/cli/channels')
+      ? [{ id: 1, name: 'production', version: 7, rollout_version: null }]
+      : { status: 'ok' }
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }) as typeof fetch
+  try {
+    return await fn({ apikey: 'key', apiHost: 'http://127.0.0.1:9' } as CapgoClient, requests)
+  }
+  finally {
+    globalThis.fetch = originalFetch
+  }
+}
+
+describe('deleteSpecificVersion on a linked bundle', () => {
+  it('unlinks with the id from the 409 and retries the delete', async () => {
+    const { calls, invoke } = recordingInvoke([
+      { data: null, error: makeBundleApiError({ error: 'bundle_linked', message: 'linked', moreInfo: { bundle_id: 7, channels: ['production'] } }, 409) },
+      { data: { status: 'ok' }, error: null },
+    ])
+    const requests = await withLinkedChannelApi(async (target, requests) => {
+      await deleteSpecificVersion(target, 'com.test.app', '1.2.3', { silent: true, autoUnlink: true, apikey: 'key', invoke })
+      return requests
+    })
+    expect(calls.map(call => call.method)).toEqual(['DELETE', 'DELETE'])
+    expect(requests.map(request => `${request.method} ${request.path}`)).toEqual(['GET /private/cli/channels', 'POST /channel'])
+    expect(requests[1].body).toMatchObject({ app_id: 'com.test.app', channel: 'production', version: null })
+  })
+
+  it('looks the id up once on backends that answer cannot_delete_linked_version', async () => {
+    const { calls, invoke } = recordingInvoke([
+      { data: null, error: makeBundleApiError({ error: 'cannot_delete_linked_version', message: 'linked' }, 400) },
+      { data: [bundleRow], error: null },
+      { data: { status: 'ok' }, error: null },
+    ])
+    await withLinkedChannelApi(target => deleteSpecificVersion(target, 'com.test.app', '1.2.3', { silent: true, autoUnlink: true, apikey: 'key', invoke }))
+    expect(calls.map(call => `${call.method} ${call.path.split('?')[0]}`)).toEqual(['DELETE bundle', 'GET bundle', 'DELETE bundle'])
+  })
+
+  it('reports a bundle deleted before the retry as missing', async () => {
+    const { invoke } = recordingInvoke([
+      { data: null, error: makeBundleApiError({ error: 'bundle_linked', message: 'linked', moreInfo: { bundle_id: 7 } }, 409) },
+      { data: null, error: makeBundleApiError({ error: 'bundle_not_found', message: 'Bundle not found' }, 404) },
+    ])
+    await expect(withLinkedChannelApi(target => deleteSpecificVersion(target, 'com.test.app', '1.2.3', { silent: true, autoUnlink: true, apikey: 'key', invoke })))
+      .rejects
+      .toThrow('App version com.test.app@1.2.3 doesn\'t exist')
+  })
+})
+
+describe('invokeCapgoCliApi', () => {
+  it('sends the per-request apiVersion as the capgo_api header', async () => {
+    const seen: Record<string, string>[] = []
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      seen.push(init?.headers as Record<string, string>)
+      return new Response('{"status":"ok"}', { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }) as typeof fetch
+    try {
+      await invokeCapgoCliApi('bundle', { apikey: 'key', method: 'DELETE', body: {}, apiHost: 'http://127.0.0.1:9', apiVersion: '2026-10-22', instrument: false })
+      await invokeCapgoCliApi('bundle', { apikey: 'key', method: 'GET', apiHost: 'http://127.0.0.1:9', instrument: false })
+    }
+    finally {
+      globalThis.fetch = originalFetch
+    }
+    expect(seen[0].capgo_api).toBe('2026-10-22')
+    expect(seen[1].capgo_api).toBe('2025-10-01')
+  })
+})
+

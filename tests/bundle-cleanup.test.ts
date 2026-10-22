@@ -109,8 +109,20 @@ describe('[POST] /bundle/cleanup', () => {
   })
 })
 
-// Runs after the cleanup cases above: 5.0.3 is linked to a channel, 5.0.4 is active.
 describe('[DELETE] /bundle with capgo_api 2026-10-22', () => {
+  // Own bundles so this block does not depend on the cleanup cases: 6.0.1 is linked, 6.0.2 is not.
+  beforeAll(async () => {
+    const linked = await createAppVersions('6.0.1', APPNAME)
+    await createAppVersions('6.0.2', APPNAME)
+    const supabase = getSupabaseClient()
+    const { data: app, error: appError } = await supabase.from('apps').select('owner_org').eq('app_id', APPNAME).single()
+    expect(appError).toBeNull()
+    const { error } = await supabase
+      .from('channels')
+      .insert({ name: `delete-${randomUUID().slice(0, 8)}`, app_id: APPNAME, version: linked.id, created_by: USER_ID, owner_org: app!.owner_org })
+    expect(error).toBeNull()
+  })
+
   function deleteBundle(name: string, apiVersion?: string) {
     return fetch(`${BASE_URL}/bundle`, {
       method: 'DELETE',
@@ -119,32 +131,38 @@ describe('[DELETE] /bundle with capgo_api 2026-10-22', () => {
     })
   }
 
+  async function isDeleted(name: string) {
+    const { data, error } = await getSupabaseClient().from('app_versions').select('deleted').eq('app_id', APPNAME).eq('name', name).single()
+    expect(error).toBeNull()
+    return data!.deleted
+  }
+
   it('keeps the legacy contract on the default version', async () => {
-    const response = await deleteBundle('5.9.9')
+    const response = await deleteBundle('6.9.9')
     expect(response.status).toBe(400)
     expect((await response.json() as { error: string }).error).toBe('cannot_delete_version')
   })
 
   it('reports a missing bundle as bundle_not_found', async () => {
-    const response = await deleteBundle('5.9.9', '2026-10-22')
+    const response = await deleteBundle('6.9.9', '2026-10-22')
     expect(response.status).toBe(404)
     expect((await response.json() as { error: string }).error).toBe('bundle_not_found')
   })
 
   it('refuses a linked bundle with its id and channels', async () => {
-    const response = await deleteBundle('5.0.3', '2026-10-22')
+    const response = await deleteBundle('6.0.1', '2026-10-22')
     expect(response.status).toBe(409)
     const data = await response.json() as { error: string, moreInfo: { bundle_id: number, channels: string[] } }
     expect(data.error).toBe('bundle_linked')
     expect(data.moreInfo.bundle_id).toEqual(expect.any(Number))
     expect(data.moreInfo.channels).toHaveLength(1)
-    expect(await deletedNames()).not.toContain('5.0.3')
+    expect(await isDeleted('6.0.1')).toBe(false)
   })
 
   it('soft-deletes an unlinked bundle in one request', async () => {
-    const response = await deleteBundle('5.0.4', '2026-10-22')
+    const response = await deleteBundle('6.0.2', '2026-10-22')
     expect(response.status).toBe(200)
-    expect((await response.json() as { name: string }).name).toBe('5.0.4')
-    expect(await deletedNames()).toContain('5.0.4')
+    expect((await response.json() as { name: string }).name).toBe('6.0.2')
+    expect(await isDeleted('6.0.2')).toBe(true)
   })
 })

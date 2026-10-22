@@ -1,12 +1,13 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { HTTPException } from 'hono/http-exception'
 import { CAPGO_API_2026_10_22, resolveCapgoApiVersion } from '../../utils/api_version.ts'
 import { BRES, quickError, simpleError } from '../../utils/hono.ts'
+import { beginWriteTransaction, checkoutPgClient, closeClient, getPgClient, logPgError, releasePgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
-import { softDeleteBundles } from './cleanup.ts'
 
 interface GetLatest {
   app_id: string
@@ -36,43 +37,97 @@ function wantsDistinctDeleteErrors(c: Context<MiddlewareKeyVariables>) {
   }
 }
 
+type DeleteByNameOutcome
+  = | { status: 'deleted', id: number }
+    | { status: 'not_found' }
+    | { status: 'linked', id: number, channels: string[] }
+
 /**
  * capgo_api >= 2026-10-22: one request resolves the name, reports a missing bundle (404
  * bundle_not_found) or a linked one (409 bundle_linked with its id and channels, so a client
- * can offer to unlink without another lookup), and soft-deletes under the bundle lifecycle lock.
+ * can offer to unlink without another lookup), and soft-deletes. Lookup, link check and delete
+ * run in one transaction holding the bundle lifecycle lock (lock_channel_bundle_lifecycle, the
+ * protocol channel promotion uses), so a concurrent promotion or unlink cannot make the answer
+ * stale. Authorization is the bundle.delete check in deleteBundle.
  */
 async function deleteBundleByName(c: Context<MiddlewareKeyVariables>, appId: string, name: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const effectiveApikey = apikey.key ?? c.get('capgkey')
   if (!effectiveApikey)
     throw simpleError('cannot_delete_bundle', 'You can\'t access this app', { app_id: appId })
-  const supabase = supabaseApikey(c, apikey.key)
-  const { data: bundle, error: bundleError } = await supabase
-    .from('app_versions')
-    .select('id, name')
-    .eq('app_id', appId)
-    .eq('name', name)
-    .eq('deleted', false)
-    .maybeSingle()
-  if (bundleError)
-    throw simpleError('cannot_delete_version', 'Cannot delete version', { supabaseError: bundleError })
-  if (!bundle)
+
+  const pgClient = await getPgClient(c)
+  let dbClient: Awaited<ReturnType<typeof checkoutPgClient>> | null = null
+  let transactionStarted = false
+  let outcome: DeleteByNameOutcome
+  try {
+    dbClient = await checkoutPgClient(pgClient)
+    await beginWriteTransaction(dbClient)
+    transactionStarted = true
+    outcome = await deleteBundleByNameInTransaction(dbClient, effectiveApikey, appId, name)
+    await dbClient.query('COMMIT')
+  }
+  catch (error) {
+    if (dbClient && transactionStarted) {
+      try {
+        await dbClient.query('ROLLBACK')
+      }
+      catch {
+        // Preserve the original error when rollback itself fails.
+      }
+    }
+    if (error instanceof HTTPException)
+      throw error
+    logPgError(c, 'delete_bundle_by_name', error)
+    throw simpleError('cannot_delete_version', 'Cannot delete version', { error: (error as Error)?.message })
+  }
+  finally {
+    releasePgClient(pgClient, dbClient)
+    await closeClient(c, pgClient)
+  }
+
+  if (outcome.status === 'not_found')
     quickError(404, 'bundle_not_found', 'Bundle not found', { app_id: appId, version: name })
+  if (outcome.status === 'linked')
+    quickError(409, 'bundle_linked', 'Cannot delete a bundle linked to a channel', { app_id: appId, version: name, bundle_id: outcome.id, channels: outcome.channels })
+  return c.json({ ...BRES, id: outcome.id, name })
+}
 
-  const deleted = await softDeleteBundles(c, effectiveApikey, appId, [bundle.id], false)
-  if (deleted.includes(bundle.id))
-    return c.json({ ...BRES, id: bundle.id, name: bundle.name })
+async function deleteBundleByNameInTransaction(
+  dbClient: Awaited<ReturnType<typeof checkoutPgClient>>,
+  effectiveApikey: string,
+  appId: string,
+  name: string,
+): Promise<DeleteByNameOutcome> {
+  const found = await dbClient.query<{ id: string | number }>(
+    `SELECT id FROM public.app_versions
+     WHERE app_id = $1 AND name = $2 AND deleted = false
+     ORDER BY id DESC
+     LIMIT 1`,
+    [appId, name],
+  )
+  if (!found.rows.length)
+    return { status: 'not_found' }
+  const id = Number(found.rows[0].id)
 
-  // Not deleted: either a channel targets it, or it was deleted concurrently.
-  const { data: channels, error: channelsError } = await supabase
-    .from('channels')
-    .select('name')
-    .eq('app_id', appId)
-    .or(`version.eq.${bundle.id},rollout_version.eq.${bundle.id}`)
-  if (channelsError)
-    throw simpleError('cannot_check_linked_channels', 'Cannot check linked channels', { supabaseError: channelsError })
-  if (channels?.length)
-    quickError(409, 'bundle_linked', 'Cannot delete a bundle linked to a channel', { app_id: appId, version: name, bundle_id: bundle.id, channels: channels.map(channel => channel.name) })
-  quickError(404, 'bundle_not_found', 'Bundle not found', { app_id: appId, version: name })
+  await dbClient.query('SELECT public.lock_channel_bundle_lifecycle($1, NULL)', [id])
+  // Re-read under the lock: it may have been deleted while we waited.
+  const live = await dbClient.query('SELECT 1 FROM public.app_versions WHERE id = $1 AND deleted = false', [id])
+  if (!live.rows.length)
+    return { status: 'not_found' }
+
+  const channels = await dbClient.query<{ name: string }>(
+    `SELECT name FROM public.channels
+     WHERE app_id = $1 AND (version = $2 OR rollout_version = $2)
+     ORDER BY name`,
+    [appId, id],
+  )
+  if (channels.rows.length)
+    return { status: 'linked', id, channels: channels.rows.map(row => row.name) }
+
+  // Attribute the write to the caller's API key in the audit log (get_apikey_header).
+  await dbClient.query('SELECT set_config(\'request.headers\', $1, true)', [JSON.stringify({ capgkey: effectiveApikey })])
+  await dbClient.query('UPDATE public.app_versions SET deleted = true WHERE id = $1 AND deleted = false', [id])
+  return { status: 'deleted', id }
 }
 
 export async function deleteBundle(c: Context<MiddlewareKeyVariables>, body: GetLatest, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
