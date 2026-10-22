@@ -87,9 +87,9 @@ export function captureOrganizationInvitationEvent(input: OrganizationInvitation
 
 export async function runTrackedOrganizationInvitationMutation(
   input: TrackedOrganizationInvitationMutationInput,
-  mutation: () => Promise<string>,
+  mutation: () => Promise<string | void>,
 ): Promise<void> {
-  let invitationId: string
+  let invitationId: string | void
   try {
     invitationId = await mutation()
   }
@@ -105,7 +105,7 @@ export async function runTrackedOrganizationInvitationMutation(
 
   captureOrganizationInvitationEvent({
     event: input.successEvent,
-    invitationId,
+    invitationId: invitationId ?? undefined,
     pendingInvitationCount: input.pendingInvitationCount,
     userId: input.userId,
   })

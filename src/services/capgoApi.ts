@@ -161,6 +161,14 @@ export async function getCapgoApiErrorCode(error: unknown): Promise<string | und
   return typeof code === 'string' ? code : undefined
 }
 
+/** The backend's own error name (`simpleError`'s first argument), ignoring nested provider codes. */
+export async function getCapgoApiErrorName(error: unknown): Promise<string | undefined> {
+  if (!(error instanceof FunctionsHttpError) || !(error.context instanceof Response))
+    return undefined
+  const body = await error.context.clone().json().catch(() => null) as { error?: unknown } | null
+  return typeof body?.error === 'string' ? body.error : undefined
+}
+
 /**
  * Call Capgo Cloudflare API with the same { data, error } shape as
  * supabase.functions.invoke. Capgo cloud console traffic uses VITE_API_HOST.
