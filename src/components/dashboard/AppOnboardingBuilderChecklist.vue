@@ -102,7 +102,11 @@ const completed = computed(() => steps.value.length > 0
   && steps.value.every(step => step.status === 'done' || step.status === 'skipped')
   && steps.value.at(-1)?.status === 'done')
 const platformCommand = computed(() => viewedPlatform.value && props.command ? `${props.command} --platform ${viewedPlatform.value}` : '')
-const guideHref = computed(() => viewedPlatform.value ? `https://capgo.app/docs/cli/cloud-build/${viewedPlatform.value}/` : '')
+const guideHref = computed(() => {
+  if (viewedPlatform.value === 'android' && selectedStep.value?.id === 'connect_google_play')
+    return 'https://capgo.app/docs/cli/reference/build/'
+  return viewedPlatform.value ? `https://capgo.app/docs/cli/cloud-build/${viewedPlatform.value}/` : ''
+})
 
 watch(() => props.initialPlatform, (platform) => {
   if (platform)

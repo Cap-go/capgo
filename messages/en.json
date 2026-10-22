@@ -650,7 +650,7 @@
   "builder-checklist-android-prepare_keystore-title": "Prepare your signing keystore",
   "builder-checklist-android-prepare_keystore-description": "Import the keystore you already use for this app or let the CLI create one. Keep it and its passwords safe: future Android updates must use the same key.",
   "builder-checklist-android-connect_google_play-title": "Connect Google Play",
-  "builder-checklist-android-connect_google_play-description": "Google Play upload needs a service account with access to your app in Play Console. For a download-only build, use the no-Play-upload option in the build guide.",
+  "builder-checklist-android-connect_google_play-description": "Google Play upload needs a service account with access to your app in Play Console. After saving your Android signing credentials, add --no-playstore-upload --output-upload to your build request for a downloadable AAB without Play upload.",
   "builder-checklist-android-successful_cloud_build-title": "Run a successful cloud build",
   "builder-checklist-android-successful_cloud_build-description": "Request an Android cloud build and wait for it to succeed. Starting a build or finishing credential setup alone does not complete this checklist.",
   "app-onboarding-mode-import": "Import from store",
