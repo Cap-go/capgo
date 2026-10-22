@@ -5,6 +5,7 @@ import { box } from '@clack/prompts'
 import { isCI } from 'ci-info'
 import { flushAnalytics, trackEvent } from '../analytics/track'
 import { getPendingOnboardingChecks, takeSetupNotices } from './background-workers'
+import { renderGitHubNotice } from './github-notice'
 import { setupDebug } from './setup-diagnostics'
 import { ONBOARDING_CHECK_GRACE_MS as gracePeriodMs, shouldEvaluateSetupNotice } from './setup-notice-policy'
 import { formatSetupNotice } from './setup-notices'
@@ -66,7 +67,7 @@ const interactiveCommands = new Set([
 ])
 
 function shouldWaitForOnboardingChecks(commandPath: string, options: Record<string, unknown>): boolean {
-  return !!process.stdin.isTTY && !!process.stdout.isTTY && !isCI
+  return (isCI || (!!process.stdin.isTTY && !!process.stdout.isTTY))
     && interactiveCommands.has(commandPath)
     && !options.json && !options.outputText && !options.quiet && !options.silent && !options.format
 }
@@ -74,7 +75,7 @@ function shouldWaitForOnboardingChecks(commandPath: string, options: Record<stri
 function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPath: string): void {
   const notices = takeSetupNotices()
   setupDebug('render checked', { available_notices: notices.length })
-  if (!shouldEvaluateSetupNotice(commandPath, command.optsWithGlobals(), isCI))
+  if (!shouldEvaluateSetupNotice(commandPath, command.optsWithGlobals()))
     return
   const shownApps = new Set<string>()
   for (const notice of notices) {
@@ -94,7 +95,8 @@ function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPa
           return setupStyle('yellow', line)
         return line.startsWith('You can also') ? setupStyle('dim', line) : line
       }).join('\n')
-      box(styledText, '', setupBoxOptions)
+      if (!renderGitHubNotice(text))
+        box(styledText, '', setupBoxOptions)
       setupDebug('render shown', { kind: notice.kind })
       shownApps.add(notice.appId)
       if (notice.kind === 'plan')
@@ -120,7 +122,8 @@ export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGl
   process.prependOnceListener('SIGINT', onInterrupt)
   try {
     setupDebug('shutdown wait started', { budget_ms: gracePeriodMs })
-    box(`${setupStyle(['bold', 'cyan'], 'Checking your setup...')}\n\n${setupStyle('dim', 'Press Ctrl+C to skip.')}`, '', setupBoxOptions)
+    if (!isCI)
+      box(`${setupStyle(['bold', 'cyan'], 'Checking your setup...')}\n\n${setupStyle('dim', 'Press Ctrl+C to skip.')}`, '', setupBoxOptions)
     const checks = [...pendingChecks.values()]
     const options = command.optsWithGlobals()
     void trackEvent({

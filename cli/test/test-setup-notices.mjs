@@ -31,12 +31,11 @@ const message = progress => formatSetupNotice(getSetupNotice(appId, progress, 'h
 
 test('only app-specific human-readable commands start the optional progress request', () => {
   for (const command of ['bundle list', 'bundle upload', 'channel list', 'doctor', 'build request'])
-    assert.equal(shouldEvaluateSetupNotice(command, {}, false), true)
+    assert.equal(shouldEvaluateSetupNotice(command, {}), true)
   for (const command of ['app list', 'organization list', 'app todo', 'build init', 'mcp', 'init'])
-    assert.equal(shouldEvaluateSetupNotice(command, {}, false), false)
+    assert.equal(shouldEvaluateSetupNotice(command, {}), false)
   for (const options of [{ json: true }, { outputText: true }, { quiet: true }, { silent: true }, { format: 'json' }])
-    assert.equal(shouldEvaluateSetupNotice('bundle list', options, false), false)
-  assert.equal(shouldEvaluateSetupNotice('bundle list', {}, true), false)
+    assert.equal(shouldEvaluateSetupNotice('bundle list', options), false)
 })
 test('only commands that can change setup need a post-success refresh', () => {
   for (const command of ['bundle upload', 'channel add', 'app add', 'build request'])

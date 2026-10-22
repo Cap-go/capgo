@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 process.env.CAPGO_DISABLE_POSTHOG = '1'
 
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import process from 'node:process'
+import { wasTrialNoticeShown } from '../src/onboarding/trial-notice-state.ts'
 import { checkPlanValid, checkPlanValidUpload } from '../src/api/preflight.ts'
 import * as utils from '../src/utils.ts'
 
@@ -20,6 +24,7 @@ let fetchHandler = () => Response.json(okBody)
 
 globalThis.fetch = async (input, init) => {
   const url = String(input)
+  if (url.endsWith('/private/config')) return Response.json({})
   if (!url.includes('/private/cli/preflight'))
     return originalFetch(input)
   httpCalls.push({
@@ -79,6 +84,34 @@ await test('checkPlanValid asks the backend for the full metered plan in one cal
 await test('checkPlanValidUpload only gates storage', async () => {
   await checkPlanValidUpload(makeClient(), 'org-id', 'com.example.app', false)
   assertEquals(httpCalls[0].body, { app_id: 'com.example.app', org_id: 'org-id', check_2fa: false, plan: 'upload' })
+})
+
+await test('GitHub Actions publishes the existing preflight trial warning to both surfaces', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'capgo-plan-notice-'))
+  const previous = { github: process.env.GITHUB_ACTIONS, summary: process.env.GITHUB_STEP_SUMMARY }
+  const write = process.stdout.write
+  let output = ''
+  try {
+    process.env.GITHUB_ACTIONS = 'true'
+    process.env.GITHUB_STEP_SUMMARY = join(dir, 'summary.md')
+    process.stdout.write = chunk => { output += chunk; return true }
+    fetchHandler = () => Response.json({ ...okBody, trial_days_left: 3 })
+    await checkPlanValidUpload(makeClient(), 'org-id', 'com.example.app')
+    assert(output.includes('::notice::WARNING !!%0ATrial expires in 3 days, upgrade here:'), output)
+    const summary = readFileSync(process.env.GITHUB_STEP_SUMMARY, 'utf8')
+    assert(summary.includes('### WARNING'), summary)
+    assert(summary.includes('Trial expires in 3 days, upgrade here:'), summary)
+    assert(summary.includes('/settings/organization/plans?oid=org-id'), summary)
+    assert(wasTrialNoticeShown('org-id'), 'preflight prevents a duplicate background plan prompt')
+  }
+  finally {
+    process.stdout.write = write
+    if (previous.github === undefined) delete process.env.GITHUB_ACTIONS
+    else process.env.GITHUB_ACTIONS = previous.github
+    if (previous.summary === undefined) delete process.env.GITHUB_STEP_SUMMARY
+    else process.env.GITHUB_STEP_SUMMARY = previous.summary
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 await test('billing limit maps to plan upgrade copy', async () => {

@@ -35,8 +35,8 @@ const mutatingCommands = new Set([
   'build request',
 ])
 
-export function shouldEvaluateSetupNotice(command: string, options: Record<string, unknown>, ci: boolean): boolean {
-  return !ci && noticeCommands.has(command) && !options.json && !options.outputText
+export function shouldEvaluateSetupNotice(command: string, options: Record<string, unknown>): boolean {
+  return noticeCommands.has(command) && !options.json && !options.outputText
     && !options.quiet && !options.silent && !options.format
 }
 

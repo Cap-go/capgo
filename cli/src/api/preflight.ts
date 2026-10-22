@@ -1,5 +1,6 @@
 import type { CapgoClient } from '../utils'
 import { log } from '@clack/prompts'
+import { renderGitHubNotice } from '../onboarding/github-notice'
 import { markTrialNoticeShown } from '../onboarding/trial-notice-state'
 import { formatPlanRequiredMessage } from '../shared/direct-offer'
 import { CliUserError } from '../shared/cli-user-error'
@@ -220,7 +221,9 @@ export async function runCliPreflight(
   printWarnings(data?.warnings ?? [])
   if (result.trialDaysLeft !== null && options.warnTrial !== false) {
     const orgId = result.orgId ?? request.orgId
-    log.warn(`WARNING !!\nTrial expires in ${result.trialDaysLeft} days, upgrade here: ${await plansUrl(orgId)}\n`)
+    const message = `WARNING !!\nTrial expires in ${result.trialDaysLeft} days, upgrade here: ${await plansUrl(orgId)}\n`
+    if (!renderGitHubNotice(message))
+      log.warn(message)
     if (orgId)
       markTrialNoticeShown(orgId)
   }
