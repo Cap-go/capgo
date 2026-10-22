@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 process.env.CAPGO_DISABLE_POSTHOG = '1'
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import fs, { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -91,11 +91,17 @@ await test('GitHub Actions publishes the existing preflight trial warning to bot
   const dir = mkdtempSync(join(tmpdir(), 'capgo-plan-notice-'))
   const previous = { github: process.env.GITHUB_ACTIONS, summary: process.env.GITHUB_STEP_SUMMARY }
   const write = process.stdout.write
+  const writeSync = fs.writeSync
   let output = ''
   try {
     process.env.GITHUB_ACTIONS = 'true'
     process.env.GITHUB_STEP_SUMMARY = join(dir, 'summary.md')
     process.stdout.write = chunk => { output += chunk; return true }
+    fs.writeSync = (fd, buffer, offset, length) => {
+      if (fd !== 1) return writeSync(fd, buffer, offset, length)
+      output += buffer.subarray(offset, offset + length).toString()
+      return length
+    }
     fetchHandler = () => Response.json({ ...okBody, trial_days_left: 3 })
     await checkPlanValidUpload(makeClient(), 'org-id', 'com.example.app')
     assert(output.includes('::notice::WARNING !!%0ATrial expires in 3 days, upgrade here:'), output)
@@ -107,6 +113,7 @@ await test('GitHub Actions publishes the existing preflight trial warning to bot
   }
   finally {
     process.stdout.write = write
+    fs.writeSync = writeSync
     if (previous.github === undefined) delete process.env.GITHUB_ACTIONS
     else process.env.GITHUB_ACTIONS = previous.github
     if (previous.summary === undefined) delete process.env.GITHUB_STEP_SUMMARY
@@ -121,11 +128,17 @@ await test('preflight trial reminders honor every machine-output guard in GitHub
   const summaryPath = join(dir, 'summary.md')
   writeFileSync(summaryPath, 'Existing summary\n')
   const write = process.stdout.write
+  const writeSync = fs.writeSync
   let output = ''
   try {
     process.env.GITHUB_ACTIONS = 'true'
     process.env.GITHUB_STEP_SUMMARY = summaryPath
     process.stdout.write = chunk => { output += chunk; return true }
+    fs.writeSync = (fd, buffer, offset, length) => {
+      if (fd !== 1) return writeSync(fd, buffer, offset, length)
+      output += buffer.subarray(offset, offset + length).toString()
+      return length
+    }
     fetchHandler = () => Response.json({ ...okBody, org_id: 'machine-output-org', trial_days_left: 3 })
     for (const github of ['false', 'true']) {
       process.env.GITHUB_ACTIONS = github
@@ -147,6 +160,7 @@ await test('preflight trial reminders honor every machine-output guard in GitHub
   }
   finally {
     process.stdout.write = write
+    fs.writeSync = writeSync
     setNoticeOutputOptions({})
     if (previous.github === undefined) delete process.env.GITHUB_ACTIONS
     else process.env.GITHUB_ACTIONS = previous.github

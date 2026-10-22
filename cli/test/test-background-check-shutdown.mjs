@@ -37,9 +37,10 @@ beforeAll(async () => {
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
-function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, github = false, summaryPath = '', noticeWriteFailure = false, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, earlyCompletion = false, immediateCompletion = false, waitForWorkers = false, trialAlreadyShown = false, debug = false, columns = 80, colorEnv = {} } = {}) {
+function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tty, stdoutTty = tty, ci = false, github = false, summaryPath = '', noticeWriteFailure = false, noticeWriteChunkSize = 0, priorFlushMs = 0, workers = ['busy.mjs'], foregroundMs = 0, previousInterrupt = false, telemetry = 'ok', disabled = false, controlledClock = false, earlyCompletion = false, immediateCompletion = false, waitForWorkers = false, trialAlreadyShown = false, debug = false, columns = 80, colorEnv = {} } = {}) {
   const source = `
     import assert from 'node:assert/strict'
+    import fs from 'node:fs'
     import { performance } from 'node:perf_hooks'
     import FakeTimers from ${JSON.stringify(import.meta.resolve('@sinonjs/fake-timers'))}
     import { setImmediate as nextTurn } from 'node:timers/promises'
@@ -70,11 +71,14 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
       for (const [worker] of checks) worker.ref()
       await Promise.all(checks.map(([, check]) => check.completion))
     }
-    if (${noticeWriteFailure}) {
-      const write = process.stdout.write.bind(process.stdout)
-      process.stdout.write = (chunk, ...args) => {
-        if (String(chunk).startsWith('::notice::')) throw new Error('synthetic notice write failure')
-        return write(chunk, ...args)
+    let noticeWriteCalls = 0
+    if (${noticeWriteFailure || noticeWriteChunkSize > 0}) {
+      const write = fs.writeSync
+      fs.writeSync = (fd, buffer, offset, length) => {
+        if (fd !== 1) return write(fd, buffer, offset, length)
+        noticeWriteCalls++
+        if (${noticeWriteFailure}) throw new Error('synthetic notice write failure')
+        return write(fd, buffer, offset, Math.min(length, ${noticeWriteChunkSize}))
       }
     }
     console.log('pending-attempts:' + JSON.stringify([...getPendingOnboardingChecks().values()].map(check => check.attemptId)))
@@ -90,7 +94,7 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
     const now = ${controlledClock} ? Date.now : () => performance.now()
     const started = now()
     let finished = false
-    const completion = waitForOnboardingChecks(command, ${JSON.stringify(commandPath)}).then(() => { finished = true })
+    const completion = waitForOnboardingChecks(command, ${JSON.stringify(commandPath)}, Date.now() - ${priorFlushMs}).then(() => { finished = true })
     if (${immediateCompletion}) {
       await completion
       assert.equal(finished, true, 'shutdown must finish without advancing the clock')
@@ -123,7 +127,7 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
         await Promise.all(checks.map(([, check]) => check.completion))
       }
       await nextTurn()
-      clock.tick(4_999)
+      clock.tick(${4999 - priorFlushMs})
       await nextTurn()
       assert.equal(finished, false, 'shutdown completed before the shared deadline')
       clock.tick(1)
@@ -136,6 +140,7 @@ function run({ commandPath = 'app list', options = {}, tty = true, stdinTty = tt
       await completion
     }
     console.log('foreground-finished:' + Math.round(now() - started))
+    if (${noticeWriteChunkSize > 0}) assert.ok(noticeWriteCalls > 1, 'exercise partial annotation writes')
     if (${controlledClock}) clock.uninstall()
   `
   const runner = join(dir, `run-${++runnerCount}.mjs`)
@@ -431,4 +436,17 @@ test.concurrent('GitHub annotation write failure falls back to the existing setu
   assert.doesNotMatch(result.output, /^::notice::/m)
   assert.match(result.text, /Finish setting up live updates/)
   assert.match(result.text, /Continue your checklist/)
+}, 12_000)
+
+
+test.concurrent('pre-wait analytics draining shares the same five-second shutdown deadline', async () => {
+  const result = await run({ ci: true, tty: false, priorFlushMs: 2_000, controlledClock: true }).completion
+  assert.equal(waitedMs(result), 3_000, 'two seconds of analytics draining leave three seconds for checks')
+}, 12_000)
+
+test.concurrent('GitHub annotations finish partial writes before suppressing the terminal fallback', async () => {
+  const result = await run({ commandPath: 'bundle list', ci: true, tty: false, github: true, noticeWriteChunkSize: 7, workers: ['notice.mjs'], waitForWorkers: true }).completion
+  assert.equal(result.code, 0, result.text)
+  assert.match(result.output, /^::notice::Finish setting up live updates.*Continue your checklist\n/m)
+  assert.equal((result.text.match(/Finish setting up live updates/g) ?? []).length, 1)
 }, 12_000)

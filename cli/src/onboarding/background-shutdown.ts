@@ -105,8 +105,7 @@ function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPa
   }
 }
 
-export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGlobals'>, commandPath: string): Promise<void> {
-  const started = Date.now()
+export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGlobals'>, commandPath: string, started = Date.now()): Promise<void> {
   const pendingChecks = getPendingOnboardingChecks()
   setupDebug('shutdown entered', { pending_workers: pendingChecks.size, stdin_tty: !!process.stdin.isTTY, stdout_tty: !!process.stdout.isTTY, ci: isCI })
   if (!shouldWaitForOnboardingChecks(commandPath, command.optsWithGlobals()) || pendingChecks.size === 0) {
@@ -116,12 +115,13 @@ export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGl
     return
   }
 
+  const remainingMs = Math.max(0, gracePeriodMs - (Date.now() - started))
   let timer: ReturnType<typeof setTimeout> | undefined
   const onInterrupt = () => process.exit(130)
   // Take precedence over any command-specific cancellation handler still attached.
   process.prependOnceListener('SIGINT', onInterrupt)
   try {
-    setupDebug('shutdown wait started', { budget_ms: gracePeriodMs })
+    setupDebug('shutdown wait started', { budget_ms: remainingMs })
     if (!isCI)
       box(`${setupStyle(['bold', 'cyan'], 'Checking your setup...')}\n\n${setupStyle('dim', 'Press Ctrl+C to skip.')}`, '', setupBoxOptions)
     const checks = [...pendingChecks.values()]
@@ -140,13 +140,13 @@ export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGl
       },
     })
     await Promise.race([
-      Promise.allSettled([...checks.map(check => check.completion), flushAnalytics(gracePeriodMs)]),
+      Promise.allSettled([...checks.map(check => check.completion), flushAnalytics(remainingMs)]),
       new Promise<void>((resolve) => {
         // This timer keeps the process alive while the workers remain unreferenced.
         timer = setTimeout(() => {
           setupDebug('shutdown deadline reached', { pending_workers: pendingChecks.size })
           resolve()
-        }, gracePeriodMs)
+        }, remainingMs)
       }),
     ])
   }
