@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test'
+import process from 'node:process'
 import { APP_ONBOARDING_OTA_V1_STEP_IDS } from '../src/services/appOnboarding'
 import { BUILDER_STEP_IDS } from '../src/services/builderOnboardingChecklist'
 
@@ -9,6 +10,69 @@ export interface VisualDiffRoute {
   auth?: boolean
   /** Optional deterministic UI setup before the screenshot is captured. */
   prepare?: (page: Page) => Promise<void>
+}
+
+async function prepareProfileGoalScreenshot(page: Page, completed = false) {
+  const assignments = {}
+  let profile: Record<string, unknown> | undefined
+  await page.route('**/private/onboarding_ab_tests', route => route.fulfill({ json: { assignments } }))
+  await page.route('**/rest/v1/rpc/get_orgs_v7', route => route.fulfill({ json: [] }))
+  await page.route('**/rest/v1/users?*', async (route) => {
+    // Welcome persists a draft before opening About you. Keep those writes local
+    // instead of returning an empty conditional-update result or altering seed data.
+    if (route.request().method() === 'PATCH' && profile) {
+      Object.assign(profile, route.request().postDataJSON())
+      return route.fulfill({ json: [profile] })
+    }
+    if (route.request().method() !== 'GET')
+      return route.fulfill({ json: [] })
+    if (profile)
+      return route.fulfill({ json: [profile] })
+    const response = await route.fetch()
+    const json = await response.json()
+    const row = Array.isArray(json) ? json[0] : json
+    if (!row)
+      throw new Error('The visual profile fixture requires an existing test user')
+    profile = {
+      ...row,
+      first_name: completed ? 'Example' : '',
+      last_name: completed ? 'User' : '',
+      onboarding: {
+        abtests: assignments,
+        version: 6,
+        ...(completed ? { profile_completed_at: '2026-10-20T11:00:00.000Z' } : {}),
+      },
+    }
+    await route.fulfill({ response, json: [profile] })
+  })
+  await page.reload()
+  const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
+  const goal = page.locator('[data-test="onboarding-intent-ota"]')
+  const name = page.locator('[data-test="onboarding-name-step"]')
+  await welcome.or(goal).or(name).waitFor()
+  if (await name.isVisible())
+    return
+  if (await welcome.isVisible())
+    await welcome.click()
+  await name.or(goal).waitFor()
+  if (await name.isVisible())
+    return
+  await goal.click()
+}
+
+async function prepareProfileResumeScreenshot(page: Page) {
+  await prepareProfileGoalScreenshot(page)
+  const firstName = page.locator('[data-test="onboarding-first-name"]')
+  // The base branch can still show Your goal without a separate name page.
+  if (!await firstName.isVisible())
+    return
+  const saved = page.waitForResponse(response => response.request().method() === 'PATCH'
+    && response.url().includes('/rest/v1/users?')
+    && response.request().postDataJSON()?.onboarding?.profile_draft?.first_name === 'Example')
+  await firstName.fill('Example')
+  await saved
+  await page.reload()
+  await page.locator('[data-test="onboarding-name-step"]').or(page.locator('[data-test="onboarding-resume-continue"]')).waitFor()
 }
 
 const nativeObserveDays = ['2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28', '2026-09-29', '2026-09-30']
@@ -191,7 +255,38 @@ async function mockReleaseLive(page: Page) {
  * Console pages captured for before/after visual diffs.
  * Add routes here when a PR touches a new screen reviewers should compare.
  */
+function visualTrialPlan(scheduled: boolean) {
+  return {
+    planName: 'Solo',
+    productId: 'prod_LQIregjtNduh4q',
+    amount: 1400,
+    currency: 'usd',
+    interval: 'month',
+    startsAt: '2026-10-30T00:00:00.000Z',
+    scheduled,
+  }
+}
+
+function visualTrialPlanOptions() {
+  return [
+    { productId: 'prod_LQIregjtNduh4q', planName: 'Solo', amount: 1400, currency: 'usd' },
+    { productId: 'prod_LQIs1Yucml9ChU', planName: 'Maker', amount: 3900, currency: 'usd' },
+    { productId: 'prod_LQIugvJcPrxhda', planName: 'Team', amount: 9900, currency: 'usd' },
+  ]
+}
+
 export const visualDiffRoutes: VisualDiffRoute[] = [
+  {
+    slug: 'builds-empty',
+    path: '/app/com.demo.app/builds',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/rest/v1/build_requests?*', route => route.fulfill({ json: [], headers: { 'content-range': '*/0' } }))
+      await page.route('**/app/com.demo.app/onboarding/builder', route => route.fulfill({ json: { canEnable: true } }))
+      await page.reload()
+      await page.locator('[data-test="builder-introduction"]').or(page.getByRole('heading', { name: 'Start a native build', exact: true })).first().waitFor({ state: 'visible' })
+    },
+  },
   ...[
     { slug: 'onboarding-dual-goals', progress: null },
     { slug: 'onboarding-dual-live-updates', progress: 'ota' },
@@ -231,11 +326,225 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.goto('/app/com.demo.app/getting-started')
       await page.locator('[data-test="dual-onboarding-checklists"], [data-test="builder-checklist"]').first().waitFor()
       if (progress === 'builder')
-        await page.locator('[data-test="builder-step-start_setup"][data-status="done"]').waitFor()
+        await page.locator('[data-test="builder-step-start_setup"][data-status="done"]').waitFor({ state: 'attached' })
+    },
+  })),
+  // Out-of-order setup: a later step is done while an earlier one is still open.
+  ...[
+    { slug: 'onboarding-ota-passed-over-step', path: 'ota' as const },
+    { slug: 'onboarding-builder-passed-over-step', path: 'builder' as const },
+  ].map(({ slug, path }): VisualDiffRoute => ({
+    slug,
+    path: '/apps',
+    auth: true,
+    prepare: async (page) => {
+      const onboarding = { setup: {
+        todo_list_version: 4,
+        ...(path === 'ota' ? { ota_todo_list_version: '1' } : { builder_todo_list_version: '1', selected_builder_platform: 'android' }),
+        paths: [path],
+        selected_path: path,
+        source: 'manual',
+        outcome: 'in_progress',
+        steps: path === 'ota'
+          ? { ota: Object.fromEntries(APP_ONBOARDING_OTA_V1_STEP_IDS.map(id => [id, { status: id === 'add_channel' ? 'done' : 'pending' }])) }
+          : { builder: Object.fromEntries((['ios', 'android'] as const).map(platform => [platform, Object.fromEntries(BUILDER_STEP_IDS[platform].map(id => [id, { status: platform === 'android' && id === 'prepare_keystore' ? 'done' : 'pending' }]))])) },
+      } }
+      await page.route('**/rest/v1/apps?*', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json().catch(() => null)
+        const matchesApp = new URL(route.request().url()).searchParams.get('app_id') === 'eq.com.demo.app'
+        const override = (row: any) => row?.app_id === 'com.demo.app' || (matchesApp && row?.onboarding !== undefined)
+          ? { ...row, need_onboarding: true, onboarding }
+          : row
+        await route.fulfill({ response, json: Array.isArray(json) ? json.map(override) : override(json) })
+      })
+      await page.route('**/rpc/verify_getting_started', route => route.fulfill({ json: onboarding }))
+      await page.route('**/private/onboarding_progress', route => route.fulfill({ json: { onboarding, hasChannel: path === 'ota', checkErrors: [] } }))
+      // Tall viewport so the passed-over banner + task panel + Skip button fit in one frame.
+      await page.setViewportSize({ width: 1280, height: 1500 })
+      await page.goto('/app/com.demo.app/getting-started')
+      await page.locator(path === 'ota' ? '[data-test="onboarding-setup-cli"]' : '[data-test="builder-step-prepare_keystore"][data-status="done"]').first().waitFor({ state: 'attached' })
     },
   })),
   { slug: 'login', path: '/login/', auth: false },
+  { slug: 'register', path: '/register/', auth: false },
+  {
+    slug: 'register-mobile',
+    path: '/register/',
+    auth: false,
+    prepare: page => page.setViewportSize({ width: 390, height: 844 }),
+  },
+  {
+    slug: 'onboarding-profile-goal',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: page => prepareProfileGoalScreenshot(page),
+  },
+  {
+    slug: 'onboarding-profile-goal-mobile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await prepareProfileGoalScreenshot(page)
+    },
+  },
+  {
+    slug: 'onboarding-profile-resume',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: prepareProfileResumeScreenshot,
+  },
+  {
+    slug: 'onboarding-profile-resume-mobile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await prepareProfileResumeScreenshot(page)
+    },
+  },
+  {
+    slug: 'onboarding-profile-intent',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: page => prepareProfileGoalScreenshot(page, true),
+  },
+  {
+    slug: 'onboarding-profile-intent-mobile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.setViewportSize({ width: 390, height: 844 })
+      await prepareProfileGoalScreenshot(page, true)
+    },
+  },
+  {
+    slug: 'onboarding-organization-profile-legacy',
+    path: '/onboarding/organization?source=org-switcher',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/rest/v1/users?*', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json()
+        const profile = (row: any) => ({ ...row, first_name: '', last_name: '', onboarding: { ...row.onboarding, version: 6 } })
+        await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
+      })
+      await page.reload()
+      await page.locator('[data-test="onboarding-intent-ota"]').click()
+      await page.locator('[data-test="onboarding-mode-name"]').click()
+      await page.locator('[data-test="onboarding-org-name"]').scrollIntoViewIfNeeded()
+    },
+  },
+  {
+    slug: 'onboarding-organization-profile',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/rest/v1/users?*', async (route) => {
+        if (route.request().method() !== 'GET')
+          return route.fulfill({ json: [] })
+        const response = await route.fetch()
+        const json = await response.json()
+        const profile = (row: any) => ({ ...row, first_name: 'Example', last_name: 'User', onboarding: { profile_completed_at: '2026-10-20T10:00:00.000Z' } })
+        await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
+      })
+      await page.reload()
+      // Base captures predate the required name step and still open on the legacy welcome canvas.
+      const welcome = page.locator('[data-test="onboarding-welcome-continue"]')
+      const otaIntent = page.locator('[data-test="onboarding-intent-ota"]')
+      await welcome.or(otaIntent).waitFor()
+      if (await welcome.isVisible())
+        await welcome.click()
+      await otaIntent.click()
+      await page.locator('[data-test="app-onboarding-continue-intent"]').click()
+      const assistant = page.locator('[data-test="onboarding-development-environment-ai_assistant"]')
+      const appName = page.locator('[data-test="app-onboarding-name"]')
+      await assistant.or(appName).waitFor()
+      if (await assistant.isVisible()) {
+        await assistant.click()
+        await page.locator('[data-test="app-onboarding-continue-development-environment"]').click()
+      }
+      await appName.fill('Example App')
+      await page.locator('[data-test="app-onboarding-continue"]').click()
+      await page.locator('[data-test="app-onboarding-continue"]').click()
+      await page.locator('[data-test="onboarding-org-name"]').waitFor()
+    },
+  },
   { slug: 'dashboard', path: '/dashboard', auth: true },
+  {
+    slug: 'dashboard-trial-card-prompt',
+    path: '/dashboard',
+    auth: true,
+    prepare: async (page) => {
+      // Trial org whose first device just installed an update, with no card on file yet.
+      await page.route('**/private/config', route => route.fulfill({ json: { stripeEnabled: true } }))
+      await page.route('**/rest/v1/rpc/get_orgs_v7', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json().catch(() => null)
+        const rows = Array.isArray(json) ? json.map(org => ({ ...org, paying: false, trial_left: 9 })) : json
+        await route.fulfill({ response, json: rows })
+      })
+      await page.route('**/rest/v1/apps?*', async (route) => {
+        const response = await route.fetch()
+        const json = await response.json().catch(() => null)
+        const withOtaSuccess = (row: any) => row?.app_id === 'com.demo.app' && row?.onboarding !== undefined
+          ? { ...row, onboarding: { ...row.onboarding, features: { ...row.onboarding?.features, ota: { started_at: '2026-10-20T09:00:00.000Z', succeeded_at: '2026-10-20T10:00:00.000Z' } } } }
+          : row
+        await route.fulfill({ response, json: Array.isArray(json) ? json.map(withOtaSuccess) : withOtaSuccess(json) })
+      })
+      let promptRequested = false
+      await page.route('**/private/stripe_billing/trial-plan', (route) => {
+        promptRequested = true
+        return route.fulfill({ json: { card: null, plan: visualTrialPlan(false), plans: visualTrialPlanOptions() } })
+      })
+      await page.reload()
+      const prompt = page.locator('[data-test="trial-card-prompt-add"]')
+      // The base branch has no prompt: capture the plain dashboard there. The head (after)
+      // capture, or any build that asked for the trial plan, must render it or fail.
+      if (process.env.VISUAL_DIFF_PHASE === 'after') {
+        await prompt.waitFor({ timeout: 15_000 })
+        return
+      }
+      await prompt.waitFor({ timeout: 15_000 }).catch(() => {})
+      if (promptRequested)
+        await prompt.waitFor({ timeout: 5_000 })
+    },
+  },
+  {
+    slug: 'org-billing-trial-plan-offer',
+    path: '/settings/organization/billing',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/private/stripe_billing/overview', route => route.fulfill({ json: {
+        publishableKey: '',
+        card: { id: 'pm_visual', brand: 'visa', last4: '4242', expMonth: 12, expYear: 2030 },
+        subscription: null,
+        invoices: [],
+        openInvoice: null,
+        trialPlan: visualTrialPlan(false),
+      } }))
+      await page.reload()
+      await page.locator('[data-test="billing-subscription"]').waitFor()
+    },
+  },
+  {
+    slug: 'org-billing-trial-plan-scheduled',
+    path: '/settings/organization/billing',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/private/stripe_billing/overview', route => route.fulfill({ json: {
+        publishableKey: '',
+        card: { id: 'pm_visual', brand: 'visa', last4: '4242', expMonth: 12, expYear: 2030 },
+        subscription: null,
+        invoices: [],
+        openInvoice: null,
+        trialPlan: visualTrialPlan(true),
+      } }))
+      await page.reload()
+      await page.locator('[data-test="billing-subscription"]').waitFor()
+    },
+  },
   { slug: 'account-settings', path: '/settings/account', auth: true },
   {
     slug: 'email-verification-send',
@@ -473,6 +782,19 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       const appOnlyScope = page.locator('[data-test="create-key-app-only-scope"]')
       if (await appOnlyScope.count())
         await appOnlyScope.check()
+    },
+  },
+  {
+    slug: 'api-keys-secure-column',
+    path: '/apikeys',
+    auth: true,
+    prepare: async (page) => {
+      const createKey = page.locator('[data-test="create-key"]')
+      await createKey.waitFor({ state: 'visible', timeout: 30_000 })
+      // Seed includes hashed + plain keys for test@capgo.app — wait for the table body.
+      await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 30_000 })
+      const hashed = page.getByLabel('Secure key (hidden)').or(page.getByText('Secure key (hidden)'))
+      await hashed.first().waitFor({ state: 'visible', timeout: 30_000 })
     },
   },
 ]

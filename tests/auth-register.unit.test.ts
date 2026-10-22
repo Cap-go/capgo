@@ -7,6 +7,7 @@ const {
   signUpMock,
   usersUpsertMock,
   deleteUserMock,
+  updateUserByIdMock,
   usersDeleteMock,
 } = vi.hoisted(() => ({
   getEnvMock: vi.fn((_c: unknown, key: string) => {
@@ -32,6 +33,7 @@ const {
   })),
   usersUpsertMock: vi.fn(async () => ({ error: null })),
   deleteUserMock: vi.fn(async () => ({ error: null })),
+  updateUserByIdMock: vi.fn<(id: string, attributes: unknown) => Promise<{ error: Error | null }>>(async () => ({ error: null })),
   usersDeleteMock: vi.fn(async () => ({ error: null })),
 }))
 
@@ -65,6 +67,7 @@ vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
     auth: {
       admin: {
         deleteUser: deleteUserMock,
+        updateUserById: updateUserByIdMock,
       },
     },
   }),
@@ -93,14 +96,18 @@ describe('pOST /auth/register unit', () => {
     vi.clearAllMocks()
   })
 
-  it('requires captcha when CAPTCHA_SECRET_KEY is configured', async () => {
+  it.each([
+    { label: 'names supplied', names: {} },
+    { label: 'both names omitted', names: { first_name: undefined, last_name: undefined } },
+  ])('requires captcha when CAPTCHA_SECRET_KEY is configured ($label)', async ({ names }) => {
     const response = await postRegister({
       ...validBody,
+      ...names,
       captcha_token: undefined,
     })
     expect(response.status).toBe(422)
-    const body = await response.json() as { error: string }
-    expect(body.error).toBe('captcha_failed')
+    expect(await response.json()).toMatchObject({ error: 'captcha_failed' })
+    expect(rpcMock).not.toHaveBeenCalled()
     expect(signUpMock).not.toHaveBeenCalled()
   })
 
@@ -118,6 +125,30 @@ describe('pOST /auth/register unit', () => {
         },
       },
     })
+  })
+
+  it('stores offer=direct in server-only app metadata before creating the profile', async () => {
+    const response = await postRegister({ ...validBody, offer: 'direct' })
+    expect(response.status).toBe(200)
+    expect(updateUserByIdMock).toHaveBeenCalledWith('11111111-1111-1111-1111-111111111111', { app_metadata: { offer: 'direct' } })
+    expect(updateUserByIdMock.mock.invocationCallOrder[0]).toBeLessThan(usersUpsertMock.mock.invocationCallOrder[0])
+    const signUpOptions = (signUpMock.mock.calls[0] as unknown as [{ options: { data: Record<string, unknown> } }])[0].options
+    expect(signUpOptions.data).not.toHaveProperty('offer')
+  })
+
+  it('ignores any other offer value', async () => {
+    const response = await postRegister({ ...validBody, offer: 'Direct' })
+    expect(response.status).toBe(200)
+    expect(updateUserByIdMock).not.toHaveBeenCalled()
+  })
+
+  it('rolls back the signup when the direct offer cannot be stored', async () => {
+    updateUserByIdMock.mockResolvedValueOnce({ error: new Error('auth unavailable') })
+    const response = await postRegister({ ...validBody, offer: 'direct' })
+    expect(response.status).toBe(500)
+    expect(await response.json()).toMatchObject({ error: 'registration_failed' })
+    expect(usersUpsertMock).not.toHaveBeenCalled()
+    expect(deleteUserMock).toHaveBeenCalledWith('11111111-1111-1111-1111-111111111111')
   })
 
   it.each([
@@ -172,19 +203,6 @@ describe('pOST /auth/register unit', () => {
     expect(rpcMock).not.toHaveBeenCalled()
     expect(signUpMock).not.toHaveBeenCalled()
     expect(usersUpsertMock).not.toHaveBeenCalled()
-  })
-
-  it('still requires captcha when both names are omitted', async () => {
-    const response = await postRegister({
-      ...validBody,
-      first_name: undefined,
-      last_name: undefined,
-      captcha_token: undefined,
-    })
-    expect(response.status).toBe(422)
-    expect(await response.json()).toMatchObject({ error: 'captcha_failed' })
-    expect(rpcMock).not.toHaveBeenCalled()
-    expect(signUpMock).not.toHaveBeenCalled()
   })
 
   it.each(['password', 'Password!', 'Password123', 'PASSWORD123!', ''])('still rejects weak passwords without names: %j', async (password) => {

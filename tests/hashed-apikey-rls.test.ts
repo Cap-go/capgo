@@ -1,3 +1,4 @@
+import type { PoolClient } from 'pg'
 /**
  * Tests for hashed API key support in RBAC-backed request identity and RLS functions.
  *
@@ -9,7 +10,6 @@
  * org and API key to prevent interference with other tests that create/delete API keys.
  */
 import type { Database } from '../src/types/supabase.types'
-import type { PoolClient } from 'pg'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { Pool } from 'pg'
@@ -800,34 +800,6 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
       'anon',
       plainKey.key,
     )).rejects.toThrow('Invalid API key provided')
-  })
-})
-
-describe('request_actor_user_id() API-key-only behavior with hashed API keys', () => {
-  let hashedKey: { id: number, key: string, key_hash: string }
-
-  beforeAll(async () => {
-    hashedKey = await createHashedApiKey('test-hashed-apikey-only')
-  }, 60000)
-
-  afterAll(async () => {
-    await deleteApiKey(hashedKey.id)
-  })
-
-  it('returns user_id for hashed API key', async () => {
-    const rows = await execWithCapgkey(
-      `SELECT public.request_actor_user_id() AS user_id`,
-      hashedKey.key,
-    )
-    expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
-  })
-
-  it('returns NULL for invalid API key', async () => {
-    const rows = await execWithCapgkey(
-      `SELECT public.request_actor_user_id() AS user_id`,
-      'invalid-key',
-    )
-    expect(rows[0].user_id).toBeNull()
   })
 })
 

@@ -45,8 +45,11 @@ async function cancelTimedOutBuilderJob(c: Context, jobId: string, appId: string
     const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs/${jobId}/cancel`, {
       method: 'POST',
       headers: {
+        'Content-Type': 'application/json',
         'x-api-key': getEnv(c, 'BUILDER_API_KEY'),
       },
+      // The builder logs why the build stopped instead of "cancelled by user".
+      body: JSON.stringify({ app_id: appId, reason: 'timeout' }),
       signal: controller.signal,
     })
 

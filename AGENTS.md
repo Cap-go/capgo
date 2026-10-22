@@ -119,10 +119,13 @@ testing against Cloudflare Workers.
 
 ### Code Quality
 
-- `bun lint` - Lint Vue, TypeScript, and JavaScript files
+- `bun lint` - Lint Vue, TypeScript, and JavaScript files in `src`: oxlint
+  (`.oxlintrc.frontend.json`, the @antfu/eslint-config rule set plus
+  `oxlint-plugin-vize` for templates), then ESLint on `.vue` files only for the
+  template rules oxlint cannot cover yet (allowlist in `eslint.config.js`)
 - `bun lint:fix` - Auto-fix linting issues
 - `bun lint:backend` - Lint Supabase backend files
-- `bun typecheck` - Run TypeScript type checking with vue-tsc
+- `bun typecheck` - Type-check the CLI and backend with TypeScript 7 `tsc`, and the frontend with vue-tsc
 - `bun types` - Generate TypeScript types from Supabase
 
 ### Database and Backend
@@ -466,6 +469,14 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 - Path aliases: `~/` maps to `src/`
 - Auto-generated types for Vue components and routes
 - Supabase types auto-generated via CLI
+- TypeScript 7 layout (official dual install): `@typescript/native` is
+  `npm:typescript@7.x` and provides `tsc`; `typescript` is aliased to
+  `@typescript/typescript6` so tools that need the classic JS API (vue-tsc,
+  typescript-eslint, eslint-plugin-perfectionist) keep working. Do not point
+  `typescript` at 7.x until those tools support it. `bunfig.toml` uses the
+  hoisted linker so undeclared `typescript` imports resolve to the 6 API.
+- `cli` keeps a real `typescript@6` runtime dependency: the published CLI uses
+  its compiler API to load users' `capacitor.config.ts`.
 
 ### Comments
 
@@ -1255,27 +1266,6 @@ can read them), and app transfers count MAU for each org. These are intentional
 anti-fraud behaviors documented in
 [docs/billing-usage-retention.md](docs/billing-usage-retention.md). Do not
 change them without a product decision.
-
-## Graphify
-
-The project-scoped Graphify skill lives at `.agents/skills/graphify/SKILL.md`.
-Use it for questions about architecture, file relationships, dead code, used
-code, and where code is used.
-
-Rules:
-- When the user types `/graphify`, follow the project skill before doing
-  anything else.
-- `graphify-out/graph.json` is committed and refreshed by a
-  `chore(auto-sync)` commit after each release. Prefer `graphify query "<question>"`, `graphify affected "<node>"`,
-  `graphify path "<A>" "<B>"`, or `graphify explain "<concept>"` before broad
-  source searches.
-- Use `bun run graphify:generate` to refresh the committed code graph. The
-  generator is deterministic AST/code extraction and does not require LLM API
-  keys.
-- For deterministic unused export checks, keep using `bun run lint:deadcode`
-  alongside Graphify's graph queries.
-- After code changes that should update the repository graph, run
-  `bun run graphify:generate` and commit the resulting `graphify-out/` changes.
 
 ## Cursor Cloud specific instructions
 

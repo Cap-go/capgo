@@ -8,11 +8,13 @@ import {
   BillingAccountUnavailableError,
   getBillingAccountForCustomer,
   getPlanPriceId,
+  getStripePublishableKey,
   getStripeSecretKey,
   isAutomaticTaxEnabled,
   isStripeConfiguredForAccount,
   planProductIdOrFilter,
   resolveCheckoutPlanProductId,
+  TRIAL_PLAN_SCHEDULE_METADATA_KEY,
 } from './stripe_billing.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv, isStripeConfigured, trimTrailingSlashes } from './utils.ts'
@@ -263,7 +265,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
 
     // Retrieve the specific subscription from Stripe
     const subscription = await stripeContext.stripe.subscriptions.retrieve(subscriptionId, {
-      expand: ['items.data.price'], // Correct expand path for retrieve
+      expand: ['items.data.price', 'latest_invoice'], // Correct expand path for retrieve
     })
 
     cloudlog({
@@ -280,10 +282,17 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
     const cycleEnd = stripeTimestampToIso(currentItem?.current_period_end)
     const canceledAt = getSubscriptionEndDate(subscription, currentItem)
 
+    // A trial plan subscription only converts once its first invoice is paid (see stripe_trial_plan.ts).
+    const latestInvoice = typeof subscription.latest_invoice === 'object' ? subscription.latest_invoice : null
+    const trialPlanFirstInvoiceUnpaid = subscription.metadata?.[TRIAL_PLAN_SCHEDULE_METADATA_KEY] === 'true'
+      && latestInvoice?.billing_reason === 'subscription_create'
+      && latestInvoice.status !== 'paid'
+
     return {
       productId,
       extraMau: getExtraMau(subscription.items.data),
       status: subscription.status,
+      trialPlanFirstInvoiceUnpaid,
       cycleStart,
       cycleEnd,
       canceledAt,
@@ -351,8 +360,13 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 
     if (subscriptionData) {
       if (subscriptionData.status === 'canceled') {
-        if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date())
+        // Paid access runs to period end, but a never-paid trial plan grants none.
+        if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date() && !subscriptionData.trialPlanFirstInvoiceUnpaid)
           dbStatus = 'succeeded'
+      }
+      else if (subscriptionData.trialPlanFirstInvoiceUnpaid) {
+        // Live in Stripe but never paid: keep the org non-paying, as the webhook does.
+        dbStatus = 'failed'
       }
       else if (subscriptionData.status === 'active' || subscriptionData.status === 'trialing' || subscriptionData.status === 'past_due') {
         dbStatus = 'succeeded'
@@ -420,7 +434,9 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 
 export type PortalFlow = 'cancel_subscription'
 
-async function getActiveSubscriptionId(c: Context, customerId: string) {
+// known is false on a stripe_info read error: the subscription may exist, so callers must not
+// treat null as "no subscription" for destructive work (e.g. spare-card detach).
+export async function lookupActiveSubscriptionId(c: Context, customerId: string) {
   const { data, error } = await supabaseAdmin(c)
     .from('stripe_info')
     .select('subscription_id, status')
@@ -428,11 +444,16 @@ async function getActiveSubscriptionId(c: Context, customerId: string) {
     .maybeSingle()
   if (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getActiveSubscriptionId', error })
-    return null
+    return { subscriptionId: null as string | null, known: false }
   }
   if (!data?.subscription_id || data.status === 'canceled' || data.status === 'deleted')
-    return null
-  return data.subscription_id
+    return { subscriptionId: null as string | null, known: true }
+  return { subscriptionId: data.subscription_id, known: true }
+}
+
+export async function getActiveSubscriptionId(c: Context, customerId: string) {
+  const { subscriptionId } = await lookupActiveSubscriptionId(c, customerId)
+  return subscriptionId
 }
 
 export async function createPortal(c: Context, customerId: string, callbackUrl: string, flow?: PortalFlow) {
@@ -610,6 +631,47 @@ export function isSubscriptionInvoice(invoice: Pick<OpenInvoiceShape, 'billing_r
   return typeof invoice.billing_reason === 'string' && invoice.billing_reason.startsWith('subscription')
 }
 
+// charge.failed fires for every charge, including credit auto top-ups and one-off
+// purchases. Only a failed subscription invoice says anything about the plan.
+// Errors propagate so the webhook is retried instead of guessing.
+// One webhook checks the same charge twice (subscription check, backup retry): look it up once.
+const chargeInvoiceLookups = new WeakMap<object, Promise<Stripe.Invoice | null>>()
+
+// The invoice a charge paid (or tried to pay), through its PaymentIntent.
+export function findInvoiceForCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
+  let lookup = chargeInvoiceLookups.get(charge)
+  if (!lookup) {
+    lookup = lookupInvoiceForCharge(stripe, charge)
+    chargeInvoiceLookups.set(charge, lookup)
+    // Errors must not stick: a retried webhook delivery parses a new charge object anyway.
+    lookup.catch(() => chargeInvoiceLookups.delete(charge))
+  }
+  return lookup
+}
+
+async function lookupInvoiceForCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
+  const paymentIntentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
+  if (!paymentIntentId)
+    return null
+  const payments = await stripe.invoicePayments.list({
+    payment: { type: 'payment_intent', payment_intent: paymentIntentId },
+    limit: 1,
+    expand: ['data.invoice'],
+  })
+  const invoice = payments.data[0]?.invoice
+  if (!invoice || typeof invoice === 'string' || invoice.deleted)
+    return null
+  return invoice
+}
+
+export async function isSubscriptionCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
+  // Legacy charges without a PaymentIntent keep the previous behavior.
+  if (!charge.payment_intent)
+    return true
+  const invoice = await findInvoiceForCharge(stripe, charge)
+  return !!invoice && isSubscriptionInvoice(invoice)
+}
+
 export function toOpenSubscriptionInvoiceSummary(invoice: OpenInvoiceShape): OpenSubscriptionInvoiceSummary {
   return {
     hosted_invoice_url: invoice.hosted_invoice_url ?? null,
@@ -622,17 +684,22 @@ export function toOpenSubscriptionInvoiceSummary(invoice: OpenInvoiceShape): Ope
   }
 }
 
+export async function findLatestOpenSubscriptionInvoice(c: Context, customerId: string, billingAccount: BillingAccount = 'ee'): Promise<Stripe.Invoice | null> {
+  // Stripe lists newest first; page past newer non-subscription invoices.
+  for await (const invoice of getStripe(c, billingAccount).invoices.list({ customer: customerId, status: 'open', limit: 10 })) {
+    if (isSubscriptionInvoice(invoice))
+      return invoice
+  }
+  return null
+}
+
 // Best effort: dunning emails and the past-due banner still work without the pay link.
 export async function getLatestOpenSubscriptionInvoice(c: Context, customerId: string, billingAccount: BillingAccount = 'ee'): Promise<OpenSubscriptionInvoiceSummary | null> {
   if (!isStripeConfiguredForAccount(c, billingAccount) || !customerId)
     return null
   try {
-    // Stripe lists newest first; page past newer non-subscription invoices.
-    for await (const invoice of getStripe(c, billingAccount).invoices.list({ customer: customerId, status: 'open', limit: 10 })) {
-      if (isSubscriptionInvoice(invoice))
-        return toOpenSubscriptionInvoiceSummary(invoice)
-    }
-    return null
+    const invoice = await findLatestOpenSubscriptionInvoice(c, customerId, billingAccount)
+    return invoice ? toOpenSubscriptionInvoiceSummary(invoice) : null
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getLatestOpenSubscriptionInvoice', customerId, billingAccount, error })
@@ -874,7 +941,51 @@ export interface ExtraMauCheckout {
   extraMau: number
 }
 
-export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string, datafastAttribution?: DatafastAttribution, affonsoReferral?: string | null, extraMau?: ExtraMauCheckout) {
+// Embedded sessions render inside Capgo; url is only set for the hosted fallback.
+export interface CheckoutSessionResult {
+  url: string | null
+  clientSecret?: string | null
+  publishableKey?: string
+  sessionId?: string
+}
+
+// The emulator only serves hosted pages, and Stripe.js needs the account's publishable key.
+function getEmbeddedCheckoutPublishableKey(c: Context, billingAccount: BillingAccount, embedded?: boolean) {
+  if (!embedded || isStripeEmulatorEnabled(c))
+    return ''
+  return getStripePublishableKey(c, billingAccount)
+}
+
+function getCheckoutRedirectParams(publishableKey: string, successUrl: string, cancelUrl: string): Pick<Stripe.Checkout.SessionCreateParams, 'ui_mode' | 'return_url' | 'redirect_on_completion' | 'success_url' | 'cancel_url'> {
+  if (!publishableKey)
+    return { success_url: successUrl, cancel_url: cancelUrl }
+  // Cards complete in place; redirect-based methods come back to the same success URL.
+  const separator = successUrl.includes('?') ? '&' : '?'
+  return {
+    ui_mode: 'embedded_page',
+    redirect_on_completion: 'if_required',
+    return_url: successUrl.includes('{CHECKOUT_SESSION_ID}') ? successUrl : `${successUrl}${separator}session_id={CHECKOUT_SESSION_ID}`,
+  }
+}
+
+function toCheckoutSessionResult(session: Stripe.Checkout.Session, publishableKey: string): CheckoutSessionResult {
+  if (!publishableKey)
+    return { url: session.url }
+  return { url: null, clientSecret: session.client_secret, publishableKey, sessionId: session.id }
+}
+
+export interface CheckoutOptions {
+  clientReferenceId?: string
+  attributionId?: string
+  datafastAttribution?: DatafastAttribution
+  affonsoReferral?: string | null
+  extraMau?: ExtraMauCheckout
+  // Embedded session rendered in Capgo instead of the hosted page.
+  embedded?: boolean
+}
+
+export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, options: CheckoutOptions = {}): Promise<CheckoutSessionResult> {
+  const { clientReferenceId, attributionId, datafastAttribution, affonsoReferral, extraMau, embedded } = options
   const billingAccount = await getBillingAccountForCustomer(c, customerId)
   assertBillingAccountReachableForUser(c, billingAccount, customerId)
   if (!isStripeConfiguredForAccount(c, billingAccount))
@@ -899,13 +1010,13 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
   }
   const allowedSuccessUrl = getAllowedRedirectUrl(c, successUrl, 'success_url')
   const allowedCancelUrl = getAllowedRedirectUrl(c, cancelUrl, 'cancel_url')
+  const publishableKey = getEmbeddedCheckoutPublishableKey(c, billingAccount, embedded)
   const session = await getStripe(c, billingAccount).checkout.sessions.create({
     allow_promotion_codes: true,
     billing_address_collection: 'auto',
     mode: 'subscription',
     customer: customerId,
-    success_url: `${allowedSuccessUrl}?success=true`,
-    cancel_url: allowedCancelUrl,
+    ...getCheckoutRedirectParams(publishableKey, `${allowedSuccessUrl}?success=true`, allowedCancelUrl),
     automatic_tax: { enabled: isAutomaticTaxEnabled(billingAccount) },
     client_reference_id: clientReferenceId,
     metadata: Object.keys(metadata).length ? metadata : undefined,
@@ -917,7 +1028,7 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
     saved_payment_method_options: CHECKOUT_SAVED_PAYMENT_METHOD_OPTIONS,
     line_items: lineItems,
   })
-  return { url: session.url }
+  return toCheckoutSessionResult(session, publishableKey)
 }
 
 async function listPricesByProduct(c: Context, productId: string, billingAccount: BillingAccount, active?: boolean) {
@@ -955,7 +1066,8 @@ export async function createOneTimeCheckout(
   clientReferenceId?: string,
   datafastAttribution?: DatafastAttribution,
   affonsoReferral?: string | null,
-) {
+  embedded?: boolean,
+): Promise<CheckoutSessionResult> {
   const billingAccount = await getBillingAccountForCustomer(c, customerId)
   assertBillingAccountReachableForUser(c, billingAccount, customerId)
   if (!isStripeConfiguredForAccount(c, billingAccount))
@@ -968,13 +1080,13 @@ export async function createOneTimeCheckout(
   const allowedSuccessUrl = getAllowedRedirectUrl(c, successUrl, 'success_url')
   const allowedCancelUrl = getAllowedRedirectUrl(c, cancelUrl, 'cancel_url')
   const successUrlWithFlag = allowedSuccessUrl.includes('?') ? `${allowedSuccessUrl}&success=true` : `${allowedSuccessUrl}?success=true`
+  const publishableKey = getEmbeddedCheckoutPublishableKey(c, billingAccount, embedded)
 
   const session = await getStripe(c, billingAccount).checkout.sessions.create({
     billing_address_collection: 'auto',
     mode: 'payment',
     customer: customerId,
-    success_url: successUrlWithFlag,
-    cancel_url: allowedCancelUrl,
+    ...getCheckoutRedirectParams(publishableKey, successUrlWithFlag, allowedCancelUrl),
     automatic_tax: { enabled: isAutomaticTaxEnabled(billingAccount) },
     client_reference_id: clientReferenceId,
     customer_update: {
@@ -1015,7 +1127,7 @@ export async function createOneTimeCheckout(
       ...getAffonsoReferralMetadata(affonsoReferral),
     },
   })
-  return { url: session.url }
+  return toCheckoutSessionResult(session, publishableKey)
 }
 
 export async function getCreditCheckoutDetails(c: Context, session: Stripe.Checkout.Session, expectedProductId: string, billingAccount: BillingAccount = 'ee'): Promise<CreditCheckoutDetails> {

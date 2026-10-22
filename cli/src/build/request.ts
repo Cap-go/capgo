@@ -67,7 +67,9 @@ import { appendInternalLog, getInternalLogPath, startInternalLog } from '../supp
 import { uploadSupportLogs } from '../support/support-upload.js'
 import { offerSupportUploadBeforeAi } from '../support/support-upload-prompt.js'
 import { buildCliRequestHeaders } from '../analytics/cli-headers'
-import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, trimTrailingSlashes, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
+import { isDirectOfferApp } from '../api/direct-offer'
+import { DIRECT_OFFER_PLAN_MESSAGE } from '../shared/direct-offer'
+import { assertCliPermission, canPromptInteractively, createCapgoClient, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, trimTrailingSlashes, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { getBuilderAppId } from './app-id'
 import { parseBuildEnv } from './build-env'
 import { syncAndroidVersion } from './android-version'
@@ -218,6 +220,7 @@ interface CapgoApiErrorBody {
   message?: string
   moreInfo?: {
     upgrade_url?: string
+    org_id?: string
     reason?: string
     activeBuilds?: number
     limit?: number
@@ -238,11 +241,12 @@ function parseCapgoApiErrorBody(errorText: string): CapgoApiErrorBody | null {
 }
 
 /** Surface plan / concurrency limit errors with a clear upgrade CTA, then throw. */
-async function throwIfBuildPlanLimitError(
+export async function throwIfBuildPlanLimitError(
   status: number,
   errorText: string,
   action: 'request' | 'start',
   logger: BuildLogger,
+  isDirectOffer?: () => Promise<boolean>,
 ): Promise<void> {
   if (status !== 429)
     return
@@ -254,10 +258,14 @@ async function throwIfBuildPlanLimitError(
 
   const config = await getRemoteConfig()
   const upgradeUrl = body?.moreInfo?.upgrade_url || `${config.hostWeb}/settings/organization/plans`
-  const message = body?.message
-    || (errorCode === 'native_build_concurrency_limit_exceeded'
-      ? `Native build concurrency limit reached for your plan. Upgrade here: ${upgradeUrl}`
-      : `Cannot ${action} native build, upgrade plan to continue: ${upgradeUrl}`)
+  // Orgs created without a free trial (direct offer) get "choose a plan" copy, not "upgrade".
+  const directOffer = errorCode === 'need_plan_upgrade' && !!isDirectOffer && await isDirectOffer()
+  const message = directOffer
+    ? `${DIRECT_OFFER_PLAN_MESSAGE} Choose a plan here: ${upgradeUrl}`
+    : body?.message
+      || (errorCode === 'native_build_concurrency_limit_exceeded'
+        ? `Native build concurrency limit reached for your plan. Upgrade here: ${upgradeUrl}`
+        : `Cannot ${action} native build, upgrade plan to continue: ${upgradeUrl}`)
 
   logger.error(message)
   if (!message.includes(upgradeUrl))
@@ -1522,9 +1530,8 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         : `Android app version is already ${syncResult.packageVersion}`)
     }
 
-    const host = options.supaHost || 'https://api.capgo.app'
-
-    const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
+    const client = await createCapgoClient(options.apikey, options.apiHost)
+    const host = client.apiHost
     // NOTE: the build-permission assert was moved below (after the prescan gate) so prescan's
     // batched report — which includes shared/apikey-permission — is what users see first.
 
@@ -1534,7 +1541,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // run first gives the batched report instead of a bare "Cannot get organization id".
     let orgId = ''
     try {
-      orgId = await getOrganizationId(options.apikey!, appId, { supaHost: options.supaHost, supaAnon: options.supaAnon })
+      orgId = await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
     }
     catch {
       // App not accessible / no org — surfaced by prescan (app-exists) and the permission backstop.
@@ -2005,8 +2012,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
           iosDist: options.iosDistribution,
           skip: options.prescanSkip,
           warn: options.prescanWarn,
-          supaHost: options.supaHost,
-          supaAnon: options.supaAnon,
+          apiHost: options.apiHost,
         })).report,
       )
       // Telemetry: emit one `Prescan run` event for the build-request gate on EVERY
@@ -2056,7 +2062,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // missing build permission first — batched with every other problem — and blocks above.
     // This hard assert still runs when prescan is skipped (--no-prescan) or bypassed
     // (--prescan-ignore-fatal), so permission is always enforced before the POST.
-    await assertCliPermission(supabase, options.apikey, 'app.build_native', { appId }, {
+    await assertCliPermission(client, options.apikey, 'app.build_native', { appId }, {
       message: `Capgo rejected this API key: missing app.build_native permission for app ${appId}.`,
       silent,
     })
@@ -2081,7 +2087,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
     if (!response.ok) {
       const errorText = await response.text()
-      await throwIfBuildPlanLimitError(response.status, errorText, 'request', log)
+      await throwIfBuildPlanLimitError(response.status, errorText, 'request', log, () => isDirectOfferApp(client, appId))
       if (errorText.includes('build_machine_version_unavailable')) {
         let message = errorText
         try {
@@ -2332,7 +2338,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
       if (!startResponse.ok) {
         const errorText = await startResponse.text()
-        await throwIfBuildPlanLimitError(startResponse.status, errorText, 'start', log)
+        await throwIfBuildPlanLimitError(startResponse.status, errorText, 'start', log, () => isDirectOfferApp(client, appId))
         throw new Error(`Failed to start build: ${startResponse.status} - ${errorText}`)
       }
 

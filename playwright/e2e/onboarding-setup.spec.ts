@@ -58,14 +58,18 @@ test.describe('Actionable onboarding setup checklist', () => {
     await expect(page.locator(instructions)).toContainText('Choose iOS or Android, build your app with Capgo installed')
     await expect(page.locator('[data-test="setup-checklist-start-actions"]')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Copy AI setup prompt', exact: true })).toBeVisible()
+    await expect(page.locator(instructions).getByRole('button', { name: 'Copy AI setup prompt', exact: true })).toHaveCount(0)
+    await page.locator('[data-test="setup-checklist-ai-agent-copy"]').click()
+    await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.events.filter((event: string) => event === 'copy-ai').length)).toBe(1)
     await expect(page.locator('[data-test="app-onboarding-cli-step-run_device"]')).toHaveAttribute('data-status', 'pending')
     await page.getByRole('button', { name: 'Back to the current task' }).click()
     await expect(page.locator(instructions).getByRole('heading', { name: 'Start guided setup' })).toBeVisible()
+    await expect(page.locator('[data-test="setup-checklist-ai-agent"]')).toHaveCount(0)
 
     await page.locator('[data-test="setup-checklist-copy-command"]').click()
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.events)).toContain('copy-command')
     await page.locator('[data-test="setup-checklist-copy-ai"]').click()
-    await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.events)).toContain('copy-ai')
+    await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.events.filter((event: string) => event === 'copy-ai').length)).toBe(2)
     await expect(page.getByText('They’ll need to complete the setup for you.', { exact: false })).toBeVisible()
     await page.getByRole('button', { name: 'Send setup instructions', exact: true }).click()
     await expect(page.locator('#invite-email')).toBeVisible()
@@ -717,4 +721,29 @@ test.describe('Dashboard exploration and returning to v3 setup', () => {
       await expect(page.locator('[data-test="preview-app-dashboard"]')).toHaveCount(0)
     })
   }
+})
+
+test('asks to finish or explicitly skip a step passed over by out-of-order setup', async ({ page }) => {
+  // The AI (or the user) created a channel before running `npx @capgo/cli init`.
+  await page.goto(`${fixture}?channel=1`)
+  await expect(page.locator('[data-test="setup-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'false')
+  // The first unfinished step stays the current task — no orange alarm banner.
+  await expect(page.locator(instructions)).toContainText('Current task · 1 of 7')
+  await expect(page.locator('[data-test="app-onboarding-command-copy"]')).toBeVisible()
+  await expect(page.getByText('Already handled this another way?')).toBeVisible()
+  // Reason form stays closed until the user chooses Skip.
+  await expect(page.locator('[data-test="setup-checklist-skip-reason"]')).toHaveCount(0)
+  await expect(page.getByLabel('Why are you skipping this step?')).toHaveCount(0)
+
+  await page.locator('[data-test="setup-checklist-skip-step"]').click()
+  const confirm = page.locator('[data-test="setup-checklist-skip-confirm"]')
+  await expect(page.getByLabel('Why are you skipping this step?')).toBeFocused()
+  await expect(confirm).toBeDisabled()
+  await page.locator('[data-test="setup-checklist-skip-reason"]').fill('  My AI agent set it up  ')
+  await confirm.click()
+  await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.state.skips)).toEqual(['ota.login_cli_mcp'])
+  expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.skipReasons)).toEqual(['My AI agent set it up'])
+  await expect(page.locator(instructions)).toContainText('Current task · 3 of 7')
+  await expect(page.locator('[data-test="setup-checklist-progress"]')).toContainText('2 of 7 complete')
+  await expect(page.locator('[data-test="app-onboarding-cli-step-login_cli_mcp"]')).toHaveAttribute('data-status', 'skipped')
 })

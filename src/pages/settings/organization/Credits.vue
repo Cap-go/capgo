@@ -13,6 +13,9 @@ import ChevronDownIcon from '~icons/heroicons/chevron-down'
 import CloudIcon from '~icons/heroicons/cloud'
 import ScaleIcon from '~icons/heroicons/scale'
 import UserGroupIcon from '~icons/heroicons/user-group'
+import CardFormModal from '~/components/billing/CardFormModal.vue'
+import EmbeddedCheckoutModal from '~/components/billing/EmbeddedCheckoutModal.vue'
+import TrialPlanOfferModal from '~/components/billing/TrialPlanOfferModal.vue'
 import CreditsOnlyTip from '~/components/CreditsOnlyTip.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { creditPricingMetricOrder, formatCreditPricingPrice, formatCreditPricingTierLabel } from '~/services/creditPricing'
@@ -20,7 +23,7 @@ import { formatLocalDate } from '~/services/date'
 import { formatNumber, formatNumberValue } from '~/services/formatLocale'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
-import { completeCreditTopUp, getCreditAutoTopUp, openPortal, saveCreditAutoTopUp, startCreditTopUp } from '~/services/stripe'
+import { completeCreditTopUp, getCreditAutoTopUp, saveCreditAutoTopUp, startCreditTopUp } from '~/services/stripe'
 import { getCreditPricingSteps, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
@@ -82,6 +85,9 @@ const isLoadingTransactions = ref(false)
 const loadError = ref<string | null>(null)
 const creditUsdRate = ref(1)
 const isStartingCheckout = ref(false)
+const embeddedCheckout = ref<{ clientSecret: string, publishableKey: string, sessionId: string } | null>(null)
+const showCardModal = ref(false)
+const showTrialPlanOffer = ref(false)
 const isCompletingTopUp = ref(false)
 const isProcessingCheckout = computed(() => isStartingCheckout.value || isCompletingTopUp.value)
 const currentPage = ref(1)
@@ -598,13 +604,30 @@ async function onAutoTopUpFieldBlur() {
   await persistAutoTopUpSettings(false, false, true)
 }
 
-async function openBillingPortalForCard() {
+async function openCardForm() {
   const orgId = currentOrganization.value?.gid
   if (!orgId)
     return
   if (!(await ensureUpdateBillingAccess()))
     return
-  await openPortal(orgId, t)
+  showCardModal.value = true
+}
+
+async function onCardSaved() {
+  showCardModal.value = false
+  // Trial orgs that add a card here are offered to start their plan when the trial ends.
+  showTrialPlanOffer.value = !!currentOrganization.value && !currentOrganization.value.paying && (currentOrganization.value.trial_left ?? 0) > 0
+  await loadAutoTopUpSettings()
+}
+
+// Embedded checkout finished in place: reuse the same completion path as a Stripe redirect.
+async function onCreditCheckoutComplete() {
+  const session = embeddedCheckout.value
+  embeddedCheckout.value = null
+  if (!session)
+    return
+  await router.replace({ query: { ...route.query, creditCheckout: 'success', session_id: session.sessionId } })
+  await handleCreditCheckoutReturn()
 }
 
 // Page view requires org.read_billing; buy/checkout still requires org.update_billing.
@@ -671,7 +694,11 @@ async function handleBuyCredits() {
   }
   try {
     isStartingCheckout.value = true
-    await startCreditTopUp(orgId, topUpQuantity.value)
+    const session = await startCreditTopUp(orgId, topUpQuantity.value)
+    if (session.kind === 'embedded')
+      embeddedCheckout.value = session
+    else
+      globalThis.location.href = session.url
   }
   catch (error) {
     console.error('Failed to initiate credit checkout', error)
@@ -1049,7 +1076,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
             v-if="!autoTopUpHasCard"
             type="button"
             class="d-btn d-btn-sm d-btn-outline mt-4"
-            @click="openBillingPortalForCard"
+            @click="openCardForm"
           >
             {{ t('credits-auto-top-up-add-card') }}
           </button>
@@ -1257,6 +1284,28 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
       </div>
     </div>
     <!-- Permission modal: read denial is not dismissible; update denial can be closed -->
+    <EmbeddedCheckoutModal
+      v-if="embeddedCheckout"
+      :title="t('billing-credits-checkout-title')"
+      :client-secret="embeddedCheckout.clientSecret"
+      :publishable-key="embeddedCheckout.publishableKey"
+      @close="embeddedCheckout = null"
+      @complete="onCreditCheckoutComplete"
+    />
+    <CardFormModal
+      v-if="showCardModal && currentOrganization?.gid"
+      :org-id="currentOrganization.gid"
+      mode="setup"
+      @close="showCardModal = false"
+      @saved="onCardSaved"
+    />
+    <TrialPlanOfferModal
+      v-if="showTrialPlanOffer && currentOrganization?.gid"
+      :org-id="currentOrganization.gid"
+      source="credits"
+      @close="showTrialPlanOffer = false"
+      @scheduled="showTrialPlanOffer = false"
+    />
     <RbacPermissionOnlyModal
       v-if="showAdminModal"
       :title="t('billing-access-required')"

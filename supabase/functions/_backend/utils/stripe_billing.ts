@@ -60,6 +60,16 @@ export function getStripeSecretKey(c: Context, account: BillingAccount = 'ee'): 
   return getEnv(c, getStripeSecretKeyEnvName(account))
 }
 
+export function getStripePublishableKeyEnvName(account: BillingAccount): string {
+  return account === 'us' ? 'STRIPE_PUBLISHABLE_KEY_US' : 'STRIPE_PUBLISHABLE_KEY'
+}
+
+// Public key for the in-app Stripe.js forms; empty means billing UI falls back to hosted pages.
+export function getStripePublishableKey(c: Context, account: BillingAccount = 'ee'): string {
+  const key = getEnv(c, getStripePublishableKeyEnvName(account)).trim()
+  return key.startsWith('pk_') ? key : ''
+}
+
 export function getStripeWebhookSecret(c: Context, account: BillingAccount = 'ee'): string {
   return getEnv(c, getStripeWebhookSecretEnvName(account))
 }
@@ -196,6 +206,10 @@ export async function resolveCheckoutPlanProductId(
   }
   return getPlanProductId(plan, billingAccount)
 }
+
+// Marks the subscription schedule (and the subscription it starts) that begins the
+// onboarding plan when the free trial ends.
+export const TRIAL_PLAN_SCHEDULE_METADATA_KEY = 'capgo_trial_plan'
 
 // The US entity has no sales tax registrations yet; collect tax only on the EE account.
 export function isAutomaticTaxEnabled(billingAccount: BillingAccount): boolean {

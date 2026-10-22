@@ -18,7 +18,6 @@ import devtoolsJson from 'vite-plugin-devtools-json'
 import EnvironmentPlugin from 'vite-plugin-environment'
 import VueDevTools from 'vite-plugin-vue-devtools'
 import Layouts from 'vite-plugin-vue-layouts'
-import WebfontDownload from 'vite-plugin-webfont-dl'
 import { VueRouterAutoImports } from 'vue-router/unplugin'
 import VueRouter from 'vue-router/vite'
 import keys from './configs.json'
@@ -203,18 +202,30 @@ export default defineConfig({
       '@capgo/capacitor-notifications': path.resolve(__dirname, 'packages/capacitor-notifications/src/index.ts'),
     },
   },
-  // CI serves a built preview; include browser fixtures only in that test build.
-  build: process.env.CAPGO_PLAYWRIGHT_FIXTURES === 'true'
-    ? {
-        rolldownOptions: {
-          input: [
+  build: {
+    rolldownOptions: {
+      // CI serves a built preview; include browser fixtures only in that test build.
+      input: process.env.CAPGO_PLAYWRIGHT_FIXTURES === 'true'
+        ? [
             path.resolve(__dirname, 'index.html'),
             path.resolve(__dirname, 'playwright/fixtures/onboarding-setup.html'),
             path.resolve(__dirname, 'playwright/fixtures/email-verification.html'),
+          ]
+        : undefined,
+      output: {
+        codeSplitting: {
+          // The Supabase SDK is shared by almost every page; keep it in its own
+          // long-lived chunk instead of inflating whichever app module imports it first.
+          groups: [
+            {
+              name: 'supabase',
+              test: /node_modules[\\/](@supabase|iceberg-js)[\\/]/,
+            },
           ],
         },
-      }
-    : undefined,
+      },
+    },
+  },
   plugins: [
     wellKnownPasswordManagerPlugin(),
     envFaviconPlugin(),
@@ -280,11 +291,6 @@ export default defineConfig({
       fullInstall: true,
       include: [path.resolve(__dirname, 'locales/**')],
     }),
-
-    // https://github.com/feat-agency/vite-plugin-webfont-dl
-    WebfontDownload([
-      'https://fonts.bunny.net/css?family=inter:100,200,300,400,500,600,700,800,900|prompt:100,200,300,400,500,600,700,800,900',
-    ]),
 
     // https://github.com/webfansplz/vite-plugin-vue-devtools
     VueDevTools({

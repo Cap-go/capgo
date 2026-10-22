@@ -65,7 +65,7 @@ export async function warnAndContinueTwoFactorPreflightNetworkFailure(
   }
 }
 
-/** Maps Supabase RPC transport failures to user-facing 2FA compliance errors. */
+/** Maps 2FA compliance API transport failures to user-facing errors. */
 export function throwTwoFactorComplianceRpcError(error: { message?: string }): void {
   if (isTransientNetworkError(error))
     throw new TwoFactorComplianceNetworkError()

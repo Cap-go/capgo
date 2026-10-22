@@ -793,50 +793,22 @@ describe('[PUT] /organization with API key policy', () => {
   })
 })
 
-describe('expired API key rejection', () => {
-  let expiredKeyValue: string
-  let validKeyValue: string
-  const seededApiKeyIds: number[] = []
-
-  beforeAll(async () => {
-    const expiredKey = await seedPlainApiKey('key-to-be-expired', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-    const validKey = await seedPlainApiKey('key-valid-for-test', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())
-
-    expiredKeyValue = expiredKey.key
-    validKeyValue = validKey.key
-    seededApiKeyIds.push(expiredKey.id, validKey.id)
-  })
-
-  afterAll(async () => {
-    await deleteSeededApiKeys(seededApiKeyIds)
-  })
-
-  it.concurrent('expired API key should be rejected when used for authentication', async () => {
-    await expectApiKeyCannotReadBaseOrg(expiredKeyValue)
-  })
-
-  it.concurrent('valid (non-expired) API key should work for RLS authentication', async () => {
-    await expectApiKeyCanReadBaseOrg(validKeyValue)
-  })
-})
-
 describe('api key expiration boundary conditions', () => {
-  it.concurrent('api key already expired should be rejected', async () => {
-    const data = await seedPlainApiKey('key-boundary-test', new Date(Date.now() - 1000).toISOString())
+  const DAY_MS = 24 * 60 * 60 * 1000
+
+  it.concurrent.each([
+    ['expired a day ago', -DAY_MS, false],
+    ['expired a second ago', -1000, false],
+    ['expiring in 7 days', 7 * DAY_MS, true],
+    ['expiring in 30 seconds', 30_000, true],
+  ])('api key %s authenticates only when not expired', async (label, offsetMs, canRead) => {
+    const data = await seedPlainApiKey(`key-${label.replaceAll(' ', '-')}`, new Date(Date.now() + offsetMs).toISOString())
 
     try {
-      await expectApiKeyCannotReadBaseOrg(data.key)
-    }
-    finally {
-      await deleteSeededApiKeys([data.id])
-    }
-  })
-
-  it.concurrent('api key expiring in the near future should still work', async () => {
-    const data = await seedPlainApiKey('key-near-expiration', new Date(Date.now() + 30_000).toISOString())
-
-    try {
-      await expectApiKeyCanReadBaseOrg(data.key)
+      if (canRead)
+        await expectApiKeyCanReadBaseOrg(data.key)
+      else
+        await expectApiKeyCannotReadBaseOrg(data.key)
     }
     finally {
       await deleteSeededApiKeys([data.id])

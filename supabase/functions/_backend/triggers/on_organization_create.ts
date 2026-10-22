@@ -3,7 +3,8 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { parseSignupAttributionRecord, signupAttributionEventTags } from '../../shared/signup-attribution.ts'
 import { syncBentoSubscriberTags } from '../utils/bento.ts'
-import { buildBillingPlanBentoTags } from '../utils/billing_bento_tags.ts'
+import { applyDirectOfferBentoTags, buildBillingPlanBentoTags } from '../utils/billing_bento_tags.ts'
+import { getDirectOfferStatus } from '../utils/direct_offer.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { buildOnboardingIntentBentoEventData, parseOrgOnboardingIntent, syncOrgOnboardingIntentForOrg } from '../utils/org_onboarding_intent.ts'
@@ -89,7 +90,10 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     trialPlanName = await finalizePendingStripeCustomer(c, org)
   }
 
-  if (trialPlanName) {
+  // Direct-offer (paid ads) creators never had a trial: tag offer=direct, no trial tags.
+  // An unknown offer (lookup failed) only skips the trial tag; later syncs reconcile it.
+  const directOffer = await getDirectOfferStatus(c, supabaseAdmin(c), org.created_by)
+  if (trialPlanName || directOffer === true) {
     const { data: creator, error: creatorError } = await supabaseAdmin(c)
       .from('users')
       .select('email')
@@ -100,7 +104,7 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     if (creator?.email) {
       await backgroundTask(c, syncBentoSubscriberTags(c, {
         email: creator.email.trim().toLowerCase(),
-        ...buildBillingPlanBentoTags(trialPlanName, 'trial'),
+        ...applyDirectOfferBentoTags(buildBillingPlanBentoTags(trialPlanName, 'trial'), directOffer),
       }))
     }
   }
