@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { hasSupportedOtaTodoList, parseAppOnboarding } from '../src/services/appOnboarding'
 import { shouldShowGettingStartedNav, shouldSkipOnboardingResume } from '../src/utils/appOnboardingProgress'
+import { hasDualOnboardingChecklists } from '../src/utils/dualOnboardingChecklists'
 import { app } from '../supabase/functions/_backend/public/app/index.ts'
 import { POSTGRES_URL } from './test-utils.ts'
 
@@ -97,8 +98,8 @@ describe('explicit Builder checklist activation', () => {
     expect((await admin.from('apps').select('need_onboarding').eq('app_id', appId).single()).data!.need_onboarding).toBe(true)
   })
 
-  it.concurrent.each([1, '1', null, undefined])('persists readable v4 OTA progress for accepted subversion %j', async (subversion) => {
-    const appId = await fixture({ setup: { todo_list_version: 4, ota_todo_list_version: subversion, paths: ['ota'], steps: { ota: otaSteps } } })
+  it.concurrent.each([1, '1', null, undefined].flatMap(subversion => [undefined, [], ['builder'], ['ota']].map(paths => ({ subversion, paths }))))('persists readable v4 OTA progress for accepted metadata %j', async ({ subversion, paths }) => {
+    const appId = await fixture({ setup: { todo_list_version: 4, ota_todo_list_version: subversion, paths, steps: { ota: otaSteps } } })
     const data = await activate(appId)
     const persisted = (await admin.from('apps').select('onboarding').eq('app_id', appId).single()).data!.onboarding
     expect(persisted).toEqual(data)
@@ -106,6 +107,7 @@ describe('explicit Builder checklist activation', () => {
     expect(data.setup.steps.ota).toEqual(otaSteps)
     const parsed = parseAppOnboarding(persisted)
     expect(hasSupportedOtaTodoList(parsed)).toBe(true)
+    expect(hasDualOnboardingChecklists(data)).toBe(true)
     expect(parsed.steps.login_cli_mcp?.status).toBe('done')
     expect(parsed.steps.add_channel?.status).toBe('skipped')
     expect(await activate(appId)).toEqual(data)

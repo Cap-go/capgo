@@ -47,8 +47,11 @@ export function enableBuilderChecklist(value: unknown): JsonObject {
   }
   else if (version === '4') {
     paths = Array.isArray(setup.paths) ? [...setup.paths] : []
-    if (paths.includes('ota') || setup.ota_todo_list_version != null)
+    if (paths.includes('ota') || setup.ota_todo_list_version != null || Object.keys(object(steps.ota)).length > 0) {
       setup.ota_todo_list_version = '1'
+      if (!paths.includes('ota'))
+        paths.push('ota')
+    }
     if (!paths.includes('builder'))
       paths.push('builder')
   }
