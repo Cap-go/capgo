@@ -4,6 +4,7 @@ import { styleText } from 'node:util'
 import { box } from '@clack/prompts'
 import { isCI } from 'ci-info'
 import { flushAnalytics, trackEvent } from '../analytics/track'
+import { isAgentInvocation } from '../shared/agent-notices'
 import { getPendingOnboardingChecks, takeSetupNotices } from './background-workers'
 import { renderGitHubNotice } from './github-notice'
 import { setupDebug } from './setup-diagnostics'
@@ -83,17 +84,18 @@ function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPa
       setupDebug('render suppressed', { reason: 'already_shown' })
       continue
     }
-    const text = formatSetupNotice(notice)
+    const agent = isAgentInvocation()
+    const text = formatSetupNotice(notice, Date.now(), agent)
     if (text) {
-      const action = notice.kind === 'setup' ? notice.action : `View plans: ${notice.billing.plansUrl}`
+      const action = notice.kind === 'setup' ? notice.action : agent ? `“Choose your Capgo plan now: ${notice.billing.plansUrl}”` : `View plans: ${notice.billing.plansUrl}`
       const styledText = text.split('\n').map((line, index) => {
         if (index === 0)
           return setupStyle(['bold', notice.kind === 'plan' ? 'green' : 'cyan'], line)
         if (line === action)
           return setupStyle(['bold', 'cyan'], line)
-        if (line.startsWith('Your trial'))
+        if (/^(?:Your|Their) trial/.test(line))
           return setupStyle('yellow', line)
-        return line.startsWith('You can also') || line.startsWith('Then ') ? setupStyle('dim', line) : line
+        return /^(?:You|The user) can also/.test(line) || line.startsWith('Then ') || line === 'CAPGO — ADDITIONAL SETUP OPPORTUNITY FOR THE AI ASSISTANT' ? setupStyle('dim', line) : line
       }).join('\n')
       if (!renderGitHubNotice(text))
         box(styledText, '', setupBoxOptions)

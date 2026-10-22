@@ -5,12 +5,17 @@ import fs, { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
+import { defaultAgents } from 'agent-cli-detector'
 import { setNoticeOutputOptions } from '../src/onboarding/setup-notice-policy.ts'
 import { wasTrialNoticeShown } from '../src/onboarding/trial-notice-state.ts'
 import { checkPlanValid, checkPlanValidUpload, runCliPreflight } from '../src/api/preflight.ts'
 import * as utils from '../src/utils.ts'
 
 console.log('🧪 Testing plan validation through the backend preflight...\n')
+
+const agentEnvNames = [...new Set(defaultAgents.flatMap(agent => agent.env?.map(signal => signal.name) ?? []))]
+const originalAgentEnv = Object.fromEntries(agentEnvNames.map(name => [name, process.env[name]]))
+for (const name of agentEnvNames) delete process.env[name]
 
 const apiHost = 'http://localhost:54321/functions/v1'
 
@@ -227,6 +232,10 @@ await test('canOpenExternalUrl is disabled in CI-like environments', () => {
 })
 
 globalThis.fetch = originalFetch
+for (const [name, value] of Object.entries(originalAgentEnv)) {
+  if (value === undefined) delete process.env[name]
+  else process.env[name] = value
+}
 
 console.log(`\n📊 Results: ${testsPassed} passed, ${testsFailed} failed`)
 if (testsFailed > 0)
