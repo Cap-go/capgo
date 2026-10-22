@@ -39,7 +39,7 @@ export function getCommonCurrencies(prices: PlanPriceAmounts) {
   const sets = Object.values(prices).flatMap(plan => [plan.month, plan.year])
   if (!sets.length)
     return []
-  return Object.keys(sets[0]).filter(currency => sets.every(amounts => currency in amounts)).sort()
+  return Object.keys(sets[0]).filter(currency => sets.every(amounts => currency in amounts)).sort((a, b) => a.localeCompare(b))
 }
 
 export function pickCurrency(currencies: string[], lockedCurrency: string | null, country: string | null) {

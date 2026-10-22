@@ -41,6 +41,10 @@ export function getPlanAmounts(prices: PlanPriceAmounts, productId: string, curr
   return { month: stripeAmountToMajorUnits(month, currency), year: stripeAmountToMajorUnits(year, currency) }
 }
 
+export function formatPlanAmount(value: number, code: string, options: Intl.NumberFormatOptions = {}) {
+  return formatNumber(value, { style: 'currency', currency: code.toUpperCase(), currencyDisplay: 'narrowSymbol', ...options })
+}
+
 export function usePlanPrices(orgId: Ref<string | undefined>) {
   const data = ref<PlanPricesResponse | null>(null)
   // True once the request settled, success or not: checkout waits for it.
@@ -84,9 +88,5 @@ export function usePlanPrices(orgId: Ref<string | undefined>) {
     return data.value && currency.value ? getPlanAmounts(data.value.prices, productId, currency.value) : null
   }
 
-  function formatAmount(value: number, code: string, options: Intl.NumberFormatOptions = {}) {
-    return formatNumber(value, { style: 'currency', currency: code.toUpperCase(), currencyDisplay: 'narrowSymbol', ...options })
-  }
-
-  return { amountsFor, currencies, currency, formatAmount, lockedCurrency, lockedCurrencyUnavailable, ready, setCurrency }
+  return { amountsFor, currencies, currency, lockedCurrency, lockedCurrencyUnavailable, ready, setCurrency }
 }

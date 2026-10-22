@@ -903,7 +903,7 @@ async function getExtraMauPriceId(c: Context, includedMau: number, interval: 'mo
     throw simpleError('mau_tiers_not_found', 'Cannot load MAU price tiers', { error })
 
   const tiers = buildExtraMauTiers(steps, includedMau, interval)
-  const currencies = [...new Set(extraCurrencies.map(currency => currency.toLowerCase()))].filter(currency => currency !== 'usd').sort()
+  const currencies = [...new Set(extraCurrencies.map(currency => currency.toLowerCase()))].filter(currency => currency !== 'usd').sort((a, b) => a.localeCompare(b))
   const hashInput = currencies.length ? { includedMau, tiers, currencies } : { includedMau, tiers }
   const lookupKey = `${EXTRA_MAU_LOOKUP_KEY_PREFIX}${interval}_${hashString(JSON.stringify(hashInput))}`
   const taxBehaviorParam = taxBehavior && taxBehavior !== 'unspecified' ? { tax_behavior: taxBehavior } : {}
@@ -1023,6 +1023,17 @@ function toCheckoutSessionResult(session: Stripe.Checkout.Session, publishableKe
   return { url: null, clientSecret: session.client_secret, publishableKey, sessionId: session.id }
 }
 
+// The server owns the currency: a billed customer keeps theirs even when the client sends none.
+async function resolveCheckoutCurrency(c: Context, customerId: string, billingAccount: BillingAccount, planCurrencies: string[], requestedCurrency: string | undefined) {
+  const customerCurrency = await getStripeCustomerCurrency(c, customerId, billingAccount)
+  if (customerCurrency && requestedCurrency && customerCurrency !== requestedCurrency)
+    throw simpleError('currency_locked', 'This organization is already billed in another currency', { currency: requestedCurrency, customerCurrency })
+  const checkoutCurrency = customerCurrency ?? requestedCurrency
+  if (checkoutCurrency && !planCurrencies.includes(checkoutCurrency))
+    throw simpleError('invalid_currency', 'This plan is not sold in the requested currency', { currency: checkoutCurrency })
+  return checkoutCurrency
+}
+
 export interface CheckoutOptions {
   clientReferenceId?: string
   attributionId?: string
@@ -1050,13 +1061,7 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: prices.priceId, quantity: 1 }]
   const planPrice = await getStripe(c, billingAccount).prices.retrieve(prices.priceId, { expand: ['currency_options'] })
   const planCurrencies = Object.keys(getPriceCurrencyAmounts(planPrice))
-  // The server owns the currency: a billed customer keeps theirs even when the client sends none.
-  const customerCurrency = await getStripeCustomerCurrency(c, customerId, billingAccount)
-  if (customerCurrency && requestedCurrency && customerCurrency !== requestedCurrency)
-    throw simpleError('currency_locked', 'This organization is already billed in another currency', { currency: requestedCurrency, customerCurrency })
-  const checkoutCurrency = customerCurrency ?? requestedCurrency
-  if (checkoutCurrency && !planCurrencies.includes(checkoutCurrency))
-    throw simpleError('invalid_currency', 'This plan is not sold in the requested currency', { currency: checkoutCurrency })
+  const checkoutCurrency = await resolveCheckoutCurrency(c, customerId, billingAccount, planCurrencies, requestedCurrency)
   if (extraMau && extraMau.extraMau > 0) {
     // Same interval as the plan: Checkout bills every item of a subscription together.
     const interval = recurrence === 'year' ? 'year' : 'month'

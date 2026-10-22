@@ -19,7 +19,7 @@ import { formatNumberValue, getFormatLocale } from '~/services/formatLocale'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { shouldShowExpiredTrialPlansState, shouldShowPlanFailureBanner } from '~/services/paymentRequired'
 import { checkPermissions } from '~/services/permissions'
-import { usePlanPrices } from '~/services/planPrices'
+import { formatPlanAmount, usePlanPrices } from '~/services/planPrices'
 import { createPlansVisitTracker } from '~/services/plansVisitTracking'
 import { getSignupAttributionEventTags } from '~/services/signupAttribution'
 import { startSubscriptionCheckout } from '~/services/stripe'
@@ -170,7 +170,7 @@ const enterpriseQuote = computed(() => {
 })
 
 // Real Stripe amounts per currency (price currency_options); USD from the plans table until they load.
-const { amountsFor, currencies: priceCurrencies, currency: priceCurrency, formatAmount, lockedCurrency, lockedCurrencyUnavailable, ready: pricesReady, setCurrency } = usePlanPrices(billingOrgId)
+const { amountsFor, currencies: priceCurrencies, currency: priceCurrency, lockedCurrency, lockedCurrencyUnavailable, ready: pricesReady, setCurrency } = usePlanPrices(billingOrgId)
 
 function planAmounts(plan: Database['public']['Tables']['plans']['Row']) {
   const stripeAmounts = amountsFor(plan.stripe_id)
@@ -181,7 +181,7 @@ function planAmounts(plan: Database['public']['Tables']['plans']['Row']) {
 
 // Enterprise extra MAU is created in Stripe with the same tier figures in every plan currency.
 function formatPlanPrice(plan: Database['public']['Tables']['plans']['Row'], value: number) {
-  return formatAmount(value, planAmounts(plan).currency, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+  return formatPlanAmount(value, planAmounts(plan).currency, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
 function currencyLabel(code: string) {
