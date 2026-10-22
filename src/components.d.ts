@@ -29,7 +29,6 @@ declare module 'vue' {
     AppOnboardingPageFrame: typeof import('./components/dashboard/AppOnboardingPageFrame.vue')['default']
     AppOnboardingSetupChecklist: typeof import('./components/dashboard/AppOnboardingSetupChecklist.vue')['default']
     AppOnboardingSkipStep: typeof import('./components/dashboard/AppOnboardingSkipStep.vue')['default']
-    AppOnboardingWelcome: typeof import('./components/dashboard/AppOnboardingWelcome.vue')['default']
     AppPageFrame: typeof import('./components/dashboard/AppPageFrame.vue')['default']
     AppPageNotFound: typeof import('./components/dashboard/AppPageNotFound.vue')['default']
     AppSetting: typeof import('./components/dashboard/AppSetting.vue')['default']

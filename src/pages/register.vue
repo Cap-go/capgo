@@ -36,9 +36,13 @@ async function submit(form: { password: string, email: string }) {
     const { error } = await supabase.auth.setSession(registered.session)
     if (error)
       throw error
-    router.push('/dashboard')
+    // Keep the spinner until onboarding has loaded; the button must not look idle meanwhile.
+    const failure = await router.push('/dashboard')
+    if (failure)
+      isLoading.value = false
   }
   catch (error) {
+    isLoading.value = false
     const code = await getCapgoApiErrorCode(error)
     let message = t('account-error')
     if (error instanceof FunctionsHttpError && error.context instanceof Response) {
@@ -47,9 +51,6 @@ async function submit(form: { password: string, email: string }) {
         message = body.message
     }
     setErrors('register-account', [code === 'account_deleted' ? t('used-to-create') : message], {})
-  }
-  finally {
-    isLoading.value = false
   }
 }
 </script>

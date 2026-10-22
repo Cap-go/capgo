@@ -2197,9 +2197,6 @@
   "onboarding-resume-restart": "Restart",
   "onboarding-resume-title": "Continue where you left off?",
   "onboarding-trend": "Onboarding Trend",
-  "onboarding-welcome-cta": "Set up my first update",
-  "onboarding-welcome-description": "You’re a few steps away from the magic of over-the-air updates — and so much more.",
-  "onboarding-welcome-eyebrow": "Good to have you here",
   "onboarding-welcome-title": "Welcome to Capgo",
   "channel-routing-mockup-kicker": "Channels · Default routing",
   "channel-routing-mockup-title": "Every device knows where to look.",
@@ -3952,5 +3949,6 @@
   "ai-onboarding-task-setup-builder": "Set up signing and run your first cloud build",
   "ai-onboarding-task-setup-both": "Set up cloud builds and live updates, in the order you confirm",
   "ai-onboarding-task-setup-unsure": "Recommend live updates or Builder, then set it up with you",
-  "setup-checklist-next-step": "Your next step"
+  "setup-checklist-next-step": "Your next step",
+  "login-signing-in": "Signing you in…"
 }

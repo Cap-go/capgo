@@ -426,8 +426,9 @@ test.describe('Registration', () => {
       await page.reload()
       await expect(page.locator('[data-test="onboarding-resume-restart"]')).toBeVisible()
       await page.click('[data-test="onboarding-resume-restart"]')
-      await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toBeVisible()
-      await continuePastProfileWelcome(page)
+      // Restart lands directly on an empty About you form; there is no welcome screen anymore.
+      await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toHaveCount(0)
+      await expect(page.locator('[data-test="onboarding-name-step"]')).toBeVisible()
       await expect(firstName).toHaveValue('')
       await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('')
       await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeDisabled()

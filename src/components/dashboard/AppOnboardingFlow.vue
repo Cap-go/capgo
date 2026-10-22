@@ -119,7 +119,6 @@ import AppOnboardingDualChecklist from './AppOnboardingDualChecklist.vue'
 import AppOnboardingHeader from './AppOnboardingHeader.vue'
 import AppOnboardingIconInput from './AppOnboardingIconInput.vue'
 import AppOnboardingSetupChecklist from './AppOnboardingSetupChecklist.vue'
-import AppOnboardingWelcome from './AppOnboardingWelcome.vue'
 import BillingRegionChoice from './BillingRegionChoice.vue'
 import ChannelConsoleAssignOnboarding from './ChannelConsoleAssignOnboarding.vue'
 import ChannelCreateOnboarding from './ChannelCreateOnboarding.vue'
@@ -174,7 +173,6 @@ const newChannelTreatment = computed(() => hasNewChannelTreatment(onboardingForA
 const APPLE_LOOKUP_TIMEOUT_MS = 5_000
 const STORE_ICON_FETCH_TIMEOUT_MS = 10_000
 const ONBOARDING_AB_TEST_WAIT_TIMEOUT_MS = 3_000
-const WELCOME_CANVAS_MEDIA_QUERY = '(min-width: 640px) and (min-height: 640px)'
 const WEBNATIVE_APP_URL = 'https://webnativeapp.com/?ref=capgo'
 const removeBeforeUnloadWarning = useBeforeUnloadWarning(Boolean(props.preOrg && !props.setupAppId))
 
@@ -214,9 +212,6 @@ interface OnboardingABTestsResponse {
 
 const isLoading = ref(true)
 const isHydratingOnboarding = ref(true)
-const welcomeCanvasEligible = ref(false)
-const welcomePending = ref(false)
-const showPreOrgWelcome = computed(() => props.preOrg && welcomeCanvasEligible.value && welcomePending.value)
 const isSubmitting = ref(false)
 const isImportingStore = ref(false)
 const isImportingStoreIcon = ref(false)
@@ -725,17 +720,15 @@ function ensurePublishAppQuestionStepTracked() {
 }
 
 function initializeProgressTracking(resumed: boolean) {
-  const initialStep: OnboardingAnalyticsStep = showPreOrgWelcome.value ? 'welcome' : analyticsStepFor(flowStep.value)
+  const initialStep: OnboardingAnalyticsStep = analyticsStepFor(flowStep.value)
   trackedAnalyticsSteps = appOnboardingSteps.value.flatMap<OnboardingAnalyticsStep>((step) => {
     if (step.id === 'details')
       return Object.values(APP_DETAILS_ANALYTICS_STEPS)
     return [step.id]
   })
-  if (initialStep === 'welcome')
-    trackedAnalyticsSteps.unshift('welcome')
   ensurePublishAppQuestionStepTracked()
   if (props.preOrg && !props.newOrganization)
-    trackedAnalyticsSteps = initialProfileOnboardingSteps(onboardingForABTests.value, true)
+    trackedAnalyticsSteps = initialProfileOnboardingSteps(onboardingForABTests.value, false)
 
   progressTracker = createOnboardingProgressTracker({
     flow: props.preOrg ? 'pre_org' : 'existing_org',
@@ -958,20 +951,6 @@ async function resetOnboardingForm() {
   await redirectToRequiredInitialName()
 }
 
-function showWelcomeOnDesktop() {
-  welcomePending.value = Boolean(props.preOrg && welcomeCanvasEligible.value && !initialProfileOnboarding.value)
-}
-
-async function continueFromWelcome() {
-  await waitForOnboardingABTests()
-  ensurePublishAppQuestionStepTracked()
-  const nextStep = flowStep.value
-  const nextAnalyticsStep = analyticsStepFor(nextStep)
-  progressTracker?.completeStep('welcome', { nextStep: nextAnalyticsStep })
-  progressTracker?.viewStep(nextAnalyticsStep, 'welcome')
-  welcomePending.value = false
-}
-
 function applyOnboardingProgress(progress: ReturnType<typeof parseUserOnboardingProgress>) {
   if (!progress)
     return
@@ -1080,7 +1059,6 @@ async function maybeResumeSavedOnboarding() {
     else {
       applyDefaultPreOrgDetails()
     }
-    showWelcomeOnDesktop()
     return false
   }
 
@@ -1093,7 +1071,6 @@ async function maybeResumeSavedOnboarding() {
     await resetOnboardingForm()
     if (props.preOrg)
       applyDefaultPreOrgDetails()
-    showWelcomeOnDesktop()
     return false
   }
 
@@ -1115,7 +1092,6 @@ async function maybeResumeSavedOnboarding() {
     await resetOnboardingForm()
     existingApp.value = true
     existingAppSetup.value = 'manual'
-    showWelcomeOnDesktop()
     return false
   }
 
@@ -2697,7 +2673,6 @@ function trackDashboardExplored() {
 onMounted(async () => {
   window.addEventListener(ONBOARDING_DASHBOARD_EXPLORED_EVENT, trackDashboardExplored)
   document.addEventListener('visibilitychange', trackOnboardingVisibilityChange)
-  welcomeCanvasEligible.value = window.matchMedia(WELCOME_CANVAS_MEDIA_QUERY).matches
   let resumedFlow = false
   isLoading.value = true
   isHydratingOnboarding.value = true
@@ -2807,7 +2782,7 @@ onMounted(async () => {
       else
         pendingVisibilityChanges = []
     }
-    if (props.preOrg && !welcomePending.value)
+    if (props.preOrg)
       await waitForOnboardingABTests()
     finishOnboardingMount()
   }
@@ -2888,10 +2863,6 @@ defineExpose({
       {{ t('retry') }}
     </button>
   </div>
-  <AppOnboardingWelcome
-    v-else-if="showPreOrgWelcome && !isLoading"
-    @continue="continueFromWelcome"
-  />
 
   <section
     v-else

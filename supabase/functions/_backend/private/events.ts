@@ -666,9 +666,6 @@ app.post('/', middlewareAuth(), async (c) => {
     return c.json({ ...BRES, event_id: identity.event_id })
   }
 
-  // Product state, not analytics: record it even if the analytics queue is unavailable.
-  await markAiOnboardingAgentConnected(c, trackedBody.channel, trackedBody.event)
-
   const apikeyId = c.get('apikey')?.id
   await enqueueTrackingSnapshot(c, addAuthenticatedApiKeyIdToTrackingPayload({
     ...trackedBody,
@@ -738,6 +735,8 @@ app.post('/', middlewareAuth(), async (c) => {
   await markBuilderChecklistFromAnalytics(c, appId, trackedBody)
 
   await markAppOnboardingLoginFromTracking(c, trackedBody.channel, trackedBody.event)
+  // AI onboarding page: tick "logged in" / "MCP installed" from the agent's first events.
+  await markAiOnboardingAgentConnected(c, trackedBody.channel, trackedBody.event)
 
   await recordUserBentoEvent(c, {
     userId: c.get('auth')!.userId,

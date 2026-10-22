@@ -2476,9 +2476,6 @@
   "onboarding-source-manual": "Used in Capgo web console. Role: short UI label about \"onboarding source manual\". Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "onboarding-source-mcp": "Used in Capgo web console. Role: short UI label about \"onboarding source mcp\". Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "onboarding-trend": "Used in Capgo web console. Role: UI label about \"onboarding trend\". Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
-  "onboarding-welcome-cta": "Used in Capgo web console areas: components/dashboard. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
-  "onboarding-welcome-description": "Used in Capgo web console areas: components/dashboard. Role: helper or description text. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
-  "onboarding-welcome-eyebrow": "Used in Capgo web console areas: components/dashboard. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "onboarding-welcome-title": "Used in Capgo web console areas: components/dashboard. Role: section or dialog title. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "onboarding-wizard-abandoned": "Used in Capgo web console. Role: short UI label about \"onboarding wizard abandoned\". Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "onboarding-wizard-completed": "Used in Capgo web console. Role: short UI label about \"onboarding wizard completed\". Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
@@ -3951,5 +3948,6 @@
   "ai-onboarding-task-setup-builder": "Used in Capgo web console areas: pages/onboarding, components/dashboard. Onboarding: choosing Capgo Live Updates or Capgo Builder. Role: helper or description text. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "ai-onboarding-task-setup-both": "Used in Capgo web console areas: pages/onboarding, components/dashboard. Onboarding: choosing Capgo Live Updates or Capgo Builder. Role: helper or description text. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "ai-onboarding-task-setup-unsure": "Used in Capgo web console areas: pages/onboarding, components/dashboard. Onboarding: choosing Capgo Live Updates or Capgo Builder. Role: helper or description text. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
-  "setup-checklist-next-step": "Used in Capgo web console areas: components/dashboard. Onboarding: choosing Capgo Live Updates or Capgo Builder. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged."
+  "setup-checklist-next-step": "Used in Capgo web console areas: components/dashboard. Onboarding: choosing Capgo Live Updates or Capgo Builder. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "login-signing-in": "Used in Capgo web console areas: pages. Shown on the login page while a saved session signs the user in automatically. Role: status message. Translate for UI; keep Capgo product names unchanged."
 }
