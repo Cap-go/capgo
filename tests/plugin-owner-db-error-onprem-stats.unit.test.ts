@@ -1,3 +1,4 @@
+// Owner lookup PG failures must surface as 5xx, not sticky onprem (regression for plugin-oc-prod drops).
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const setAppStatusMock = vi.fn(() => Promise.resolve())
