@@ -51,10 +51,14 @@ async function refreshPendingOnboardingApp() {
   const singleOrganization = selectableOrganizations.value.length === 1
     ? selectableOrganizations.value[0]
     : undefined
+  const organizationAppCount = singleOrganization
+    ? Math.max(singleOrganization.app_count, organizationStore.getAppsByOrgId(singleOrganization.gid).length)
+    : 0
+  if (!singleOrganization || organizationAppCount !== 1)
+    return
+
   const routeAppId = 'app' in route.params && typeof route.params.app === 'string' ? route.params.app : null
   const candidateAppId = routeAppId ?? getOnboardingResumeAppId(main.user?.id ?? main.auth?.id)
-  if (!candidateAppId && (!singleOrganization || singleOrganization.app_count !== 1))
-    return
 
   let query = supabase.from('apps').select('app_id, need_onboarding, onboarding')
   if (candidateAppId)
@@ -76,7 +80,7 @@ async function refreshPendingOnboardingApp() {
 
   pendingOnboardingAppId.value = getOnboardingExploreBannerAppId({
     app: data,
-    organizationAppCount: singleOrganization?.app_count ?? 0,
+    organizationAppCount,
     organizationCount: selectableOrganizations.value.length,
   }) ?? ''
 }
