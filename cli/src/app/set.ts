@@ -54,8 +54,8 @@ export async function setAppInternal(appId: string, options: Options, silent = f
   }
 
   const client = await createCapgoClient(options.apikey, options.apiHost)
-  await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'app.update_settings', silent)
-  const organizationUid = await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
+  const preflight = await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'app.update_settings', silent)
+  const organizationUid = preflight?.orgId ?? await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
 
   const {
     name,

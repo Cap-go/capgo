@@ -93,6 +93,13 @@ try {
   await withCapgoHosts({ apiHost: 'http://127.0.0.1:8002' }, () => getRemoteConfig(true))
   await withCapgoHosts({ apiHost: 'http://127.0.0.1:8001' }, () => getRemoteConfig(true))
   assert.deepEqual(requests.map(request => request.url), ['http://127.0.0.1:8001/private/config', 'http://127.0.0.1:8002/private/config'])
+  // Telemetry passes an abort signal: it still reuses the cached config instead of refetching.
+  await withCapgoHosts({ apiHost: 'http://127.0.0.1:8001' }, () => getRemoteConfig(true, new AbortController().signal))
+  assert.equal(requests.length, 2, 'a signaled read reuses the cached config')
+  // A signaled fetch that succeeds fills the cache for later reads.
+  await withCapgoHosts({ apiHost: 'http://127.0.0.1:8003' }, () => getRemoteConfig(true, new AbortController().signal))
+  await withCapgoHosts({ apiHost: 'http://127.0.0.1:8003' }, () => getRemoteConfig(true))
+  assert.deepEqual(requests.slice(2).map(request => request.url), ['http://127.0.0.1:8003/private/config'])
   delete process.env.CAPGO_TOKEN
   globalThis.fetch = async () => {
     throw new Error('network unavailable')

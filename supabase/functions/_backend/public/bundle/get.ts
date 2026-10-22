@@ -8,11 +8,21 @@ import { integerLikeSchema, numberLikeSchema, safeParseSchema } from '../../util
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit, isValidAppId } from '../../utils/utils.ts'
 
+// PostgREST caps a response at max_rows (1000): never ask for a larger page.
+export const BUNDLE_LIST_MAX_LIMIT = 1000
+
+// Every app_versions column except the large `manifest` and `native_packages` arrays.
+export const BUNDLE_SUMMARY_COLUMNS = 'id, created_at, app_id, name, updated_at, deleted, deleted_at, external_url, checksum, session_key, storage_provider, min_update_version, owner_org, user_id, r2_path, link, comment, manifest_count, key_id, cli_version, created_by_apikey_rbac_id'
+
 export const getBundleQuerySchema = z.object({
   app_id: z.string().optional(),
   version: z.string().min(1).optional(),
   id: integerLikeSchema.refine(Number.isSafeInteger, { message: 'id must be a safe integer' }).optional(),
   page: numberLikeSchema.optional(),
+  // List page size (default 50). `page` counts in pages of this size.
+  limit: integerLikeSchema.refine(value => value >= 1 && value <= BUNDLE_LIST_MAX_LIMIT, { message: `limit must be between 1 and ${BUNDLE_LIST_MAX_LIMIT}` }).optional(),
+  // `summary` leaves out the heavy per-file `manifest` and `native_packages` arrays.
+  fields: z.enum(['full', 'summary']).optional(),
   // Version/id lookups only: also match soft-deleted bundles (name occupancy checks).
   include_deleted: z.union([z.boolean(), z.enum(['true', 'false', '1', '0'])]).optional(),
 })
@@ -65,6 +75,7 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: unknown, 
   }
 
   const supabase = supabaseApikey(c, apikey.key)
+  const columns = body.fields === 'summary' ? BUNDLE_SUMMARY_COLUMNS : '*'
   const hasVersionFilter = body.version !== undefined
   const hasIdFilter = body.id !== undefined
 
@@ -72,7 +83,7 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: unknown, 
     const includeDeleted = body.include_deleted === true || body.include_deleted === 'true' || body.include_deleted === '1'
     let query = supabase
       .from('app_versions')
-      .select()
+      .select(columns)
       .eq('app_id', body.app_id)
       .limit(1)
       .order('created_at', { ascending: false })
@@ -96,11 +107,12 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: unknown, 
   // GET callers send page as a query string; coerce so (page + 1) is not string concatenation.
   const requestedPage = Math.trunc(Number(body.page ?? 0))
   const fetchOffset = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 0
-  const from = fetchOffset * fetchLimit
-  const to = (fetchOffset + 1) * fetchLimit - 1
+  const pageSize = body.limit ?? fetchLimit
+  const from = fetchOffset * pageSize
+  const to = (fetchOffset + 1) * pageSize - 1
   const { data: dataBundles, error: dbError } = await supabase
     .from('app_versions')
-    .select()
+    .select(columns)
     .eq('app_id', body.app_id)
     .eq('deleted', false)
     .range(from, to)

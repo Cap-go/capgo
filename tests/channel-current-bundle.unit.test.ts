@@ -122,6 +122,24 @@ describe('channel current bundle endpoint', () => {
     expect(mocks.adminFrom).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['the linked bundle checksum', false, 'sha-abc'],
+    ['no checksum for a soft-deleted linked bundle', true, null],
+  ])('returns %s', async (_label, deleted, expected) => {
+    mocks.adminFrom.mockReturnValue(queryMock({
+      data: { id: 99, name: '1.0.0', min_update_version: null, checksum: 'sha-abc', deleted, native_packages: [] },
+      error: null,
+    }))
+
+    const response = await getCurrentBundle(
+      createContext(),
+      { app_id: 'com.example.app', channel: 'production' },
+      { key: 'test-key' } as any,
+    )
+    const body = await response.json() as { checksum?: string | null }
+    expect(body.checksum).toBe(expected)
+  })
+
   it('rejects callers without channel.read', async () => {
     mocks.checkPermission.mockResolvedValueOnce(false)
     await expect(getCurrentBundle(
