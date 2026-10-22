@@ -750,15 +750,27 @@ async function getPriceIds(c: Context, planId: string, recurrence: string, billi
   return { priceId }
 }
 
+// Stripe sets unit_amount_decimal alone for sub-unit amounts.
+function readStripeUnitAmount(source: { unit_amount?: number | null, unit_amount_decimal?: unknown }) {
+  if (typeof source.unit_amount === 'number')
+    return source.unit_amount
+  if (source.unit_amount_decimal === null || source.unit_amount_decimal === undefined)
+    return null
+  const decimal = Number(String(source.unit_amount_decimal))
+  return Number.isFinite(decimal) ? decimal : null
+}
+
 // Smallest-unit amount per currency, exactly as configured on the Stripe price (currency_options).
-export function getPriceCurrencyAmounts(price: Pick<Stripe.Price, 'currency' | 'unit_amount' | 'currency_options'>): Record<string, number> {
+export function getPriceCurrencyAmounts(price: Pick<Stripe.Price, 'currency' | 'unit_amount' | 'unit_amount_decimal' | 'currency_options'>): Record<string, number> {
   const amounts: Record<string, number> = {}
   for (const [currency, option] of Object.entries(price.currency_options ?? {})) {
-    if (typeof option.unit_amount === 'number')
-      amounts[currency.toLowerCase()] = option.unit_amount
+    const amount = readStripeUnitAmount(option)
+    if (amount !== null)
+      amounts[currency.toLowerCase()] = amount
   }
-  if (typeof price.unit_amount === 'number')
-    amounts[price.currency.toLowerCase()] = price.unit_amount
+  const amount = readStripeUnitAmount(price)
+  if (amount !== null)
+    amounts[price.currency.toLowerCase()] = amount
   return amounts
 }
 
@@ -1025,7 +1037,7 @@ export interface CheckoutOptions {
 
 export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, options: CheckoutOptions = {}): Promise<CheckoutSessionResult> {
   const { clientReferenceId, attributionId, datafastAttribution, affonsoReferral, extraMau, embedded } = options
-  const requestedCurrency = options.currency?.toLowerCase()
+  const requestedCurrency = options.currency?.trim().toLowerCase() || undefined
   const billingAccount = await getBillingAccountForCustomer(c, customerId)
   assertBillingAccountReachableForUser(c, billingAccount, customerId)
   if (!isStripeConfiguredForAccount(c, billingAccount))
@@ -1036,19 +1048,16 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
   if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: prices.priceId, quantity: 1 }]
-  const needsPlanPrice = (extraMau && extraMau.extraMau > 0) || requestedCurrency
-  const planPrice = needsPlanPrice
-    ? await getStripe(c, billingAccount).prices.retrieve(prices.priceId, { expand: ['currency_options'] })
-    : null
-  const planCurrencies = planPrice ? Object.keys(getPriceCurrencyAmounts(planPrice)) : []
-  if (requestedCurrency) {
-    if (!planCurrencies.includes(requestedCurrency))
-      throw simpleError('invalid_currency', 'This plan is not sold in the requested currency', { currency: requestedCurrency })
-    const customerCurrency = await getStripeCustomerCurrency(c, customerId, billingAccount)
-    if (customerCurrency && customerCurrency !== requestedCurrency)
-      throw simpleError('currency_locked', 'This organization is already billed in another currency', { currency: requestedCurrency, customerCurrency })
-  }
-  if (extraMau && extraMau.extraMau > 0 && planPrice) {
+  const planPrice = await getStripe(c, billingAccount).prices.retrieve(prices.priceId, { expand: ['currency_options'] })
+  const planCurrencies = Object.keys(getPriceCurrencyAmounts(planPrice))
+  // The server owns the currency: a billed customer keeps theirs even when the client sends none.
+  const customerCurrency = await getStripeCustomerCurrency(c, customerId, billingAccount)
+  if (customerCurrency && requestedCurrency && customerCurrency !== requestedCurrency)
+    throw simpleError('currency_locked', 'This organization is already billed in another currency', { currency: requestedCurrency, customerCurrency })
+  const checkoutCurrency = customerCurrency ?? requestedCurrency
+  if (checkoutCurrency && !planCurrencies.includes(checkoutCurrency))
+    throw simpleError('invalid_currency', 'This plan is not sold in the requested currency', { currency: checkoutCurrency })
+  if (extraMau && extraMau.extraMau > 0) {
     // Same interval as the plan: Checkout bills every item of a subscription together.
     const interval = recurrence === 'year' ? 'year' : 'month'
     const extraMauPriceId = await getExtraMauPriceId(c, extraMau.includedMau, interval, planPrice.tax_behavior ?? null, billingAccount, planCurrencies)
@@ -1078,7 +1087,7 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
     tax_id_collection: { enabled: true },
     saved_payment_method_options: CHECKOUT_SAVED_PAYMENT_METHOD_OPTIONS,
     line_items: lineItems,
-    ...(requestedCurrency ? { currency: requestedCurrency } : {}),
+    ...(checkoutCurrency ? { currency: checkoutCurrency } : {}),
   })
   return toCheckoutSessionResult(session, publishableKey)
 }

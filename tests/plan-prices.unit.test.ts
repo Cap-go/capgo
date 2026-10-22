@@ -19,6 +19,12 @@ describe('plan prices', () => {
       },
     } as any)).toEqual({ usd: 1400, eur: 1400 })
     expect(getPriceCurrencyAmounts({ currency: 'usd', unit_amount: 3900, currency_options: undefined } as any)).toEqual({ usd: 3900 })
+    expect(getPriceCurrencyAmounts({
+      currency: 'usd',
+      unit_amount: null,
+      unit_amount_decimal: '1400.5',
+      currency_options: { eur: { unit_amount: null, unit_amount_decimal: '1400' } },
+    } as any)).toEqual({ usd: 1400.5, eur: 1400 })
   })
 
   it.concurrent('keeps only currencies every plan is sold in', () => {
@@ -26,7 +32,12 @@ describe('plan prices', () => {
       solo: { month: { usd: 1400, eur: 1400, gbp: 1400 }, year: { usd: 14600, eur: 14600, gbp: 14600 } },
       team: { month: { usd: 9900, eur: 9900 }, year: { usd: 99800, eur: 99800 } },
     })).toEqual(['eur', 'usd'])
-    expect(getCommonCurrencies({})).toEqual(['usd'])
+    // A plan whose Stripe price failed to load disables every currency.
+    expect(getCommonCurrencies({
+      solo: { month: { usd: 1400, eur: 1400 }, year: { usd: 14600, eur: 14600 } },
+      team: { month: {}, year: {} },
+    })).toEqual([])
+    expect(getCommonCurrencies({})).toEqual([])
   })
 
   it.concurrent('picks the locked, local, then USD currency', () => {
@@ -35,6 +46,8 @@ describe('plan prices', () => {
     expect(pickCurrency(['eur', 'gbp', 'usd'], null, 'GB')).toBe('gbp')
     expect(pickCurrency(['eur', 'usd'], null, 'GB')).toBe('usd')
     expect(pickCurrency(['eur', 'usd'], null, null)).toBe('usd')
+    expect(pickCurrency(['usd'], 'eur', 'FR')).toBeNull()
+    expect(pickCurrency([], null, 'FR')).toBeNull()
     expect(currencyForCountry('JP')).toBeNull()
   })
 

@@ -100,7 +100,7 @@ app.post('/', middlewareAuth, async (c) => {
     affonsoReferral: body.affonsoReferral,
     extraMau: extraMauCheckout,
     embedded: body.embedded === true,
-    currency: typeof body.currency === 'string' && /^[a-z]{3}$/i.test(body.currency) ? body.currency : undefined,
+    currency: typeof body.currency === 'string' ? body.currency : undefined,
   })
   return c.json(checkout)
 })

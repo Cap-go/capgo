@@ -170,11 +170,11 @@ const enterpriseQuote = computed(() => {
 })
 
 // Real Stripe amounts per currency (price currency_options); USD from the plans table until they load.
-const { amountsFor, currencies: priceCurrencies, currency: priceCurrency, formatAmount, lockedCurrency, setCurrency } = usePlanPrices(billingOrgId)
+const { amountsFor, currencies: priceCurrencies, currency: priceCurrency, formatAmount, lockedCurrency, lockedCurrencyUnavailable, ready: pricesReady, setCurrency } = usePlanPrices(billingOrgId)
 
 function planAmounts(plan: Database['public']['Tables']['plans']['Row']) {
   const stripeAmounts = amountsFor(plan.stripe_id)
-  return stripeAmounts
+  return stripeAmounts && priceCurrency.value
     ? { ...stripeAmounts, currency: priceCurrency.value }
     : { month: plan.price_m, year: plan.price_y, currency: 'usd' }
 }
@@ -243,7 +243,7 @@ async function startPlanCheckout(plan: Database['public']['Tables']['plans']['Ro
     // Enterprise only: MAU added to the plan quota, billed on the same subscription.
     extraMau: isEnterprisePlan(plan) ? enterpriseQuote.value?.extraMau : undefined,
     // Only a currency Stripe sells this plan in; otherwise Checkout uses the price default.
-    currency: amountsFor(plan.stripe_id) ? priceCurrency.value : undefined,
+    currency: amountsFor(plan.stripe_id) ? priceCurrency.value ?? undefined : undefined,
   })
 }
 
@@ -314,7 +314,7 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
   // get the current url
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id) {
-    const checkoutIsYearly = hasYearlyDiscount(plan) ? isYearly.value : false
+    const checkoutIsYearly = isCheckoutYearly(plan)
     const session = await startPlanCheckout(plan, checkoutIsYearly)
     if (!session) {
       toast.error(t('billing-checkout-error'))
@@ -335,6 +335,15 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
 function hasYearlyDiscount(plan: Database['public']['Tables']['plans']['Row']): boolean {
   const { month, year } = planAmounts(plan)
   return year > 0 && Math.round(year / 12) < month
+}
+
+// Yearly only when this currency's price is actually discounted; drives checkout and current-plan state.
+function isCheckoutYearly(plan: Database['public']['Tables']['plans']['Row']) {
+  return isYearly.value && hasYearlyDiscount(plan)
+}
+
+function isCurrentSubscription(plan: Database['public']['Tables']['plans']['Row']) {
+  return !!currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isCheckoutYearly(plan)
 }
 
 function getPrice(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): number {
@@ -523,13 +532,13 @@ function buttonName(p: Database['public']['Tables']['plans']['Row']) {
   if (isMobile)
     return t('check-on-web')
   if (isEnterprisePlan(p) && enterpriseQuote.value) {
-    if (isCurrentEnterpriseScale(p) && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value)
+    if (isCurrentEnterpriseScale(p) && isCurrentSubscription(p))
       return t('Current')
     if (currentEnterpriseMau.value)
       return t('enterprise-scale-change', { mau: formatMau(enterpriseQuote.value.targetMau) })
     return t('enterprise-scale-get', { mau: formatMau(enterpriseQuote.value.targetMau) })
   }
-  if (currentPlan.value?.name === p.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) {
+  if (currentPlan.value?.name === p.name && isCurrentSubscription(p)) {
     return t('Current')
   }
   if (showExpiredTrialState.value)
@@ -545,9 +554,12 @@ function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
   // Above the allowance, checkout needs the MAU price to add the extra MAU item.
   if (isEnterprisePlan(plan) && enterpriseMauIndex.value > 0 && !enterpriseQuote.value)
     return true
+  // Wait for the billing currency, and never start a checkout Stripe would reject for currency.
+  if (!pricesReady.value || lockedCurrencyUnavailable.value)
+    return true
   if (isEnterprisePlan(plan) && !isCurrentEnterpriseScale(plan))
     return isMobile
-  return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) || isMobile
+  return (currentPlan.value?.name === plan.name && isCurrentSubscription(plan)) || isMobile
 }
 
 function isRecommended(p: Database['public']['Tables']['plans']['Row']) {
@@ -645,7 +657,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
             </select>
           </label>
           <p v-if="lockedCurrency" data-test="plans-currency-locked" class="text-xs text-gray-500 dark:text-gray-400">
-            {{ t('plans-currency-locked', { currency: lockedCurrency.toUpperCase() }) }}
+            {{ t(lockedCurrencyUnavailable ? 'plans-currency-unavailable' : 'plans-currency-locked', { currency: lockedCurrency.toUpperCase() }) }}
           </p>
         </div>
       </div>

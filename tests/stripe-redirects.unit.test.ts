@@ -54,6 +54,14 @@ function createPriceList(recurringInterval = 'month', type = 'recurring') {
   ]
 }
 
+// createCheckout reads the plan price currencies and the customer's pinned currency.
+function subscriptionCheckoutMocks(customerCurrency: string | null = null, currencyOptions: Record<string, { unit_amount: number }> = { usd: { unit_amount: 1400 } }) {
+  return {
+    retrievePrice: vi.fn().mockResolvedValue({ id: 'price_1', currency: 'usd', unit_amount: 1400, currency_options: currencyOptions }),
+    customers: { retrieve: vi.fn().mockResolvedValue({ id: 'cus_123', currency: customerCurrency }) },
+  }
+}
+
 function mockBillingAccountLookup(billingAccount = 'ee') {
   mockedSupabaseAdmin.mockReturnValue({
     from: vi.fn().mockReturnValue({
@@ -179,10 +187,13 @@ describe('stripe redirect URL allowlist', () => {
 
   it('allows same-origin success and cancel URLs for checkout', async () => {
     const createSession = vi.fn().mockResolvedValue({ url: 'https://pay.capgo.test/p/pay' })
+    const mocks = subscriptionCheckoutMocks()
     const stripeClient = {
       prices: {
         list: vi.fn().mockResolvedValue({ data: createPriceList() }),
+        retrieve: mocks.retrievePrice,
       },
+      customers: mocks.customers,
       checkout: {
         sessions: {
           create: createSession,
@@ -235,8 +246,10 @@ describe('stripe redirect URL allowlist', () => {
     mockedEnv.STRIPE_PUBLISHABLE_KEY = 'pk_test_123'
     const createSession = vi.fn().mockResolvedValue({ id: 'cs_test_123', url: null, client_secret: 'cs_test_123_secret' })
     vi.mocked(Stripe).mockImplementation(function () {
+      const mocks = subscriptionCheckoutMocks()
       return {
-        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList() }) },
+        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList() }), retrieve: mocks.retrievePrice },
+        customers: mocks.customers,
         checkout: { sessions: { create: createSession } },
       }
     } as any)
@@ -255,11 +268,40 @@ describe('stripe redirect URL allowlist', () => {
     expect(params).not.toHaveProperty('cancel_url')
   })
 
+  it('checks out in the selected Stripe currency, and keeps a billed customer on theirs', async () => {
+    const createSession = vi.fn().mockResolvedValue({ id: 'cs_test_123', url: 'https://pay.capgo.test/p/pay' })
+    let customerCurrency: string | null = null
+    vi.mocked(Stripe).mockImplementation(function () {
+      const mocks = subscriptionCheckoutMocks(customerCurrency, { usd: { unit_amount: 1400 }, eur: { unit_amount: 1400 } })
+      return {
+        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList() }), retrieve: mocks.retrievePrice },
+        customers: mocks.customers,
+        checkout: { sessions: { create: createSession } },
+      }
+    } as any)
+
+    const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const checkout = (currency?: string) => createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', { currency })
+
+    await checkout('EUR')
+    expect(createSession.mock.calls.at(-1)?.[0]).toMatchObject({ currency: 'eur' })
+    await checkout()
+    expect(createSession.mock.calls.at(-1)?.[0]).not.toHaveProperty('currency')
+    await expect(checkout('gbp')).rejects.toMatchObject({ cause: { error: 'invalid_currency' } })
+
+    customerCurrency = 'usd'
+    await checkout()
+    expect(createSession.mock.calls.at(-1)?.[0]).toMatchObject({ currency: 'usd' })
+    await expect(checkout('eur')).rejects.toMatchObject({ cause: { error: 'currency_locked' } })
+  })
+
   it('keeps hosted checkout when embedded is requested without a publishable key', async () => {
     const createSession = vi.fn().mockResolvedValue({ id: 'cs_test_123', url: 'https://pay.capgo.test/p/pay' })
     vi.mocked(Stripe).mockImplementation(function () {
+      const mocks = subscriptionCheckoutMocks()
       return {
-        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList() }) },
+        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList() }), retrieve: mocks.retrievePrice },
+        customers: mocks.customers,
         checkout: { sessions: { create: createSession } },
       }
     } as any)
@@ -290,10 +332,13 @@ describe('stripe redirect URL allowlist', () => {
 
   it('rejects external success URLs for checkout', async () => {
     const createSession = vi.fn()
+    const mocks = subscriptionCheckoutMocks()
     const stripeClient = {
       prices: {
         list: vi.fn().mockResolvedValue({ data: createPriceList() }),
+        retrieve: mocks.retrievePrice,
       },
+      customers: mocks.customers,
       checkout: {
         sessions: {
           create: createSession,
@@ -524,8 +569,11 @@ describe('stripe redirect URL allowlist', () => {
     })
 
     const createSession = vi.fn().mockResolvedValue({ url: 'https://pay.capgo.test/p/subscription' })
+    const mocks = subscriptionCheckoutMocks()
     const stripeClient = {
+      customers: mocks.customers,
       prices: {
+        retrieve: mocks.retrievePrice,
         list: vi.fn().mockResolvedValue({
           data: [
             {

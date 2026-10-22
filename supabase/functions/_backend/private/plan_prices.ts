@@ -33,44 +33,51 @@ export function currencyForCountry(country: string | null | undefined) {
   return null
 }
 
-// Currencies every plan is sold in, so switching never leaves a card without a price.
+// Currencies every plan and interval is sold in: a plan whose price failed to load disables them all,
+// so switching never leaves a card on a fallback price.
 export function getCommonCurrencies(prices: PlanPriceAmounts) {
-  const plans = Object.values(prices)
-  if (!plans.length)
-    return [DEFAULT_CURRENCY]
-  const sets = plans.flatMap(plan => [plan.month, plan.year]).filter(amounts => Object.keys(amounts).length)
+  const sets = Object.values(prices).flatMap(plan => [plan.month, plan.year])
   if (!sets.length)
-    return [DEFAULT_CURRENCY]
+    return []
   return Object.keys(sets[0]).filter(currency => sets.every(amounts => currency in amounts)).sort()
 }
 
 export function pickCurrency(currencies: string[], lockedCurrency: string | null, country: string | null) {
   if (lockedCurrency)
-    return lockedCurrency
+    return currencies.includes(lockedCurrency) ? lockedCurrency : null
   const local = currencyForCountry(country)
   if (local && currencies.includes(local))
     return local
-  return currencies.includes(DEFAULT_CURRENCY) ? DEFAULT_CURRENCY : currencies[0] ?? DEFAULT_CURRENCY
+  return currencies.includes(DEFAULT_CURRENCY) ? DEFAULT_CURRENCY : currencies[0] ?? null
 }
 
-async function loadPlanPrices(c: Context, billingAccount: BillingAccount): Promise<PlanPriceAmounts> {
+async function loadPlanPrices(c: Context, billingAccount: BillingAccount): Promise<{ prices: PlanPriceAmounts, complete: boolean }> {
   const { data: plans, error } = await supabaseAdmin(c)
     .from('plans')
     .select('stripe_id')
   if (error)
     throw simpleError('plans_not_found', 'Cannot load plans', { error })
 
+  let complete = true
   const entries = await Promise.all((plans ?? []).map(async ({ stripe_id }) => {
-    const [month, year] = await Promise.all([
-      getCheckoutPlanPrice(c, stripe_id, 'month', billingAccount),
-      getCheckoutPlanPrice(c, stripe_id, 'year', billingAccount),
-    ])
-    return [stripe_id, {
-      month: month ? getPriceCurrencyAmounts(month) : {},
-      year: year ? getPriceCurrencyAmounts(year) : {},
-    }] as const
+    try {
+      const [month, year] = await Promise.all([
+        getCheckoutPlanPrice(c, stripe_id, 'month', billingAccount),
+        getCheckoutPlanPrice(c, stripe_id, 'year', billingAccount),
+      ])
+      return [stripe_id, {
+        month: month ? getPriceCurrencyAmounts(month) : {},
+        year: year ? getPriceCurrencyAmounts(year) : {},
+      }] as const
+    }
+    catch (priceError) {
+      // One broken plan must not hide the others; its empty amounts disable localized currencies.
+      complete = false
+      cloudlogErr({ requestId: c.get('requestId'), message: 'plan_prices price lookup failed', planProductId: stripe_id, error: serializeError(priceError) })
+      return [stripe_id, { month: {}, year: {} }] as const
+    }
   }))
-  return Object.fromEntries(entries)
+  return { prices: Object.fromEntries(entries), complete }
 }
 
 async function getPlanPrices(c: Context, billingAccount: BillingAccount) {
@@ -79,9 +86,11 @@ async function getPlanPrices(c: Context, billingAccount: BillingAccount) {
   const cached = await cache.matchJson<PlanPriceAmounts>(key, { timeoutMs: 200 })
   if (cached)
     return cached
-  const fresh = await loadPlanPrices(c, billingAccount)
-  await cache.putJson(key, fresh, PLAN_PRICES_TTL_SECONDS, { timeoutMs: 200 })
-  return fresh
+  const { prices, complete } = await loadPlanPrices(c, billingAccount)
+  // Never cache a partial catalog: the next request retries the failed plans.
+  if (complete)
+    await cache.putJson(key, prices, PLAN_PRICES_TTL_SECONDS, { timeoutMs: 200 })
+  return prices
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -108,24 +117,20 @@ app.get('/', middlewareAuth, async (c) => {
 
   const billingAccount = org.customer_id ? await getBillingAccountForCustomer(c, org.customer_id) : 'ee'
   if (!isStripeConfiguredForAccount(c, billingAccount))
-    return c.json({ currencies: [DEFAULT_CURRENCY], currency: DEFAULT_CURRENCY, lockedCurrency: null, prices: {} })
+    return c.json({ currencies: [], currency: null, lockedCurrency: null, prices: {} })
 
-  const prices = await getPlanPrices(c, billingAccount)
-  let lockedCurrency: string | null = null
-  if (org.customer_id) {
-    try {
-      lockedCurrency = await getStripeCustomerCurrency(c, org.customer_id, billingAccount)
-    }
-    catch (customerError) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'plan_prices customer currency', error: serializeError(customerError) })
-    }
-  }
-  const currencies = getCommonCurrencies(prices)
-  // A pinned customer can only check out in its own currency.
-  const available = lockedCurrency ? currencies.filter(currency => currency === lockedCurrency) : currencies
+  // Fail closed: an unknown customer currency must not unlock currencies checkout would reject.
+  const [prices, lockedCurrency] = await Promise.all([
+    getPlanPrices(c, billingAccount),
+    org.customer_id ? getStripeCustomerCurrency(c, org.customer_id, billingAccount) : null,
+  ])
+  // A pinned customer can only check out in its own currency; empty when the catalog lacks it.
+  const common = getCommonCurrencies(prices)
+  const currencies = lockedCurrency ? common.filter(currency => currency === lockedCurrency) : common
   return c.json({
-    currencies: available.length ? available : [DEFAULT_CURRENCY],
-    currency: pickCurrency(available, lockedCurrency, getRequestCountry(c)),
+    currencies,
+    // Null means no currency is sold on every plan: the page shows the stored USD prices.
+    currency: pickCurrency(currencies, lockedCurrency, getRequestCountry(c)),
     lockedCurrency,
     prices,
   })

@@ -2589,6 +2589,7 @@
   "plan-upgrade-v2": "Upgrade",
   "plans": "plans",
   "plans-currency-locked": "This organization is billed in {currency}.",
+  "plans-currency-unavailable": "This organization is billed in {currency}, which these plans are not sold in. Contact support to change plan.",
   "plans-display-currency": "Currency",
   "plans-category-paying": "Paying",
   "plans-category-active-trial": "Active trial",

@@ -5,14 +5,14 @@ import { formatNumber } from '~/services/formatLocale'
 import { stripeAmountToMajorUnits } from '../../supabase/functions/shared/stripe-amount.ts'
 
 const STORAGE_KEY = 'capgo_plan_currency'
-const DEFAULT_CURRENCY = 'usd'
 
 // Smallest-unit amounts per currency, straight from the Stripe prices (currency_options).
 type PlanPriceAmounts = Record<string, { month: Record<string, number>, year: Record<string, number> }>
 
 interface PlanPricesResponse {
+  // Currencies sold on every plan and interval (only the locked one for a billed customer).
   currencies: string[]
-  currency: string
+  currency: string | null
   lockedCurrency: string | null
   prices: PlanPriceAmounts
 }
@@ -43,25 +43,32 @@ export function getPlanAmounts(prices: PlanPriceAmounts, productId: string, curr
 
 export function usePlanPrices(orgId: Ref<string | undefined>) {
   const data = ref<PlanPricesResponse | null>(null)
+  // True once the request settled, success or not: checkout waits for it.
+  const ready = ref(false)
   const storedCurrency = ref(readStoredCurrency())
 
   watch(orgId, async (id) => {
     data.value = null
+    ready.value = false
     if (!id)
       return
     const { data: response, error } = await invokeCapgoApi<PlanPricesResponse>(`private/plan_prices?orgId=${encodeURIComponent(id)}`, { method: 'GET' })
-    if (!error && response && orgId.value === id)
-      data.value = response
+    if (orgId.value !== id)
+      return
+    data.value = !error && response ? response : null
+    ready.value = true
   }, { immediate: true })
 
-  const currencies = computed(() => data.value?.currencies ?? [DEFAULT_CURRENCY])
+  const currencies = computed(() => data.value?.currencies ?? [])
   const lockedCurrency = computed(() => data.value?.lockedCurrency ?? null)
+  // The org is billed in a currency these plans are not sold in: checkout would be rejected.
+  const lockedCurrencyUnavailable = computed(() => !!lockedCurrency.value && !currencies.value.includes(lockedCurrency.value))
   const currency = computed(() => {
     if (lockedCurrency.value)
-      return lockedCurrency.value
+      return lockedCurrencyUnavailable.value ? null : lockedCurrency.value
     if (storedCurrency.value && currencies.value.includes(storedCurrency.value))
       return storedCurrency.value
-    return data.value?.currency ?? DEFAULT_CURRENCY
+    return data.value?.currency ?? null
   })
 
   function setCurrency(code: string) {
@@ -74,12 +81,12 @@ export function usePlanPrices(orgId: Ref<string | undefined>) {
 
   // Null until Stripe prices load: callers fall back to the USD amounts stored on the plan.
   function amountsFor(productId: string) {
-    return data.value ? getPlanAmounts(data.value.prices, productId, currency.value) : null
+    return data.value && currency.value ? getPlanAmounts(data.value.prices, productId, currency.value) : null
   }
 
   function formatAmount(value: number, code: string, options: Intl.NumberFormatOptions = {}) {
     return formatNumber(value, { style: 'currency', currency: code.toUpperCase(), currencyDisplay: 'narrowSymbol', ...options })
   }
 
-  return { amountsFor, currencies, currency, formatAmount, lockedCurrency, setCurrency }
+  return { amountsFor, currencies, currency, formatAmount, lockedCurrency, lockedCurrencyUnavailable, ready, setCurrency }
 }
