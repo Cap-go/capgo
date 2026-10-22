@@ -458,6 +458,13 @@ watch([flowStep, createdApp, setupStage, usesBuilderSetupCommand, activeChecklis
 })
 
 const cliSubcommand = computed(() => usesBuilderSetupCommand.value ? 'build init' : 'i')
+
+watch(() => props.initialChecklistPath, (path) => {
+  if (path && createdApp.value) {
+    flowStep.value = 'setup'
+    setupStage.value = 'cli'
+  }
+})
 const builderCliCommand = computed(() => apiKey.value ? `npx @capgo/cli@latest build init -a ${apiKey.value}` : '')
 const cliCommand = computed(() => {
   const key = apiKey.value
@@ -1323,10 +1330,11 @@ async function loadResumeApp(appId = resumeAppId.value) {
   const iconLoadRun = ++resumeIconLoadRun
   localIconPreview.value = getImmediateImageUrl(data.icon_url) || ''
   void loadResumeIconPreview(data.icon_url, data.app_id, iconLoadRun)
-  const resumeFinalStep = props.showChecklist || !newChannelTreatment.value
+  const hasChecklistTarget = props.showChecklist || !!props.initialChecklistPath
+  const resumeFinalStep = hasChecklistTarget || !newChannelTreatment.value
     || Boolean(savedProgress && savedProgress.app_id === data.app_id && savedProgress.final_step && savedProgress.setup_stage === 'cli')
   flowStep.value = resumeFinalStep ? 'setup' : 'channel'
-  if (props.showChecklist)
+  if (hasChecklistTarget)
     setupStage.value = 'cli'
   if (!savedProgress?.intent)
     hydrateIntentFromCurrentOrg()

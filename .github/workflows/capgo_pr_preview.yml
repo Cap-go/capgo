@@ -71,7 +71,7 @@ jobs:
           echo "bundle=${base_version}-pr.${PR_NUMBER}.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
           echo "base_version=${base_version}" >> "$GITHUB_OUTPUT"
       - name: Delete orphaned PR preview bundles
-        timeout-minutes: 5
+        timeout-minutes: 6
         env:
           CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -84,7 +84,7 @@ jobs:
             start_run=1
           fi
           delete_preview_bundle() {
-            timeout 35s bunx "$CAPGO_CLI" bundle delete "$1" "$APP_ID" --apikey "$CAPGO_TOKEN" 2>/dev/null || true
+            timeout --kill-after=2s 33s bunx "$CAPGO_CLI" bundle delete "$1" "$APP_ID" --apikey "$CAPGO_TOKEN" 2>/dev/null || true
           }
           for run in $(seq "$start_run" "$GITHUB_RUN_NUMBER"); do
             for attempt in 1 2 3; do

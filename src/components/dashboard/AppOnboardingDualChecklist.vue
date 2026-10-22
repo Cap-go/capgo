@@ -40,6 +40,10 @@ const paths = ['ota', 'builder'] as const
 const label = (path: ChecklistPath) => t(path === 'ota' ? 'setup-goal-live-updates' : 'setup-goal-builder')
 
 watch(() => props.initialOnboarding, value => snapshot.value = value)
+watch(() => props.initialPath, (path) => {
+  if (path)
+    selectPath(path)
+})
 watch(() => props.userId, (userId) => {
   if (!userId)
     return

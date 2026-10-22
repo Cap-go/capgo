@@ -108,7 +108,7 @@ const previewUserOnboarding = {
   status: params.get('checklistState') === 'completed' ? 'completed' : 'in_progress',
   step: 'setup',
   flow: 'existing_org',
-  setup_stage: 'cli',
+  setup_stage: params.get('setupStage') ?? 'cli',
   app_id: previewAppId,
   ...(params.get('legacyChannel') === '1' ? {} : { final_step: 'setup' }),
 }
@@ -357,4 +357,5 @@ const router = createRouter({
 })
 installOnboardingSetupNavigation({ app, router, routes: router.options.routes })
 app.use(router)
+Object.assign(preview, { navigate: (path: string) => router.push(path) })
 void router.isReady().then(() => app.mount('#app'))

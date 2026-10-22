@@ -14,6 +14,7 @@ const cleanups: Array<() => void> = []
 
 function mountChecklist(started = true, selectedPath = 'ota', builderPlatforms = ['ios', 'android'], initialPath?: 'ota' | 'builder') {
   const userId = ref<string | null>(null)
+  const requestedPath = ref(initialPath)
   let automaticPlatformChange: ((platform: 'ios' | 'android') => void) | undefined
   const Inspection = defineComponent({
     setup() {
@@ -36,7 +37,7 @@ function mountChecklist(started = true, selectedPath = 'ota', builderPlatforms =
   const host = document.createElement('div')
   const app = createApp(defineComponent({
     setup() {
-      return () => h(AppOnboardingDualChecklist, { appId, userId: userId.value, initialOnboarding: onboarding, initialPath, hiding: false, leaving: false }, {
+      return () => h(AppOnboardingDualChecklist, { appId, userId: userId.value, initialOnboarding: onboarding, initialPath: requestedPath.value, hiding: false, leaving: false }, {
         builder: (panel: any) => {
           automaticPlatformChange = panel.selectPlatform
           return h('div', { 'data-test': 'builder', 'data-platform': panel.platform }, [
@@ -52,7 +53,7 @@ function mountChecklist(started = true, selectedPath = 'ota', builderPlatforms =
     app.unmount()
     host.remove()
   })
-  return { host, userId, automaticPlatformChange: () => automaticPlatformChange?.('ios') }
+  return { host, userId, requestedPath, automaticPlatformChange: () => automaticPlatformChange?.('ios') }
 }
 
 describe('dual-checklist identity hydration', () => {
@@ -75,6 +76,21 @@ describe('dual-checklist identity hydration', () => {
   it('opens an explicitly requested Builder path without requiring progress or a goal choice', () => {
     const { host } = mountChecklist(false, 'ota', [], 'builder')
     expect(host.querySelector('[data-test="setup-goal-chooser"]')).toBeNull()
+    expect(host.querySelector('[aria-selected="true"]')?.textContent?.trim()).toBe('setup-goal-builder')
+  })
+
+  it('applies a later explicit path request while keeping the checklist mounted', async () => {
+    saveChecklistPreference(user, appId, { path: 'ota' })
+    const { host, userId, requestedPath } = mountChecklist()
+    userId.value = user
+    await nextTick()
+    expect(host.querySelector('[aria-selected="true"]')?.textContent?.trim()).toBe('setup-goal-live-updates')
+    requestedPath.value = 'builder'
+    await nextTick()
+    expect(host.querySelector('[aria-selected="true"]')?.textContent?.trim()).toBe('setup-goal-builder')
+    expect(loadChecklistPreference(user, appId).path).toBe('builder')
+    requestedPath.value = undefined
+    await nextTick()
     expect(host.querySelector('[aria-selected="true"]')?.textContent?.trim()).toBe('setup-goal-builder')
   })
 

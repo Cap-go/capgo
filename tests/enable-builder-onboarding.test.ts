@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { hasSupportedOtaTodoList, parseAppOnboarding } from '../src/services/appOnboarding'
 import { shouldShowGettingStartedNav, shouldSkipOnboardingResume } from '../src/utils/appOnboardingProgress'
 import { app } from '../supabase/functions/_backend/public/app/index.ts'
 import { POSTGRES_URL } from './test-utils.ts'
@@ -94,6 +95,20 @@ describe('explicit Builder checklist activation', () => {
     expect(Object.keys(data.setup.steps.ota)).toHaveLength(7)
     expect(data.custom).toBe('keep')
     expect((await admin.from('apps').select('need_onboarding').eq('app_id', appId).single()).data!.need_onboarding).toBe(true)
+  })
+
+  it.concurrent.each([1, '1', null, undefined])('persists readable v4 OTA progress for accepted subversion %j', async (subversion) => {
+    const appId = await fixture({ setup: { todo_list_version: 4, ota_todo_list_version: subversion, paths: ['ota'], steps: { ota: otaSteps } } })
+    const data = await activate(appId)
+    const persisted = (await admin.from('apps').select('onboarding').eq('app_id', appId).single()).data!.onboarding
+    expect(persisted).toEqual(data)
+    expect(data.setup.ota_todo_list_version).toBe('1')
+    expect(data.setup.steps.ota).toEqual(otaSteps)
+    const parsed = parseAppOnboarding(persisted)
+    expect(hasSupportedOtaTodoList(parsed)).toBe(true)
+    expect(parsed.steps.login_cli_mcp?.status).toBe('done')
+    expect(parsed.steps.add_channel?.status).toBe('skipped')
+    expect(await activate(appId)).toEqual(data)
   })
 
   it.concurrent.each(['ota', 'builder', 'both'])('extends or reuses v4 %s without resetting progress and is idempotent', async (path) => {

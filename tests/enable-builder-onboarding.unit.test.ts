@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { hasSupportedOtaTodoList, parseAppOnboarding } from '../src/services/appOnboarding'
 import { BUILDER_STEP_IDS } from '../src/services/builderOnboardingChecklist'
 import { shouldShowGettingStartedNav, shouldSkipOnboardingResume } from '../src/utils/appOnboardingProgress'
 import { enableBuilderChecklist, UnsupportedBuilderOnboardingVersion } from '../supabase/functions/_backend/utils/enableBuilderOnboarding.ts'
@@ -85,5 +86,15 @@ describe('explicit Builder checklist activation', () => {
   it.concurrent('keeps nullish defaults and numeric subversion support', () => {
     expect(activate({ setup: { todo_list_version: null } }).setup.paths).toEqual(['builder'])
     expect(activate({ setup: { todo_list_version: 4, ota_todo_list_version: 1, builder_todo_list_version: null, paths: ['ota'] } }).setup.paths).toEqual(['ota', 'builder'])
+  })
+
+  it.concurrent.each([1, '1', null, undefined])('keeps v4 OTA progress readable after normalizing subversion %j', (subversion) => {
+    const data = activate({ setup: { todo_list_version: 4, ota_todo_list_version: subversion, paths: ['ota'], steps: { ota: otaSteps } } })
+    expect(data.setup.ota_todo_list_version).toBe('1')
+    const parsed = parseAppOnboarding(data)
+    expect(hasSupportedOtaTodoList(parsed)).toBe(true)
+    expect(parsed.steps.login_cli_mcp?.status).toBe('done')
+    expect(parsed.steps.add_channel?.status).toBe('skipped')
+    expect(data.setup.steps.ota).toEqual(otaSteps)
   })
 })
