@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { buildOpenAIRegistrationEvent, buildOpenAISubscriptionEvent, getOpenAISubscriptionSourceUrl, normalizeOpenAICurrency, normalizeOpenAIName, trackOpenAIRegistration, trackOpenAISubscription } from '../supabase/functions/_backend/utils/openai_ads.ts'
-import { getInvoicePayment, getOpenAIFirstPaymentAt, isIncompleteSubscriptionActivation, trackOpenAIFirstPayment } from '../supabase/functions/_backend/utils/openai_ads_first_payment.ts'
+import { getInvoicePayment, getOpenAIFirstPaymentAt, isFirstSubscriptionInvoicePaid, isIncompleteSubscriptionActivation, trackOpenAIFirstPayment } from '../supabase/functions/_backend/utils/openai_ads_first_payment.ts'
 
 const envValues: Record<string, string> = {}
 
@@ -211,6 +211,36 @@ describe('openai ads conversions api', () => {
       // An org that first paid long ago is not a new conversion.
       expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: '2026-01-01T00:00:00.000Z', stripeEvent: activation, eventOccurredAtIso, now })).toBeNull()
       expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: null, stripeEvent: activation, eventOccurredAtIso, now })).toBeNull()
+    })
+
+    it('recovers an invoiced (send_invoice) subscription whose first invoice is paid later', async () => {
+      const eventOccurredAtIso = '2026-10-19T11:50:00.000Z'
+      const invoice = { id: 'in_transfer', status: 'paid', billing_reason: 'subscription_create', collection_method: 'send_invoice' }
+      const invoiceUpdated = { type: 'invoice.updated', data: { object: invoice, previous_attributes: { status: 'open' } } } as any
+      expect(isFirstSubscriptionInvoicePaid(invoiceUpdated)).toBe(true)
+      expect(isFirstSubscriptionInvoicePaid({ type: 'invoice.paid', data: { object: invoice } } as any)).toBe(true)
+      // Not a payment transition, a renewal, or a card subscription (handled by the subscription webhooks).
+      expect(isFirstSubscriptionInvoicePaid({ ...invoiceUpdated, data: { object: invoice, previous_attributes: { footer: 'x' } } })).toBe(false)
+      expect(isFirstSubscriptionInvoicePaid({ ...invoiceUpdated, data: { ...invoiceUpdated.data, object: { ...invoice, billing_reason: 'subscription_cycle' } } })).toBe(false)
+      expect(isFirstSubscriptionInvoicePaid({ ...invoiceUpdated, data: { ...invoiceUpdated.data, object: { ...invoice, collection_method: 'charge_automatically' } } })).toBe(false)
+      expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: paidAt, stripeEvent: invoiceUpdated, eventOccurredAtIso, now })).toBe(eventOccurredAtIso)
+
+      envValues.OPENAI_ADS_API_KEY = 'test-key'
+      vi.useFakeTimers({ now, toFake: ['Date'] })
+      const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))
+      vi.stubGlobal('fetch', fetchMock)
+      const retrieveInvoice = vi.fn(async () => ({ status: 'paid' as const, amount_paid: 11880, currency: 'eur' }))
+      try {
+        expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt: eventOccurredAtIso, planId: 'Team', stripeEvent: invoiceUpdated }, { loadUser: async () => record, retrieveInvoice })).toBe(true)
+      }
+      finally {
+        vi.useRealTimers()
+      }
+      expect(retrieveInvoice).toHaveBeenCalledWith('in_transfer')
+      expect(JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string).events[0]).toMatchObject({
+        id: `subscription_${sha(orgId)}`,
+        data: { type: 'plan_enrollment', plan_id: 'Team', amount: 11880, currency: 'EUR' },
+      })
     })
 
     it('uses the console plans page as source url', () => {

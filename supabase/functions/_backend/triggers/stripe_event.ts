@@ -1244,25 +1244,7 @@ async function createdOrUpdated(
       // or converted trial). Scheduled right after the commit, before any step
       // that can fail the webhook: a Stripe retry no longer sees paid_at as new.
       // Background only: it never fails the webhook.
-      await backgroundTask(c, trackOpenAIFirstPayment(c, {
-        orgId: org.id,
-        ownerUserId: org.created_by,
-        paidAt: openAIFirstPaymentAt,
-        planId: plan.name || stripeData.data.price_id,
-        stripeEvent: c.get('stripeEvent'),
-      }, {
-        loadUser: async (userId) => {
-          const { data, error } = await supabaseAdmin(c)
-            .from('users')
-            .select('id, email, first_name, last_name, country')
-            .eq('id', userId)
-            .maybeSingle()
-          if (error)
-            throw error
-          return data
-        },
-        retrieveInvoice: invoiceId => getStripe(c, getWebhookBillingAccount(c)).invoices.retrieve(invoiceId),
-      }))
+      await scheduleOpenAIFirstPayment(c, org, openAIFirstPaymentAt, plan.name || stripeData.data.price_id)
     }
 
     if (status === 'past_due')
@@ -1652,12 +1634,61 @@ async function handleCustomerSourceStripeEvent(
   return null
 }
 
+// Paid conversion for OpenAI Ads, in the background: it never fails the webhook.
+async function scheduleOpenAIFirstPayment(c: Context, org: Org, paidAt: string, planId: string | null | undefined) {
+  const billingAccount = getWebhookBillingAccount(c)
+  await backgroundTask(c, trackOpenAIFirstPayment(c, {
+    orgId: org.id,
+    ownerUserId: org.created_by,
+    paidAt,
+    planId,
+    stripeEvent: c.get('stripeEvent'),
+  }, {
+    loadUser: async (userId) => {
+      const { data, error } = await supabaseAdmin(c)
+        .from('users')
+        .select('id, email, first_name, last_name, country')
+        .eq('id', userId)
+        .maybeSingle()
+      if (error)
+        throw error
+      return data
+    },
+    // Short, single-shot requests: the helper retries, inside the background budget.
+    retrieveInvoice: invoiceId => getStripe(c, billingAccount).invoices.retrieve(invoiceId, {}, { timeout: 3_000, maxNetworkRetries: 0 }),
+  }))
+}
+
+// An invoiced subscription's first invoice was paid after paid_at was set:
+// report the conversion the subscription webhook had to skip.
+async function recoverOpenAIFirstPaymentFromInvoice(c: Context<MiddlewareKeyVariablesStripe>, org: Org, stripeEvent: Stripe.Event, customer: StripeInfoRow) {
+  const paidAt = getOpenAIFirstPaymentAt({
+    firstPaidAt: null,
+    currentPaidAt: customer.paid_at,
+    stripeEvent,
+    eventOccurredAtIso: new Date(stripeEvent.created * 1000).toISOString(),
+  })
+  if (!paidAt)
+    return
+  try {
+    const plans = await getBillingPlans(c)
+    const plan = plans.find(candidate => candidate.stripe_id === customer.product_id || candidate.stripe_id_us === customer.product_id)
+    await scheduleOpenAIFirstPayment(c, org, paidAt, plan?.name || customer.price_id)
+  }
+  catch (error) {
+    // Ads reporting must never fail the webhook.
+    cloudlogErr({ requestId: c.get('requestId'), message: 'OpenAI Ads invoice recovery failed', orgId: org.id, error })
+  }
+}
+
 async function handleInvoiceStripeEvent(
   c: Context<MiddlewareKeyVariablesStripe>,
   org: Org,
   stripeEvent: Stripe.Event,
   stripeData: StripeData,
+  customer: StripeInfoRow,
 ) {
+  await recoverOpenAIFirstPaymentFromInvoice(c, org, stripeEvent, customer)
   if (stripeEvent.type === 'invoice.upcoming')
     return invoiceUpcoming(c, org, stripeEvent, stripeData)
   if (stripeEvent.type === 'invoice.created' || stripeEvent.type === 'invoice.updated')
@@ -1926,7 +1957,7 @@ async function stripeEventHandler(c: Context<MiddlewareKeyVariablesStripe>) {
   if (customerSourceResponse)
     return customerSourceResponse
 
-  const invoiceResponse = await handleInvoiceStripeEvent(c, org, stripeEvent, stripeData)
+  const invoiceResponse = await handleInvoiceStripeEvent(c, org, stripeEvent, stripeData, customer)
   if (invoiceResponse)
     return invoiceResponse
 
