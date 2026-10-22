@@ -134,7 +134,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - The Capgo API selects and deletes the bundles server-side (`POST /bundle/cleanup`). Without `--force`, the CLI first shows a preview (dry run), asks for confirmation, then deletes only the bundles shown as removable, even if new bundles are uploaded meanwhile.
   - With `--force`, selection and deletion happen in one request, with no preview.
   - Self-hosted Capgo: this needs a backend that serves `POST /bundle/cleanup`. Against an older backend the command stops with "does not support server-side bundle cleanup"; update the backend or use an older CLI.
-  - `bundle delete` sends a single delete request; the API reports a missing bundle or one still linked to a channel (the CLI then offers to unlink it).
+  - `bundle delete` starts with a direct delete request. If the API reports the bundle is still linked to a channel, the CLI offers to unlink it and then retries the delete; a missing bundle is reported directly.
 - Key options:
   - `-b, --bundle <bundle>`
   - `-k, --keep <keep>`
