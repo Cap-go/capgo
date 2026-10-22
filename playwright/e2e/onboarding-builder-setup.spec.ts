@@ -17,6 +17,16 @@ test('shows live Builder progress while keeping platform tasks separate', async 
   await expect(page.locator('[data-test="builder-checklist-choose-platform"]')).toBeVisible()
 
   await page.locator('[data-test="builder-platform-ios"]').click()
+  const toggle = page.locator('[data-test="builder-checklist-toggle"]')
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  await expect(toggle).toHaveText('Hide steps')
+  await expect(page.locator('[data-test="builder-step-prepare_certificate"]')).toBeVisible()
+  await toggle.click()
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  await expect(toggle).toHaveText('Show all 6 steps')
+  await expect(page.locator('[data-test="builder-step-prepare_certificate"]')).toBeHidden()
+  await toggle.click()
+  await expect(page.locator('[data-test="builder-step-prepare_certificate"]')).toBeVisible()
   await expect(page.locator('[data-test^="builder-step-"] button')).toContainText([
     'Start guided Builder setup',
     'Choose where the build goes',
@@ -129,7 +139,7 @@ for (const assignment of ['both-builder', 'both-ota']) {
 test('asks to finish or explicitly skip a Builder step passed over by out-of-order setup', async ({ page }) => {
   await page.clock.install()
   await page.goto(`${fixture}&platform=android`)
-  await expect(page.locator('[data-test="builder-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.locator('[data-test="builder-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'true')
 
   await page.evaluate(() => {
     (window as any).onboardingSetupPreview.state.builderSteps.android.prepare_keystore = { status: 'done' }
