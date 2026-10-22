@@ -17,6 +17,7 @@ import {
   TRIAL_PLAN_SCHEDULE_METADATA_KEY,
 } from './stripe_billing.ts'
 import { supabaseAdmin } from './supabase.ts'
+import { sendEventToTracking } from './tracking.ts'
 import { getEnv, isStripeConfigured, trimTrailingSlashes } from './utils.ts'
 
 export type { BillingAccount } from './stripe_billing.ts'
@@ -974,6 +975,45 @@ function toCheckoutSessionResult(session: Stripe.Checkout.Session, publishableKe
   return { url: null, clientSecret: session.client_secret, publishableKey, sessionId: session.id }
 }
 
+// Only successful purchase checkouts call this; card SetupIntents never do.
+async function notifyCheckoutStarted(c: Context, customerId: string, sessionId: string, productId: string, recurrence = 'one_time') {
+  try {
+    const { data: org, error } = await supabaseAdmin(c)
+      .from('orgs')
+      .select('id, name')
+      .eq('customer_id', customerId)
+      .single()
+    if (error || !org)
+      throw error ?? new Error('Checkout organization not found')
+
+    await sendEventToTracking(c, {
+      channel: 'usage',
+      event: 'Checkout Started',
+      user_id: c.get('auth')?.userId,
+      groups: { organization: org.id },
+      sentToBento: true,
+      bento: {
+        event: 'user:checkout_started',
+        preferenceKey: 'credit_usage',
+        audience: 'billing',
+        cron: '* * * * *',
+        uniqId: `checkout_started:${productId}:${recurrence}`,
+        data: {
+          org_id: org.id,
+          org_name: org.name,
+          product_id: productId,
+          recurrence,
+          checkout_source: recurrence === 'one_time' ? 'credits' : 'plans',
+          checkout_session_id: sessionId,
+        },
+      },
+    }, { posthog: false })
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Checkout started Bento tracking failed', error })
+  }
+}
+
 export interface CheckoutOptions {
   clientReferenceId?: string
   attributionId?: string
@@ -1028,6 +1068,7 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
     saved_payment_method_options: CHECKOUT_SAVED_PAYMENT_METHOD_OPTIONS,
     line_items: lineItems,
   })
+  await notifyCheckoutStarted(c, customerId, session.id, resolvedPlanId, recurrence)
   return toCheckoutSessionResult(session, publishableKey)
 }
 
@@ -1127,6 +1168,7 @@ export async function createOneTimeCheckout(
       ...getAffonsoReferralMetadata(affonsoReferral),
     },
   })
+  await notifyCheckoutStarted(c, customerId, session.id, productId)
   return toCheckoutSessionResult(session, publishableKey)
 }
 

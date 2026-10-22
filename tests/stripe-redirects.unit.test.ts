@@ -6,8 +6,14 @@ const mockedEnv: Record<string, string> = {
   WEBAPP_URL: 'https://capgo.test',
   STRIPE_SECRET_KEY: 'sk_test_123',
 }
-const { mockedSupabaseAdmin } = vi.hoisted(() => ({
+const { mockedSupabaseAdmin, mockedOrgLookup, mockedSendEventToTracking } = vi.hoisted(() => ({
   mockedSupabaseAdmin: vi.fn(),
+  mockedOrgLookup: vi.fn(),
+  mockedSendEventToTracking: vi.fn(),
+}))
+
+vi.mock('../supabase/functions/_backend/utils/tracking.ts', () => ({
+  sendEventToTracking: mockedSendEventToTracking,
 }))
 
 vi.mock('hono/adapter', async (importOriginal) => {
@@ -55,10 +61,12 @@ function createPriceList(recurringInterval = 'month', type = 'recurring') {
 }
 
 function mockBillingAccountLookup(billingAccount = 'ee') {
+  mockedOrgLookup.mockResolvedValue({ data: { id: 'org_123', name: 'Demo Org' }, error: null })
   mockedSupabaseAdmin.mockReturnValue({
     from: vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
         eq: vi.fn().mockReturnValue({
+          single: mockedOrgLookup,
           maybeSingle: vi.fn().mockResolvedValue({
             data: { billing_account: billingAccount },
             error: null,
@@ -81,7 +89,82 @@ afterEach(() => {
   mockedEnv.ENV = 'local'
   mockedEnv.STRIPE_SECRET_KEY = 'sk_test_123'
   mockedSupabaseAdmin.mockReset()
+  mockedOrgLookup.mockReset()
+  mockedSendEventToTracking.mockReset()
   vi.restoreAllMocks()
+})
+
+describe('checkout recovery Bento signals', () => {
+  beforeEach(() => mockBillingAccountLookup())
+
+  async function startCheckout(credits = false, embedded = false, failure?: Error) {
+    mockedEnv.STRIPE_PUBLISHABLE_KEY = 'pk_test_123'
+    const createSession = vi.fn().mockResolvedValue({ id: 'cs_test_recovery', url: 'https://pay.capgo.test/pay', client_secret: 'secret' })
+    if (failure)
+      createSession.mockRejectedValue(failure)
+    vi.mocked(Stripe).mockImplementation(function () {
+      return {
+        prices: { list: vi.fn().mockResolvedValue({ data: createPriceList('month', credits ? 'one_time' : 'recurring') }) },
+        checkout: { sessions: { create: createSession } },
+      }
+    } as any)
+    const { createCheckout, createOneTimeCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    return credits
+      ? createOneTimeCheckout(createContext(), 'cus_123', 'prod_test', 50, '/app/success', '/app/cancel', 'untrusted_reference', undefined, undefined, embedded)
+      : createCheckout(createContext(), 'cus_123', 'month', 'prod_test', '/app/success', '/app/cancel', { embedded })
+  }
+
+  it.each([
+    { credits: false, embedded: false },
+    { credits: false, embedded: true },
+    { credits: true, embedded: false },
+    { credits: true, embedded: true },
+  ])('sends the existing event for $credits credits / $embedded embedded checkout', async ({ credits, embedded }) => {
+    await startCheckout(credits, embedded)
+
+    expect(mockedSendEventToTracking).toHaveBeenCalledExactlyOnceWith(expect.anything(), expect.objectContaining({
+      groups: { organization: 'org_123' },
+      sentToBento: true,
+      bento: expect.objectContaining({
+        event: 'user:checkout_started',
+        preferenceKey: 'credit_usage',
+        audience: 'billing',
+        data: expect.objectContaining({
+          org_id: 'org_123',
+          org_name: 'Demo Org',
+          product_id: 'prod_test',
+          recurrence: credits ? 'one_time' : 'month',
+          checkout_source: credits ? 'credits' : 'plans',
+          checkout_session_id: 'cs_test_recovery',
+        }),
+      }),
+    }), { posthog: false })
+    expect(JSON.stringify(mockedSendEventToTracking.mock.calls)).not.toContain('client_secret')
+  })
+
+  it.each([false, true])('does not signal a failed checkout (credits: %s)', async (credits) => {
+    await expect(startCheckout(credits, false, new Error('Stripe unavailable'))).rejects.toThrow('Stripe unavailable')
+    expect(mockedSendEventToTracking).not.toHaveBeenCalled()
+  })
+
+  it('keeps checkout usable when Bento fails', async () => {
+    mockedSendEventToTracking.mockRejectedValue(new Error('Bento unavailable'))
+    await expect(startCheckout()).resolves.toEqual({ url: 'https://pay.capgo.test/pay' })
+  })
+
+  it('skips the signal when the customer organization cannot be resolved', async () => {
+    mockedOrgLookup.mockResolvedValue({ data: null, error: new Error('lookup failed') })
+    await expect(startCheckout()).resolves.toEqual({ url: 'https://pay.capgo.test/pay' })
+    expect(mockedSendEventToTracking).not.toHaveBeenCalled()
+  })
+
+  it('does not signal when only putting a card on file', async () => {
+    const { createCardSetupIntent } = await import('../supabase/functions/_backend/utils/stripe_in_app.ts')
+    const create = vi.fn().mockResolvedValue({ client_secret: 'setup_secret' })
+    await createCardSetupIntent({ customerId: 'cus_123', billingAccount: 'ee', publishableKey: 'pk_test_123', stripe: { setupIntents: { create } } as any })
+    expect(create).toHaveBeenCalledOnce()
+    expect(mockedSendEventToTracking).not.toHaveBeenCalled()
+  })
 })
 
 describe('stripe redirect URL allowlist', () => {
