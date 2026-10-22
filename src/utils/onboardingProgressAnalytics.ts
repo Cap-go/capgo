@@ -76,7 +76,7 @@ type AnalyticsPrimitive = string | number | boolean
 type AnalyticsProperties = Record<string, AnalyticsPrimitive>
 type CaptureEvent = (name: string, apiHost: string, properties?: AnalyticsProperties) => void
 
-const captureOnboardingEvent: CaptureEvent = (name, _supaHost, properties) => {
+const captureOnboardingEvent: CaptureEvent = (name, _apiHost, properties) => {
   sendOnboardingEvent(name, properties)
 }
 

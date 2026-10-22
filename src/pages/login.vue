@@ -58,6 +58,16 @@ const passwordPathReady = ref(false)
 const domainCheckTimeoutMs = 5000
 const domainCheckDebounceMs = 350
 const isCheckingSavedSession = ref(true)
+// A saved session usually means auto-login: show a sign-in status instead of flashing the form.
+const hasStoredSession = (() => {
+  try {
+    return Object.keys(globalThis.localStorage ?? {}).some(key => /^sb-.+-auth-token$/.test(key))
+  }
+  catch {
+    return false
+  }
+})()
+const showSigningIn = computed(() => hasStoredSession && isCheckingSavedSession.value)
 const profileUnavailable = computed(() => route.query.profile_unavailable === '1')
 const captchaStatus = ref<'disabled' | 'loading' | 'ready' | 'unavailable'>(captchaKey.value ? 'loading' : 'disabled')
 let captchaInitTimeout: ReturnType<typeof setTimeout> | null = null
@@ -1030,7 +1040,11 @@ onMounted(checkLogin)
           </div>
 
           <div class="relative mt-5 sm:mt-6">
-            <div v-if="profileUnavailable" class="space-y-4" data-test="account-load-recovery">
+            <div v-if="showSigningIn && !profileUnavailable" role="status" aria-live="polite" class="flex min-h-40 flex-col items-center justify-center gap-3 text-sm text-slate-600 dark:text-slate-300" data-test="login-signing-in">
+              <Spinner size="w-8 h-8" />
+              {{ t('login-signing-in') }}
+            </div>
+            <div v-else-if="profileUnavailable" class="space-y-4" data-test="account-load-recovery">
               <p role="alert" class="text-sm leading-6 text-slate-600 dark:text-slate-300">
                 {{ t('account-load-failed') }}
               </p>

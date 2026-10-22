@@ -8,6 +8,8 @@ interface ApiKeyLoadScope {
   userId: string
   orgId?: string | null
   appId?: string | null
+  /** Distinguishes loads of a specific named key (AI onboarding) from any usable key. */
+  name?: string | null
 }
 
 const inFlightApiKeyLoads = new Map<string, Promise<string | null>>()
@@ -16,7 +18,7 @@ export function shareInFlightApiKeyLoad(
   scope: ApiKeyLoadScope,
   load: () => Promise<string | null>,
 ): Promise<string | null> {
-  const scopeKey = JSON.stringify([scope.userId, scope.orgId ?? null, scope.appId ?? null])
+  const scopeKey = JSON.stringify([scope.userId, scope.orgId ?? null, scope.appId ?? null, scope.name ?? null])
   const existingLoad = inFlightApiKeyLoads.get(scopeKey)
   if (existingLoad)
     return existingLoad
@@ -164,16 +166,19 @@ export async function findUsablePlainApiKey(
   userId: string,
   orgId?: string | null,
   appId?: string | null,
+  options: { name?: string } = {},
 ): Promise<string | null> {
   const isLiveKey = (expiresAt: string | null) => !expiresAt || new Date(expiresAt).getTime() > Date.now()
   let appUuid: string | null = null
 
-  const { data: keys, error } = await capgo
+  let query = capgo
     .from('apikeys')
     .select('key, expires_at, rbac_id, created_at')
     .eq('user_id', userId)
     .not('key', 'is', null)
-    .order('created_at', { ascending: false })
+  if (options.name)
+    query = query.eq('name', options.name)
+  const { data: keys, error } = await query.order('created_at', { ascending: false })
 
   if (error || !keys?.length)
     return null

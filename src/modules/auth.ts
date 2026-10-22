@@ -17,7 +17,8 @@ import { useMainStore } from '~/stores/main'
 import { isPendingOrganizationInvite, useOrganizationStore } from '~/stores/organization'
 import { shouldSkipOnboardingResume } from '~/utils/appOnboardingProgress'
 import { needsInitialOnboardingName } from '~/utils/onboardingProfile'
-import { getOnboardingResumeRedirect, isNewOnboardingUser } from '~/utils/onboardingRedirect'
+import { canExploreOnboardingDashboard, getOnboardingResumeRedirect, isNewOnboardingUser } from '~/utils/onboardingRedirect'
+import { AI_ONBOARDING_PATH, shouldRedirectToAiOnboarding } from '~/utils/onboardingSetupMode'
 import { hasPendingInviteSkip } from '~/utils/pendingInviteSkip'
 import { validateRedirectPath } from '~/utils/safeRedirect'
 import { getPlans } from './../services/console'
@@ -305,6 +306,16 @@ async function guard(
     if (error) {
       console.error('Cannot resolve onboarding redirect', error)
       return null
+    }
+
+    if (shouldRedirectToAiOnboarding({
+      onboarding: main.user?.onboarding,
+      appCount: apps?.length ?? 0,
+      organizationCount: selectableOrganizations.length,
+      path: to.path,
+      canExploreDashboard: canExploreOnboardingDashboard(sessionUser?.id),
+    })) {
+      return { path: AI_ONBOARDING_PATH }
     }
 
     const app = apps?.[0]

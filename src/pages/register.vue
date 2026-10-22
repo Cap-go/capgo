@@ -36,7 +36,6 @@ async function submit(form: { password: string, email: string }) {
     const { error } = await capgo.auth.setSession(registered.session)
     if (error)
       throw error
-    router.push('/dashboard')
   }
   catch (error) {
     const code = await getCapgoApiErrorCode(error)
@@ -47,9 +46,22 @@ async function submit(form: { password: string, email: string }) {
         message = body.message
     }
     setErrors('register-account', [code === 'account_deleted' ? t('used-to-create') : message], {})
-  }
-  finally {
+    // Re-enable only after the error is shown, so a quick second click cannot start another signup.
     isLoading.value = false
+    return
+  }
+
+  // The account exists and the user is signed in from here on: a navigation problem is not a
+  // signup failure. Keep the spinner until onboarding has loaded, and fall back to a full page
+  // load if the in-app navigation fails.
+  try {
+    const failure = await router.push('/dashboard')
+    if (failure)
+      isLoading.value = false
+  }
+  catch (navigationError) {
+    console.error('Navigation after registration failed', navigationError)
+    window.location.assign('/dashboard')
   }
 }
 </script>
