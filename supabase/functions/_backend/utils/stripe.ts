@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { BillingAccount } from './stripe_billing.ts'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
+import { stripeMinorUnitDivisor } from '../../shared/stripe-amount.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import {
@@ -880,6 +881,18 @@ export function buildExtraMauTiers(steps: MauTierStep[], includedMau: number, in
   return tiers
 }
 
+// Same tier figures, re-expressed in the currency's smallest unit (JPY has none, KWD has 1,000).
+export function scaleTiersToCurrency(tiers: Stripe.PriceCreateParams.Tier[], currency: string): Stripe.PriceCreateParams.Tier[] {
+  const divisor = stripeMinorUnitDivisor(currency)
+  return tiers.map(({ unit_amount, ...tier }) => {
+    const amount = (unit_amount ?? 0) * divisor / 100
+    if (Number.isInteger(amount))
+      return { ...tier, unit_amount: amount }
+    // Plain string on purpose: the SDK form-encodes a Stripe.Decimal as its internal fields.
+    return { ...tier, unit_amount_decimal: String(amount) as unknown as Stripe.Decimal }
+  })
+}
+
 // Short stable hash so a tier change gets a new price (lookup keys are unique).
 function hashString(value: string) {
   let hash = 0x811C9DC5
@@ -904,7 +917,8 @@ async function getExtraMauPriceId(c: Context, includedMau: number, interval: 'mo
 
   const tiers = buildExtraMauTiers(steps, includedMau, interval)
   const currencies = [...new Set(extraCurrencies.map(currency => currency.toLowerCase()))].filter(currency => currency !== 'usd').sort((a, b) => a.localeCompare(b))
-  const hashInput = currencies.length ? { includedMau, tiers, currencies } : { includedMau, tiers }
+  const currencyTiers = Object.fromEntries(currencies.map(currency => [currency, scaleTiersToCurrency(tiers, currency)]))
+  const hashInput = currencies.length ? { includedMau, tiers, currencyTiers } : { includedMau, tiers }
   const lookupKey = `${EXTRA_MAU_LOOKUP_KEY_PREFIX}${interval}_${hashString(JSON.stringify(hashInput))}`
   const taxBehaviorParam = taxBehavior && taxBehavior !== 'unspecified' ? { tax_behavior: taxBehavior } : {}
   const existing = await getStripe(c, billingAccount).prices.list({ lookup_keys: [lookupKey], active: true, limit: 1 })
@@ -929,7 +943,7 @@ async function getExtraMauPriceId(c: Context, includedMau: number, interval: 'mo
       metadata: { capgo_kind: EXTRA_MAU_PRICE_KIND, included_mau: String(includedMau) },
       ...taxBehaviorParam,
       ...(currencies.length
-        ? { currency_options: Object.fromEntries(currencies.map(currency => [currency, { tiers, ...taxBehaviorParam }])) }
+        ? { currency_options: Object.fromEntries(currencies.map(currency => [currency, { tiers: currencyTiers[currency], ...taxBehaviorParam }])) }
         : {}),
     })
   }

@@ -8,7 +8,7 @@ import { middlewareAuth } from '../utils/hono_jwt.ts'
 import { cloudlogErr, serializeError } from '../utils/logging.ts'
 import { getCheckoutPlanPrice, getPriceCurrencyAmounts, getStripeCustomerCurrency } from '../utils/stripe.ts'
 import { getBillingAccountForCustomer, getRequestCountry, isStripeConfiguredForAccount } from '../utils/stripe_billing.ts'
-import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
+import { supabaseClient } from '../utils/supabase.ts'
 
 const PLAN_PRICES_CACHE_PATH = '/private/plan_prices'
 const PLAN_PRICES_TTL_SECONDS = 60 * 60
@@ -51,8 +51,8 @@ export function pickCurrency(currencies: string[], lockedCurrency: string | null
   return currencies.includes(DEFAULT_CURRENCY) ? DEFAULT_CURRENCY : currencies[0] ?? null
 }
 
-async function loadPlanPrices(c: Context, billingAccount: BillingAccount): Promise<{ prices: PlanPriceAmounts, complete: boolean }> {
-  const { data: plans, error } = await supabaseAdmin(c)
+async function loadPlanPrices(c: Context, authorization: string, billingAccount: BillingAccount): Promise<{ prices: PlanPriceAmounts, complete: boolean }> {
+  const { data: plans, error } = await supabaseClient(c, authorization)
     .from('plans')
     .select('stripe_id')
   if (error)
@@ -65,6 +65,9 @@ async function loadPlanPrices(c: Context, billingAccount: BillingAccount): Promi
         getCheckoutPlanPrice(c, stripe_id, 'month', billingAccount),
         getCheckoutPlanPrice(c, stripe_id, 'year', billingAccount),
       ])
+      // A null price means the lookup and its stored-ID fallback both failed: do not cache it.
+      if (!month || !year)
+        complete = false
       return [stripe_id, {
         month: month ? getPriceCurrencyAmounts(month) : {},
         year: year ? getPriceCurrencyAmounts(year) : {},
@@ -80,13 +83,13 @@ async function loadPlanPrices(c: Context, billingAccount: BillingAccount): Promi
   return { prices: Object.fromEntries(entries), complete }
 }
 
-async function getPlanPrices(c: Context, billingAccount: BillingAccount) {
+async function getPlanPrices(c: Context, authorization: string, billingAccount: BillingAccount) {
   const cache = new CacheHelper(c)
   const key = cache.buildRequest(PLAN_PRICES_CACHE_PATH, { account: billingAccount })
   const cached = await cache.matchJson<PlanPriceAmounts>(key, { timeoutMs: 200 })
   if (cached)
     return cached
-  const { prices, complete } = await loadPlanPrices(c, billingAccount)
+  const { prices, complete } = await loadPlanPrices(c, authorization, billingAccount)
   // Never cache a partial catalog: the next request retries the failed plans.
   if (complete)
     await cache.putJson(key, prices, PLAN_PRICES_TTL_SECONDS, { timeoutMs: 200 })
@@ -121,7 +124,7 @@ app.get('/', middlewareAuth, async (c) => {
 
   // Fail closed: an unknown customer currency must not unlock currencies checkout would reject.
   const [prices, lockedCurrency] = await Promise.all([
-    getPlanPrices(c, billingAccount),
+    getPlanPrices(c, authorization, billingAccount),
     org.customer_id ? getStripeCustomerCurrency(c, org.customer_id, billingAccount) : null,
   ])
   // A pinned customer can only check out in its own currency; empty when the catalog lacks it.

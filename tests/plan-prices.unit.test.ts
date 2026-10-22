@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { currencyForCountry, getCommonCurrencies, pickCurrency } from '../supabase/functions/_backend/private/plan_prices.ts'
-import { getPriceCurrencyAmounts } from '../supabase/functions/_backend/utils/stripe.ts'
+import { getPriceCurrencyAmounts, scaleTiersToCurrency } from '../supabase/functions/_backend/utils/stripe.ts'
 import { getPlanAmounts } from '../src/services/planPrices'
 
 vi.mock('~/services/capgoApi', () => ({
@@ -56,5 +56,12 @@ describe('plan prices', () => {
     expect(getPlanAmounts(prices, 'prod_solo', 'eur')).toEqual({ month: 14, year: 146 })
     expect(getPlanAmounts(prices, 'prod_solo', 'gbp')).toBeNull()
     expect(getPlanAmounts(prices, 'prod_missing', 'usd')).toBeNull()
+  })
+
+  it.concurrent('re-expresses extra-MAU tiers in each currency\'s smallest unit', () => {
+    const tiers = [{ up_to: 10, unit_amount: 60 }, { up_to: 'inf' as const, unit_amount: 45 }]
+    expect(scaleTiersToCurrency(tiers, 'eur')).toEqual(tiers)
+    expect(scaleTiersToCurrency(tiers, 'jpy').map(tier => [tier.up_to, String(tier.unit_amount_decimal)])).toEqual([[10, '0.6'], ['inf', '0.45']])
+    expect(scaleTiersToCurrency(tiers, 'kwd')).toEqual([{ up_to: 10, unit_amount: 600 }, { up_to: 'inf', unit_amount: 450 }])
   })
 })
