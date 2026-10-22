@@ -551,6 +551,23 @@ const showSearchAndActions = computed(() => {
  * Check a bundle's native packages against a channel and ask the user to accept a mismatch.
  * Returns false when the user cancels.
  */
+async function loadBundleNativePackagesForLink(bundle: BundlePickerRow) {
+  // Picker rows stay light (no native_packages). Load them only when linking so
+  // compatibility still sees real deps instead of an empty array.
+  const { data, error } = await capgo
+    .from('app_versions')
+    .select('id, app_id, name, native_packages')
+    .eq('app_id', bundle.app_id)
+    .eq('id', bundle.id)
+    .single()
+  if (error || !data) {
+    console.error(error)
+    toast.error(t('error-fetching-versions'))
+    return null
+  }
+  return data
+}
+
 async function confirmBundleCompatibleWithChannel(
   appVersion: Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'app_id' | 'native_packages'>,
   channelName: string,
@@ -601,13 +618,16 @@ async function confirmBundleCompatibleWithChannel(
   return true
 }
 
-async function handleVersionLink(appVersion: Database['public']['Tables']['app_versions']['Row']) {
+async function handleVersionLink(picked: BundlePickerRow) {
   if (!channel.value)
     return
   // Close the bundle picker once a bundle is chosen; the compatibility, rollout and
   // notification prompts below open their own dialogs when needed.
   if (dialogStore.showDialog && dialogStore.dialogOptions?.title === t('bundle-management'))
     await dialogStore.closeDialog()
+  const appVersion = await loadBundleNativePackagesForLink(picked)
+  if (!appVersion)
+    return
   if (!(await confirmBundleCompatibleWithChannel(appVersion, channel.value.name, channel.value.version?.id)))
     return
   if (bundleLinkMode.value === 'rollout') {
@@ -2288,7 +2308,7 @@ async function copyCurlCommand() {
               :key="version.id"
               type="button"
               class="block w-full p-3 text-left border border-gray-300 rounded-lg cursor-pointer dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
-              @click="handleVersionLink(version as any)"
+              @click="handleVersionLink(version)"
             >
               <span class="flex items-center justify-between">
                 <span class="block">

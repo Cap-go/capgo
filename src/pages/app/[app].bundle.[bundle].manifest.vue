@@ -281,11 +281,11 @@ async function getVersion() {
       return
     }
 
-    version.value = data
+    version.value = data as BundleSummaryRow
 
-    if (version.value?.name)
+    if (version.value.name)
       displayStore.setBundleName(String(version.value.id), version.value.name)
-    displayStore.NavTitle = version.value?.name ?? t('bundle')
+    displayStore.NavTitle = version.value.name ?? t('bundle')
   }
   catch (error) {
     console.error(error)
@@ -394,7 +394,7 @@ watch(
     if (requestId !== pageLoadRequestId.value)
       return
     loading.value = false
-    const loadedVersion = version.value as Database['public']['Tables']['app_versions']['Row'] | undefined
+    const loadedVersion = version.value
     if (!loadedVersion?.name)
       displayStore.NavTitle = t('bundle')
     displayStore.defaultBack = `/app/${packageId.value}/bundles`
