@@ -38,8 +38,8 @@ permissions: {}
 env:
   DENO_DIR: my_cache_directory
   CLICOLOR: '1'
-  # GitHub-hosted runners pull public Docker Hub images without rate limits.
-  # Restore this in each Supabase job after setup-cli exports its GHCR override.
+  # Intentionally pin Docker Hub: functions serve does not implement registry fallback.
+  # Hosted public-image policy: https://docs.github.com/en/actions/reference/limits#docker-hubs-rate-limit-for-github-actions
   SUPABASE_INTERNAL_IMAGE_REGISTRY: docker.io
 
 jobs:
