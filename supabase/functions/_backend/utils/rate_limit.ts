@@ -110,8 +110,7 @@ export async function isIPRateLimited(c: Context): Promise<RateLimitStatus> {
     return { limited: false }
 
   const limit = getFailedAuthLimit(c)
-  // Usage is recorded before this check, so the request that brings the count to the limit is still allowed.
-  const isLimited = data.count > limit
+  const isLimited = data.count >= limit
 
   if (isLimited) {
     cloudlog({
@@ -278,7 +277,8 @@ export async function isAPIKeyRateLimited(c: Context, apiKeyId: number, scope: A
     return { limited: false }
 
   const limit = getAPIKeyRateLimit(c, scope)
-  const isLimited = data.count >= limit
+  // Usage is recorded before this check, so the request that brings the count to the limit is still allowed.
+  const isLimited = data.count > limit
 
   if (isLimited) {
     cloudlog({

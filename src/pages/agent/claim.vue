@@ -95,6 +95,31 @@ async function load(): Promise<void> {
   }
 }
 
+// The key is minted before approval; if approval fails, delete it so no unused credential stays behind.
+let createdKeyId: number | null = null
+
+const createTrackedKey: CliLoginKeyDependencies['createKey'] = async (input) => {
+  const { data, error } = await invokeCapgoApi<{ id?: number, key?: string | null }>('apikey', {
+    client: supabase,
+    method: 'POST',
+    body: input,
+  })
+  if (error)
+    throw error
+  createdKeyId = typeof data?.id === 'number' ? data.id : null
+  return { key: data?.key ?? null }
+}
+
+async function deleteUnusedKey(): Promise<void> {
+  if (createdKeyId === null)
+    return
+  const id = createdKeyId
+  createdKeyId = null
+  const { error } = await invokeCapgoApi(`apikey/${id}`, { client: supabase, method: 'DELETE' })
+  if (error)
+    console.error('Cannot delete the unused agent API key', error)
+}
+
 async function approve(): Promise<void> {
   if (!attemptToken.value || state.value !== 'ready')
     return
@@ -144,31 +169,6 @@ async function approve(): Promise<void> {
     await deleteUnusedKey()
     state.value = 'error'
   }
-}
-
-// The key is minted before approval; if approval fails, delete it so no unused credential stays behind.
-let createdKeyId: number | null = null
-
-const createTrackedKey: CliLoginKeyDependencies['createKey'] = async (input) => {
-  const { data, error } = await invokeCapgoApi<{ id?: number, key?: string | null }>('apikey', {
-    client: supabase,
-    method: 'POST',
-    body: input,
-  })
-  if (error)
-    throw error
-  createdKeyId = typeof data?.id === 'number' ? data.id : null
-  return { key: data?.key ?? null }
-}
-
-async function deleteUnusedKey(): Promise<void> {
-  if (createdKeyId === null)
-    return
-  const id = createdKeyId
-  createdKeyId = null
-  const { error } = await invokeCapgoApi(`apikey/${id}`, { client: supabase, method: 'DELETE' })
-  if (error)
-    console.error('Cannot delete the unused agent API key', error)
 }
 
 async function deny(): Promise<void> {
