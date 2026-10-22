@@ -1,6 +1,7 @@
 import type { AppTodoProgress } from '../app/todo'
 import { getBuilderChecklist, onboardingRecord } from '../app/builder-checklist'
 import { getAppTodoNextStep, getAppTodoSteps, getAvailableAppTodoLists } from '../app/todo'
+import { DIRECT_OFFER_PLAN_MESSAGE, isZeroLengthTrial } from '../shared/direct-offer'
 import { defaultHostWeb } from '../utils'
 import { setupDebug } from './setup-diagnostics'
 
@@ -13,6 +14,8 @@ export type LocalOnboardingStep = 'add_code' | 'add_updater'
 interface Billing {
   orgId: string
   trialEndsAt: string | null
+  /** Org created without a free trial (direct offer): never mention a trial. */
+  trialSkipped?: boolean
   plansUrl: string
 }
 export type SetupNotice = { appId: string, secondary: string[] } & (
@@ -46,7 +49,12 @@ function readBilling(value: unknown, webHost: string): Billing | undefined {
     if (!['https:', 'http:'].includes(plansUrl.protocol) || plansUrl.username || plansUrl.password)
       return
     plansUrl.searchParams.set('oid', data.orgId)
-    return { orgId: data.orgId, trialEndsAt: data.trialEndsAt as string | null, plansUrl: plansUrl.href }
+    const trialEndsAt = data.trialEndsAt as string | null
+    // `orgCreatedAt`/`hasPaid` are optional: older servers omit them and keep the
+    // trial copy. Only never-paid orgs qualify: a churned org must not see
+    // "choose a plan to start".
+    const trialSkipped = data.hasPaid === false && typeof data.orgCreatedAt === 'string' && isZeroLengthTrial(data.orgCreatedAt, trialEndsAt)
+    return { orgId: data.orgId, trialEndsAt, ...(trialSkipped ? { trialSkipped } : {}), plansUrl: plansUrl.href }
   }
   catch {
     return undefined
@@ -146,9 +154,12 @@ function remainingTrial(trialEndsAt: string, now: number): string {
 export function formatSetupNotice(notice: SetupNotice | undefined, now = Date.now()): string | undefined {
   if (!notice)
     return
-  const planAction = notice.kind === 'plan' && notice.billing.trialEndsAt
-    ? `Choose a Capgo plan to continue ${Date.parse(notice.billing.trialEndsAt) > now ? 'after your trial' : 'using Capgo'}.`
-    : 'Choose a Capgo plan.'
+  const trialSkipped = notice.kind === 'plan' && !!notice.billing.trialSkipped
+  const planAction = trialSkipped
+    ? DIRECT_OFFER_PLAN_MESSAGE
+    : notice.kind === 'plan' && notice.billing.trialEndsAt
+      ? `Choose a Capgo plan to continue ${Date.parse(notice.billing.trialEndsAt) > now ? 'after your trial' : 'using Capgo'}.`
+      : 'Choose a Capgo plan.'
   const primary = notice.kind === 'setup'
     ? [
         `Finish setting up ${notice.product}`,
@@ -161,7 +172,7 @@ export function formatSetupNotice(notice: SetupNotice | undefined, now = Date.no
     : [
         notice.secondary.length ? `${notice.completed.join(' and ')} are set up` : 'Your Capgo setup is complete',
         '',
-        ...(notice.billing.trialEndsAt ? [remainingTrial(notice.billing.trialEndsAt, now)] : []),
+        ...(notice.billing.trialEndsAt && !trialSkipped ? [remainingTrial(notice.billing.trialEndsAt, now)] : []),
         planAction,
         '',
         `View plans: ${notice.billing.plansUrl}`,

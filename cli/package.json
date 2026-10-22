@@ -237,7 +237,7 @@
     "test:app-permission-helper": "bun test/test-app-permission-helper.mjs",
     "test:2fa-compliance-network": "bun test/test-2fa-compliance-network.mjs",
     "test:organization-set-api-host": "bun test/test-organization-set-api-host.mjs",
-    "test:plan-validation": "bun test/test-plan-validation.mjs",
+    "test:plan-validation": "bun test/test-plan-validation.mjs && bun test ./test/test-direct-offer-plan.mjs",
     "test:auto-bump-version": "bun test/test-auto-bump-version.mjs",
     "test:auto-bump-ai-diff": "bun test/test-auto-bump-ai-diff.mjs",
     "test:ios-provisioning-map": "bun test/test-ios-provisioning-map.mjs",

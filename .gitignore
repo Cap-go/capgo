@@ -96,6 +96,9 @@ internal/Certificates.p12
 .superpowers/
 .playwright-mcp/
 
+# Local codedb index snapshot
+codedb.snapshot
+
 # Capgo CLI keychain helper — locally built bundles
 cli-helper/dist/
 cli-helper/npm/*/CapgoKeychainHelper.app
