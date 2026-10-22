@@ -171,6 +171,7 @@ declare module 'vue' {
     TrialCardPrompt: typeof import('./components/dashboard/TrialCardPrompt.vue')['default']
     TrialPlanOfferModal: typeof import('./components/billing/TrialPlanOfferModal.vue')['default']
     TrialPlanPicker: typeof import('./components/billing/TrialPlanPicker.vue')['default']
+    TrialPlanStartNowModal: typeof import('./components/billing/TrialPlanStartNowModal.vue')['default']
     UnpaidState: typeof import('./components/UnpaidState.vue')['default']
     UpdateStatsCard: typeof import('./components/dashboard/UpdateStatsCard.vue')['default']
     UpdateStatsChart: typeof import('./components/dashboard/UpdateStatsChart.vue')['default']
