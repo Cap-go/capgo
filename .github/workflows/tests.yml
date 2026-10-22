@@ -1616,6 +1616,9 @@ jobs:
         uses: supabase/setup-cli@v2
         with:
           version: 2.109.1
+      - name: Allow Supabase registry fallbacks
+        # A forced registry disables the CLI's ECR/GHCR/Docker Hub fallback.
+        run: echo 'SUPABASE_INTERNAL_IMAGE_REGISTRY=' >> "$GITHUB_ENV"
       - name: Pre-pull Supabase images
         # Start pulling while the runner sets up; supabase start reuses in-flight layers.
         background: true
