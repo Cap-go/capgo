@@ -240,20 +240,32 @@ export async function deleteAppVersion(
   }
 }
 
+/** A 404 whose code is not a known one means the Capgo API predates this route. */
+async function throwIfRouteMissing(appid: string, error: unknown, feature: string, silent: boolean, knownCodes: string[] = []) {
+  const payload = await readCapgoCliApiErrorPayload(error)
+  if (getCapgoCliHttpStatus(error) !== 404 || payload?.error === 'app_not_found' || knownCodes.includes(payload?.error ?? ''))
+    return
+  const message = `This Capgo API does not support ${feature}. Update your Capgo backend or use an older CLI.`
+  if (!silent)
+    log.error(message)
+  throw new CliUserError(message, { appId: appid }, error)
+}
+
 async function deleteBundleByName(appid: string, bundle: string, options: CapgoHttpOptions & Pick<VersionOptions, 'invoke'>) {
   const invoke = options.invoke ?? invokeCapgoCliApi
-  const { error } = await invoke('bundle', {
+  const { error } = await invoke('private/cli/bundles/delete', {
     apikey: options.apikey,
-    method: 'DELETE',
-    body: { app_id: appid, version: bundle },
+    method: 'POST',
+    body: { app_id: appid, name: bundle },
     apiHost: options.apiHost,
   })
   return error
 }
 
 /**
- * Deletes one bundle with a single DELETE /bundle: the API already resolves the name and
- * refuses bundles linked to a channel. Only that rare case does extra work (unlink, retry).
+ * Deletes one bundle with a single request to the CLI delete endpoint, which resolves the name,
+ * reports a missing bundle (`bundle_not_found`) and refuses a linked one (`bundle_linked`, with
+ * the bundle id). Only that linked case does extra work: offer to unlink, then retry.
  */
 export async function deleteSpecificVersion(
   client: CapgoClient,
@@ -271,18 +283,14 @@ export async function deleteSpecificVersion(
     return
 
   const payload = await readCapgoCliApiErrorPayload(error)
-  // The API answers `cannot_delete_version` for both a missing bundle and a DB failure: one
-  // filtered lookup tells them apart. If the lookup fails too, report the delete error.
-  if (payload?.error === 'cannot_delete_version') {
-    const existing = await fetchSingleBundle(appid, { version: bundle }, { ...http, silent: true }).catch(() => undefined)
-    if (existing === null)
-      throwMissingVersion(appid, bundle, silent)
-  }
-  if (payload?.error !== 'cannot_delete_linked_version')
+  if (payload?.error === 'bundle_not_found')
+    throwMissingVersion(appid, bundle, silent)
+  await throwIfRouteMissing(appid, error, 'the CLI bundle delete endpoint', silent)
+  const bundleId = payload?.moreInfo?.bundle_id
+  if (payload?.error !== 'bundle_linked' || typeof bundleId !== 'number')
     await throwBundleHttpInvokeError(appid, error, 'delete', silent, 'bundle.delete')
 
-  const versionData = await getVersionData(apikey, appid, bundle, { silent, apikey, apiHost, invoke })
-  await checkVersionNotUsedInChannel(client, appid, versionData, { silent, autoUnlink, apikey, apiHost })
+  await checkVersionNotUsedInChannel(client, appid, { id: bundleId as number, name: bundle }, { silent, autoUnlink, apikey, apiHost })
   error = await deleteBundleByName(appid, bundle, http)
   if (error)
     await throwBundleHttpInvokeError(appid, error, 'delete', silent, 'bundle.delete')
@@ -326,14 +334,7 @@ export async function cleanupAppVersions(
     apiHost: options.apiHost,
   })
   if (error) {
-    // A 404 that is not about the app means this API predates POST /bundle/cleanup.
-    const payload = await readCapgoCliApiErrorPayload(error)
-    if (getCapgoCliHttpStatus(error) === 404 && payload?.error !== 'app_not_found') {
-      const message = 'This Capgo API does not support server-side bundle cleanup (POST /bundle/cleanup). Update your Capgo backend or use an older CLI.'
-      if (!options.silent)
-        log.error(message)
-      throw new CliUserError(message, { appId: appid }, error)
-    }
+    await throwIfRouteMissing(appid, error, 'server-side bundle cleanup (POST /bundle/cleanup)', !!options.silent)
     await throwBundleHttpInvokeError(appid, error, 'delete', !!options.silent, 'bundle.delete')
   }
   if (!data || !Array.isArray(data.kept) || !Array.isArray(data.removed))

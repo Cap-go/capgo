@@ -12,6 +12,7 @@ import { safeParseSchema } from '../../utils/schema_validation.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { MAX_MANIFEST_ENTRIES } from '../../utils/manifest_limits.ts'
 import { isValidAppId } from '../../utils/utils.ts'
+import { softDeleteBundles } from '../../public/bundle/cleanup.ts'
 import { uploadCliAppIcon } from './storage_icon.ts'
 
 /**
@@ -62,6 +63,11 @@ const channelsQuerySchema = z.object({
   app_id: z.string().min(1),
   name: z.string().min(1).optional(),
   linked_version_id: z.coerce.number().int().positive().optional(),
+})
+
+const deleteBundleBodySchema = z.object({
+  app_id: z.string().min(1),
+  name: z.string().min(1),
 })
 
 const CHANNELS_PAGE_SIZE = 1000
@@ -458,6 +464,46 @@ app.post('/bundles/deleted', middlewareKey(), versionedRoute<CliContext>({
       .select('name'), 'cannot_update_bundle', 'Cannot update bundle deleted state')
 
     return c.json({ updated: (data ?? []).map(row => row.name) })
+  },
+}))
+
+/**
+ * `bundle delete` in one request: resolves the name, refuses bundles linked to a channel
+ * (409 `bundle_linked` with the bundle id and channel names, so the CLI can offer to unlink
+ * without another lookup) and soft-deletes under the bundle lifecycle lock. Unlike public
+ * DELETE /bundle, a missing bundle is a distinct 404 `bundle_not_found`.
+ */
+app.post('/bundles/delete', middlewareKey(), versionedRoute<CliContext>({
+  [CLI_API_2025_10_01]: async (c) => {
+    const body = await parseJson(c, deleteBundleBodySchema)
+    assertValidAppId(body.app_id)
+    if (!(await checkPermission(c, 'bundle.delete', { appId: body.app_id })))
+      throw quickError(403, 'cannot_delete_bundle', 'You can\'t delete bundles of this app', { app_id: body.app_id })
+
+    const supabase = callerClient(c)
+    const bundle = unwrap(await supabase
+      .from('app_versions')
+      .select('id, name')
+      .eq('app_id', body.app_id)
+      .eq('name', body.name)
+      .eq('deleted', false)
+      .maybeSingle(), 'cannot_get_bundle', 'Cannot get bundle')
+    if (!bundle)
+      throw quickError(404, 'bundle_not_found', 'Bundle not found', { app_id: body.app_id, name: body.name })
+
+    const deleted = await softDeleteBundles(c, c.get('capgkey') as string, body.app_id, [bundle.id], false)
+    if (deleted.includes(bundle.id))
+      return c.json({ id: bundle.id, name: bundle.name })
+
+    // Not deleted: either a channel targets it, or it was deleted concurrently.
+    const channels = unwrap(await supabase
+      .from('channels')
+      .select('name')
+      .eq('app_id', body.app_id)
+      .or(`version.eq.${bundle.id},rollout_version.eq.${bundle.id}`), 'cannot_get_channel', 'Cannot check linked channels') ?? []
+    if (channels.length)
+      throw quickError(409, 'bundle_linked', 'Bundle is linked to a channel', { app_id: body.app_id, bundle_id: bundle.id, name: bundle.name, channels: channels.map(channel => channel.name) })
+    throw quickError(404, 'bundle_not_found', 'Bundle not found', { app_id: body.app_id, name: body.name })
   },
 }))
 
