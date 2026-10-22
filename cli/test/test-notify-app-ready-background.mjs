@@ -82,8 +82,8 @@ async function workerHarness(worker = workerUrl, standalone = false) {
           workerData: ${JSON.stringify(workerData)}, stdout: true, stderr: true, execArgv: []
         })
         worker.on('message', message => console.log(JSON.stringify(message)))
-        worker.on('error', () => process.exit(1))
-        worker.on('exit', code => process.exit(code))
+        worker.on('error', () => { process.exitCode = 1 })
+        worker.on('exit', code => { process.exitCode = code })
       `], {
         stdio: ['ignore', 'pipe', 'pipe'],
         env: { ...process.env, CAPGO_DISABLE_TELEMETRY: '', CAPGO_DISABLE_POSTHOG: '', CAPGO_TRUSTED_API_ORIGINS: api, ...environment },
@@ -94,7 +94,7 @@ async function workerHarness(worker = workerUrl, standalone = false) {
       child.stderr.on('data', chunk => { errors += chunk })
       const timeout = setTimeout(() => child.kill(), 10_000)
       try {
-        const [code, signal] = await once(child, 'exit')
+        const [code, signal] = await once(child, 'close')
         assert.equal(signal, null, 'worker did not finish its bounded reporting')
         assert.equal(code, 0, errors)
         return output.trim().split('\n').filter(Boolean).map(line => JSON.parse(line))
