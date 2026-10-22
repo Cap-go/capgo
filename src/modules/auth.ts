@@ -3,7 +3,7 @@ import type { ConsoleClient } from '~/services/consoleClient'
 import type { UserModule } from '~/types'
 import { ADMIN_DASHBOARD_URL } from '~/constants/adminDashboard'
 import { clearChartDataCache } from '~/services/chartDataService'
-import { isCliLoginPath, isMcpAuthorizePath } from '~/services/cliLogin'
+import { isAgentClaimPath, isCliLoginPath, isMcpAuthorizePath } from '~/services/cliLogin'
 import { getLocalConfig, useConsole } from '~/services/console'
 import { hideLoader } from '~/services/loader'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
@@ -201,7 +201,7 @@ async function guard(
   const inviteOrgId = typeof to.query.invite_org === 'string' && to.query.invite_org.length > 0
     ? to.query.invite_org
     : null
-  const isCliLoginRoute = isCliLoginPath(to.path) || isMcpAuthorizePath(to.path)
+  const isCliLoginRoute = isCliLoginPath(to.path) || isMcpAuthorizePath(to.path) || isAgentClaimPath(to.path)
   const organizationFetchOptions = { loadImages: !isCliLoginRoute }
 
   async function tryLoadOrganizations(fetcher: () => Promise<void>) {
