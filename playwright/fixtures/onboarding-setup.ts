@@ -72,6 +72,7 @@ else if (params.get('checklistState') === 'dismissed') {
   state.builderSteps.android.connect_google_play = { status: 'skipped' }
 }
 const events: string[] = []
+const copyAiPlacements: Array<'start' | 'checklist'> = []
 if (params.get('otaProgress') === '1')
   state.steps.login_cli_mcp = { status: 'done' }
 for (const platform of ['ios', 'android'] as const) {
@@ -89,7 +90,7 @@ if (params.get('otaComplete') === '1') {
   state.channels.push({ id: 1, app_id: previewAppId, name: 'staging', public: true })
 }
 const channelEvents: Array<{ event: OnboardingChannelEvent, properties: OnboardingChannelEventProperties }> = []
-const preview = { state, events, channelEvents, appId: ref(previewAppId), command: ref('npx @capgo/cli@latest i [API_KEY]'), hiding: ref(false), selectedOrgId: ref('') }
+const preview = { state, events, copyAiPlacements, channelEvents, appId: ref(previewAppId), command: ref('npx @capgo/cli@latest i [API_KEY]'), hiding: ref(false), selectedOrgId: ref('') }
 const previewUserOnboarding = {
   profile_completed_at: '2026-09-25T00:00:00.000Z',
   abtests: {
@@ -289,7 +290,10 @@ const app = createApp(defineComponent({
                       events.push('copy-command')
                       await navigator.clipboard.writeText(preview.command.value)
                     },
-                    onCopyAi: () => events.push('copy-ai'),
+                    onCopyAi: (placement?: 'checklist') => {
+                      events.push('copy-ai')
+                      copyAiPlacements.push(placement ?? 'start')
+                    },
                     onHide: () => events.push('hide'),
                     onExplore: () => events.push('explore'),
                     onComplete: () => events.push('complete'),

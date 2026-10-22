@@ -160,8 +160,8 @@ describe('build log disconnect authorization', () => {
             'Content-Type': 'application/json',
             'x-api-key': builderApiKey,
           },
-        body: JSON.stringify({ app_id: appId, reason: 'client_disconnected' }),
-      })
+          body: JSON.stringify({ app_id: appId, reason: 'client_disconnected' }),
+        })
 
       return new Response(JSON.stringify({ status: 'cancelled' }), {
           status: 200,
@@ -244,8 +244,8 @@ describe('build log disconnect authorization', () => {
             'Content-Type': 'application/json',
             'x-api-key': builderApiKey,
           },
-        body: JSON.stringify({ app_id: appId, reason: 'client_disconnected' }),
-      })
+          body: JSON.stringify({ app_id: appId, reason: 'client_disconnected' }),
+        })
 
       return new Response(JSON.stringify({ status: 'cancelled' }), {
           status: 200,
