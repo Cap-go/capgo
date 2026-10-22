@@ -121,6 +121,13 @@ describe('cleanupAppVersions', () => {
     expect(calls[0].body).toEqual({ app_id: 'com.test.app', keep: 1, ignore_channel: false, dry_run: false, ids: [4, 5] })
   })
 
+  it('reports a missing cleanup route as an unsupported API, not a missing app', async () => {
+    const { invoke } = recordingInvoke([{ data: null, error: makeBundleApiError({ error: 'not_found', message: 'Not Found' }, 404) }])
+    await expect(cleanupAppVersions('com.test.app', { keep: 1, dryRun: true }, { apikey: 'key', silent: true, invoke }))
+      .rejects
+      .toThrow(/does not support server-side bundle cleanup/)
+  })
+
   it('rejects an unexpected response shape', async () => {
     const { invoke } = recordingInvoke([{ data: { status: 'ok' }, error: null }])
     await expect(cleanupAppVersions('com.test.app', { keep: 1, dryRun: false }, { apikey: 'key', silent: true, invoke }))

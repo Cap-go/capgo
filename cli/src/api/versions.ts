@@ -313,8 +313,17 @@ export async function cleanupAppVersions(
     },
     apiHost: options.apiHost,
   })
-  if (error)
+  if (error) {
+    // A 404 that is not about the app means this API predates POST /bundle/cleanup.
+    const payload = await readCapgoCliApiErrorPayload(error)
+    if (getCapgoCliHttpStatus(error) === 404 && payload?.error !== 'app_not_found') {
+      const message = 'This Capgo API does not support server-side bundle cleanup (POST /bundle/cleanup). Update your Capgo backend or use an older CLI.'
+      if (!options.silent)
+        log.error(message)
+      throw new CliUserError(message, { appId: appid }, error)
+    }
     await throwBundleHttpInvokeError(appid, error, 'delete', !!options.silent, 'bundle.delete')
+  }
   if (!data || !Array.isArray(data.kept) || !Array.isArray(data.removed))
     throw new Error(`Cannot clean up bundles for app ${appid}: unexpected response`)
   return data
