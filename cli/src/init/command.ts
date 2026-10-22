@@ -9,7 +9,6 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync,
 import path, { dirname, join } from 'node:path'
 import { chdir, cwd, env, exit, platform, stderr, stdin, stdout } from 'node:process'
 import { canParse, format, increment, lessThan, parse } from '@std/semver'
-import spawn, { sync as spawnSync } from 'cross-spawn'
 import open from 'open'
 import tmp from 'tmp'
 import { checkAppIdsExist, completePendingOnboardingApp, findAppInOrganization, listPendingOnboardingApps } from '../api/app'
@@ -42,7 +41,7 @@ import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-co
 import { readBuilderOnlyInitAssignment, tryBuilderOnlyInit } from './builder-setup'
 import { loginInitInBrowser, shouldStartInitBrowserLogin } from './browser-login'
 import { selectOnboardingChannel } from './channel-selection'
-import { createMissingExecutableError, getAvailablePackageManagers, getMissingPackageManagerExecutable, getPackageManagerInfo, preparePackageManagerCommandEnvironment, probeExecutable, probePackageManagerCommand, resolveExecutableProbeError, waitForCommandResult } from './command-execution'
+import { assertNoWindowsCommandLineBreaks, createMissingExecutableError, getAvailablePackageManagers, getMissingPackageManagerExecutable, getPackageManagerInfo, preparePackageManagerCommandEnvironment, probeExecutable, probePackageManagerCommand, resolveExecutableProbeError, spawnCommand as spawn, spawnCommandSync as spawnSync, waitForCommandResult } from './command-execution'
 import { reportInitOnboardingStep } from './onboarding-report'
 import { cancel as pCancel, confirm as pConfirm, intro as pIntro, isCancel as pIsCancel, log as pLog, outro as pOutro, select as pSelect, spinner as pSpinner, text as pText } from './prompts'
 import { finishActiveCliReplay, getActiveCliReplaySessionId, isCliTelemetryDisabled, startInitReplay } from './replay'
@@ -3957,6 +3956,7 @@ interface InheritedCommandOptions {
 }
 
 export async function runInheritedCommand(command: string, args: string[], options: InheritedCommandOptions = {}): Promise<InheritedCommandResult> {
+  assertNoWindowsCommandLineBreaks(command, args)
   if (options.forcePty || (stdin.isTTY && stdout.isTTY))
     return runPtyInheritedCommand(command, args, options)
   return runPipedInheritedCommand(command, args, options)

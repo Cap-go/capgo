@@ -54,19 +54,38 @@ else {
     assert.equal(result.status, 0, result.stderr)
   })
 
+  test('Windows command launches reject line breaks before calling the OS', () => {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', `
+      import assert from 'node:assert/strict'
+      import childProcess from 'node:child_process'
+      import { syncBuiltinESMExports } from 'node:module'
+      Object.defineProperty(process, 'platform', { value: 'win32' })
+      childProcess.spawn = childProcess.spawnSync = () => { throw new Error('OS launch reached') }
+      syncBuiltinESMExports()
+      const { spawnCommand, spawnCommandSync } = await import(${JSON.stringify(process.env.CAPGO_INIT_PROBE_MODULE)})
+      for (const launch of [spawnCommand, spawnCommandSync]) {
+        for (const value of ['first\\nsecond', 'first\\rsecond']) {
+          assert.throws(() => launch('npx', ['cap', 'init', value]), /line breaks/)
+          assert.throws(() => launch(value, []), /line breaks/)
+        }
+      }
+    `], { encoding: 'utf8' })
+    assert.equal(result.status, 0, result.stderr)
+  })
+
   test('package manager probes find PATH shims from project paths containing spaces', () => {
     const root = mkdtempSync(join(tmpdir(), 'capgo init probes '))
     const bin = join(root, 'node_modules', '.bin')
     mkdirSync(bin, { recursive: true })
     try {
-      for (const name of ['npm', 'npx', 'pnpm', 'yarn']) {
+      for (const name of ['npm', 'npx', 'pnpm', 'yarn', 'bun', 'bunx']) {
         const windows = process.platform === 'win32'
         writeFileSync(join(bin, `${name}${windows ? '.cmd' : ''}`), windows
           ? '@echo off\r\necho 11.0.0\r\n'
           : '#!/bin/sh\nprintf "11.0.0\\n"\n', { mode: 0o755 })
       }
       const options = { cwd: root, env: { PATH: bin, Path: bin } }
-      for (const command of ['npm', 'npx', 'pnpm exec', 'yarn dlx']) {
+      for (const command of ['npm', 'npx', 'pnpm exec', 'yarn dlx', 'bun', 'bunx']) {
         const probe = probePackageManagerCommand(command, options)
         assert.equal(probe.available, true, `${command}: ${probe.error?.message}`)
         assert.equal(probe.stdout.trim(), '11.0.0')
