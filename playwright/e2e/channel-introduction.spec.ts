@@ -76,9 +76,10 @@ test('keeps request, policy and response markers on their dotted paths in a wide
   await page.goto(fixture)
   await page.locator('[data-test="channel-default-routing-continue"]').click()
   await expect(page.locator('[data-test="channel-self-assign-stage"]')).toBeVisible()
-  const result = await page.evaluate(async () => {
-    const gsapUrl = performance.getEntriesByType('resource').map(entry => entry.name).find(url => /\/gsap\.js/.test(url))!
-    const { gsap } = await import(gsapUrl)
+  await page.waitForFunction(() => (window as any).onboardingSetupPreview.gsap.globalTimeline.getChildren()
+    .some((animation: any) => animation.labels?.['routing-request']))
+  const result = await page.evaluate(() => {
+    const { gsap } = (window as any).onboardingSetupPreview
     const stage = document.querySelector<HTMLElement>('.csa-stage')!
     const canvas = stage.querySelector<HTMLElement>('.csa-routing-canvas')!
     const timeline = gsap.globalTimeline.getChildren().find((animation: any) => animation.labels?.['routing-request'])

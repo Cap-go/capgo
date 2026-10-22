@@ -284,10 +284,9 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.route('**/rest/v1/build_requests?*', route => route.fulfill({ json: [], headers: { 'content-range': '*/0' } }))
       await page.route('**/app/com.demo.app/onboarding/builder', route => route.fulfill({ json: { canEnable: true } }))
       await page.reload()
-      if (process.env.VISUAL_DIFF_PHASE === 'before')
-        await page.getByRole('heading', { name: 'Start a native build', exact: true }).waitFor({ state: 'visible' })
-      else
-        await page.locator('[data-test="builder-introduction"]').waitFor({ state: 'visible' })
+      // The base can already include the introduction after the Builder PR merges.
+      await page.getByRole('heading', { name: 'Start a native build', exact: true })
+        .or(page.locator('[data-test="builder-introduction"]')).waitFor({ state: 'visible' })
     },
   },
   ...[
@@ -670,6 +669,19 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
   { slug: 'org-settings-team', path: '/settings/organization/members', auth: true },
   { slug: 'org-settings-billing', path: '/settings/organization/plans', auth: true },
   { slug: 'channels', path: '/app/com.demo.app/channels', auth: true },
+  {
+    slug: 'channels-empty',
+    path: '/app/com.demo.app/channels',
+    auth: true,
+    prepare: async (page) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await page.route('**/rest/v1/channels?*', route => route.fulfill({ json: [], headers: { 'content-range': '*/0' } }))
+      await page.reload()
+      // The previous empty state opened the creation dialog automatically.
+      await page.locator('[data-test="channel-introduction"]')
+        .or(page.getByRole('dialog', { name: 'Create channel', exact: true })).waitFor({ state: 'visible' })
+    },
+  },
   {
     slug: 'devices',
     path: '/app/com.demo.app/devices',
