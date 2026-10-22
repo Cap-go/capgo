@@ -417,11 +417,6 @@ export async function scheduleTrialPlan(
   return summary
 }
 
-async function sha256Hex(value: string) {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
-  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
-}
-
 export interface StartNowSubscriptionInput {
   customerId: string
   orgId: string
@@ -442,10 +437,11 @@ async function findLiveSubscription(stripe: Stripe, customerId: string) {
 
 // Charges the first month right away. error_if_incomplete makes Stripe reject the request
 // (no subscription is left behind) when the card is declined or needs authentication.
-// Callers hold the per-customer start-now lock: an existing live subscription is reused when
+// Callers hold the per-customer trial plan lock: an existing live subscription is reused when
 // it is a started-now plan (a retry after a lost response) and refused otherwise, so two
-// requests, other cards or other attribution cookies can never charge twice. The
-// idempotency key also covers a network retry of the same request.
+// requests, other cards or other attribution cookies can never charge twice. No explicit
+// idempotency key: Stripe would replay a declined card for 24 hours, so a fixed card could
+// never be retried (stripe-node still adds one to its own network retries).
 export async function createStartNowSubscription(stripe: Stripe, input: StartNowSubscriptionInput): Promise<{ subscription: Stripe.Subscription, reused: boolean }> {
   const live = await findLiveSubscription(stripe, input.customerId)
   if (live) {
@@ -468,9 +464,8 @@ export async function createStartNowSubscription(stripe: Stripe, input: StartNow
     automatic_tax: { enabled: input.automaticTax },
     metadata,
   }
-  const idempotencyKey = `capgo-trial-start-now:${input.customerId}:${await sha256Hex(JSON.stringify(params))}`
   try {
-    return { subscription: await stripe.subscriptions.create(params, { idempotencyKey }), reused: false }
+    return { subscription: await stripe.subscriptions.create(params), reused: false }
   }
   catch (error) {
     const stripeError = error as { type?: string, statusCode?: number, code?: string }
@@ -489,6 +484,7 @@ interface LockQueryClient { query: (queryText: string, values?: unknown[]) => Pr
 // Holds a transaction-scoped advisory lock on `client` while `run` calls Stripe. `run` never
 // uses the connection, so a heartbeat keeps the transaction from going idle: otherwise
 // idle_in_transaction_session_timeout would end the session and release the lock mid-charge.
+// The timeout stays set so a request that dies without its heartbeat frees the lock.
 // The lock guards no writes, so a failed heartbeat or COMMIT after `run` succeeded is logged
 // and the Stripe result is still returned.
 export async function holdTrialPlanLock<T>(
@@ -498,7 +494,7 @@ export async function holdTrialPlanLock<T>(
   run: () => Promise<T>,
   heartbeatMs = Math.floor(TRANSACTION_IDLE_TIMEOUT_MS / 3),
 ): Promise<{ result: T, connectionLost: boolean }> {
-  await client.query('BEGIN READ WRITE; SET LOCAL statement_timeout = 10000')
+  await client.query(`BEGIN READ WRITE; SET LOCAL statement_timeout = 10000; SET LOCAL idle_in_transaction_session_timeout = ${TRANSACTION_IDLE_TIMEOUT_MS}`)
   let connectionLost = false
   let heartbeat: ReturnType<typeof setInterval> | undefined
   try {

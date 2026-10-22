@@ -315,7 +315,7 @@ describe('start trial plan now', () => {
       payment_behavior: 'error_if_incomplete',
       automatic_tax: { enabled: true },
       metadata: { affonso_referral: 'ref_example', org_id: 'org_1', capgo_trial_plan: 'true', capgo_trial_started_now: 'true' },
-    }, { idempotencyKey: expect.stringMatching(/^capgo-trial-start-now:cus_1:[0-9a-f]{64}$/) })
+    })
   })
 
   it('returns the started-now subscription instead of charging again', async () => {
@@ -336,15 +336,11 @@ describe('start trial plan now', () => {
     expect(create).not.toHaveBeenCalled()
   })
 
-  it('reuses the idempotency key for a double click and changes it for another card', async () => {
+  it('lets a declined card be retried instead of replaying the decline', async () => {
     const create = vi.fn(async () => ({ id: 'sub_now', created: 1 }))
     const stripe = { subscriptions: { create, list: vi.fn(async () => ({ data: [] })) } } as unknown as Stripe
     await createStartNowSubscription(stripe, input)
-    await createStartNowSubscription(stripe, input)
-    await createStartNowSubscription(stripe, { ...input, paymentMethodId: 'pm_2' })
-    const keys = create.mock.calls.map(call => (call as unknown[])[1] as { idempotencyKey: string }).map(options => options.idempotencyKey)
-    expect(keys[0]).toBe(keys[1])
-    expect(keys[2]).not.toBe(keys[0])
+    expect(create.mock.calls[0]).toHaveLength(1)
   })
 
   it('reports a declined card without leaving a subscription behind', async () => {
@@ -394,6 +390,28 @@ describe('trial plan lock', () => {
     finally {
       vi.useRealTimers()
     }
+  })
+
+  it('returns the Stripe result when a heartbeat finds the connection lost', async () => {
+    vi.useFakeTimers()
+    try {
+      const { client, queries } = fakeLockClient('SELECT 1')
+      const run = vi.fn(() => new Promise<string>(resolve => setTimeout(() => resolve('sub_now'), 20_000)))
+      const held = holdTrialPlanLock(context, client, 'cus_1', run, 5_000)
+      await vi.advanceTimersByTimeAsync(20_000)
+      await expect(held).resolves.toEqual({ result: 'sub_now', connectionLost: true })
+      // The heartbeat stops after the first failure.
+      expect(queries.filter(text => text === 'SELECT 1')).toHaveLength(1)
+    }
+    finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('bounds the lock transaction with the idle timeout', async () => {
+    const { client, queries } = fakeLockClient()
+    await holdTrialPlanLock(context, client, 'cus_1', async () => 'sub_now')
+    expect(queries[0]).toMatch(/^BEGIN READ WRITE; SET LOCAL statement_timeout = \d+; SET LOCAL idle_in_transaction_session_timeout = \d+$/)
   })
 
   it('returns the Stripe result when the connection drops before COMMIT', async () => {

@@ -11,7 +11,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconBolt from '~icons/heroicons/bolt'
 import BillingModal from '~/components/billing/BillingModal.vue'
-import { getCapgoApiErrorCode } from '~/services/capgoApi'
+import { getCapgoApiErrorName } from '~/services/capgoApi'
 import { pushEvent } from '~/services/posthog'
 import { formatStripeAmount, startTrialPlanNow } from '~/services/stripe'
 import { getLocalConfig } from '~/services/supabase'
@@ -27,7 +27,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   started: [plan: TrialPlan]
-  // The org can no longer start now (trial over, already subscribed): Billing reloads.
+  // The org can no longer start now (trial over, already subscribed), or the outcome is unknown: Billing reloads.
   stale: []
 }>()
 
@@ -85,14 +85,23 @@ async function startNow() {
   }
   catch (error) {
     console.error('Cannot start trial plan now', error)
-    if (STALE_ERROR_CODES.has(await getCapgoApiErrorCode(error) ?? '')) {
-      track('trial_plan_start_now_unavailable')
-      toast.error(t('trial-plan-start-now-unavailable'))
-      emit('stale')
+    const errorName = await getCapgoApiErrorName(error)
+    // Only a confirmed decline means nothing was charged. A timeout or server error may
+    // follow a successful charge, so never send the user to pay again: reload Billing instead.
+    if (errorName === 'trial_plan_payment_failed') {
+      track('trial_plan_start_now_failed')
+      toast.error(t('trial-plan-start-now-error'))
       return
     }
-    track('trial_plan_start_now_failed')
-    toast.error(t('trial-plan-start-now-error'))
+    if (STALE_ERROR_CODES.has(errorName ?? '')) {
+      track('trial_plan_start_now_unavailable')
+      toast.error(t('trial-plan-start-now-unavailable'))
+    }
+    else {
+      track('trial_plan_start_now_unconfirmed')
+      toast.error(t('trial-plan-start-now-unconfirmed'))
+    }
+    emit('stale')
   }
   finally {
     isStarting.value = false

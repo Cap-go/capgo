@@ -3145,6 +3145,7 @@
   "trial-plan-started-now": "Your {plan} plan has started. Usage counts from today.",
   "trial-plan-start-now-unavailable": "Your billing changed since this page loaded. Check your plan below before starting it.",
   "trial-plan-start-now-error": "We could not charge your card. Update it in Billing or choose a plan to pay with another method.",
+  "trial-plan-start-now-unconfirmed": "We could not confirm whether your plan started. Your billing was reloaded: check it before trying again.",
   "trial-days-left": "{count} days left",
   "trial-end-date": "Trial End Date",
   "trial-ended-description": "Choose a plan to continue using Capgo updates and other features. If you didn’t get a chance to explore Capgo during your trial, email {supportEmail} to request an extension.",
