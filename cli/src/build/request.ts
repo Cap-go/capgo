@@ -70,7 +70,8 @@ import { buildCliRequestHeaders } from '../analytics/cli-headers'
 import { isDirectOfferApp } from '../api/direct-offer'
 import { isAgentInvocation } from '../shared/agent-notices'
 import { DIRECT_OFFER_PLAN_MESSAGE, formatPlanRequiredMessage } from '../shared/direct-offer'
-import { assertCliPermission, canPromptInteractively, createCapgoClient, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, trimTrailingSlashes, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
+import { normalizePlansUrl } from '../shared/plan-url'
+import { assertCliPermission, canPromptInteractively, createCapgoClient, defaultHostWeb, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, trimTrailingSlashes, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { getBuilderAppId } from './app-id'
 import { parseBuildEnv } from './build-env'
 import { syncAndroidVersion } from './android-version'
@@ -258,15 +259,8 @@ export async function throwIfBuildPlanLimitError(
     return
 
   const config = await getRemoteConfig()
-  let upgradeUrl = `${config.hostWeb}/settings/organization/plans`
-  try {
-    const url = new URL(body?.moreInfo?.upgrade_url ?? '')
-    if (url.protocol === 'http:' || url.protocol === 'https:')
-      upgradeUrl = url.href
-  }
-  catch {
-    // Keep the default plans link for malformed server responses.
-  }
+  const fallbackUrl = normalizePlansUrl(`${config.hostWeb}/settings/organization/plans`, `${defaultHostWeb}/settings/organization/plans`)
+  const upgradeUrl = normalizePlansUrl(body?.moreInfo?.upgrade_url, fallbackUrl)
   // Orgs created without a free trial (direct offer) get "choose a plan" copy, not "upgrade".
   const directOffer = errorCode === 'need_plan_upgrade' && !!isDirectOffer && await isDirectOffer()
   const message = directOffer

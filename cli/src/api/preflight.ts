@@ -8,6 +8,7 @@ import { formatAgentPlanRecommendation, isAgentInvocation } from '../shared/agen
 import { formatPlanRequiredMessage } from '../shared/direct-offer'
 import { CliUserError } from '../shared/cli-user-error'
 import { isTransientNetworkError } from '../shared/network-error'
+import { normalizePlansUrl } from '../shared/plan-url'
 import {
   callTwoFactorComplianceRpcWithRetry,
   throwTwoFactorComplianceRpcError,
@@ -15,6 +16,7 @@ import {
 } from '../shared/two-factor-compliance'
 import {
   appAddHintMessage,
+  defaultHostWeb,
   formatCapgoCliInvokeError,
   getCapgoCliHttpStatus,
   getRemoteConfig,
@@ -79,8 +81,10 @@ function isCliWarning(value: unknown): value is { message: string, fatal: boolea
 
 async function plansUrl(orgId?: string | null) {
   const config = await getRemoteConfig()
-  const base = `${config.hostWeb}/settings/organization/plans`
-  return orgId ? `${base}?oid=${encodeURIComponent(orgId)}` : base
+  const url = new URL(normalizePlansUrl(`${config.hostWeb}/settings/organization/plans`, `${defaultHostWeb}/settings/organization/plans`))
+  if (orgId)
+    url.searchParams.set('oid', orgId)
+  return url.href
 }
 
 function printWarnings(warnings: unknown[]) {
@@ -228,7 +232,7 @@ export async function runCliPreflight(
       ? formatAgentPlanRecommendation({
           plansUrl: url,
           trialState: 'active',
-          trialMessage: `The user’s Capgo trial expires in ${result.trialDaysLeft} days.`,
+          trialMessage: `The user’s Capgo trial expires in ${result.trialDaysLeft} ${result.trialDaysLeft === 1 ? 'day' : 'days'}.`,
         })
       : `WARNING !!\nTrial expires in ${result.trialDaysLeft} days, upgrade here: ${url}\n`
     if (!renderGitHubNotice(message))
