@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 process.env.CAPGO_DISABLE_POSTHOG = '1'
 
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -116,11 +116,15 @@ await test('GitHub Actions publishes the existing preflight trial warning to bot
 })
 
 await test('preflight trial reminders honor every machine-output guard in GitHub Actions', async () => {
-  const previous = process.env.GITHUB_ACTIONS
+  const dir = mkdtempSync(join(tmpdir(), 'capgo-machine-plan-notice-'))
+  const previous = { github: process.env.GITHUB_ACTIONS, summary: process.env.GITHUB_STEP_SUMMARY }
+  const summaryPath = join(dir, 'summary.md')
+  writeFileSync(summaryPath, 'Existing summary\n')
   const write = process.stdout.write
   let output = ''
   try {
     process.env.GITHUB_ACTIONS = 'true'
+    process.env.GITHUB_STEP_SUMMARY = summaryPath
     process.stdout.write = chunk => { output += chunk; return true }
     fetchHandler = () => Response.json({ ...okBody, org_id: 'machine-output-org', trial_days_left: 3 })
     for (const github of ['false', 'true']) {
@@ -133,13 +137,22 @@ await test('preflight trial reminders honor every machine-output guard in GitHub
       }
     }
     assertEquals(output, '', 'trial reminders cannot contaminate machine output')
+    assertEquals(readFileSync(summaryPath, 'utf8'), 'Existing summary\n', 'machine modes cannot append to the job summary')
     assert(!wasTrialNoticeShown('machine-output-org'), 'suppressed output must not hide a later human-facing reminder')
+    setNoticeOutputOptions({})
+    await checkPlanValidUpload(makeClient(), 'org-id', 'com.example.app')
+    assert(output.includes('Trial expires in 3 days'), 'the later human-mode reminder must print')
+    assert(readFileSync(summaryPath, 'utf8').includes('Trial expires in 3 days'), 'the later human-mode summary must render')
+    assert(wasTrialNoticeShown('machine-output-org'), 'a displayed reminder must mark its organization')
   }
   finally {
     process.stdout.write = write
     setNoticeOutputOptions({})
-    if (previous === undefined) delete process.env.GITHUB_ACTIONS
-    else process.env.GITHUB_ACTIONS = previous
+    if (previous.github === undefined) delete process.env.GITHUB_ACTIONS
+    else process.env.GITHUB_ACTIONS = previous.github
+    if (previous.summary === undefined) delete process.env.GITHUB_STEP_SUMMARY
+    else process.env.GITHUB_STEP_SUMMARY = previous.summary
+    rmSync(dir, { recursive: true, force: true })
   }
 })
 
