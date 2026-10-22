@@ -27,7 +27,7 @@ const skipStepBodySchema = z.object({
 })
 type Observations = Partial<Record<'login_cli_mcp' | 'add_channel' | 'run_device' | 'upload_bundle' | 'test_update', boolean>>
 type AuthenticatedClient = ReturnType<typeof supabaseWithAuth>
-type BillingSummary = { status: 'available', orgId: string, trialEndsAt: string | null, isPaying: boolean, hasCredits: boolean } | { status: 'unavailable' }
+type BillingSummary = { status: 'available', orgId: string, orgCreatedAt: string | null, trialEndsAt: string | null, hasPaid: boolean, isPaying: boolean, hasCredits: boolean } | { status: 'unavailable' }
 
 async function readBilling(c: Context<MiddlewareKeyVariables>, client: AuthenticatedClient, orgId: string): Promise<BillingSummary> {
   try {
@@ -35,7 +35,7 @@ async function readBilling(c: Context<MiddlewareKeyVariables>, client: Authentic
       return { status: 'unavailable' }
     // Use the caller's RLS context and the existing org/customer foreign key.
     // No Stripe call or credit-ledger aggregation is needed for CLI notices.
-    const { data, error } = await client.from('orgs').select('has_usage_credits, stripe_info(status, trial_at)').eq('id', orgId).maybeSingle()
+    const { data, error } = await client.from('orgs').select('created_at, has_usage_credits, stripe_info(status, trial_at, paid_at)').eq('id', orgId).maybeSingle()
     if (error)
       throw error
     if (!data?.stripe_info)
@@ -43,7 +43,11 @@ async function readBilling(c: Context<MiddlewareKeyVariables>, client: Authentic
     return {
       status: 'available',
       orgId,
+      // Lets the CLI detect zero-length (direct-offer) trials: trialEndsAt ~= orgCreatedAt.
+      orgCreatedAt: data.created_at,
       trialEndsAt: data.stripe_info.trial_at,
+      // Ever paid (stripe_info.paid_at set): a churned org is not a never-paid direct-offer org.
+      hasPaid: !!data.stripe_info.paid_at,
       // Match is_paying_org and has_usage_credits_org without extra RPCs.
       isPaying: data.stripe_info.status === 'succeeded',
       hasCredits: data.has_usage_credits ?? false,

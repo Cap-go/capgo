@@ -1,6 +1,7 @@
 import type { CapgoClient } from '../utils'
 import { log } from '@clack/prompts'
 import { markTrialNoticeShown } from '../onboarding/trial-notice-state'
+import { formatPlanRequiredMessage } from '../shared/direct-offer'
 import { CliUserError } from '../shared/cli-user-error'
 import { isTransientNetworkError } from '../shared/network-error'
 import {
@@ -18,6 +19,7 @@ import {
   readCapgoCliApiErrorPayload,
   show2FADeniedError,
 } from '../utils'
+import { isDirectOfferApp } from './direct-offer'
 
 /** What a command needs checked before it acts. The backend owns every rule. */
 export interface CliPreflightRequest {
@@ -104,7 +106,7 @@ function printWarnings(warnings: unknown[]) {
   log.info('End of cli warnings.')
 }
 
-async function throwPreflightError(request: CliPreflightRequest, error: Error, options: CliPreflightOptions): Promise<never> {
+async function throwPreflightError(client: CapgoClient, request: CliPreflightRequest, error: Error, options: CliPreflightOptions): Promise<never> {
   if (error instanceof CliUserError)
     throw error
   const payload = await readCapgoCliApiErrorPayload(error)
@@ -136,9 +138,12 @@ async function throwPreflightError(request: CliPreflightRequest, error: Error, o
     }
     case 'plan_upgrade_required': {
       const url = await plansUrl(request.orgId)
-      log.error(`You need to upgrade your plan to continue to use capgo.\n Upgrade here: ${url}\n`)
+      // Orgs created without a free trial (direct offer) get "choose a plan", not "upgrade".
+      const directOffer = await isDirectOfferApp(client, request.appId)
+      log.error(formatPlanRequiredMessage(url, directOffer))
       await openExternalUrl(url)
-      throw new CliUserError(request.plan === 'upload' ? 'Plan upgrade required for upload' : 'Plan upgrade required')
+      const prefix = directOffer ? 'Plan required' : 'Plan upgrade required'
+      throw new CliUserError(request.plan === 'upload' ? `${prefix} for upload` : prefix)
     }
     case 'plan_permission_denied': {
       log.error('Cannot validate plan usage for this app. The API key may lack permission to read app billing details.')
@@ -201,7 +206,7 @@ export async function runCliPreflight(
       })
       return null
     }
-    await throwPreflightError(request, error as Error, options)
+    await throwPreflightError(client, request, error as Error, options)
   }
 
   const result: CliPreflightResult = {
