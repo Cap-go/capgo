@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
+import type { BundleSummaryRow } from '~/services/bundleColumns'
 import type { LinkedChannel } from '~/services/bundleLinkedChannels'
 import type { ChannelPromotionTarget } from '~/services/channelPromotion'
 import type { Database } from '~/types/database.types'
@@ -27,7 +28,7 @@ const props = defineProps<{
   appId: string
 }>()
 
-type Element = Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']
+type Element = BundleSummaryRow & Database['public']['Tables']['app_versions_meta']['Row']
 
 const canDeleteBundle = computedAsync(async () => {
   if (!props.appId)
@@ -189,7 +190,7 @@ function showChannelUnlinkPermissionError(deniedChannels: ChannelPromotionTarget
   }))
 }
 
-async function enhanceVersionElems(dataVersions: Database['public']['Tables']['app_versions']['Row'][]) {
+async function enhanceVersionElems(dataVersions: BundleSummaryRow[]) {
   const { data: dataVersionsMeta } = await capgo
     .from('app_versions_meta')
     .select()

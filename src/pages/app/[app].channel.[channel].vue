@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { BundlePickerRow } from '~/services/bundleColumns'
 import type { Database } from '~/types/database.types'
 import { FormKit } from '@formkit/vue'
 import { greaterOrEqual, parse } from '@std/semver'
@@ -66,7 +67,7 @@ type EditableChannelKey = 'allow_dev'
   | 'version'
 
 // Bundle link dialog state
-const bundleLinkVersions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
+const bundleLinkVersions = ref<BundlePickerRow[]>([])
 const bundleLinkSearchVal = ref('')
 const bundleLinkSearchMode = ref(false)
 const bundleLinkMode = ref<'stable' | 'rollout'>('stable')
@@ -935,7 +936,7 @@ async function openSelectVersion(startInSearch = false) {
     return
   }
 
-  bundleLinkVersions.value = (data ?? []) as Database['public']['Tables']['app_versions']['Row'][]
+  bundleLinkVersions.value = data ?? []
   bundleLinkSearchVal.value = ''
   bundleLinkSearchMode.value = startInSearch
 
@@ -1122,7 +1123,7 @@ async function refreshFilteredVersions() {
       console.error(error)
       toast.error(t('error-fetching-versions'))
     }
-    bundleLinkVersions.value = (data ?? []) as Database['public']['Tables']['app_versions']['Row'][]
+    bundleLinkVersions.value = data ?? []
   }
   else {
     const { data, error } = await capgo.from('app_versions')
@@ -1136,7 +1137,7 @@ async function refreshFilteredVersions() {
       console.error(error)
       toast.error(t('error-fetching-versions'))
     }
-    bundleLinkVersions.value = (data ?? []) as Database['public']['Tables']['app_versions']['Row'][]
+    bundleLinkVersions.value = data ?? []
   }
 }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
+import type { BundleSummaryRow } from '~/services/bundleColumns'
 import type { Database } from '~/types/database.types'
 import { computed, h, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -36,7 +37,7 @@ const packageId = ref<string>('')
 const id = ref<number>(0)
 const loading = ref(true)
 const tableLoading = ref(false)
-const version = ref<Database['public']['Tables']['app_versions']['Row']>()
+const version = ref<BundleSummaryRow>()
 const manifestEntries = ref<ManifestEntry[]>([])
 const selectedCompareVersion = ref<VersionRow | null>(null)
 const compareManifestEntries = ref<ManifestEntry[]>([])

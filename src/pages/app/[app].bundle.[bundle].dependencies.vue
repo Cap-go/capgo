@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { BundleSummaryWithNativePackages } from '~/services/bundleColumns'
 import type { IncompatibilityReason, NativePackage, PackageComparison, PackageStatus } from '~/services/bundleCompatibility'
 import type { Database } from '~/types/database.types'
 import { FormKit } from '@formkit/vue'
@@ -47,7 +48,7 @@ const packageId = ref<string>('')
 const id = ref<number>(0)
 const loading = ref(true)
 const tableLoading = ref(false)
-const version = ref<Database['public']['Tables']['app_versions']['Row']>()
+const version = ref<BundleSummaryWithNativePackages>()
 const selectedCompareVersion = ref<VersionRow | null>(null)
 const baselinePackages = ref<NativePackage[]>([])
 const baselinePackagesCache = ref<Record<number, NativePackage[]>>({})

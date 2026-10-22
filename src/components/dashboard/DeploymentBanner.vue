@@ -23,6 +23,7 @@
  * <DeploymentBanner :app-id="appId" @deployed="refreshData" />
  */
 
+import type { BundlePickerRow } from '~/services/bundleColumns'
 import type { Database } from '~/types/database.types'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -62,7 +63,7 @@ const loading = ref(true)
 /** Indicates if a deployment is currently in progress */
 const deploying = ref(false)
 /** The most recent bundle available for deployment */
-const latestBundle = ref<Database['public']['Tables']['app_versions']['Row'] | null>(null)
+const latestBundle = ref<BundlePickerRow | null>(null)
 type DefaultChannel = Pick<
   Database['public']['Tables']['channels']['Row'],
   'id' | 'name' | 'ios' | 'android' | 'electron' | 'public' | 'version'
@@ -176,7 +177,7 @@ async function loadData() {
       .order('created_at', { ascending: false })
       .limit(1)
 
-    latestBundle.value = (bundles?.[0] ?? null) as Database['public']['Tables']['app_versions']['Row'] | null
+    latestBundle.value = bundles?.[0] ?? null
   }
   catch (error) {
     // Errors are logged but don't block the UI

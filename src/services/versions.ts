@@ -59,7 +59,7 @@ export function withBuiltinChannelVersion<T extends {
   }
 }
 
-export async function openVersion(app: Database['public']['Tables']['app_versions']['Row']) {
+export async function openVersion(app: Pick<Database['public']['Tables']['app_versions']['Row'], 'r2_path' | 'storage_provider' | 'user_id' | 'app_id' | 'id' | 'external_url' | 'name'>) {
   const { t } = i18n.global
 
   let signedURL

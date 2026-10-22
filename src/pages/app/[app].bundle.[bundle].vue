@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { BundleSummaryWithNativePackages } from '~/services/bundleColumns'
 import type { LinkedChannel } from '~/services/bundleLinkedChannels'
 import type { ChannelPromotionTarget } from '~/services/channelPromotion'
 import type { Database } from '~/types/database.types'
@@ -40,7 +41,7 @@ const capgo = useConsole()
 const packageId = ref<string>('')
 const id = ref<number>()
 const loading = ref(true)
-const version = ref<Database['public']['Tables']['app_versions']['Row']>()
+const version = ref<BundleSummaryWithNativePackages>()
 const channels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
 const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()

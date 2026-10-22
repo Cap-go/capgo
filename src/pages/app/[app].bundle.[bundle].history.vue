@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Database } from '~/types/database.types'
+import type { BundleSummaryRow } from '~/services/bundleColumns'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -16,7 +16,7 @@ const capgo = useConsole()
 const packageId = ref<string>('')
 const id = ref<number>(0)
 const loading = ref(true)
-const version = ref<Database['public']['Tables']['app_versions']['Row']>()
+const version = ref<BundleSummaryRow>()
 
 async function getVersion() {
   if (!id.value)

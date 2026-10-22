@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { BundleSummaryRow } from '~/services/bundleColumns'
 import type { Database } from '~/types/database.types'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -17,7 +18,7 @@ const capgo = useConsole()
 const packageId = ref<string>('')
 const id = ref<number>(0)
 const loading = ref(true)
-const version = ref<Database['public']['Tables']['app_versions']['Row']>()
+const version = ref<BundleSummaryRow>()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 
 type PreviewState = 'loading' | 'preview-disabled' | 'ready'
