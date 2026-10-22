@@ -32,6 +32,12 @@ const TRANSLATION_STORE_CLEANUP_INTERVAL_SECONDS = 60
 const TRANSLATION_REQUEUE_AFTER_SECONDS = 60
 const TRANSLATION_BATCH_LEASE_SECONDS = 15 * 60
 const TRANSLATION_STORE_TABLE = 'translation_messages_cache'
+// Translation memory: one row per translated string, keyed by a hash of its English
+// text, translator context and pipeline version. A catalog change only sends new or
+// edited strings to Workers AI; every other string is reused from here.
+const TRANSLATION_MEMORY_TABLE = 'translation_memory'
+// D1 caps a query at 100 bound parameters.
+const TRANSLATION_MEMORY_LOOKUP_CHUNK = 90
 const CLAIMED_TRANSLATION_BATCH_INDEX_OFFSET = 1_000_000_000
 const PLACEHOLDER_PATTERN = /\{[\w.]+\}|%\w+%?|\$\d+/g
 
@@ -158,7 +164,6 @@ interface ReadyTranslationWriteInput {
 
 interface TranslatedBatchPersistenceInput {
   batchIndex: number
-  batches: MessageEntry[][]
   checksum: string
   env: TranslationWorkerBindings
   mergedMessages: Record<string, string>
@@ -759,6 +764,16 @@ async function ensureTranslationStore(db: D1Database) {
     `CREATE INDEX IF NOT EXISTS idx_${TRANSLATION_STORE_TABLE}_expires_at
      ON ${TRANSLATION_STORE_TABLE} (expires_at)`,
   ).run()
+  await db.prepare(
+    `CREATE TABLE IF NOT EXISTS ${TRANSLATION_MEMORY_TABLE} (
+       target_language TEXT NOT NULL,
+       source_hash TEXT NOT NULL,
+       translated TEXT NOT NULL,
+       model TEXT NOT NULL,
+       updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+       PRIMARY KEY (target_language, source_hash)
+     )`,
+  ).run()
   translationStoreInitialized = true
 }
 
@@ -1022,6 +1037,106 @@ async function deleteTranslationStoreEntry(env: TranslationWorkerBindings, entry
      WHERE target_language = ?
        AND checksum = ?`,
   ).bind(entry.targetLanguage, entry.checksum).run()
+}
+
+function translationMemoryHash(text: string, context: string) {
+  return sha256Hex(JSON.stringify([TRANSLATION_PIPELINE_VERSION, text, context]))
+}
+
+function untranslatedMessages(messages: Record<string, string>) {
+  return Object.fromEntries(Object.entries(sourceMessageCatalog).filter(([key]) => typeof messages[key] !== 'string'))
+}
+
+async function readTranslationMemory(env: TranslationWorkerBindings, targetLanguage: string, messages: Record<string, string>) {
+  const entries = await Promise.all(Object.entries(messages).map(async ([key, text]) => [key, await translationMemoryHash(text, messageContextFor(key))] as const))
+  if (!entries.length)
+    return {}
+
+  const db = getTranslationStore(env)
+  await ensureTranslationStore(db)
+  const hashes = [...new Set(entries.map(([, hash]) => hash))]
+  const statements = []
+  for (let index = 0; index < hashes.length; index += TRANSLATION_MEMORY_LOOKUP_CHUNK) {
+    const chunk = hashes.slice(index, index + TRANSLATION_MEMORY_LOOKUP_CHUNK)
+    statements.push(db.prepare(
+      `SELECT source_hash, translated FROM ${TRANSLATION_MEMORY_TABLE}
+       WHERE target_language = ?
+         AND source_hash IN (${chunk.map(() => '?').join(', ')})`,
+    ).bind(targetLanguage, ...chunk))
+  }
+
+  const translatedByHash = new Map<string, string>()
+  for (const result of await db.batch(statements)) {
+    for (const row of result.results ?? []) {
+      const record = recordOf(row)
+      if (typeof record?.source_hash === 'string' && typeof record.translated === 'string')
+        translatedByHash.set(record.source_hash, record.translated)
+    }
+  }
+
+  const reused: Record<string, string> = {}
+  for (const [key, hash] of entries) {
+    const translated = translatedByHash.get(hash)
+    if (translated !== undefined)
+      reused[key] = translated
+  }
+  return reused
+}
+
+async function writeTranslationMemory(env: TranslationWorkerBindings, targetLanguage: string, model: string, translated: Record<string, string>) {
+  // Strings that fell back to English (dropped placeholder, failed batch) are not
+  // remembered, so the next catalog change gets another chance to translate them.
+  const remembered = Object.entries(translated).filter(([key, text]) => sourceMessageCatalog[key] !== undefined && text !== sourceMessageCatalog[key])
+  if (!remembered.length)
+    return
+
+  const db = getTranslationStore(env)
+  await ensureTranslationStore(db)
+  const rows = await Promise.all(remembered.map(async ([key, text]) => [await translationMemoryHash(sourceMessageCatalog[key], messageContextFor(key)), text] as const))
+  await db.batch(rows.map(([hash, text]) => db.prepare(
+    `INSERT INTO ${TRANSLATION_MEMORY_TABLE} (target_language, source_hash, translated, model, updated_at)
+     VALUES (?, ?, ?, ?, unixepoch())
+     ON CONFLICT (target_language, source_hash) DO UPDATE
+     SET translated = excluded.translated,
+         model = excluded.model,
+         updated_at = excluded.updated_at`,
+  ).bind(targetLanguage, hash, text, model)))
+}
+
+async function reuseTranslationMemory(env: TranslationWorkerBindings, targetLanguage: string, messages: Record<string, string>, requestId?: string) {
+  try {
+    const reused = await readTranslationMemory(env, targetLanguage, untranslatedMessages(messages))
+    cloudlog({
+      requestId,
+      message: 'Reused translation memory',
+      targetLanguage,
+      reusedCount: Object.keys(reused).length,
+    })
+    return { ...messages, ...reused }
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId,
+      message: 'Unable to read translation memory',
+      error: serializeError(error),
+      targetLanguage,
+    })
+    return messages
+  }
+}
+
+async function rememberTranslatedBatch(env: TranslationWorkerBindings, targetLanguage: string, model: string, translated: Record<string, string>, requestId?: string) {
+  try {
+    await writeTranslationMemory(env, targetLanguage, model, translated)
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId,
+      message: 'Unable to write translation memory',
+      error: serializeError(error),
+      targetLanguage,
+    })
+  }
 }
 
 function workerCache() {
@@ -1341,13 +1456,7 @@ async function writeReadyTranslation(input: ReadyTranslationWriteInput) {
   return true
 }
 
-async function translateOwnedBatch(ai: AiBinding, env: TranslationWorkerBindings, checksum: string, targetLanguage: string, model: string, batches: MessageEntry[][], batchIndex: number) {
-  const batch = batches[batchIndex]
-  if (!batch) {
-    await releaseTranslationBatchClaim(env, checksum, targetLanguage, batchIndex).catch(() => {})
-    return null
-  }
-
+async function translateOwnedBatch(ai: AiBinding, env: TranslationWorkerBindings, checksum: string, targetLanguage: string, model: string, batch: MessageEntry[], batchIndex: number) {
   try {
     return await translateBatch(ai, model, targetLanguage, batch, getTranslationReviewModel(env))
   }
@@ -1360,7 +1469,6 @@ async function translateOwnedBatch(ai: AiBinding, env: TranslationWorkerBindings
 async function persistTranslatedBatch(input: TranslatedBatchPersistenceInput) {
   const {
     batchIndex,
-    batches,
     checksum,
     env,
     mergedMessages,
@@ -1371,9 +1479,9 @@ async function persistTranslatedBatch(input: TranslatedBatchPersistenceInput) {
   } = input
   const followingBatchIndex = batchIndex + 1
 
-  if (followingBatchIndex >= batches.length) {
+  if (!Object.keys(untranslatedMessages(mergedMessages)).length) {
     await writeReadyTranslation({
-      batchCount: batches.length,
+      batchCount: followingBatchIndex,
       checksum,
       claimedBatchIndex: batchIndex,
       env,
@@ -1425,25 +1533,10 @@ async function processTranslationQueueBatch(env: TranslationWorkerBindings, body
   if (storedEntry?.status !== 'pending')
     return
 
-  const batches = buildBatches(sourceMessageCatalog)
   const batchIndex = normalizeBatchIndex(body.batchIndex)
   const nextBatchIndex = await nextProcessableBatchIndex(env, storedEntry, checksum, targetLanguage, batchIndex)
   if (nextBatchIndex === null)
     return
-
-  if (nextBatchIndex >= batches.length) {
-    await writeReadyTranslation({
-      checksum,
-      env,
-      messages: storedEntry.messages,
-      model,
-      nextBatchIndex,
-      readyRequest,
-      requestId,
-      targetLanguage,
-    })
-    return
-  }
 
   if (batchIndex < nextBatchIndex)
     return
@@ -1457,17 +1550,38 @@ async function processTranslationQueueBatch(env: TranslationWorkerBindings, body
   if (!claimed)
     return
 
-  const translatedBatch = await translateOwnedBatch(ai, env, checksum, targetLanguage, model, batches, batchIndex)
-  if (!translatedBatch)
+  // Each queue step translates the next batch of strings still missing from this
+  // catalog. The first step fills in every string already in translation memory, so
+  // an en.json change only sends its new or edited strings to Workers AI.
+  const messages = batchIndex === 0
+    ? await reuseTranslationMemory(env, targetLanguage, storedEntry.messages, requestId)
+    : storedEntry.messages
+  const batch = buildBatches(untranslatedMessages(messages))[0]
+  if (!batch) {
+    await writeReadyTranslation({
+      batchCount: batchIndex,
+      checksum,
+      claimedBatchIndex: batchIndex,
+      env,
+      messages,
+      model,
+      nextBatchIndex: batchIndex + 1,
+      readyRequest,
+      requestId,
+      targetLanguage,
+    })
     return
+  }
+
+  const translatedBatch = await translateOwnedBatch(ai, env, checksum, targetLanguage, model, batch, batchIndex)
+  await rememberTranslatedBatch(env, targetLanguage, model, translatedBatch, requestId)
 
   const mergedMessages = {
-    ...storedEntry.messages,
+    ...messages,
     ...translatedBatch,
   }
   await persistTranslatedBatch({
     batchIndex,
-    batches,
     checksum,
     env,
     mergedMessages,
@@ -1527,6 +1641,7 @@ export default {
 export const __translationWorkerTestUtils__ = {
   buildBatches,
   claimedTranslationBatchIndex,
+  currentSourceChecksum,
   escapeVueI18nAtSigns,
   getTranslationReviewModel,
   isReadyTranslationFresh,
@@ -1540,6 +1655,7 @@ export const __translationWorkerTestUtils__ = {
   translationBatchPayload,
   translationBatchClaimMarker,
   translationBatchIndexFromStore,
+  translationMemoryHash,
   translationPrompt,
   translationRequest,
   translationStoreTtlSeconds,
