@@ -4,9 +4,12 @@ import { buildAiOnboardingPrompt } from '../src/services/cliAiPrompt'
 import { onboardingPlanStops } from '../src/utils/onboardingPlanStops'
 import {
   AI_ONBOARDING_PATH,
+  aiGoalToIntent,
+  checklistTaskListMode,
   defaultAiOrganizationName,
   initialOnboardingSetupScreen,
   readAiAgentProgress,
+  readAiOnboardingGoal,
   readOnboardingSetupMode,
   shouldRedirectToAiOnboarding,
   withOnboardingSetupMode,
@@ -127,5 +130,45 @@ describe('readAiAgentProgress', () => {
     // MCP calls imply the agent is connected even if only the MCP marker exists.
     expect(readAiAgentProgress({ ai_mcp_connected_at: '2026-10-22T12:00:00Z' })).toEqual({ agentConnected: true, mcpConnected: true })
     expect(readAiAgentProgress(null)).toEqual({ agentConnected: false, mcpConnected: false })
+  })
+})
+
+describe('AI onboarding goal', () => {
+  it.concurrent('round-trips through the saved onboarding intent', () => {
+    for (const goal of ['ota', 'builder', 'both', 'unsure'] as const)
+      expect(readAiOnboardingGoal({ intent: aiGoalToIntent(goal) })).toBe(goal)
+    expect(aiGoalToIntent('unsure')).toBe('exploring')
+    expect(readAiOnboardingGoal({})).toBeNull()
+    expect(readAiOnboardingGoal({ intent: 'publish' })).toBeNull()
+  })
+
+  it.concurrent('opens the task list for AI setup and hides it for new manual signups only', () => {
+    expect(checklistTaskListMode({ setup_mode: 'ai' })).toBe('open')
+    expect(checklistTaskListMode({ setup_mode: 'manual' })).toBe('hidden')
+    // Accounts from before the setup choice keep the existing behavior.
+    expect(checklistTaskListMode({})).toBe('default')
+  })
+
+  const promptFor = (goal?: 'ota' | 'builder' | 'both' | 'unsure') => buildAiOnboardingPrompt({ apiKey: 'capgo_test_secret', organization: { id: 'org-1', name: 'Acme' }, goal })
+
+  it.concurrent('starts the chosen product directly', () => {
+    const ota = promptFor('ota')
+    expect(ota).toContain('I chose **Capgo Live Updates**')
+    expect(ota).toContain('call `start_capgo_live_update_onboarding`')
+    expect(ota).not.toContain('Help me decide')
+    const builder = promptFor('builder')
+    expect(builder).toContain('I chose **Capgo Builder**')
+    expect(builder).toContain('call `start_capgo_builder_onboarding`')
+    expect(builder).not.toContain('Help me decide')
+  })
+
+  it.concurrent('makes the agent inspect the project and recommend when the user is unsure', () => {
+    for (const prompt of [promptFor('unsure'), promptFor()]) {
+      expect(prompt).toContain('Help me decide')
+      expect(prompt).toContain('Inspect my project before asking anything')
+      expect(prompt).toContain('at most these two questions')
+      expect(prompt).toContain('wait for my confirmation')
+    }
+    expect(promptFor('both')).toContain('Help me pick the order')
   })
 })

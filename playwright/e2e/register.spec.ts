@@ -344,6 +344,10 @@ test.describe('Registration', () => {
     await continuePastChannelOnboardingIfShown(page)
     await expect(page.locator('[data-test="onboarding-technical-invite"]')).toBeVisible()
     await expect(page).toHaveURL(/\/app\/[^/]+\/getting-started$/)
+    // New manual signups see one next step, without task counts or the full list.
+    await expect(page.locator('[data-test="setup-checklist-instructions"]')).toContainText('Your next step')
+    await expect(page.locator('[data-test="setup-checklist-progress"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="setup-checklist-toggle"]')).toHaveCount(0)
   })
 
   test('should collect first and last names before the goal on the About you step on mobile', async ({ page }) => {

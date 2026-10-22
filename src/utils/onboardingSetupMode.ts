@@ -87,3 +87,41 @@ export function readAiAgentProgress(onboarding: Json | unknown) {
     mcpConnected,
   }
 }
+
+/**
+ * What the user wants first on the AI path. Saved as the usual onboarding intent before the
+ * agent registers the app, so the app gets the matching Getting started checklist.
+ * `unsure` lets the agent inspect the project and recommend one.
+ */
+export const AI_ONBOARDING_GOALS = ['ota', 'builder', 'both', 'unsure'] as const
+export type AiOnboardingGoal = typeof AI_ONBOARDING_GOALS[number]
+
+export function aiGoalToIntent(goal: AiOnboardingGoal): 'ota' | 'builder' | 'both' | 'exploring' {
+  return goal === 'unsure' ? 'exploring' : goal
+}
+
+export function readAiOnboardingGoal(onboarding: Json | unknown): AiOnboardingGoal | null {
+  const intent = asObject(onboarding).intent
+  if (intent === 'ota' || intent === 'builder' || intent === 'both')
+    return intent
+  return intent === 'exploring' ? 'unsure' : null
+}
+
+export function withOnboardingFields(onboarding: Json, fields: Record<string, Json>): Json {
+  return { ...asObject(onboarding), ...fields } as Json
+}
+
+/**
+ * How Getting started shows its task list:
+ * - AI setup: open, so the user watches the agent tick tasks off.
+ * - Manual setup (new signups): hidden, one next step at a time without counts.
+ * - Accounts from before the setup choice: unchanged (every step shown, user can hide the list).
+ */
+export type ChecklistTaskListMode = 'default' | 'hidden' | 'open'
+
+export function checklistTaskListMode(onboarding: Json | unknown): ChecklistTaskListMode {
+  const mode = readOnboardingSetupMode(onboarding)
+  if (mode === 'ai')
+    return 'open'
+  return mode === 'manual' ? 'hidden' : 'default'
+}

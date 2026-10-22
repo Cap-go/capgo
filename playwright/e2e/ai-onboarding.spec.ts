@@ -50,10 +50,14 @@ test.describe('AI onboarding', () => {
     await expect(page.locator('[data-test="onboarding-ai-plan"]')).toBeVisible()
 
     await page.locator('[data-test="onboarding-ai-plan-option"]').nth(1).click()
+    // The goal is required: it decides which Getting started checklist the app gets.
+    await expect(create).toBeDisabled()
+    await expect(page.locator('[data-test="onboarding-goal-decision-hint"]')).toBeVisible()
+    await page.locator('[data-test="onboarding-ai-goal-ota"]').click()
     const orgRequest = page.waitForRequest(request => request.method() === 'POST' && /\/organization(?:\?|$)/.test(request.url()))
     await create.click()
     const body = (await orgRequest).postDataJSON()
-    expect(body).toMatchObject({ name: 'Example\'s organization', developmentEnvironment: 'ai_assistant', startingOut: false })
+    expect(body).toMatchObject({ name: 'Example\'s organization', developmentEnvironment: 'ai_assistant', startingOut: false, intent: 'ota' })
     expect(body.estimatedMau).toBeGreaterThan(0)
 
     await page.waitForURL(/\/onboarding\/ai$/)
@@ -90,6 +94,9 @@ test.describe('AI onboarding', () => {
     await expect(page.locator('[data-test="onboarding-ai-app-detected"]')).toContainText('Agent App', { timeout: 15000 })
     // No click: the page opens Getting started by itself, where the agent's progress shows live.
     await page.waitForURL(new RegExp(`/app/${appId.replaceAll('.', '\\.')}/getting-started$`))
+    // AI setup shows the whole task list open, so the user can watch the agent tick tasks off.
+    await expect(page.locator('[data-test="setup-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.locator('[data-test="setup-checklist-progress"]')).toBeVisible()
   })
 
   test('keeps the manual wizard one click away', async ({ page }) => {

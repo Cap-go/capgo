@@ -102,6 +102,7 @@ import {
   readOnboardingSetupHandoff,
 } from '~/utils/onboardingRedirect'
 import { openOnboardingResumeDialog } from '~/utils/onboardingResumeDialog'
+import { checklistTaskListMode } from '~/utils/onboardingSetupMode'
 import { slugifyOnboardingSegment } from '~/utils/onboardingSlug'
 import {
   buildUserOnboardingProgress,
@@ -324,6 +325,8 @@ const usesDualTodoList = computed(() => !!createdApp.value && hasDualOnboardingC
 const activeChecklistPath = ref<ChecklistPath | null>(null)
 const usesBuilderTodoList = computed(() => usesDualTodoList.value ? activeChecklistPath.value === 'builder' : !!createdApp.value && isBuilderTodoListSelected(createdApp.value.onboarding))
 const usesBuilderSetupCommand = computed(() => usesBuilderTodoList.value || (!usesOtaTodoList.value && (selectedIntent.value === 'builder' || selectedIntent.value === 'publish')))
+// New AI signups watch the agent tick tasks off; new manual signups see one next step.
+const checklistTaskList = computed(() => checklistTaskListMode(main.user?.onboarding))
 const markedOnboardingFeatures = new Set<string>()
 let onboardingABTestsRequest: Promise<void> | null = null
 
@@ -2972,6 +2975,9 @@ defineExpose({
                   </span>
                 </button>
               </div>
+              <p class="-mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400" data-test="onboarding-goal-decision-hint">
+                {{ t('onboarding-goal-decision-hint') }}
+              </p>
               <div class="onboarding-intent-actions flex flex-col-reverse gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-end dark:border-white/15">
                 <button v-if="canReturnToProfile" type="button" class="d-btn min-h-12 sm:mr-auto" :class="whiteCardSecondaryButtonClass()" data-test="app-onboarding-back-profile" :disabled="isSubmitting" @click="backToProfile">
                   {{ t('button-back') }}
@@ -3543,6 +3549,7 @@ defineExpose({
         >
           <template #ota="panel">
             <AppOnboardingSetupChecklist
+              :task-list="checklistTaskList"
               :app-id="createdApp.app_id"
               :initial-onboarding="createdApp.onboarding"
               :command="apiKey ? `npx @capgo/cli@latest i ${apiKey}${localCommand}` : ''"
@@ -3562,6 +3569,7 @@ defineExpose({
           </template>
           <template #builder="panel">
             <AppOnboardingBuilderChecklist
+              :task-list="checklistTaskList"
               :app-id="createdApp.app_id"
               :initial-onboarding="createdApp.onboarding"
               :command="builderCliCommand"
@@ -3584,6 +3592,7 @@ defineExpose({
         <AppOnboardingBuilderChecklist
           v-else-if="showBuilderChecklist && createdApp"
           :key="createdApp.app_id"
+          :task-list="checklistTaskList"
           :app-id="createdApp.app_id"
           :initial-onboarding="createdApp.onboarding"
           :command="builderCliCommand"
@@ -3599,6 +3608,7 @@ defineExpose({
         <AppOnboardingSetupChecklist
           v-else-if="showSetupChecklist && createdApp"
           :key="createdApp.app_id"
+          :task-list="checklistTaskList"
           :app-id="createdApp.app_id"
           :initial-onboarding="createdApp.onboarding"
           :command="cliCommand"

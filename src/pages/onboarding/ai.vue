@@ -22,7 +22,7 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { allowOnboardingDashboardExploration, getAppGettingStartedPath } from '~/utils/onboardingRedirect'
-import { readAiAgentProgress, withOnboardingSetupMode } from '~/utils/onboardingSetupMode'
+import { readAiAgentProgress, readAiOnboardingGoal, withOnboardingSetupMode } from '~/utils/onboardingSetupMode'
 
 const APP_POLL_INTERVAL_MS = 3000
 // Long enough to read the confirmation, short enough to feel automatic.
@@ -44,6 +44,7 @@ const apiKey = ref<string | null>(null)
 const copied = ref(false)
 const detectedApp = ref<{ app_id: string, name: string | null } | null>(null)
 const agentProgress = ref(readAiAgentProgress(main.user?.onboarding))
+const goal = readAiOnboardingGoal(main.user?.onboarding)
 const organization = computed(() => organizationStore.currentOrganization)
 const assistantIcons = developmentEnvironmentOptions.find(option => option.value === 'ai_assistant')?.icons ?? []
 let pollTimer: ReturnType<typeof setInterval> | undefined
@@ -63,7 +64,7 @@ const agentTasks = computed(() => {
     { label: t('ai-onboarding-task-login'), done: appDone || agentProgress.value.agentConnected },
     { label: t('ai-onboarding-task-mcp'), done: appDone || agentProgress.value.mcpConnected },
     { label: t('ai-onboarding-task-app'), done: appDone },
-    { label: t('ai-onboarding-task-setup'), done: false },
+    { label: t(`ai-onboarding-task-setup-${goal ?? 'unsure'}`), done: false },
   ]
 })
 const waitingMessage = computed(() => {
@@ -78,7 +79,7 @@ function promptFor(key: string) {
   const org = organization.value
   if (!org)
     return ''
-  return buildAiOnboardingPrompt({ apiKey: key, organization: { id: org.gid, name: org.name } })
+  return buildAiOnboardingPrompt({ apiKey: key, organization: { id: org.gid, name: org.name }, goal })
 }
 
 const prompt = computed(() => apiKey.value ? promptFor(apiKey.value) : '')

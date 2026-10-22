@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { OnboardingSetupMode } from '~/utils/onboardingSetupMode'
+import type { Json } from '~/types/supabase.types'
+import type { AiOnboardingGoal, OnboardingSetupMode } from '~/utils/onboardingSetupMode'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -7,8 +8,13 @@ import { toast } from 'vue-sonner'
 import IconArrowRight from '~icons/lucide/arrow-right'
 import IconBot from '~icons/lucide/bot'
 import IconCheck from '~icons/lucide/check'
+import IconCompass from '~icons/lucide/compass'
+import IconLayers from '~icons/lucide/layers'
+import IconLightbulb from '~icons/lucide/lightbulb'
 import IconListChecks from '~icons/lucide/list-checks'
 import IconLoader from '~icons/lucide/loader-2'
+import IconRefresh from '~icons/lucide/refresh-cw'
+import IconSmartphone from '~icons/lucide/smartphone'
 import IconUsers from '~icons/lucide/users'
 import AppOnboardingHeader from '~/components/dashboard/AppOnboardingHeader.vue'
 import BillingRegionChoice from '~/components/dashboard/BillingRegionChoice.vue'
@@ -21,7 +27,7 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { onboardingPlanStops } from '~/utils/onboardingPlanStops'
-import { AI_ONBOARDING_PATH, defaultAiOrganizationName, withOnboardingSetupMode } from '~/utils/onboardingSetupMode'
+import { AI_ONBOARDING_PATH, aiGoalToIntent, defaultAiOrganizationName, readAiOnboardingGoal, withOnboardingFields, withOnboardingSetupMode } from '~/utils/onboardingSetupMode'
 
 const props = defineProps<{ initialScreen: 'choice' | 'ai' }>()
 const emit = defineEmits<{ manual: [] }>()
@@ -35,6 +41,14 @@ const screen = ref<'choice' | 'ai'>(props.initialScreen)
 const isSaving = ref(false)
 const isCreating = ref(false)
 const planIndex = ref<number | null>(null)
+// A refresh keeps the goal the user already picked.
+const goal = ref<AiOnboardingGoal | null>(readAiOnboardingGoal(main.user?.onboarding))
+const goalOptions = [
+  { value: 'ota', icon: IconRefresh },
+  { value: 'builder', icon: IconSmartphone },
+  { value: 'both', icon: IconLayers },
+  { value: 'unsure', icon: IconCompass },
+] as const satisfies ReadonlyArray<{ value: AiOnboardingGoal, icon: unknown }>
 const billingAccount = ref<'ee' | 'us' | undefined>()
 const hasEditedOrgName = ref(false)
 const orgNameInput = ref('')
@@ -54,7 +68,7 @@ const orgName = computed({
 })
 const planStops = computed(() => onboardingPlanStops(main.plans))
 const selectedPlan = computed(() => planIndex.value === null ? null : planStops.value[planIndex.value] ?? null)
-const canCreate = computed(() => !!selectedPlan.value && orgName.value.trim().length >= 3 && !isCreating.value)
+const canCreate = computed(() => !!goal.value && !!selectedPlan.value && orgName.value.trim().length >= 3 && !isCreating.value)
 const steps = computed(() => [
   { id: 'name', label: t('unified-onboarding-step-about-you') },
   { id: 'mode', label: t('ai-onboarding-step-mode') },
@@ -76,6 +90,10 @@ function planTitle(index: number) {
 // Remembering the choice lets a refresh land on the same screen. A failed write only costs
 // that convenience, so the user is never blocked here.
 async function rememberSetupMode(mode: OnboardingSetupMode) {
+  await rememberOnboarding(current => withOnboardingSetupMode(current, mode))
+}
+
+async function rememberOnboarding(update: (current: Json) => Json) {
   const userId = main.user?.id
   if (!userId)
     return
@@ -84,7 +102,7 @@ async function rememberSetupMode(mode: OnboardingSetupMode) {
       const result = await replaceUserOnboardingWithRetry(
         userId,
         main.user!.onboarding,
-        current => withOnboardingSetupMode(current, mode),
+        update,
         () => main.user?.id === userId,
       )
       if (result.status === 'persisted' && main.user?.id === userId)
@@ -117,11 +135,16 @@ async function chooseMode(mode: OnboardingSetupMode) {
 async function createOrganization() {
   const plan = selectedPlan.value
   const name = orgName.value.trim()
-  if (!plan || name.length < 3 || isCreating.value)
+  const chosenGoal = goal.value
+  if (!chosenGoal || !plan || name.length < 3 || isCreating.value)
     return
 
   isCreating.value = true
   try {
+    const intent = aiGoalToIntent(chosenGoal)
+    // Saved before the agent registers the app: app creation reads it to pick the
+    // matching Getting started checklist (live updates, Builder or both).
+    await rememberOnboarding(current => withOnboardingFields(current, { intent }))
     const { data, error } = await invokeCapgoApi<{ id: string }>('organization', {
       method: 'POST',
       body: {
@@ -129,6 +152,7 @@ async function createOrganization() {
         email: main.auth?.email ?? '',
         estimatedMau: plan.value,
         startingOut: plan.startingOut === true,
+        intent,
         developmentEnvironment: 'ai_assistant',
         billingAccount: billingAccount.value,
       },
@@ -146,6 +170,7 @@ async function createOrganization() {
       plan_name: plan.planName,
       starting_out: plan.startingOut === true,
       org_name_edited: hasEditedOrgName.value,
+      goal: chosenGoal,
     })
 
     try {
@@ -235,6 +260,33 @@ async function createOrganization() {
             </h2>
             <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
               {{ t('ai-onboarding-plan-subtitle') }}
+            </p>
+          </div>
+
+          <div>
+            <p id="ai-onboarding-goal-label" class="text-sm font-medium text-slate-800 dark:text-slate-200">
+              {{ t('ai-onboarding-goal-label') }}
+            </p>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2" role="radiogroup" aria-labelledby="ai-onboarding-goal-label" data-test="onboarding-ai-goal-options">
+              <label v-for="option in goalOptions" :key="option.value" class="group cursor-pointer" :data-test="`onboarding-ai-goal-${option.value}`">
+                <input v-model="goal" type="radio" name="ai-onboarding-goal" class="peer sr-only" :value="option.value">
+                <span
+                  class="flex h-full min-h-20 items-start gap-3 rounded-xl border p-3 text-left transition peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-white dark:peer-focus-visible:ring-offset-slate-900"
+                  :class="goal === option.value
+                    ? 'border-primary-500 bg-slate-100 text-slate-950 ring-2 ring-primary-500/15 dark:border-primary-500/80 dark:bg-primary-500/25 dark:text-white dark:ring-primary-500/30'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 dark:border-white/15 dark:bg-slate-950/90 dark:text-slate-200 dark:hover:border-white/30 dark:hover:bg-slate-900'"
+                >
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary-500/10 text-primary-500"><component :is="option.icon" class="h-5 w-5" aria-hidden="true" /></span>
+                  <span class="min-w-0">
+                    <span class="block text-sm font-semibold">{{ t(`ai-onboarding-goal-${option.value}-label`) }}</span>
+                    <span class="mt-1 block text-xs leading-5 text-slate-600 dark:text-slate-300">{{ t(`ai-onboarding-goal-${option.value}-desc`) }}</span>
+                  </span>
+                </span>
+              </label>
+            </div>
+            <p class="mt-3 flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2.5 text-xs leading-5 text-slate-600 dark:bg-slate-950/60 dark:text-slate-300" data-test="onboarding-goal-decision-hint">
+              <IconLightbulb class="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+              {{ t('onboarding-goal-decision-hint') }}
             </p>
           </div>
 
