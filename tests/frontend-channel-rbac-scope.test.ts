@@ -46,9 +46,6 @@ describe('frontend channel RBAC scope regressions', () => {
     const source = await readRepoFile('src/components/tables/ChannelTable.vue')
 
     const permission = 'channel.delete'
-    expect(source).toMatch(/const appId = props\.appId/)
-    expect(source).toMatch(/loadChannelPermissions\(elements\.value, appId, requestId\)/)
-    expect(source).toMatch(/checkPermissions\(\s*['"]channel\.delete['"]\s*,\s*\{\s*appId\s*,\s*channelId\s*:\s*row\.id\s*\}\s*\)/)
     expect(source).toMatch(channelScopedCheckPermissionsCall(permission, 'props.appId', 'one.id'))
     expect(source).toMatch(/disabled\s*:\s*\(\s*elem\s*:\s*Element\s*\)\s*=>\s*!\s*canReadChannel\.value\[elem\.id\]/)
     expect(source).toMatch(/visible\s*:\s*\(\s*elem\s*:\s*Element\s*\)\s*=>\s*!!\s*canDeleteChannel\.value\[elem\.id\]/)

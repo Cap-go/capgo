@@ -64,11 +64,21 @@ const canReadChannel = ref<Record<number, boolean>>({})
 const canDeleteChannel = ref<Record<number, boolean>>({})
 const defaultUploadChannel = ref<string | null>(null)
 
-const canCreateChannel = computedAsync(async () => {
-  if (!props.appId)
-    return false
-  return await checkPermissions('app.create_channel', { appId: props.appId })
-}, false)
+const evaluatingCreatePermission = ref(false)
+const createPermission = computedAsync(async () => {
+  const appId = props.appId
+  if (!appId)
+    return { appId, allowed: false }
+  try {
+    return { appId, allowed: await checkPermissions('app.create_channel', { appId }) }
+  }
+  catch {
+    return { appId, allowed: false }
+  }
+}, null, { evaluating: evaluatingCreatePermission })
+const canCreateChannel = computed(() => !evaluatingCreatePermission.value
+  && createPermission.value?.appId === props.appId
+  && createPermission.value?.allowed === true)
 
 const showIntroduction = computed(() => !isLoading.value
   && loadedQuery.value?.appId === props.appId

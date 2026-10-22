@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   rows: [] as any[],
   failed: false,
   canCreate: true,
+  createPermissions: {} as Record<string, Promise<boolean>>,
   inserts: [] as any[],
   delayedApp: '',
   delayedResponse: null as Promise<unknown> | null,
@@ -41,7 +42,7 @@ vi.mock('~/stores/organization', async () => {
 vi.mock('~/services/permissions', () => ({
   checkPermissions: async (permission: string, scope: { appId?: string, channelId?: number }) => {
     state.permissionChecks.push({ permission, scope })
-    return permission === 'app.create_channel' ? state.canCreate : true
+    return permission === 'app.create_channel' ? state.createPermissions[scope.appId!] ?? state.canCreate : true
   },
 }))
 vi.mock('~/components/dashboard/ChannelIntroduction.vue', async () => {
@@ -110,11 +111,11 @@ async function mountTable(appId = 'com.example.channels') {
   app.use(createI18n({ legacy: false, locale: 'en', messages: { en } }))
   app.component('DataTable', defineComponent({
     props: ['isLoading', 'elementList', 'showAdd'],
-    emits: ['reload', 'update:search'],
+    emits: ['reload', 'update:search', 'add'],
     setup(props, { emit }) {
       tableEmit = emit
       onMounted(() => emit('reload'))
-      return () => h('div', { 'data-test': 'channel-table', 'data-loading': props.isLoading }, props.elementList.map((row: any) => row.name).join(', '))
+      return () => h('div', { 'data-test': 'channel-table', 'data-loading': props.isLoading, 'data-show-add': props.showAdd }, props.elementList.map((row: any) => row.name).join(', '))
     },
   }))
   app.mount(container)
@@ -127,6 +128,7 @@ beforeEach(() => {
   state.inserts = []
   state.failed = false
   state.canCreate = true
+  state.createPermissions = {}
   state.delayedApp = ''
   state.delayedResponse = null
   state.permissionChecks = []
@@ -216,6 +218,55 @@ describe('Channels page empty state', () => {
     expect(container.querySelector('[data-test="channel-introduction"]')).not.toBeNull()
     expect(container.querySelector('[data-test="create-channel"]')).toBeNull()
     expect(dialog.showDialog).toBe(false)
+  })
+
+  it.each([false, true])('hides creation while the current app permission is pending (populated: %s)', async (populated) => {
+    if (populated)
+      state.rows = [{ id: 1, name: 'production' }]
+    await mountTable()
+    let finishPermission!: (allowed: boolean) => void
+    state.createPermissions['com.example.next'] = new Promise(resolve => finishPermission = resolve)
+    currentAppId.value = 'com.example.next'
+    await settle()
+    expect(container.querySelector('[data-test="create-channel"]')).toBeNull()
+    expect(container.querySelector('[data-test="channel-table"]')?.getAttribute('data-show-add')).toBe('false')
+    tableEmit('add')
+    await settle()
+    expect(dialog.showDialog).toBe(false)
+    finishPermission(true)
+    await settle()
+    expect(container.querySelector('[data-test="channel-table"]')?.getAttribute('data-show-add')).toBe('true')
+  })
+
+  it.each([false, true])('denies creation after the current app permission rejects (populated: %s)', async (populated) => {
+    if (populated)
+      state.rows = [{ id: 1, name: 'production' }]
+    await mountTable()
+    let rejectPermission!: (error: Error) => void
+    state.createPermissions['com.example.next'] = new Promise((_resolve, reject) => rejectPermission = reject)
+    currentAppId.value = 'com.example.next'
+    await settle()
+    rejectPermission(new Error('permission lookup unavailable'))
+    await settle()
+    expect(container.querySelector('[data-test="create-channel"]')).toBeNull()
+    expect(container.querySelector('[data-test="channel-table"]')?.getAttribute('data-show-add')).toBe('false')
+    tableEmit('add')
+    await settle()
+    expect(dialog.showDialog).toBe(false)
+    expect(state.inserts).toEqual([])
+  })
+
+  it('ignores an obsolete allow result after a new app denies creation', async () => {
+    let finishOldPermission!: (allowed: boolean) => void
+    state.createPermissions['com.example.channels'] = new Promise(resolve => finishOldPermission = resolve)
+    await mountTable()
+    state.canCreate = false
+    currentAppId.value = 'com.example.next'
+    await settle()
+    finishOldPermission(true)
+    await settle()
+    expect(container.querySelector('[data-test="create-channel"]')).toBeNull()
+    expect(container.querySelector('[data-test="channel-table"]')?.getAttribute('data-show-add')).toBe('false')
   })
 
   it('opens the existing creation dialog only after the explicit action', async () => {
