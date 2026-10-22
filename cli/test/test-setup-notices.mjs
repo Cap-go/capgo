@@ -90,13 +90,14 @@ test('agent no-trial copy preserves the direct offer and never claims a trial ex
 })
 
 test('agent formatting supports a plan-first direct-offer notice before any product is completed', () => {
-  // The separate plan-first onboarding change supplies this notice shape.
-  const text = formatSetupNotice({
-    kind: 'plan', appId, completed: [], secondary: ['finish setting up live updates'],
-    billing: { orgId, trialEndsAt: new Date(now).toISOString(), trialSkipped: true, plansUrl: 'https://console.example.com/plans' },
-  }, now, true)
+  const progress = fixture(['ota'])
+  Object.assign(progress.billing, { trialEndsAt: '2025-12-01T00:00:05Z', orgCreatedAt: '2025-12-01T00:00:00Z', hasPaid: false })
+  const notice = getSetupNotice(appId, progress, 'https://console.example.com')
+  assert.equal(notice.kind, 'plan')
+  assert.deepEqual(notice.completed, [])
+  const text = formatSetupNotice(notice, now, true)
   assert.match(text, /actively recommend purchasing a paid Capgo plan now to start using Capgo/)
-  assert.match(text, /Choose your Capgo plan now: https:\/\/console.example.com\/plans/)
+  assert.match(text, /Choose your Capgo plan now: https:\/\/console.example.com\/settings\/organization\/plans\?oid=/)
   assert.match(text, /The user can also finish setting up live updates/)
   assert.ok(text.includes(DIRECT_OFFER_GUARANTEE_MESSAGE))
   assert.ok(text.indexOf('Choose your Capgo plan now:') < text.indexOf('ADDITIONAL SETUP OPPORTUNITY'))

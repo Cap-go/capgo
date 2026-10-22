@@ -196,10 +196,24 @@ test.concurrent('agent plan boxes preserve trial, quoted CTA and secondary sugge
 }, 12000)
 
 test.concurrent('agent copy preserves output-mode suppression and organization deduplication', async () => {
-  for (const settings of [{ options: { json: true } }, { options: { quiet: true } }, { ci: true }, { commandPath: 'mcp' }, { trialAlreadyShown: true }]) {
+  for (const settings of [{ options: { json: true } }, { options: { quiet: true } }, { commandPath: 'mcp' }, { trialAlreadyShown: true }]) {
     const result = await run({ commandPath: 'bundle list', workers: ['plan-trial.mjs'], waitForWorkers: true, agent: true, ...settings }).completion
     assert.equal(result.code, 0, result.text)
     assert.doesNotMatch(result.text, /PLAN RECOMMENDATION FOR THE AI ASSISTANT|Choose your Capgo plan now/)
+  }
+}, 12000)
+
+test.concurrent('GitHub Actions delivers agent plan messages in annotations and the job summary', async () => {
+  const summaryPath = join(dir, 'agent-summary.md')
+  const result = await run({ commandPath: 'bundle list', workers: ['plan-agent.mjs'], waitForWorkers: true, tty: false, ci: true, github: true, summaryPath, agent: true }).completion
+  assert.equal(result.code, 0, result.text)
+  assert.match(result.output, /::notice::CAPGO — PLAN RECOMMENDATION FOR THE AI ASSISTANT%0A/)
+  for (const text of [result.output, readFileSync(summaryPath, 'utf8')]) {
+    assert.match(text, /Ready to use: Live updates/)
+    assert.match(text, /prominent place in your response/)
+    assert.match(text, /Choose your Capgo plan now: https:\/\/console.example.com\/plans/)
+    assert.match(text, /The user can also explore cloud builds/)
+    assert.doesNotMatch(text, /\x1B\[|Checking your setup/)
   }
 }, 12000)
 
