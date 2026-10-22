@@ -38,8 +38,8 @@ permissions: {}
 env:
   DENO_DIR: my_cache_directory
   CLICOLOR: '1'
-  # Pull Supabase CLI images from GHCR instead of the default public.ecr.aws,
-  # whose anonymous pull quota fails CI with "toomanyrequests: Data limit exceeded".
+  # Warm images from GHCR; Supabase jobs clear this override after setup so the
+  # CLI can fall back to other registries when GHCR is rate-limited.
   SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io
 
 jobs:
@@ -402,6 +402,9 @@ jobs:
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
           version: 2.109.1
+      - name: Allow Supabase registry fallbacks
+        # A forced registry disables the CLI's ECR/GHCR/Docker Hub fallback.
+        run: echo 'SUPABASE_INTERNAL_IMAGE_REGISTRY=' >> "$GITHUB_ENV"
       - name: Pre-pull Supabase images
         # Start pulling while the runner sets up; supabase start reuses in-flight layers.
         background: true
@@ -555,6 +558,9 @@ jobs:
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
           version: 2.109.1
+      - name: Allow Supabase registry fallbacks
+        # A forced registry disables the CLI's ECR/GHCR/Docker Hub fallback.
+        run: echo 'SUPABASE_INTERNAL_IMAGE_REGISTRY=' >> "$GITHUB_ENV"
       - name: Pre-pull Supabase images
         # Start pulling while the runner sets up; supabase start reuses in-flight layers.
         background: true
@@ -677,6 +683,9 @@ jobs:
         uses: supabase/setup-cli@v2
         with:
           version: 2.109.1
+      - name: Allow Supabase registry fallbacks
+        # A forced registry disables the CLI's ECR/GHCR/Docker Hub fallback.
+        run: echo 'SUPABASE_INTERNAL_IMAGE_REGISTRY=' >> "$GITHUB_ENV"
       - name: Pre-pull Supabase images
         # Start pulling while the runner sets up; supabase start reuses in-flight layers.
         background: true
@@ -788,6 +797,9 @@ jobs:
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
           version: 2.109.1
+      - name: Allow Supabase registry fallbacks
+        # A forced registry disables the CLI's ECR/GHCR/Docker Hub fallback.
+        run: echo 'SUPABASE_INTERNAL_IMAGE_REGISTRY=' >> "$GITHUB_ENV"
       - name: Pre-pull Supabase images
         # Start pulling while the runner sets up; supabase start reuses in-flight layers.
         background: true
@@ -908,6 +920,9 @@ jobs:
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
           version: 2.109.1
+      - name: Allow Supabase registry fallbacks
+        # A forced registry disables the CLI's ECR/GHCR/Docker Hub fallback.
+        run: echo 'SUPABASE_INTERNAL_IMAGE_REGISTRY=' >> "$GITHUB_ENV"
       - name: Pre-pull Supabase images
         # Start pulling while the runner sets up; supabase start reuses in-flight layers.
         background: true
@@ -1056,6 +1071,9 @@ jobs:
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
           version: 2.109.1
+      - name: Allow Supabase registry fallbacks
+        # A forced registry disables the CLI's ECR/GHCR/Docker Hub fallback.
+        run: echo 'SUPABASE_INTERNAL_IMAGE_REGISTRY=' >> "$GITHUB_ENV"
       - name: Pre-pull Supabase images
         # Start pulling while the runner sets up; supabase start reuses in-flight layers.
         background: true
@@ -1521,6 +1539,9 @@ jobs:
         uses: supabase/setup-cli@v2 # v2.0.0
         with:
           version: 2.109.1
+      - name: Allow Supabase registry fallbacks
+        # A forced registry disables the CLI's ECR/GHCR/Docker Hub fallback.
+        run: echo 'SUPABASE_INTERNAL_IMAGE_REGISTRY=' >> "$GITHUB_ENV"
       - name: Pre-pull Supabase images
         # Finish image extraction before dependency installation to limit peak runner memory.
         continue-on-error: true
