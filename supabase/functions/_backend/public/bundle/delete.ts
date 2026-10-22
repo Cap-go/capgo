@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { HTTPException } from 'hono/http-exception'
 import { CAPGO_API_2026_10_22, resolveCapgoApiVersion } from '../../utils/api_version.ts'
+import { lockBundleLifecycles, softDeleteLockedBundles } from '../../utils/bundle_soft_delete.ts'
 import { BRES, quickError, simpleError } from '../../utils/hono.ts'
 import { beginWriteTransaction, checkoutPgClient, closeClient, getPgClient, logPgError, releasePgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -46,8 +47,7 @@ type DeleteByNameOutcome
  * capgo_api >= 2026-10-22: one request resolves the name, reports a missing bundle (404
  * bundle_not_found) or a linked one (409 bundle_linked with its id and channels, so a client
  * can offer to unlink without another lookup), and soft-deletes. Lookup, link check and delete
- * run in one transaction holding the bundle lifecycle lock (lock_channel_bundle_lifecycle, the
- * protocol channel promotion uses), so a concurrent promotion or unlink cannot make the answer
+ * run in one transaction holding the bundle lifecycle lock (see bundle_soft_delete.ts), so a concurrent promotion or unlink cannot make the answer
  * stale. Authorization is the bundle.delete check in deleteBundle.
  */
 async function deleteBundleByName(c: Context<MiddlewareKeyVariables>, appId: string, name: string, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -109,7 +109,7 @@ async function deleteBundleByNameInTransaction(
     return { status: 'not_found' }
   const id = Number(found.rows[0].id)
 
-  await dbClient.query('SELECT public.lock_channel_bundle_lifecycle($1, NULL)', [id])
+  await lockBundleLifecycles(dbClient, [id])
   // Re-read under the lock: it may have been deleted while we waited.
   const live = await dbClient.query('SELECT 1 FROM public.app_versions WHERE id = $1 AND deleted = false', [id])
   if (!live.rows.length)
@@ -124,9 +124,7 @@ async function deleteBundleByNameInTransaction(
   if (channels.rows.length)
     return { status: 'linked', id, channels: channels.rows.map(row => row.name) }
 
-  // Attribute the write to the caller's API key in the audit log (get_apikey_header).
-  await dbClient.query('SELECT set_config(\'request.headers\', $1, true)', [JSON.stringify({ capgkey: effectiveApikey })])
-  await dbClient.query('UPDATE public.app_versions SET deleted = true WHERE id = $1 AND deleted = false', [id])
+  await softDeleteLockedBundles(dbClient, effectiveApikey, appId, [id], false)
   return { status: 'deleted', id }
 }
 

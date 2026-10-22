@@ -4,6 +4,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { greaterThan, increment, lessThan, tryParse } from '@std/semver'
 import { z } from 'zod'
 import { HTTPException } from 'hono/http-exception'
+import { lockBundleLifecycles, retryOnDeadlock, softDeleteLockedBundles } from '../../utils/bundle_soft_delete.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { beginWriteTransaction, checkoutPgClient, closeClient, getPgClient, logPgError, releasePgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -159,37 +160,10 @@ async function softDeleteBatch(
     dbClient = await checkoutPgClient(pgClient)
     await beginWriteTransaction(dbClient)
     transactionStarted = true
-    // Follow the shared lifecycle-lock protocol (row FOR UPDATE, then advisory lock, per bundle
-    // in id order) so cleanup cannot deadlock with a channel promotion. PG evaluates volatile
-    // output expressions after ORDER BY, so the bundles are locked in sorted order.
-    await dbClient.query(
-      'SELECT public.lock_channel_bundle_lifecycle(id, NULL) FROM pg_catalog.unnest($1::bigint[]) AS t(id) ORDER BY id',
-      [ids],
-    )
-    // Attribute the write to the caller's API key in the audit log (get_apikey_header). This
-    // direct connection runs as an internal role, so the delete-permission trigger does not
-    // re-check it: cleanupBundles' checkPermission('bundle.delete') is the authorization.
-    await dbClient.query(
-      'SELECT set_config(\'request.headers\', $1, true)',
-      [JSON.stringify({ capgkey: effectiveApikey })],
-    )
-    const result = await dbClient.query<{ id: number }>(
-      `UPDATE public.app_versions AS v
-       SET deleted = true
-       WHERE v.app_id = $1
-         AND v.id = ANY($2::bigint[])
-         AND v.deleted = false
-         AND ($3::boolean OR NOT EXISTS (
-           SELECT 1
-           FROM public.channels AS ch
-           WHERE ch.app_id = v.app_id
-             AND (ch.version = v.id OR ch.rollout_version = v.id)
-         ))
-       RETURNING v.id`,
-      [appId, ids, ignoreChannel],
-    )
+    await lockBundleLifecycles(dbClient, ids)
+    const deleted = await softDeleteLockedBundles(dbClient, effectiveApikey, appId, ids, ignoreChannel)
     await dbClient.query('COMMIT')
-    return result.rows.map(row => Number(row.id))
+    return deleted
   }
   catch (error) {
     if (dbClient && transactionStarted) {
@@ -207,25 +181,6 @@ async function softDeleteBatch(
   }
   finally {
     releasePgClient(pgClient, dbClient)
-  }
-}
-
-const DEADLOCK_RETRIES = 3
-
-/**
- * With ignore_channel, the unlink trigger locks channel rows after the bundle locks, which can
- * deadlock with a promotion holding the channel row. Postgres aborts one side; a batch is its
- * own transaction and only touches still-active rows, so retrying it is safe.
- */
-async function softDeleteBatchWithRetry(...args: Parameters<typeof softDeleteBatch>): Promise<number[]> {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await softDeleteBatch(...args)
-    }
-    catch (error) {
-      if ((error as { code?: string })?.code !== '40P01' || attempt >= DEADLOCK_RETRIES)
-        throw error
-    }
   }
 }
 
@@ -268,7 +223,9 @@ export async function cleanupBundles(c: Context<MiddlewareKeyVariables>, bodyRaw
       const ids = plan.removed.slice(i, i + DELETE_BATCH_SIZE).map(row => row.id)
       let deleted: number[]
       try {
-        deleted = await softDeleteBatchWithRetry(c, pgClient, effectiveApikey, body.app_id, ids, ignoreChannel)
+        // With ignore_channel, the unlink trigger locks channel rows after the bundle locks and can
+        // deadlock with a promotion; a batch is its own transaction, so retrying it is safe.
+        deleted = await retryOnDeadlock(() => softDeleteBatch(c, pgClient, effectiveApikey, body.app_id, ids, ignoreChannel))
       }
       catch (error) {
         if (error instanceof HTTPException)

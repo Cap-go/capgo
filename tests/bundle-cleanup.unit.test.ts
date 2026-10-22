@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { planBundleCleanup } from '../supabase/functions/_backend/public/bundle/cleanup.ts'
+import { lockBundleLifecycles, retryOnDeadlock, softDeleteLockedBundles } from '../supabase/functions/_backend/utils/bundle_soft_delete.ts'
 
 // Newest first, the order the endpoint selects them in.
 const versions = [
@@ -54,3 +55,58 @@ describe('planBundleCleanup', () => {
     expect(() => planBundleCleanup(versions, new Set(), { keep: 1, bundle: 'nope', ignoreChannel: false })).toThrow()
   })
 })
+
+describe('retryOnDeadlock', () => {
+  const deadlock = Object.assign(new Error('deadlock detected'), { code: '40P01' })
+
+  it('retries a deadlock victim and returns the next result', async () => {
+    const fn = vi.fn().mockRejectedValueOnce(deadlock).mockResolvedValueOnce([1, 2])
+    await expect(retryOnDeadlock(fn)).resolves.toEqual([1, 2])
+    expect(fn).toHaveBeenCalledTimes(2)
+  })
+
+  it('rethrows any other error without retrying', async () => {
+    const failure = Object.assign(new Error('boom'), { code: '23505' })
+    const fn = vi.fn().mockRejectedValue(failure)
+    await expect(retryOnDeadlock(fn)).rejects.toBe(failure)
+    expect(fn).toHaveBeenCalledTimes(1)
+  })
+
+  it('gives up after the attempt budget', async () => {
+    const fn = vi.fn().mockRejectedValue(deadlock)
+    await expect(retryOnDeadlock(fn, 3)).rejects.toBe(deadlock)
+    expect(fn).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('bundle soft-delete helpers', () => {
+  function fakeTx(rows: unknown[] = []) {
+    const queries: { text: string, params?: unknown[] }[] = []
+    const tx = {
+      query: async (text: string, params?: unknown[]) => {
+        queries.push({ text, params })
+        return { rows: text.includes('UPDATE') ? rows : [] } as any
+      },
+    }
+    return { tx, queries }
+  }
+
+  it('locks every bundle through the lifecycle helper in id order', async () => {
+    const { tx, queries } = fakeTx()
+    await lockBundleLifecycles(tx, [9, 3])
+    expect(queries).toHaveLength(1)
+    expect(queries[0].text).toContain('lock_channel_bundle_lifecycle(id, NULL)')
+    expect(queries[0].text).toContain('ORDER BY id')
+    expect(queries[0].params).toEqual([[9, 3]])
+  })
+
+  it('attributes the write to the caller key, then deletes and returns numeric ids', async () => {
+    const { tx, queries } = fakeTx([{ id: '3' }, { id: 9 }])
+    await expect(softDeleteLockedBundles(tx, 'caller-key', 'com.test.app', [3, 9], false)).resolves.toEqual([3, 9])
+    expect(queries[0].text).toContain('set_config')
+    expect(queries[0].params).toEqual([JSON.stringify({ capgkey: 'caller-key' })])
+    expect(queries[1].text).toContain('UPDATE public.app_versions')
+    expect(queries[1].params).toEqual(['com.test.app', [3, 9], false])
+  })
+})
+
