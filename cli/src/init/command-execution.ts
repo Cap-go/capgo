@@ -1,7 +1,7 @@
 import type { PackageManagerRunner, PackageManagerType } from '@capgo/find-package-manager'
 import type { ChildProcess } from 'node:child_process'
 import { findInstallCommand } from '@capgo/find-package-manager'
-import { spawnSync } from 'node:child_process'
+import { sync as spawnSync } from 'cross-spawn'
 
 export type SupportedPackageManager = Exclude<PackageManagerType, 'unknown'>
 

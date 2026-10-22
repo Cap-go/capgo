@@ -5,11 +5,11 @@ import type { Organization } from '../utils'
 import type { SupportedPackageManager } from './command-execution'
 import type { InitCodeDiff, InitEncryptionPhase, InitEncryptionSummary } from './runtime'
 import type { PackageInstallState } from './updater'
-import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path, { dirname, join } from 'node:path'
 import { chdir, cwd, env, exit, platform, stderr, stdin, stdout } from 'node:process'
 import { canParse, format, increment, lessThan, parse } from '@std/semver'
+import spawn, { sync as spawnSync } from 'cross-spawn'
 import open from 'open'
 import tmp from 'tmp'
 import { checkAppIdsExist, completePendingOnboardingApp, findAppInOrganization, listPendingOnboardingApps } from '../api/app'
@@ -3527,9 +3527,8 @@ async function streamCommandInInitPanel(params: {
   // rendered by Ink rather than surfacing as a bare terminal error.
   startInitStreamingOutput({ title: params.title, command: displayCommand })
 
-  // `pm.runner` can contain a space ("yarn dlx", "pnpm exec"). `spawn`
-  // without `shell:true` can't handle that, and `shell:true` brings
-  // quoting risk, so we split the runner into its own head + tail args.
+  // Split multi-word runners so cross-spawn can escape each argument when
+  // invoking Windows command shims ("yarn dlx", "pnpm exec").
   let runnerCommand: { command: string, args: string[] }
   try {
     runnerCommand = params.command

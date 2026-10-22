@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { execSync, spawn } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 import {
   applyInitAutoTestChange,
   getDirtyGitStatusActionOptions,
@@ -20,6 +20,7 @@ import {
   isOnlyAllowedInitAutoTestChange,
   revertInitAutoTestChangeContent,
   runInheritedCommand,
+  runPackageRunnerSync,
   notifyAppReadyDocsUrl,
   readExistingMainFile,
 } from '../src/init/command.ts'
@@ -474,6 +475,45 @@ await tAsync('command settlement handles normal zero and nonzero exits', async (
   assert.deepEqual(success, { success: true })
   assert.equal(failure.success, false)
   assert.equal(failure.error?.message, 'Command exited with code 7')
+})
+
+await tAsync('init package runner and inherited commands preserve arguments through command shims', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'capgo init commands '))
+  const bin = join(root, 'node_modules', '.bin')
+  mkdirSync(bin, { recursive: true })
+  const script = join(bin, 'echo-args.cjs')
+  writeFileSync(script, 'process.stdout.write(JSON.stringify(process.argv.slice(2)))')
+  const windows = process.platform === 'win32'
+  const command = join(bin, `pnpm${windows ? '.cmd' : ''}`)
+  writeFileSync(command, windows
+    ? `@"${process.execPath}" "%~dp0echo-args.cjs" %*\r\n`
+    : `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`, { mode: 0o755 })
+  const args = ['cap', 'init', 'Example & Co (desktop)', 'com.example.app', '--web-dir', 'web assets']
+  const pathKey = Object.keys(process.env).find(key => key.toUpperCase() === 'PATH') ?? 'PATH'
+  const originalPath = process.env[pathKey]
+  const originalStdoutWrite = process.stdout.write
+  let output = ''
+  try {
+    process.env[pathKey] = `${bin}${delimiter}${originalPath ?? ''}`
+    const syncResult = runPackageRunnerSync('pnpm exec', args, { cwd: root, env: { ...process.env }, encoding: 'utf8' })
+    assert.equal(syncResult.status, 0, `${syncResult.stdout}\n${syncResult.stderr}`)
+    assert.deepEqual(JSON.parse(syncResult.stdout.toString()), ['exec', ...args])
+    process.stdout.write = (chunk) => {
+      output += chunk.toString()
+      return true
+    }
+    const asyncResult = await runInheritedCommand(command, args, { cwd: root })
+    assert.equal(asyncResult.status, 0, asyncResult.error?.message)
+    assert.deepEqual(JSON.parse(output), args)
+  }
+  finally {
+    process.stdout.write = originalStdoutWrite
+    if (originalPath === undefined)
+      delete process.env[pathKey]
+    else
+      process.env[pathKey] = originalPath
+    rmSync(root, { recursive: true, force: true })
+  }
 })
 
 await tAsync('inherited child output flows through parent streams for replay capture', async () => {
