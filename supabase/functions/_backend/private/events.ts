@@ -8,6 +8,7 @@ import { APP_TOO_LARGE_EVENT, buildAppTooLargeBentoEvent } from '../utils/app_to
 import { markBuilderChecklistFromAnalytics } from '../utils/builder_onboarding_checklist.ts'
 import { buildBuilderOnboardingBentoEvent, BUILDER_RECOVERY_MILESTONES } from '../utils/builder_onboarding_recovery.ts'
 import { buildBundleCompatibilityBentoEvent, BUNDLE_INCOMPATIBLE_EVENT, bundleIncompatibleEmailOutcome, isBreakingChangeGatedByChannelStrategy, isCliTrueTag } from '../utils/bundle_compatibility_recovery.ts'
+import { buildPlanCheckoutStartedBentoEvent, PLAN_CHECKOUT_STARTED_EVENT } from '../utils/checkout_tracking.ts'
 import { acceptEventIdentity, isValidClientEventId } from '../utils/event_identity.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_middleware.ts'
@@ -350,6 +351,50 @@ function optionalNonEmptyTagString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
+function optionalTagNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+async function buildPlanCheckoutStartedTrackedBentoEvent(
+  c: Context<MiddlewareKeyVariables>,
+  supabase: ReturnType<typeof supabaseWithAuth>,
+  onboardingOrgId: string | undefined,
+  trackedBody: TrackOptions,
+) {
+  if (!onboardingOrgId || trackedBody.event !== PLAN_CHECKOUT_STARTED_EVENT)
+    return undefined
+
+  if (!(await checkPermission(c, 'org.update_billing', { orgId: onboardingOrgId }))) {
+    throw quickError(403, 'no_permission', 'You cannot send checkout events for this organization')
+  }
+
+  const { data: orgData, error: orgError } = await supabase
+    .from('orgs')
+    .select('id, name')
+    .eq('id', onboardingOrgId)
+    .single()
+
+  if (orgError || !orgData) {
+    cloudlog({ requestId: c.get('requestId'), message: 'plan checkout bento lookup failed; skipping signal', org: orgError })
+    return undefined
+  }
+
+  const tags = trackedBody.tags ?? {}
+  return buildPlanCheckoutStartedBentoEvent({
+    event: trackedBody.event,
+    orgId: onboardingOrgId,
+    orgName: orgData.name,
+    productId: optionalTagString(tags.product_id),
+    planName: optionalTagString(tags.plan_name),
+    recurrence: optionalTagString(tags.recurrence),
+    checkoutSource: optionalTagString(tags.checkout_source),
+    currentPlanName: optionalTagString(tags.current_plan_name),
+    planPrice: optionalTagNumber(tags.plan_price),
+    planPriceMonthly: optionalTagNumber(tags.plan_price_monthly),
+    planPriceYearly: optionalTagNumber(tags.plan_price_yearly),
+  })
+}
+
 async function trackBundleIncompatibleEmail(
   c: Context<MiddlewareKeyVariables>,
   input: {
@@ -645,6 +690,10 @@ app.post('/', middlewareAuth(), async (c) => {
   // steps trigger the org/app lookup.
   const builderBentoEvent: BentoTrackingPayload | undefined = await buildBuilderBentoEvent(c, supabase, body, onboardingOrgId, appId, trackedBody)
 
+  // Plan checkout start: the frontend emits this only when the user accepts the
+  // Stripe navigation, not when the checkout URL is prefetched.
+  const planCheckoutBentoEvent: BentoTrackingPayload | undefined = await buildPlanCheckoutStartedTrackedBentoEvent(c, supabase, onboardingOrgId, trackedBody)
+
   // Bundle compatibility failure (capgo bundle upload / bundle compatibility):
   // when the CLI reports an incompatible bundle, emit a Bento signal so a
   // lifecycle automation can react. Mirrors the builder block above; resolves
@@ -672,7 +721,7 @@ app.post('/', middlewareAuth(), async (c) => {
   const appTooLargeBentoEvent: BentoTrackingPayload | undefined = await buildAppTooLargeTrackedBentoEvent(c, supabase, onboardingOrgId, appId, trackedBody)
 
   // Exactly one of these is ever set (distinct event names); `??` picks the active one.
-  const bentoEvent = appOnboardingReadyBentoEvent ?? onboardingBentoEvent ?? builderBentoEvent ?? bundleIncompatibleBentoEvent ?? aiInstructionsCopiedBentoEvent ?? appTooLargeBentoEvent
+  const bentoEvent = appOnboardingReadyBentoEvent ?? onboardingBentoEvent ?? builderBentoEvent ?? planCheckoutBentoEvent ?? bundleIncompatibleBentoEvent ?? aiInstructionsCopiedBentoEvent ?? appTooLargeBentoEvent
   await sendEventToTracking(c, addAuthenticatedApiKeyIdToTrackingPayload({
     ...trackedBody,
     bento: bentoEvent === bundleIncompatibleBentoEvent && bentoEvent?.data.gated ? { ...bentoEvent, event: 'bundle_safe_expected' } : bentoEvent,
