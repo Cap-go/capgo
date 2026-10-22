@@ -376,10 +376,15 @@ test.concurrent('CI background workers share the existing five-second ceiling', 
 }, 12_000)
 
 test.concurrent('GitHub Actions preserves machine modes and ignores unavailable summaries', async () => {
+  const machineSummary = join(dir, 'machine-output-summary.md')
+  writeFileSync(machineSummary, 'Existing summary\n')
   for (const options of [{ json: true }, { outputText: true }, { quiet: true }, { silent: true }, { format: 'json' }]) {
-    const result = await run({ commandPath: 'bundle upload', ci: true, tty: false, github: true, options, controlledClock: true, immediateCompletion: true }).completion
-    assert.equal(waitedMs(result), 0)
-    assert.doesNotMatch(result.text, /::notice::/)
+    for (const settings of [{}, { workers: ['notice.mjs'], waitForWorkers: true }]) {
+      const result = await run({ commandPath: 'bundle upload', ci: true, tty: false, github: true, summaryPath: machineSummary, options, controlledClock: true, immediateCompletion: true, ...settings }).completion
+      assert.equal(waitedMs(result), 0)
+      assert.doesNotMatch(result.text, /::notice::/)
+      assert.equal(readFileSync(machineSummary, 'utf8'), 'Existing summary\n')
+    }
   }
   for (const summaryPath of ['', join(dir, 'absent', 'summary.md')]) {
     const result = await run({ commandPath: 'bundle list', ci: true, tty: false, github: true, summaryPath, workers: ['notice.mjs'], waitForWorkers: true }).completion
