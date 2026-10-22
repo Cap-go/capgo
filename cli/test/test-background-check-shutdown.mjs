@@ -390,7 +390,7 @@ test.concurrent('GitHub Actions preserves machine modes and ignores unavailable 
 
 
 test.concurrent('GitHub notices escape workflow commands and Markdown from message text', async () => {
-  const notice = { kind: 'setup', appId: 'com.example.escaped', product: 'live <script> *updates*', title: '50% ready\r\n::warning::injected', action: 'Continue your checklist', secondary: [] }
+  const notice = { kind: 'setup', appId: 'com.example.escaped', product: 'live <script> *updates* <SCRIPT> <ScRiPt>', title: '50% ready\r\n::warning::injected', action: 'Continue your checklist', secondary: [] }
   writeFileSync(join(dir, 'escaped.mjs'), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: ${JSON.stringify(notice)} })`)
   const summaryPath = join(dir, 'escaped-summary.md')
   const result = await run({ commandPath: 'bundle list', ci: true, tty: false, github: true, summaryPath, workers: ['escaped.mjs'], waitForWorkers: true }).completion
@@ -399,7 +399,8 @@ test.concurrent('GitHub notices escape workflow commands and Markdown from messa
   assert.doesNotMatch(result.output, /^::warning::/m)
   const summary = readFileSync(summaryPath, 'utf8')
   assert.ok(summary.includes('&lt;script&gt; \\*updates\\*'), summary)
-  assert.doesNotMatch(summary, /<script>/)
+  assert.ok(summary.includes('&lt;SCRIPT&gt; &lt;ScRiPt&gt;'), summary)
+  assert.equal(summary.includes('<'), false, summary)
 }, 12_000)
 
 test.concurrent('GitHub plan notices retain organization-level trial deduplication', async () => {
