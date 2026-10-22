@@ -139,6 +139,7 @@ const props = defineProps<{
   // View persisted setup without automatically leaving a finished checklist
   // or restarting the user's onboarding run.
   showChecklist?: boolean
+  initialChecklistPath?: ChecklistPath
   // An existing user creating another organization runs the same first-run
   // flow from the start, ignoring any saved onboarding progress.
   newOrganization?: boolean
@@ -457,6 +458,13 @@ watch([flowStep, createdApp, setupStage, usesBuilderSetupCommand, activeChecklis
 })
 
 const cliSubcommand = computed(() => usesBuilderSetupCommand.value ? 'build init' : 'i')
+
+watch(() => props.initialChecklistPath, (path) => {
+  if (path && createdApp.value) {
+    flowStep.value = 'setup'
+    setupStage.value = 'cli'
+  }
+})
 const builderCliCommand = computed(() => apiKey.value ? `npx @capgo/cli@latest build init -a ${apiKey.value}` : '')
 const cliCommand = computed(() => {
   const key = apiKey.value
@@ -1322,10 +1330,11 @@ async function loadResumeApp(appId = resumeAppId.value) {
   const iconLoadRun = ++resumeIconLoadRun
   localIconPreview.value = getImmediateImageUrl(data.icon_url) || ''
   void loadResumeIconPreview(data.icon_url, data.app_id, iconLoadRun)
-  const resumeFinalStep = props.showChecklist || !newChannelTreatment.value
+  const hasChecklistTarget = props.showChecklist || !!props.initialChecklistPath
+  const resumeFinalStep = hasChecklistTarget || !newChannelTreatment.value
     || Boolean(savedProgress && savedProgress.app_id === data.app_id && savedProgress.final_step && savedProgress.setup_stage === 'cli')
   flowStep.value = resumeFinalStep ? 'setup' : 'channel'
-  if (props.showChecklist)
+  if (hasChecklistTarget)
     setupStage.value = 'cli'
   if (!savedProgress?.intent)
     hydrateIntentFromCurrentOrg()
@@ -3525,6 +3534,7 @@ defineExpose({
           :app-id="createdApp.app_id"
           :user-id="onboardingUserId"
           :initial-onboarding="createdApp.onboarding"
+          :initial-path="props.initialChecklistPath"
           :hiding="isHidingSplash"
           :leaving="isHandingOff"
           @path-changed="activeChecklistPath = $event"

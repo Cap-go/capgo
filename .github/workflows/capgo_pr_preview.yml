@@ -71,7 +71,7 @@ jobs:
           echo "bundle=${base_version}-pr.${PR_NUMBER}.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
           echo "base_version=${base_version}" >> "$GITHUB_OUTPUT"
       - name: Delete orphaned PR preview bundles
-        timeout-minutes: 5
+        timeout-minutes: 6
         env:
           CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -79,25 +79,28 @@ jobs:
         # Failed uploads can leave R2-backed bundles that block manifest inventory on the next run.
         run: |
           set -euo pipefail
-          delete_preview_bundle() {
-            if ! timeout --kill-after=5s 30s bunx "$CAPGO_CLI" bundle delete "$1" "$APP_ID" --apikey "$CAPGO_TOKEN" 2>/dev/null; then
-              echo "::warning::Could not remove preview bundle $1 within the cleanup budget"
-            fi
-          }
-          export -f delete_preview_bundle
           start_run=$((GITHUB_RUN_NUMBER - 8))
           if [ "$start_run" -lt 1 ]; then
             start_run=1
           fi
-          # 27 candidates take at most seven 35-second batches, below the five-minute step limit.
-          # The child shell expands its bundle argument.
-          # shellcheck disable=SC2016
+          delete_preview_bundle() {
+            local delete_status=0
+            timeout --kill-after=2s 33s bunx "$CAPGO_CLI" bundle delete "$1" "$APP_ID" --apikey "$CAPGO_TOKEN" 2>/dev/null || delete_status=$?
+            if [ "$delete_status" -eq 124 ] || [ "$delete_status" -eq 137 ]; then
+              echo "::notice::PR preview cleanup timed out for bundle $1 (exit $delete_status)"
+            fi
+            return 0
+          }
           for run in $(seq "$start_run" "$GITHUB_RUN_NUMBER"); do
             for attempt in 1 2 3; do
               bundle="${BASE_VERSION}-pr.${PR_NUMBER}.${run}.${attempt}"
-              printf '%s\0' "$bundle"
+              delete_preview_bundle "$bundle" &
+              if [ "$(jobs -pr | wc -l)" -ge 4 ]; then
+                wait -n || true
+              fi
             done
-          done | xargs -0 -r -n 1 -P 4 bash -c 'delete_preview_bundle "$1"' _
+          done
+          wait
       - name: Upload bundle to the PR channel
         env:
           CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
