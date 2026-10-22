@@ -9,8 +9,8 @@ const OPENAI_ADS_EVENTS_URL = 'https://bzr.openai.com/v1/events'
 // Same Pixel ID as the website measurement pixel; events must share it to deduplicate.
 const DEFAULT_OPENAI_ADS_PIXEL_ID = '5Fiq7Kwp18THe1MThKS7GL'
 const REGISTRATION_SOURCE_URL = 'https://capgo.app/register/'
-// The plans page is where the first payment starts; used when WEBAPP_URL is not set.
-const DEFAULT_SUBSCRIPTION_SOURCE_URL = 'https://console.capgo.app/settings/organization/plans'
+// Used when WEBAPP_URL (the console, whose plans page starts the first payment) is not a public https URL.
+const DEFAULT_SUBSCRIPTION_SOURCE_URL = 'https://capgo.app/'
 // The API rejects events older than 7 days; keep a margin for clock skew.
 const MAX_EVENT_AGE_MS = 7 * 24 * 60 * 60 * 1000 - 10 * 60 * 1000
 // Retries stay inside the ~30s background-task budget: 3 x 8s timeout + 2.5s of waits.

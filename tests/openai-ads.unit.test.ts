@@ -155,6 +155,10 @@ describe('openai ads conversions api', () => {
       sourceUrl: 'https://console.capgo.app/settings/organization/plans',
     }
 
+    it('falls back to the website as source url', async () => {
+      expect((await buildOpenAISubscriptionEvent({ ...input, sourceUrl: null }, now))!.source_url).toBe('https://capgo.app/')
+    })
+
     it('builds a plan_enrollment event with a per-org id and the registration user hashes', async () => {
       const userIdHash = sha('6aa76066-55ef-4238-ade6-0b32334a4097')
       const registration = await buildOpenAIRegistrationEvent(record, now)
@@ -193,9 +197,9 @@ describe('openai ads conversions api', () => {
       envValues.WEBAPP_URL = 'https://console.capgo.app/'
       expect(getOpenAISubscriptionSourceUrl(createContext())).toBe('https://console.capgo.app/settings/organization/plans')
       envValues.WEBAPP_URL = 'http://localhost:5173'
-      expect(getOpenAISubscriptionSourceUrl(createContext())).toBe('https://console.capgo.app/settings/organization/plans')
+      expect(getOpenAISubscriptionSourceUrl(createContext())).toBe('https://capgo.app/')
       delete envValues.WEBAPP_URL
-      expect(getOpenAISubscriptionSourceUrl(createContext())).toBe('https://console.capgo.app/settings/organization/plans')
+      expect(getOpenAISubscriptionSourceUrl(createContext())).toBe('https://capgo.app/')
     })
 
     it('does nothing without OPENAI_ADS_API_KEY, not even lookups', async () => {
