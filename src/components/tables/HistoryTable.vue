@@ -250,7 +250,7 @@ async function fetchChannelHistory() {
   }
 
   if (search.value) {
-    query = query.like('version.name', `%${search.value}%`)
+    query = query.like('version.name', `%${escapeIlike(search.value)}%`)
   }
 
   const { data, error, count } = await query
