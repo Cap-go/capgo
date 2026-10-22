@@ -264,7 +264,7 @@ function statusLabel(status: BuilderStepStatus) {
 
       <div class="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/15 dark:bg-slate-900" :class="{ 'lg:grid-cols-[minmax(0,0.38fr)_minmax(0,0.62fr)]': checklistOpen }">
         <nav class="border-b border-slate-200 px-4 py-3 sm:px-6 dark:border-white/15" :class="{ 'sm:py-6 lg:border-b-0 lg:border-r': checklistOpen }" :aria-label="t('builder-checklist-tasks-title')">
-          <!-- One task at a time, like the live-update checklist; the full list stays one click away. -->
+          <!-- Show every step by default; users can hide the list. -->
           <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <h2 class="text-lg font-semibold text-slate-950 dark:text-white">
               {{ t('builder-checklist-tasks-title') }}
