@@ -7,6 +7,7 @@ interface InvokeCall {
   path: string
   method: string
   body: unknown
+  apiVersion?: string
 }
 
 function makeBundleApiError(payload: { error: string, message: string }, status: number) {
@@ -16,8 +17,8 @@ function makeBundleApiError(payload: { error: string, message: string }, status:
 
 function recordingInvoke(responses: Array<{ data: unknown, error: Error | null }>) {
   const calls: InvokeCall[] = []
-  const invoke = (async (path: string, options: { method: string, body: unknown }) => {
-    calls.push({ path, method: options.method, body: options.body })
+  const invoke = (async (path: string, options: { method: string, body: unknown, apiVersion?: string }) => {
+    calls.push({ path, method: options.method, body: options.body, ...(options.apiVersion ? { apiVersion: options.apiVersion } : {}) })
     const response = responses.shift()
     if (!response)
       throw new Error(`unexpected request ${options.method} ${path}`)
@@ -64,10 +65,10 @@ describe('bundle lookups use one filtered request', () => {
 })
 
 describe('deleteSpecificVersion', () => {
-  it('deletes with a single request to the CLI delete endpoint', async () => {
-    const { calls, invoke } = recordingInvoke([{ data: { id: 7, name: '1.2.3' }, error: null }])
+  it('deletes with a single DELETE /bundle on the 2026-10-22 contract', async () => {
+    const { calls, invoke } = recordingInvoke([{ data: { status: 'ok', id: 7, name: '1.2.3' }, error: null }])
     await deleteSpecificVersion(client, 'com.test.app', '1.2.3', { silent: true, apikey: 'key', invoke })
-    expect(calls).toEqual([{ path: 'private/cli/bundles/delete', method: 'POST', body: { app_id: 'com.test.app', name: '1.2.3' } }])
+    expect(calls).toEqual([{ path: 'bundle', method: 'DELETE', body: { app_id: 'com.test.app', version: '1.2.3' }, apiVersion: '2026-10-22' }])
   })
 
   it('reports a missing bundle from the single request', async () => {
@@ -78,13 +79,6 @@ describe('deleteSpecificVersion', () => {
       .rejects
       .toThrow('App version com.test.app@9.9.9 doesn\'t exist')
     expect(calls).toHaveLength(1)
-  })
-
-  it('reports a backend without the endpoint as unsupported, not as a missing app', async () => {
-    const { invoke } = recordingInvoke([{ data: null, error: makeBundleApiError({ error: 'not_found', message: 'Not Found' }, 404) }])
-    await expect(deleteSpecificVersion(client, 'com.test.app', '1.2.3', { silent: true, apikey: 'key', invoke }))
-      .rejects
-      .toThrow(/does not support the CLI bundle delete endpoint/)
   })
 
   it('surfaces a linked refusal without a bundle id as a delete error', async () => {

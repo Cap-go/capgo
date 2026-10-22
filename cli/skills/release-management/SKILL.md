@@ -133,7 +133,7 @@ Use this skill for OTA update workflows in Capgo Cloud.
   - Linked bundles are preserved unless `--ignore-channel` is used; with it, linked bundles are unlinked from their channels and deleted.
   - The Capgo API selects and deletes the bundles server-side (`POST /bundle/cleanup`). Without `--force`, the CLI first shows a preview (dry run), asks for confirmation, then deletes only the bundles shown as removable, even if new bundles are uploaded meanwhile.
   - With `--force`, selection and deletion happen in one request, with no preview.
-  - Self-hosted Capgo: `bundle cleanup` and `bundle delete` need a backend that serves `POST /bundle/cleanup` and `POST /private/cli/bundles/delete`. Against an older backend the command stops with "This Capgo API does not support ..."; update the backend or use an older CLI.
+  - Self-hosted Capgo: `bundle cleanup` needs a backend that serves `POST /bundle/cleanup`; against an older backend it stops with "This Capgo API does not support server-side bundle cleanup". `bundle delete` uses the `capgo_api` `2026-10-22` contract of `DELETE /bundle`; an older backend still deletes, but reports a missing bundle as a generic delete error. Update the backend or use an older CLI.
   - `bundle delete` sends one request to the Capgo API, which reports a missing bundle directly. If the bundle is still linked to a channel, the CLI offers to unlink it and then retries the delete.
 - Key options:
   - `-b, --bundle <bundle>`
