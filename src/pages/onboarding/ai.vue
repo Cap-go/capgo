@@ -152,7 +152,7 @@ async function refreshAgentProgress(userId: string) {
 async function checkForApp() {
   const orgId = organization.value?.gid
   const userId = main.user?.id
-  if (!orgId || detectedApp.value || document.visibilityState === 'hidden')
+  if (disposed || !orgId || detectedApp.value || document.visibilityState === 'hidden')
     return
   const [{ data, error }] = await Promise.all([
     supabase
@@ -270,7 +270,8 @@ onMounted(async () => {
       }
     }
     await Promise.all([loadApiKey(), checkForApp()])
-    if (!detectedApp.value)
+    // The user may have left while the first requests were pending: never poll from a dead page.
+    if (!disposed && !detectedApp.value)
       pollTimer = setInterval(() => void checkForApp(), APP_POLL_INTERVAL_MS)
   }
   finally {
