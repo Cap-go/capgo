@@ -13,9 +13,12 @@ const props = defineProps<{ canCreate: boolean }>()
 const emit = defineEmits<{ create: [] }>()
 const { t } = useI18n()
 const stage = ref<'default' | 'self-assign' | 'console-assign'>('default')
-const animation = computed(() => stage.value === 'default'
-  ? ChannelDefaultRoutingMockup
-  : stage.value === 'self-assign' ? ChannelSelfAssignMockup : ChannelConsoleAssignMockup)
+const animations = {
+  'default': ChannelDefaultRoutingMockup,
+  'self-assign': ChannelSelfAssignMockup,
+  'console-assign': ChannelConsoleAssignMockup,
+}
+const animation = computed(() => animations[stage.value])
 
 function goBack() {
   stage.value = stage.value === 'console-assign' ? 'self-assign' : 'default'
