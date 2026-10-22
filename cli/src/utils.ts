@@ -1108,6 +1108,8 @@ export interface CapgoCliInvokeOptions {
   signal?: AbortSignal
   /** Set false for telemetry-internal calls so perf events never recurse. */
   instrument?: boolean
+  /** Opt this request into a newer `capgo_api` contract than the CLI default. */
+  apiVersion?: string
 }
 
 export function getCapgoCliHttpStatus(error: unknown): number | undefined {
@@ -1164,6 +1166,7 @@ export async function invokeCapgoCliApi<T = any>(
         'Content-Type': 'application/json',
         'Authorization': options.apikey,
         'capgkey': options.apikey,
+        ...(options.apiVersion ? { capgo_api: options.apiVersion } : {}),
       }),
       body: method === 'GET' || method === 'HEAD'
         ? undefined
