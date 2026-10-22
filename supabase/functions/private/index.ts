@@ -20,6 +20,7 @@ import { app as invite_existing_user_to_org } from '../_backend/private/invite_e
 import { app as invite_new_user_to_org } from '../_backend/private/invite_new_user_to_org.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as log_as } from '../_backend/private/log_as.ts'
+import { app as agent_identity } from '../_backend/private/agent_identity.ts'
 import { app as mcp_oauth } from '../_backend/private/mcp_oauth.ts'
 import { app as native_observe_stats } from '../_backend/private/native_observe_stats.ts'
 import { app as notification_self_proof } from '../_backend/private/notification_self_proof.ts'
@@ -90,6 +91,7 @@ appGlobal.route('/organization_invitation', organization_invitation)
 appGlobal.route('/download_link', download_link)
 appGlobal.route('/log_as', log_as)
 appGlobal.route('/mcp_oauth', mcp_oauth)
+appGlobal.route('/agent_identity', agent_identity)
 appGlobal.route('/stats', stats_priv)
 appGlobal.route('/stripe_checkout', stripe_checkout)
 appGlobal.route('/stripe_billing', stripe_billing)

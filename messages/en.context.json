@@ -3895,5 +3895,17 @@
   "native-build-stats-title": "Used in Capgo web console areas: components/dashboard. Role: section or dialog title. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "native-build-stats-total": "Used in Capgo web console areas: components/dashboard. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "native-build-stats-total-hint": "Used in Capgo web console areas: components/dashboard. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
-  "native-builds": "Used in Capgo web console areas: pages. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged."
+  "native-builds": "Used in Capgo web console areas: pages. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "agent-claim-approved": "Used in Capgo web console areas: pages/agent. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "agent-claim-code-format": "Used in Capgo web console areas: pages/agent. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "agent-claim-code-label": "Used in Capgo web console areas: pages/agent. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "agent-claim-code-mismatch": "Used in Capgo web console areas: pages/agent. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "agent-claim-denied": "Used in Capgo web console areas: pages/agent. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "agent-claim-description": "Used in Capgo web console areas: pages/agent. Role: helper or description text. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "agent-claim-error": "Used in Capgo web console areas: pages/agent. Role: toast or status message. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "agent-claim-expired": "Used in Capgo web console areas: pages/agent. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "agent-claim-loading": "Used in Capgo web console areas: pages/agent. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "agent-claim-title": "Used in Capgo web console areas: pages/agent. Role: section or dialog title. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "agent-claim-unverified": "Used in Capgo web console areas: pages/agent. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "agent-claim-wrong-account": "Used in Capgo web console areas: pages/agent. Role: UI sentence. Translate for UI; keep Capgo product names, code, and placeholders unchanged."
 }
