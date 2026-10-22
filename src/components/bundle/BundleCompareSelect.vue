@@ -8,6 +8,7 @@ import IconDown from '~icons/ic/round-keyboard-arrow-down'
 import IconSearch from '~icons/ic/round-search?raw'
 import { useConsole } from '~/services/console'
 import { formatLocalDate } from '~/services/date'
+import { escapeIlike } from '~/utils/ilike'
 
 type VersionRow = Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'name' | 'created_at' | 'manifest_count' | 'app_id'>
 type DeployHistoryRow = Pick<Database['public']['Tables']['deploy_history']['Row'], 'channel_id' | 'version_id' | 'created_at' | 'deployed_at'>
@@ -313,10 +314,6 @@ function liveBadgeTitle(versionId: number): string {
 }
 
 const COMPARE_SEARCH_LIMIT = 20
-
-function escapeIlike(term: string): string {
-  return term.replace(/[\\%_]/g, String.raw`\$&`)
-}
 
 async function searchCompareVersions(term: string) {
   const trimmed = term.trim()

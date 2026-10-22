@@ -10,6 +10,7 @@ import { formatDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
+import { escapeIlike } from '~/utils/ilike'
 
 // Define custom type for deploy_history since it doesn't exist in Database types
 interface DeployHistory {
@@ -294,7 +295,7 @@ async function fetchBundleHistory() {
       .from('channels')
       .select('id')
       .eq('app_id', props.appId)
-      .ilike('name', `%${search.value}%`)
+      .ilike('name', `%${escapeIlike(search.value)}%`)
       .limit(1000)
     if (channelsError) {
       console.error('Error fetching channels:', channelsError)
@@ -334,11 +335,12 @@ async function fetchBundleHistory() {
     assignmentQuery = assignmentQuery.in('channel_id', channelIds.map(Number))
 
   // When a channel's version changes FROM this bundle TO another bundle, that's a removal.
+  // The audit log is the largest table, so its total is estimated like AuditLogTable's.
   // Match this app and the old bundle in the database, so only real removals come
   // back instead of every channel change the caller can read.
   let removalQuery = capgo
     .from('audit_logs')
-    .select('id, record_id, user_id, created_at', { count: 'exact' })
+    .select('id, record_id, user_id, created_at', { count: 'estimated' })
     .eq('table_name', 'channels')
     .eq('operation', 'UPDATE')
     .contains('changed_fields', ['version'])
