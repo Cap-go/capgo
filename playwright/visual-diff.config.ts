@@ -687,9 +687,9 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
         await introduction.waitFor({ state: 'visible' })
         return
       }
-      // The previous empty state opened the creation dialog automatically.
+      // The base can leave the loaded empty table visible while create permission resolves.
       await introduction
-        .or(page.getByRole('dialog', { name: 'Create channel', exact: true })).waitFor({ state: 'visible' })
+        .or(page.getByRole('cell', { name: 'No elements found', exact: true })).waitFor({ state: 'visible' })
     },
   },
   {
