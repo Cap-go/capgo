@@ -186,6 +186,55 @@ describe.each(['new', 'existing'] as const)('%s-account invitation delivery with
     }
   })
 
+  it.concurrent.each(['0', '5s', '50ms'])('bounds close waits and restores lock_timeout=%s', async (lockTimeout) => {
+    const fixture = await createFixture(kind)
+    const pool = new Pool({ connectionString: POSTGRES_URL, max: 2 })
+    const locker = await pool.connect()
+    const closer = await pool.connect()
+    const closeSql = kind === 'new'
+      ? 'DELETE FROM public.tmp_users WHERE id = $1'
+      : 'UPDATE public.org_users SET is_invite = false WHERE id = $1'
+    try {
+      const queued = await fixture.state()
+      expect((await fixture.post(queued.id)).status).toBe(200)
+      await locker.query('BEGIN')
+      await locker.query('SELECT id FROM public.org_invitation_email_requests WHERE id = $1 FOR UPDATE', [queued.id])
+      await closer.query('SELECT pg_catalog.set_config(\'lock_timeout\', $1, false)', [lockTimeout])
+      // A statement timeout distinguishes an unbounded wait or a relaxed
+      // caller timeout from the expected lock-timeout error.
+      await closer.query('SELECT pg_catalog.set_config(\'statement_timeout\', $1, false)', [lockTimeout === '50ms' ? '500ms' : '4s'])
+      await closer.query('BEGIN')
+      await expect(closer.query(closeSql, [fixture.inviteId])).rejects.toMatchObject({ code: '55P03' })
+      await closer.query('ROLLBACK')
+      expect((await closer.query('SHOW lock_timeout')).rows[0]!.lock_timeout).toBe(lockTimeout)
+      const pending = await closer.query(kind === 'new'
+        ? 'SELECT id FROM public.tmp_users WHERE id = $1'
+        : 'SELECT id FROM public.org_users WHERE id = $1 AND is_invite', [fixture.inviteId])
+      expect(pending.rowCount).toBe(1)
+      expect((await closer.query(`
+        SELECT count(*) FROM pgmq.q_send_email
+        WHERE message->'payload'->'org_invitation_bento_sync'->>'email' = $1
+      `, [fixture.email])).rows[0]!.count).toBe('0')
+
+      await locker.query('ROLLBACK')
+      await closer.query('BEGIN')
+      await closer.query(closeSql, [fixture.inviteId])
+      expect((await closer.query('SHOW lock_timeout')).rows[0]!.lock_timeout).toBe(lockTimeout)
+      await closer.query('COMMIT')
+      expect((await closer.query(`
+        SELECT count(*) FROM pgmq.q_send_email
+        WHERE message->'payload'->'org_invitation_bento_sync'->>'email' = $1
+      `, [fixture.email])).rows[0]!.count).toBe('1')
+    }
+    finally {
+      await Promise.allSettled([locker.query('ROLLBACK'), closer.query('ROLLBACK')])
+      locker.release()
+      closer.release()
+      await pool.end()
+      await fixture.cleanup()
+    }
+  })
+
   it.concurrent('sends once across eight concurrent deliveries and starts one Bento flow', async () => {
     const fixture = await createFixture(kind)
     try {

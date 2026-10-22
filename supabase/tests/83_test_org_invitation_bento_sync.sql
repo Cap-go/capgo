@@ -1,7 +1,7 @@
 SET default_transaction_isolation = 'repeatable read';
 BEGIN;
 
-SELECT plan(26);
+SELECT plan(28);
 
 SELECT hasnt_table(
     'public', 'bento_event_dispatches',
@@ -174,8 +174,13 @@ WHERE
     invitation.id = request.tmp_user_id
     AND invitation.id IN (830001, 830002, 830004);
 
+SET LOCAL lock_timeout = '5s';
 UPDATE public.org_users SET is_invite = false
 WHERE id = 830001;
+SELECT is(
+    pg_catalog.current_setting('lock_timeout'), '5s',
+    'a successful existing-user close restores the caller lock timeout'
+);
 SELECT is(
     pg_temp.bento_syncs('bento-sync-original@example.com'),
     1::bigint,
@@ -196,8 +201,14 @@ SELECT is(
     'removing an invite Bento never saw queues no sync for any address'
 );
 
+SET LOCAL lock_timeout = '50ms';
 UPDATE public.tmp_users SET cancelled_at = pg_catalog.now()
 WHERE id = 830001;
+SELECT is(
+    pg_catalog.current_setting('lock_timeout'), '50ms',
+    'a successful new-user close preserves a stricter caller lock timeout'
+);
+SET LOCAL lock_timeout = '0';
 SELECT is(
     pg_temp.bento_syncs('bento-sync-rescind@example.com'),
     1::bigint,

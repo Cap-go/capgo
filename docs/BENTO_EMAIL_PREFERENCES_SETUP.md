@@ -111,6 +111,8 @@ Deploy that flow alongside the application change. Until it is deployed, Bento a
 
 Enrollment uses at-least-once delivery. Confirmed acceptance is recorded per invitation generation, but a lost Bento response or failed database commit can cause a retry to start a duplicate flow. The [Bento Events API](https://bentonow.com/docs/events_api) does not document idempotency for custom flow events; purchase `unique.key` is not a documented flow-enrollment guarantee. Both runs still stop when that invitation leaves `capgo_open_invites`.
 
+Closing an invitation waits at most two seconds for an in-flight enrollment's request-row lock, preserving any shorter caller lock timeout. If that wait expires, the close rolls back and can be retried after enrollment finishes. Successful closes still queue reconciliation in the same transaction.
+
 `org:invite_accepted` is still added on acceptance for older Bento segments, but the reminder flow no longer depends on it.
 
 #### 3c. Public email preference footer link

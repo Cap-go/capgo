@@ -167,12 +167,19 @@ SET search_path = ''
 AS $$
 DECLARE
     v_bento_email text;
+    v_lock_timeout text := pg_catalog.current_setting('lock_timeout');
 BEGIN
     -- Only delivered invitations prepared for Bento enrollment need a field
     -- rewrite, including uncertain acceptance after a lost response.
     -- Lock the request row unconditionally: an in-flight Bento enrollment
     -- holds it, so this waits and then reads its committed bento_email.
     -- BEFORE DELETE runs ahead of the request row's ON DELETE CASCADE.
+    -- Bound close latency without extending a stricter caller timeout.
+    -- A timeout rolls back the close; retrying after enrollment is safe.
+    IF v_lock_timeout::interval = interval '0 seconds'
+        OR v_lock_timeout::interval > interval '2 seconds' THEN
+        PERFORM pg_catalog.set_config('lock_timeout', '2s', true);
+    END IF;
     IF TG_TABLE_NAME = 'tmp_users' THEN
         SELECT request.bento_email INTO v_bento_email
         FROM public.org_invitation_email_requests AS request
@@ -184,6 +191,7 @@ BEGIN
         WHERE request.org_user_id = OLD.id
         FOR UPDATE;
     END IF;
+    PERFORM pg_catalog.set_config('lock_timeout', v_lock_timeout, true);
 
     IF v_bento_email IS NOT NULL THEN
         PERFORM public.queue_org_invitation_bento_sync(v_bento_email);
