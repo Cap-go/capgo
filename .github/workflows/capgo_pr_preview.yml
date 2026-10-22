@@ -79,16 +79,25 @@ jobs:
         # Failed uploads can leave R2-backed bundles that block manifest inventory on the next run.
         run: |
           set -euo pipefail
+          delete_preview_bundle() {
+            if ! timeout --kill-after=5s 30s bunx "$CAPGO_CLI" bundle delete "$1" "$APP_ID" --apikey "$CAPGO_TOKEN" 2>/dev/null; then
+              echo "::warning::Could not remove preview bundle $1 within the cleanup budget"
+            fi
+          }
+          export -f delete_preview_bundle
           start_run=$((GITHUB_RUN_NUMBER - 8))
           if [ "$start_run" -lt 1 ]; then
             start_run=1
           fi
+          # 27 candidates take at most seven 35-second batches, below the five-minute step limit.
+          # The child shell expands its bundle argument.
+          # shellcheck disable=SC2016
           for run in $(seq "$start_run" "$GITHUB_RUN_NUMBER"); do
             for attempt in 1 2 3; do
               bundle="${BASE_VERSION}-pr.${PR_NUMBER}.${run}.${attempt}"
-              bunx "$CAPGO_CLI" bundle delete "$bundle" "$APP_ID" --apikey "$CAPGO_TOKEN" 2>/dev/null || true
+              printf '%s\0' "$bundle"
             done
-          done
+          done | xargs -0 -r -n 1 -P 4 bash -c 'delete_preview_bundle "$1"' _
       - name: Upload bundle to the PR channel
         env:
           CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
