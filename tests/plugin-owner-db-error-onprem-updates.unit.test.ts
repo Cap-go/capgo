@@ -97,6 +97,13 @@ describe('/updates owner lookup DB errors', () => {
     const response = await app.fetch(new Request('http://localhost/'), createContext(), { waitUntil: () => {} } as any)
 
     expect(response.status).toBeGreaterThanOrEqual(500)
+    expect(getAppOwnerPostgresMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'com.trial.app',
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    )
     const text = await response.text()
     expect(text).not.toContain('on_premise_app')
     expect(setAppStatusMock).not.toHaveBeenCalledWith(

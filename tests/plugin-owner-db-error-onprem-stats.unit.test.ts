@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const setAppStatusMock = vi.fn(() => Promise.resolve())
+const ownerLookupLimitMock = vi.fn()
 
 ;(globalThis as any).EdgeRuntime = undefined
 
@@ -18,7 +19,10 @@ function ownerLookupFailingDrizzle() {
       from: () => ({
         where: () => ({
           leftJoin: () => ({
-            limit: () => Promise.reject(error),
+            limit: () => {
+              ownerLookupLimitMock()
+              return Promise.reject(error)
+            },
           }),
         }),
       }),
@@ -138,6 +142,7 @@ describe('/stats owner lookup DB errors', () => {
     }), createContext(), { waitUntil: () => {} } as any)
 
     expect(response.status).toBeGreaterThanOrEqual(500)
+    expect(ownerLookupLimitMock).toHaveBeenCalled()
     expect(setAppStatusMock).not.toHaveBeenCalledWith(
       expect.anything(),
       'com.trial.app',
