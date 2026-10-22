@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 process.env.CAPGO_DISABLE_POSTHOG = '1'
 
+import fs, { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import process from 'node:process'
-import { checkPlanValid, checkPlanValidUpload } from '../src/api/preflight.ts'
+import { setNoticeOutputOptions } from '../src/onboarding/setup-notice-policy.ts'
+import { wasTrialNoticeShown } from '../src/onboarding/trial-notice-state.ts'
+import { checkPlanValid, checkPlanValidUpload, runCliPreflight } from '../src/api/preflight.ts'
 import * as utils from '../src/utils.ts'
 
 console.log('🧪 Testing plan validation through the backend preflight...\n')
@@ -20,6 +25,7 @@ let fetchHandler = () => Response.json(okBody)
 
 globalThis.fetch = async (input, init) => {
   const url = String(input)
+  if (url.endsWith('/private/config')) return Response.json({})
   if (!url.includes('/private/cli/preflight'))
     return originalFetch(input)
   httpCalls.push({
@@ -79,6 +85,89 @@ await test('checkPlanValid asks the backend for the full metered plan in one cal
 await test('checkPlanValidUpload only gates storage', async () => {
   await checkPlanValidUpload(makeClient(), 'org-id', 'com.example.app', false)
   assertEquals(httpCalls[0].body, { app_id: 'com.example.app', org_id: 'org-id', check_2fa: false, plan: 'upload' })
+})
+
+await test('GitHub Actions publishes the existing preflight trial warning to both surfaces', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'capgo-plan-notice-'))
+  const previous = { github: process.env.GITHUB_ACTIONS, summary: process.env.GITHUB_STEP_SUMMARY }
+  const write = process.stdout.write
+  const writeSync = fs.writeSync
+  let output = ''
+  try {
+    process.env.GITHUB_ACTIONS = 'true'
+    process.env.GITHUB_STEP_SUMMARY = join(dir, 'summary.md')
+    process.stdout.write = chunk => { output += chunk; return true }
+    fs.writeSync = (fd, buffer, offset, length) => {
+      if (fd !== 1) return writeSync(fd, buffer, offset, length)
+      output += buffer.subarray(offset, offset + length).toString()
+      return length
+    }
+    fetchHandler = () => Response.json({ ...okBody, trial_days_left: 3 })
+    await checkPlanValidUpload(makeClient(), 'org-id', 'com.example.app')
+    assert(output.includes('::notice::WARNING !!%0ATrial expires in 3 days, upgrade here:'), output)
+    const summary = readFileSync(process.env.GITHUB_STEP_SUMMARY, 'utf8')
+    assert(summary.includes('### WARNING'), summary)
+    assert(summary.includes('Trial expires in 3 days, upgrade here:'), summary)
+    assert(summary.includes('/settings/organization/plans?oid=org-id'), summary)
+    assert(wasTrialNoticeShown('org-id'), 'preflight prevents a duplicate background plan prompt')
+  }
+  finally {
+    process.stdout.write = write
+    fs.writeSync = writeSync
+    if (previous.github === undefined) delete process.env.GITHUB_ACTIONS
+    else process.env.GITHUB_ACTIONS = previous.github
+    if (previous.summary === undefined) delete process.env.GITHUB_STEP_SUMMARY
+    else process.env.GITHUB_STEP_SUMMARY = previous.summary
+    rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+await test('preflight trial reminders honor every machine-output guard in GitHub Actions', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'capgo-machine-plan-notice-'))
+  const previous = { github: process.env.GITHUB_ACTIONS, summary: process.env.GITHUB_STEP_SUMMARY }
+  const summaryPath = join(dir, 'summary.md')
+  writeFileSync(summaryPath, 'Existing summary\n')
+  const write = process.stdout.write
+  const writeSync = fs.writeSync
+  let output = ''
+  try {
+    process.env.GITHUB_ACTIONS = 'true'
+    process.env.GITHUB_STEP_SUMMARY = summaryPath
+    process.stdout.write = chunk => { output += chunk; return true }
+    fs.writeSync = (fd, buffer, offset, length) => {
+      if (fd !== 1) return writeSync(fd, buffer, offset, length)
+      output += buffer.subarray(offset, offset + length).toString()
+      return length
+    }
+    fetchHandler = () => Response.json({ ...okBody, org_id: 'machine-output-org', trial_days_left: 3 })
+    for (const github of ['false', 'true']) {
+      process.env.GITHUB_ACTIONS = github
+      for (const options of [{ json: true }, { quiet: true }, { silent: true }, { outputText: true }, { format: 'json' }]) {
+        await runCliPreflight(makeClient(), { orgId: 'org-id', appId: 'com.example.app', plan: 'upload' }, options)
+        setNoticeOutputOptions(options)
+        await checkPlanValidUpload(makeClient(), 'org-id', 'com.example.app')
+        setNoticeOutputOptions({})
+      }
+    }
+    assertEquals(output, '', 'trial reminders cannot contaminate machine output')
+    assertEquals(readFileSync(summaryPath, 'utf8'), 'Existing summary\n', 'machine modes cannot append to the job summary')
+    assert(!wasTrialNoticeShown('machine-output-org'), 'suppressed output must not hide a later human-facing reminder')
+    setNoticeOutputOptions({})
+    await checkPlanValidUpload(makeClient(), 'org-id', 'com.example.app')
+    assert(output.includes('Trial expires in 3 days'), 'the later human-mode reminder must print')
+    assert(readFileSync(summaryPath, 'utf8').includes('Trial expires in 3 days'), 'the later human-mode summary must render')
+    assert(wasTrialNoticeShown('machine-output-org'), 'a displayed reminder must mark its organization')
+  }
+  finally {
+    process.stdout.write = write
+    fs.writeSync = writeSync
+    setNoticeOutputOptions({})
+    if (previous.github === undefined) delete process.env.GITHUB_ACTIONS
+    else process.env.GITHUB_ACTIONS = previous.github
+    if (previous.summary === undefined) delete process.env.GITHUB_STEP_SUMMARY
+    else process.env.GITHUB_STEP_SUMMARY = previous.summary
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 await test('billing limit maps to plan upgrade copy', async () => {

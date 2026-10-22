@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import process from 'node:process'
 import { afterAll, beforeAll, beforeEach, describe, test } from 'bun:test'
 import { isDirectOfferApp } from '../src/api/direct-offer.ts'
@@ -33,6 +36,10 @@ let output = ''
 const originalFetch = globalThis.fetch
 const originalWrite = process.stdout.write.bind(process.stdout)
 const originalErrWrite = process.stderr.write.bind(process.stderr)
+const originalWriteSync = fs.writeSync
+const originalSummary = process.env.GITHUB_STEP_SUMMARY
+let summaryDir
+let summaryPath
 
 function capture(chunk, ...rest) {
   output += String(chunk)
@@ -43,6 +50,9 @@ function capture(chunk, ...rest) {
 }
 
 beforeAll(() => {
+  summaryDir = fs.mkdtempSync(join(tmpdir(), 'capgo-direct-offer-'))
+  summaryPath = join(summaryDir, 'summary.md')
+  process.env.GITHUB_STEP_SUMMARY = summaryPath
   globalThis.fetch = async (input, init) => {
     const url = String(input)
     const body = init?.body ? JSON.parse(init.body) : undefined
@@ -61,15 +71,25 @@ beforeAll(() => {
   }
   process.stdout.write = capture
   process.stderr.write = capture
+  fs.writeSync = (fd, buffer, offset, length) => {
+    if (fd !== 1) return originalWriteSync(fd, buffer, offset, length)
+    output += buffer.subarray(offset, offset + length).toString()
+    return length
+  }
 })
 afterAll(() => {
   globalThis.fetch = originalFetch
   process.stdout.write = originalWrite
   process.stderr.write = originalErrWrite
+  fs.writeSync = originalWriteSync
+  if (originalSummary === undefined) delete process.env.GITHUB_STEP_SUMMARY
+  else process.env.GITHUB_STEP_SUMMARY = originalSummary
+  fs.rmSync(summaryDir, { recursive: true, force: true })
 })
 beforeEach(() => {
   calls.length = 0
   output = ''
+  fs.writeFileSync(summaryPath, '')
   progressResponse = () => Response.json({ onboarding: {}, checkErrors: [], billing: org.billing })
 })
 
@@ -157,12 +177,22 @@ describe('bundle upload plan check', () => {
     assert.ok(!output.includes(DIRECT_OFFER_PLAN_MESSAGE))
     assert.equal(error?.message, 'Plan upgrade required for upload')
   })
-  test('active trial: unchanged trial warning, no extra lookup', async () => {
-    org = orgs.activeTrial
-    const { output, error } = await run(() => checkPlanValidUpload(client, orgId, appId, true))
-    assert.equal(error, undefined)
-    assert.ok(output.includes('Trial expires in 5 days, upgrade here:'), output)
-    assert.deepEqual(calls.map(call => call.path), ['preflight'])
+  test.each(['false', 'true'])('active trial: unchanged warning, no extra lookup (GitHub Actions=%s)', async (github) => {
+    const previous = process.env.GITHUB_ACTIONS
+    try {
+      process.env.GITHUB_ACTIONS = github
+      org = orgs.activeTrial
+      const { output, error } = await run(() => checkPlanValidUpload(client, orgId, appId, true))
+      assert.equal(error, undefined)
+      assert.equal(output.split('Trial expires in 5 days, upgrade here:').length - 1, 1, output)
+      assert.equal(output.includes('::notice::'), github === 'true')
+      assert.equal(fs.readFileSync(summaryPath, 'utf8').includes('Trial expires in 5 days'), github === 'true')
+      assert.deepEqual(calls.map(call => call.path), ['preflight'])
+    }
+    finally {
+      if (previous === undefined) delete process.env.GITHUB_ACTIONS
+      else process.env.GITHUB_ACTIONS = previous
+    }
   })
   test('paying org: no message, no extra lookup', async () => {
     org = orgs.paying
