@@ -62,7 +62,7 @@ import {
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
+import { isPendingOrganizationInvite, useOrganizationStore } from '~/stores/organization'
 import { isValidAppId } from '~/utils/appId'
 import { shouldSkipOnboardingResume } from '~/utils/appOnboardingProgress'
 import { useBeforeUnloadWarning } from '~/utils/beforeUnloadWarning'
@@ -304,7 +304,10 @@ const activeChecklistPath = ref<ChecklistPath | null>(null)
 const usesBuilderTodoList = computed(() => usesDualTodoList.value ? activeChecklistPath.value === 'builder' : !!createdApp.value && isBuilderTodoListSelected(createdApp.value.onboarding))
 const usesBuilderSetupCommand = computed(() => usesBuilderTodoList.value || (!usesOtaTodoList.value && (selectedIntent.value === 'builder' || selectedIntent.value === 'publish')))
 // New AI signups watch the agent tick tasks off; new manual signups see one next step.
-const checklistTaskList = computed(() => checklistTaskListMode(main.user?.onboarding))
+// Scoped to the signup organization: a later organization keeps the default checklist.
+const checklistTaskList = computed(() => organizationStore.organizations.filter(org => !isPendingOrganizationInvite(org)).length === 1
+  ? checklistTaskListMode(main.user?.onboarding)
+  : 'default')
 const markedOnboardingFeatures = new Set<string>()
 let onboardingABTestsRequest: Promise<void> | null = null
 

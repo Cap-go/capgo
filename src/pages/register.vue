@@ -38,7 +38,6 @@ async function submit(form: { password: string, email: string }) {
       throw error
   }
   catch (error) {
-    isLoading.value = false
     const code = await getCapgoApiErrorCode(error)
     let message = t('account-error')
     if (error instanceof FunctionsHttpError && error.context instanceof Response) {
@@ -47,6 +46,8 @@ async function submit(form: { password: string, email: string }) {
         message = body.message
     }
     setErrors('register-account', [code === 'account_deleted' ? t('used-to-create') : message], {})
+    // Re-enable only after the error is shown, so a quick second click cannot start another signup.
+    isLoading.value = false
     return
   }
 

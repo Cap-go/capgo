@@ -8,6 +8,8 @@ interface ApiKeyLoadScope {
   userId: string
   orgId?: string | null
   appId?: string | null
+  /** Distinguishes loads of a specific named key (AI onboarding) from any usable key. */
+  name?: string | null
 }
 
 const inFlightApiKeyLoads = new Map<string, Promise<string | null>>()
@@ -16,7 +18,7 @@ export function shareInFlightApiKeyLoad(
   scope: ApiKeyLoadScope,
   load: () => Promise<string | null>,
 ): Promise<string | null> {
-  const scopeKey = JSON.stringify([scope.userId, scope.orgId ?? null, scope.appId ?? null])
+  const scopeKey = JSON.stringify([scope.userId, scope.orgId ?? null, scope.appId ?? null, scope.name ?? null])
   const existingLoad = inFlightApiKeyLoads.get(scopeKey)
   if (existingLoad)
     return existingLoad

@@ -20,7 +20,7 @@ import { replaceUserOnboardingWithRetry, serializeUserOnboardingWrite } from '~/
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
-import { allowOnboardingDashboardExploration, getAppGettingStartedPath } from '~/utils/onboardingRedirect'
+import { allowOnboardingDashboardExploration, getAppGettingStartedPath, ONBOARDING_DASHBOARD_EXPLORED_EVENT } from '~/utils/onboardingRedirect'
 import { readAiAgentProgress, readAiOnboardingGoal, withOnboardingSetupMode } from '~/utils/onboardingSetupMode'
 
 // Must match AI_ONBOARDING_API_KEY_NAME in the backend agent marker.
@@ -108,7 +108,7 @@ async function loadApiKey() {
     return
   loadFailed.value = false
   try {
-    apiKey.value = await shareInFlightApiKeyLoad({ userId, orgId }, () => ensureApiKey(userId, orgId))
+    apiKey.value = await shareInFlightApiKeyLoad({ userId, orgId, name: AI_ONBOARDING_API_KEY_NAME }, () => ensureApiKey(userId, orgId))
     if (!apiKey.value)
       loadFailed.value = true
   }
@@ -215,6 +215,9 @@ function reloadPage() {
 }
 
 async function exploreDashboard() {
+  sendOnboardingEvent('onboarding_ai_explore_dashboard', { org_id: organization.value?.gid ?? '' })
+  // Same signal as the other "explore the dashboard" exits, emitted before granting exploration.
+  window.dispatchEvent(new Event(ONBOARDING_DASHBOARD_EXPLORED_EVENT))
   allowOnboardingDashboardExploration(main.user?.id ?? main.auth?.id)
   await router.push('/dashboard')
 }

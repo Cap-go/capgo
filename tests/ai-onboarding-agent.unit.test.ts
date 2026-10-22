@@ -11,7 +11,11 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
   closeClient,
   getDrizzleClient: () => ({ execute }),
 }))
-vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({ cloudlogErr: vi.fn(), serializeError: (error: unknown) => error }))
+vi.mock('../supabase/functions/_backend/utils/logging.ts', async importOriginal => ({
+  ...await importOriginal<typeof import('../supabase/functions/_backend/utils/logging.ts')>(),
+  cloudlog: vi.fn(),
+  cloudlogErr: vi.fn(),
+}))
 
 const { AI_ONBOARDING_API_KEY_NAME, markAiOnboardingAgentConnected } = await import('../supabase/functions/_backend/utils/ai_onboarding_agent.ts')
 

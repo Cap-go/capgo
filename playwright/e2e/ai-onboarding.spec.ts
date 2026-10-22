@@ -111,11 +111,17 @@ test.describe('AI onboarding', () => {
     await admin.from('users').update({ onboarding: { ...(user!.onboarding as object), ai_agent_connected_at: new Date().toISOString(), ai_mcp_connected_at: new Date().toISOString() } }).eq('id', user!.id)
     await expect(task(2)).toHaveAttribute('data-done', 'true', { timeout: 15000 })
 
-    // What the MCP does next: register the app in the new organization.
+    // What the MCP does next, through the real API with the prompt's key: register the app
+    // in the new organization, identifying itself as the MCP like `capgo app add` does.
     const { data: org } = await admin.from('orgs').select('id').eq('created_by', user!.id).single()
+    const { data: promptKey } = await admin.from('apikeys').select('key').eq('user_id', user!.id).eq('name', 'ai-onboarding').single()
     const appId = `com.example.ai${Date.now()}`
-    const { error } = await admin.from('apps').insert({ app_id: appId, name: 'Agent App', owner_org: org!.id, icon_url: '' })
-    expect(error).toBeNull()
+    const created = await fetch(`${localSupabaseUrl}/functions/v1/app`, {
+      method: 'POST',
+      headers: { 'authorization': promptKey!.key!, 'content-type': 'application/json' },
+      body: JSON.stringify({ app_id: appId, name: 'Agent App', owner_org: org!.id, onboarding: { source: 'mcp' } }),
+    })
+    expect(created.status, await created.clone().text()).toBe(200)
 
     await expect(page.locator('[data-test="onboarding-ai-app-detected"]')).toContainText('Agent App', { timeout: 15000 })
     // No click: the page opens Getting started by itself, where the agent's progress shows live.
@@ -123,6 +129,8 @@ test.describe('AI onboarding', () => {
     // AI setup shows the whole task list open, so the user can watch the agent tick tasks off.
     await expect(page.locator('[data-test="setup-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'true')
     await expect(page.locator('[data-test="setup-checklist-progress"]')).toBeVisible()
+    // The agent logged in before the app existed; creating it with the key marks that step.
+    await expect(page.locator('[data-test="app-onboarding-cli-step-login_cli_mcp"]')).toHaveAttribute('data-status', 'done')
   })
 
   test('keeps the manual wizard one click away', async ({ page }) => {

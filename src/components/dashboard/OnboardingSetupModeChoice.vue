@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Json } from '~/types/supabase.types'
 import type { AiOnboardingGoal, OnboardingSetupMode } from '~/utils/onboardingSetupMode'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -89,8 +89,8 @@ function planTitle(index: number) {
 
 // Remembering the choice lets a refresh land on the same screen. A failed write only costs
 // that convenience, so the user is never blocked here.
-async function rememberSetupMode(mode: OnboardingSetupMode) {
-  await rememberOnboarding(current => withOnboardingSetupMode(current, mode))
+function rememberSetupMode(mode: OnboardingSetupMode) {
+  return rememberOnboarding(current => withOnboardingSetupMode(current, mode))
 }
 
 /** Returns whether the update was saved. Conflicts and write errors count as not saved. */
@@ -118,13 +118,24 @@ async function rememberOnboarding(update: (current: Json) => Json): Promise<bool
   }
 }
 
+// Save the goal as soon as it is picked, so a refresh before submitting restores it.
+// Organization creation saves it again and stops if that fails.
+watch(goal, (value) => {
+  if (value)
+    void rememberOnboarding(current => withOnboardingFields(current, { intent: aiGoalToIntent(value) }))
+})
+
 async function chooseMode(mode: OnboardingSetupMode) {
   if (isSaving.value)
     return
   isSaving.value = true
   try {
     sendOnboardingEvent('onboarding_setup_mode_selected', { setup_mode: mode })
-    await rememberSetupMode(mode)
+    // The mode drives redirects and the Getting started checklist, so it must be saved first.
+    if (!await rememberSetupMode(mode)) {
+      toast.error(t('account-error'))
+      return
+    }
     if (mode === 'manual') {
       emit('manual')
       return
