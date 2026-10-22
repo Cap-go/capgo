@@ -1,3 +1,5 @@
+import { formatAgentPlanRequiredMessage } from './agent-notices'
+
 // Direct-offer (paid ads) orgs are created without a free trial: stripe_info.trial_at
 // equals the org creation time (Cap-go/capgo.app#3782). Normal trials last 15 days,
 // so a trial ending within a day of org creation means the org never had one.
@@ -18,7 +20,9 @@ export function isZeroLengthTrial(orgCreatedAt: string | null | undefined, trial
 }
 
 /** Copy shown when a metered action is blocked because the org has no usable plan. */
-export function formatPlanRequiredMessage(plansUrl: string, directOffer: boolean): string {
+export function formatPlanRequiredMessage(plansUrl: string, directOffer: boolean, agent = false): string {
+  if (agent)
+    return formatAgentPlanRequiredMessage(plansUrl, directOffer)
   return directOffer
     ? `${DIRECT_OFFER_PLAN_MESSAGE}\n Choose a plan here: ${plansUrl}\n`
     : `You need to upgrade your plan to continue to use capgo.\n Upgrade here: ${plansUrl}\n`

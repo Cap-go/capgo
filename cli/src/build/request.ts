@@ -68,7 +68,8 @@ import { uploadSupportLogs } from '../support/support-upload.js'
 import { offerSupportUploadBeforeAi } from '../support/support-upload-prompt.js'
 import { buildCliRequestHeaders } from '../analytics/cli-headers'
 import { isDirectOfferApp } from '../api/direct-offer'
-import { DIRECT_OFFER_PLAN_MESSAGE } from '../shared/direct-offer'
+import { isAgentInvocation } from '../shared/agent-notices'
+import { DIRECT_OFFER_PLAN_MESSAGE, formatPlanRequiredMessage } from '../shared/direct-offer'
 import { assertCliPermission, canPromptInteractively, createCapgoClient, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, trimTrailingSlashes, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { getBuilderAppId } from './app-id'
 import { parseBuildEnv } from './build-env'
@@ -267,8 +268,11 @@ export async function throwIfBuildPlanLimitError(
         ? `Native build concurrency limit reached for your plan. Upgrade here: ${upgradeUrl}`
         : `Cannot ${action} native build, upgrade plan to continue: ${upgradeUrl}`)
 
-  logger.error(message)
-  if (!message.includes(upgradeUrl))
+  const displayMessage = errorCode === 'need_plan_upgrade' && isAgentInvocation()
+    ? formatPlanRequiredMessage(upgradeUrl, directOffer, true)
+    : message
+  logger.error(displayMessage)
+  if (!displayMessage.includes(upgradeUrl))
     logger.error(`Upgrade here: ${upgradeUrl}`)
 
   try {

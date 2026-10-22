@@ -4,6 +4,7 @@ import { styleText } from 'node:util'
 import { box } from '@clack/prompts'
 import { isCI } from 'ci-info'
 import { flushAnalytics, trackEvent } from '../analytics/track'
+import { isAgentInvocation } from '../shared/agent-notices'
 import { getPendingOnboardingChecks, takeSetupNotices } from './background-workers'
 import { renderGitHubNotice } from './github-notice'
 import { setupDebug } from './setup-diagnostics'
@@ -83,7 +84,7 @@ function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPa
       setupDebug('render suppressed', { reason: 'already_shown' })
       continue
     }
-    const text = formatSetupNotice(notice)
+    const text = formatSetupNotice(notice, Date.now(), isAgentInvocation())
     if (text) {
       const action = notice.kind === 'setup' ? notice.action : `View plans: ${notice.billing.plansUrl}`
       const styledText = text.split('\n').map((line, index) => {

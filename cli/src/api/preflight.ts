@@ -4,6 +4,7 @@ import { log } from '@clack/prompts'
 import { renderGitHubNotice } from '../onboarding/github-notice'
 import { shouldPrintNotice } from '../onboarding/setup-notice-policy'
 import { markTrialNoticeShown } from '../onboarding/trial-notice-state'
+import { formatAgentPlanRecommendation, isAgentInvocation } from '../shared/agent-notices'
 import { formatPlanRequiredMessage } from '../shared/direct-offer'
 import { CliUserError } from '../shared/cli-user-error'
 import { isTransientNetworkError } from '../shared/network-error'
@@ -142,7 +143,7 @@ async function throwPreflightError(client: CapgoClient, request: CliPreflightReq
       const url = await plansUrl(request.orgId)
       // Orgs created without a free trial (direct offer) get "choose a plan", not "upgrade".
       const directOffer = await isDirectOfferApp(client, request.appId)
-      log.error(formatPlanRequiredMessage(url, directOffer))
+      log.error(formatPlanRequiredMessage(url, directOffer, isAgentInvocation()))
       await openExternalUrl(url)
       const prefix = directOffer ? 'Plan required' : 'Plan upgrade required'
       throw new CliUserError(request.plan === 'upload' ? `${prefix} for upload` : prefix)
@@ -222,7 +223,14 @@ export async function runCliPreflight(
   printWarnings(data?.warnings ?? [])
   if (result.trialDaysLeft !== null && options.warnTrial !== false && shouldPrintNotice(options)) {
     const orgId = result.orgId ?? request.orgId
-    const message = `WARNING !!\nTrial expires in ${result.trialDaysLeft} days, upgrade here: ${await plansUrl(orgId)}\n`
+    const url = await plansUrl(orgId)
+    const message = isAgentInvocation()
+      ? formatAgentPlanRecommendation({
+          plansUrl: url,
+          trialState: result.trialDaysLeft < 0 ? 'expired' : 'active',
+          trialMessage: result.trialDaysLeft < 0 ? 'Their trial has ended.' : `The user’s Capgo trial expires in ${result.trialDaysLeft} days.`,
+        })
+      : `WARNING !!\nTrial expires in ${result.trialDaysLeft} days, upgrade here: ${url}\n`
     if (!renderGitHubNotice(message))
       log.warn(message)
     if (orgId)
