@@ -39,6 +39,7 @@ async function prepareProfileGoalScreenshot(page: Page, completed = false) {
       last_name: completed ? 'User' : '',
       onboarding: {
         abtests: assignments,
+        setup_mode: 'manual',
         version: 6,
         ...(completed ? { profile_completed_at: '2026-10-20T11:00:00.000Z' } : {}),
       },
@@ -73,6 +74,25 @@ async function prepareProfileResumeScreenshot(page: Page) {
   await saved
   await page.reload()
   await page.locator('[data-test="onboarding-name-step"]').or(page.locator('[data-test="onboarding-resume-continue"]')).waitFor()
+}
+
+async function prepareAiOnboardingScreenshot(page: Page, setupMode: 'ai' | null) {
+  await page.route('**/rest/v1/users?*', async (route) => {
+    if (route.request().method() !== 'GET')
+      return route.fulfill({ json: [] })
+    const response = await route.fetch()
+    const json = await response.json()
+    const onboarding = { profile_completed_at: '2026-10-20T10:00:00.000Z', ...(setupMode ? { setup_mode: setupMode } : {}) }
+    const profile = (row: any) => ({ ...row, first_name: 'Example', last_name: 'User', onboarding })
+    await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
+  })
+  await page.reload()
+  // The base commit has no setup choice yet; only the head capture can wait for it.
+  if (process.env.VISUAL_DIFF_PHASE !== 'after')
+    return
+  await page.locator(setupMode ? '[data-test="onboarding-ai-plan"]' : '[data-test="onboarding-setup-mode"]').waitFor()
+  if (setupMode)
+    await page.locator('[data-test="onboarding-ai-plan-option"]').nth(1).click()
 }
 
 const nativeObserveDays = ['2026-09-24', '2026-09-25', '2026-09-26', '2026-09-27', '2026-09-28', '2026-09-29', '2026-09-30']
@@ -412,6 +432,30 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     },
   },
   {
+    slug: 'onboarding-setup-mode',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: page => prepareAiOnboardingScreenshot(page, null),
+  },
+  {
+    slug: 'onboarding-ai-plan',
+    path: '/onboarding/app',
+    auth: true,
+    prepare: page => prepareAiOnboardingScreenshot(page, 'ai'),
+  },
+  {
+    slug: 'onboarding-ai-prompt',
+    path: '/onboarding/ai',
+    auth: true,
+    prepare: async (page) => {
+      // Show the waiting state: the seeded org already owns apps.
+      await page.route('**/rest/v1/apps?select=app_id%2Cname*', route => route.fulfill({ json: [] }))
+      await page.reload()
+      if (process.env.VISUAL_DIFF_PHASE === 'after')
+        await page.locator('[data-test="onboarding-ai-waiting"]').waitFor()
+    },
+  },
+  {
     slug: 'onboarding-profile-intent',
     path: '/onboarding/app',
     auth: true,
@@ -453,7 +497,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
           return route.fulfill({ json: [] })
         const response = await route.fetch()
         const json = await response.json()
-        const profile = (row: any) => ({ ...row, first_name: 'Example', last_name: 'User', onboarding: { profile_completed_at: '2026-10-20T10:00:00.000Z' } })
+        const profile = (row: any) => ({ ...row, first_name: 'Example', last_name: 'User', onboarding: { profile_completed_at: '2026-10-20T10:00:00.000Z', setup_mode: 'manual' } })
         await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
       })
       await page.reload()

@@ -176,6 +176,12 @@ async function returnFromOrganizationToAppName(page: Page) {
 
 test.describe('Registration', () => {
   test.beforeEach(async ({ page }) => {
+    // These tests cover the manual wizard. New users first choose AI or manual setup;
+    // the AI path has its own spec (ai-onboarding.spec.ts).
+    await page.addLocatorHandler(page.locator('[data-test="onboarding-setup-mode"]'), async () => {
+      await page.locator('[data-test="onboarding-setup-mode-manual"]').click()
+      await expect(page.locator('[data-test="onboarding-setup-mode"]')).toHaveCount(0)
+    })
     await page.goto('/register/')
   })
 

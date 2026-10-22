@@ -127,6 +127,7 @@ declare module 'vue' {
     OnboardingPublishIntentIcon: typeof import('./components/dashboard/OnboardingPublishIntentIcon.vue')['default']
     OnboardingPublishIntentIconMobileApp: typeof import('./components/dashboard/OnboardingPublishIntentIconMobileApp.vue')['default']
     OnboardingPublishIntentIconWebPage: typeof import('./components/dashboard/OnboardingPublishIntentIconWebPage.vue')['default']
+    OnboardingSetupModeChoice: typeof import('./components/dashboard/OnboardingSetupModeChoice.vue')['default']
     OnboardingSupportUsernames: typeof import('./components/dashboard/OnboardingSupportUsernames.vue')['default']
     OnboardingToolPattern: typeof import('./components/dashboard/OnboardingToolPattern.vue')['default']
     OrganizationOnboardingInvite: typeof import('./components/dashboard/OrganizationOnboardingInvite.vue')['default']
