@@ -7,11 +7,10 @@ const CACHE_TTL_SECONDS = 5 * 60
 const PENDING_TRANSLATION_STORE_TTL_SECONDS = 60 * 60
 const READY_TRANSLATION_STORE_TTL_SECONDS = 7 * 24 * 60 * 60
 // Picked from a French benchmark against Workers AI models (see the PR introducing it):
-// Gemma 4 drafts with thinking disabled, then gpt-oss-120b reviews against the style
-// guide. Both stay on the default 300 requests/minute tier; paid-plan models such as
-// DeepSeek V4 are capped at 20, too low for re-translating 14 locales at once.
+// Gemma 4 drafts with thinking disabled, then DeepSeek V4.1 Flash reviews against the
+// style guide with its reasoning on.
 const DEFAULT_TRANSLATION_MODEL = '@cf/google/gemma-4-26b-a4b-it'
-const DEFAULT_TRANSLATION_REVIEW_MODEL = '@cf/openai/gpt-oss-120b'
+const DEFAULT_TRANSLATION_REVIEW_MODEL = '@cf/deepseek-ai/deepseek-v4.1-flash-1017'
 // Bump when the prompt, style guides or default models change so every locale is
 // translated again instead of serving catalogs made by the previous pipeline.
 const TRANSLATION_PIPELINE_VERSION = 2

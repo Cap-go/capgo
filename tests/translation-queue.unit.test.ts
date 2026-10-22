@@ -201,8 +201,8 @@ describe('translation queue helpers', () => {
       .toEqual({ channel: 'Canal', save: 'Enregistrer' })
   })
 
-  it.concurrent('reviews with gpt-oss by default and lets env override or disable it', () => {
-    expect(__translationWorkerTestUtils__.getTranslationReviewModel({})).toBe('@cf/openai/gpt-oss-120b')
+  it.concurrent('reviews with DeepSeek V4.1 Flash by default and lets env override or disable it', () => {
+    expect(__translationWorkerTestUtils__.getTranslationReviewModel({})).toBe('@cf/deepseek-ai/deepseek-v4.1-flash-1017')
     expect(__translationWorkerTestUtils__.getTranslationReviewModel({ TRANSLATION_REVIEW_MODEL: '@cf/custom/model' })).toBe('@cf/custom/model')
     expect(__translationWorkerTestUtils__.getTranslationReviewModel({ TRANSLATION_REVIEW_MODEL: 'none' })).toBeNull()
   })
