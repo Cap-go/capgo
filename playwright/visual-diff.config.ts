@@ -276,6 +276,20 @@ function visualTrialPlanOptions() {
 }
 
 export const visualDiffRoutes: VisualDiffRoute[] = [
+  {
+    slug: 'builds-empty',
+    path: '/app/com.demo.app/builds',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/rest/v1/build_requests?*', route => route.fulfill({ json: [], headers: { 'content-range': '*/0' } }))
+      await page.route('**/app/com.demo.app/onboarding/builder', route => route.fulfill({ json: { canEnable: true } }))
+      await page.reload()
+      if (process.env.VISUAL_DIFF_PHASE === 'before')
+        await page.getByRole('heading', { name: 'Start a native build', exact: true }).waitFor({ state: 'visible' })
+      else
+        await page.locator('[data-test="builder-introduction"]').waitFor({ state: 'visible' })
+    },
+  },
   ...[
     { slug: 'onboarding-dual-goals', progress: null },
     { slug: 'onboarding-dual-live-updates', progress: 'ota' },

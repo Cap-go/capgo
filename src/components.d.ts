@@ -43,6 +43,7 @@ declare module 'vue' {
     BillingRegionChoice: typeof import('./components/dashboard/BillingRegionChoice.vue')['default']
     BlurBg: typeof import('./components/BlurBg.vue')['default']
     BuildChartControls: typeof import('./components/dashboard/BuildChartControls.vue')['default']
+    BuilderIntroduction: typeof import('./components/dashboard/BuilderIntroduction.vue')['default']
     BuilderPresentationModal: typeof import('./components/dashboard/BuilderPresentationModal.vue')['default']
     BuilderPromoBanner: typeof import('./components/dashboard/BuilderPromoBanner.vue')['default']
     BuildStatsCard: typeof import('./components/dashboard/BuildStatsCard.vue')['default']
