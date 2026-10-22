@@ -119,7 +119,6 @@ import { flushQueuedPluginNotifications } from '../../supabase/functions/_backen
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
 import { processApiQueueBatch } from './queue.ts'
 import { app as send_email } from './triggers/send_email.ts'
-import { stripPublicApiVersion } from './version.ts'
 
 function getExecutionContext(c: Context): Context['executionCtx'] | undefined {
   try {
@@ -287,7 +286,7 @@ createAllCatch(appTriggers, functionNameTriggers)
 createAllCatch(appScheduled, functionNameScheduled)
 
 export default {
-  fetch: (request: Request, env?: Bindings, ctx?: ExecutionContext) => app.fetch(stripPublicApiVersion(request), env, ctx),
+  fetch: app.fetch,
   queue: processApiQueueBatch,
   scheduled(_controller: ScheduledController, env: Bindings, ctx: ExecutionContext) {
     ctx.waitUntil(runScheduledPluginNotificationFlush(env, ctx))
