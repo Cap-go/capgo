@@ -484,10 +484,11 @@ await tAsync('init package runner and inherited commands preserve arguments thro
   const script = join(bin, 'echo-args.cjs')
   writeFileSync(script, 'process.stdout.write(JSON.stringify(process.argv.slice(2)))')
   const windows = process.platform === 'win32'
-  const command = join(bin, `pnpm${windows ? '.cmd' : ''}`)
-  writeFileSync(command, windows
-    ? `@"${process.execPath}" "%~dp0echo-args.cjs" %*\r\n`
-    : `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`, { mode: 0o755 })
+  for (const name of ['pnpm', 'yarn', 'npx']) {
+    writeFileSync(join(bin, `${name}${windows ? '.cmd' : ''}`), windows
+      ? `@"${process.execPath}" "%~dp0echo-args.cjs" %*\r\n`
+      : `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`, { mode: 0o755 })
+  }
   const args = ['cap', 'init', 'Example & Co (desktop)', 'com.example.app', '--web-dir', 'web assets']
   const pathKey = Object.keys(process.env).find(key => key.toUpperCase() === 'PATH') ?? 'PATH'
   const originalPath = process.env[pathKey]
@@ -495,14 +496,18 @@ await tAsync('init package runner and inherited commands preserve arguments thro
   let output = ''
   try {
     process.env[pathKey] = `${bin}${delimiter}${originalPath ?? ''}`
-    const syncResult = runPackageRunnerSync('pnpm exec', args, { cwd: root, env: { ...process.env }, encoding: 'utf8' })
-    assert.equal(syncResult.status, 0, `${syncResult.stdout}\n${syncResult.stderr}`)
-    assert.deepEqual(JSON.parse(syncResult.stdout.toString()), ['exec', ...args])
+    for (const [runner, prefix] of [['pnpm exec', ['exec']], ['yarn dlx', ['dlx']], ['npx', []]]) {
+      for (const commandArgs of [args, args.slice(0, 4), ['skills', 'add', 'https://github.com/Cap-go/capgo-skills', '-g', '-y']]) {
+        const syncResult = runPackageRunnerSync(runner, commandArgs, { cwd: root, env: { ...process.env }, encoding: 'utf8' })
+        assert.equal(syncResult.status, 0, `${runner}: ${syncResult.stdout}\n${syncResult.stderr}`)
+        assert.deepEqual(JSON.parse(syncResult.stdout.toString()), [...prefix, ...commandArgs])
+      }
+    }
     process.stdout.write = (chunk) => {
       output += chunk.toString()
       return true
     }
-    const asyncResult = await runInheritedCommand(command, args, { cwd: root })
+    const asyncResult = await runInheritedCommand(join(bin, `pnpm${windows ? '.cmd' : ''}`), args, { cwd: root })
     assert.equal(asyncResult.status, 0, asyncResult.error?.message)
     assert.deepEqual(JSON.parse(output), args)
   }

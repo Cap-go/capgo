@@ -1164,7 +1164,7 @@ async function maybeRunCapacitorInit(projectDir: string, projectType: string, in
     }
 
     spinner.message(`Running: ${pm.runner} cap init "${appName}" "${capacitorAppId}" --web-dir ${webDir}`)
-    const initResult = spawnSync(pm.runner, ['cap', 'init', appName, capacitorAppId, '--web-dir', webDir], { stdio: 'pipe', cwd: projectDir })
+    const initResult = runPackageRunnerSync(pm.runner, ['cap', 'init', appName, capacitorAppId, '--web-dir', webDir], { stdio: 'pipe', cwd: projectDir })
     if (initResult.error)
       throw initResult.error
     if (initResult.status !== 0) {
@@ -2130,7 +2130,7 @@ async function ensureCapacitorProjectReady(
       const spinner = pSpinner()
       spinner.start(`Running: ${pm.runner} cap init "${appName}" "${appId}"`)
       try {
-        const initResult = spawnSync(pm.runner, ['cap', 'init', appName, appId], { stdio: 'pipe' as const })
+        const initResult = runPackageRunnerSync(pm.runner, ['cap', 'init', appName, appId], { stdio: 'pipe' as const })
         if (initResult.error)
           throw initResult.error
         if (initResult.status !== 0) {
@@ -5233,7 +5233,7 @@ async function maybeInstallCapgoSkills() {
   spinner.start(`Running: ${installCommand}`)
 
   try {
-    const result = spawnSync(pm.runner, ['skills', 'add', capgoSkillsRepository, '-g', '-y'], {
+    const result = runPackageRunnerSync(pm.runner, ['skills', 'add', capgoSkillsRepository, '-g', '-y'], {
       stdio: 'pipe',
       encoding: 'utf8',
     })
@@ -5245,7 +5245,7 @@ async function maybeInstallCapgoSkills() {
 
     spinner.stop('Capgo skills install failed ❌')
     const commandError = [result.stderr, result.stdout]
-      .find(value => typeof value === 'string' && value.trim().length > 0)
+      .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
       ?.trim()
     pLog.warn(`Could not install Capgo skills automatically: ${commandError || 'Unknown error'}`)
     pLog.info(`Run it yourself with: "${installCommand}"`)
