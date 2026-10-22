@@ -184,7 +184,7 @@ describe('bundle upload plan check', () => {
       org = orgs.activeTrial
       const { output, error } = await run(() => checkPlanValidUpload(client, orgId, appId, true))
       assert.equal(error, undefined)
-      assert.ok(output.includes('Trial expires in 5 days, upgrade here:'), output)
+      assert.equal(output.split('Trial expires in 5 days, upgrade here:').length - 1, 1, output)
       assert.equal(output.includes('::notice::'), github === 'true')
       assert.equal(fs.readFileSync(summaryPath, 'utf8').includes('Trial expires in 5 days'), github === 'true')
       assert.deepEqual(calls.map(call => call.path), ['preflight'])
