@@ -364,10 +364,6 @@ async function buildPlanCheckoutStartedTrackedBentoEvent(
   if (!onboardingOrgId || trackedBody.event !== PLAN_CHECKOUT_STARTED_EVENT)
     return undefined
 
-  if (!(await checkPermission(c, 'org.update_billing', { orgId: onboardingOrgId }))) {
-    throw quickError(403, 'no_permission', 'You cannot send checkout events for this organization')
-  }
-
   const { data: orgData, error: orgError } = await supabase
     .from('orgs')
     .select('id, name')
@@ -655,6 +651,12 @@ app.post('/', middlewareAuth(), async (c) => {
     accepted_at: identity.accepted_at,
     timestamp: Date.parse(identity.occurred_at),
   })
+
+  if (trackedBody.event === PLAN_CHECKOUT_STARTED_EVENT && verifiedOrgId) {
+    if (!(await checkPermission(c, 'org.update_billing', { orgId: verifiedOrgId }))) {
+      throw quickError(403, 'no_permission', 'You cannot send checkout events for this organization')
+    }
+  }
 
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
   if (notifyConsole) {

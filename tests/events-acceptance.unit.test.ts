@@ -236,6 +236,7 @@ describe('/private/events durable acceptance', () => {
   it('rejects Checkout Started when the caller cannot update billing', async () => {
     checkPermission.mockImplementation(async (_c, permission) => permission !== 'org.update_billing')
     expect((await request({ event: 'Checkout Started', org_id: 'org-a' })).status).toBe(403)
+    expect(queueSend).not.toHaveBeenCalled()
     expect(sendTracking).not.toHaveBeenCalled()
   })
 })
