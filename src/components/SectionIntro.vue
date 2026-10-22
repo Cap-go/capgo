@@ -11,6 +11,7 @@ type Section = 'apps' | 'bundles' | 'channels' | 'devices' | 'builds' | 'apikeys
 
 const props = defineProps<{
   section: Section
+  hideExplanation?: boolean
 }>()
 
 const { t } = useI18n()
@@ -71,7 +72,7 @@ function dismiss() {
         {{ t(config.title) }}
       </h1>
       <button
-        v-if="!open"
+        v-if="!hideExplanation && !open"
         type="button"
         class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full ring-1 ring-slate-300 text-slate-600 hover:bg-white hover:text-slate-900 dark:ring-white/15 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500"
         :aria-expanded="false"
@@ -90,7 +91,7 @@ function dismiss() {
 
     <!-- Dismissible callout: the close button is the standard corner "×". -->
     <div
-      v-if="open"
+      v-if="!hideExplanation && open"
       :id="`section-intro-${section}`"
       class="relative flex flex-col gap-4 p-4 pr-12 rounded-xl bg-white ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10 lg:flex-row lg:items-center lg:justify-between"
       :class="{ 'lg:mt-3': showHeading }"

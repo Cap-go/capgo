@@ -69,6 +69,7 @@ declare module 'vue' {
     ChannelDefaultRoutingMockup: typeof import('./components/dashboard/ChannelDefaultRoutingMockup.vue')['default']
     ChannelDefaultRoutingOnboarding: typeof import('./components/dashboard/ChannelDefaultRoutingOnboarding.vue')['default']
     ChannelHistoryTable: typeof import('./components/tables/ChannelHistoryTable.vue')['default']
+    ChannelIntroduction: typeof import('./components/dashboard/ChannelIntroduction.vue')['default']
     ChannelOverrideRetentionNotice: typeof import('./components/ChannelOverrideRetentionNotice.vue')['default']
     ChannelPermissionOverridesPanel: typeof import('./components/permissions/ChannelPermissionOverridesPanel.vue')['default']
     ChannelSelfAssignMockup: typeof import('./components/dashboard/ChannelSelfAssignMockup.vue')['default']

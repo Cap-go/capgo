@@ -6,6 +6,7 @@ import AppOnboardingBuilderChecklist from '../../src/components/dashboard/AppOnb
 import AppOnboardingCliSteps from '../../src/components/dashboard/AppOnboardingCliSteps.vue'
 import AppOnboardingFlow from '../../src/components/dashboard/AppOnboardingFlow.vue'
 import AppOnboardingSetupChecklist from '../../src/components/dashboard/AppOnboardingSetupChecklist.vue'
+import ChannelIntroduction from '../../src/components/dashboard/ChannelIntroduction.vue'
 import GettingStartedNav from '../../src/components/dashboard/GettingStartedNav.vue'
 import OnboardingExploreBanner from '../../src/components/dashboard/OnboardingExploreBanner.vue'
 import OnboardingExploreReminder from '../../src/components/dashboard/OnboardingExploreReminder.vue'
@@ -265,7 +266,12 @@ const app = createApp(defineComponent({
       h('div', { class: 'mx-auto max-w-6xl' }, [
         navigationView
           ? h(RouterView)
-          : params.get('view') === 'flow'
+          : params.get('view') === 'channel-introduction'
+            ? h(ChannelIntroduction, {
+                canCreate: params.get('readOnly') !== '1',
+                onCreate: () => events.push('channel-create-requested'),
+              })
+            : params.get('view') === 'flow'
             ? h(AppOnboardingFlow, { onboarding: true, setupAppId: params.get('resume') ?? undefined })
             : builderComponentView
               ? h(AppOnboardingBuilderChecklist, {

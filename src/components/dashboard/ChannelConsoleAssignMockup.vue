@@ -472,7 +472,7 @@ const { continueOnboarding, goBack, replay } = useOnboardingChannelAnimation({
       <IconMousePointer class="csa-console-cursor pointer-events-none absolute z-50 h-5 w-5 fill-slate-950 text-white drop-shadow-[0_2px_2px_rgba(15,23,42,0.35)]" />
     </section>
 
-    <footer v-if="embedded" class="flex items-center justify-between border-t border-slate-200 bg-white px-5 py-3 sm:px-6 dark:border-white/10 dark:bg-slate-950">
+    <footer v-if="embedded" class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-5 py-3 sm:px-6 dark:border-white/10 dark:bg-slate-950">
       <button
         type="button"
         class="d-btn d-btn-ghost d-btn-square h-10 min-h-10 w-10 shrink-0"
@@ -483,9 +483,12 @@ const { continueOnboarding, goBack, replay } = useOnboardingChannelAnimation({
       >
         <IconArrowLeft class="h-4 w-4" aria-hidden="true" />
       </button>
-      <button type="button" class="d-btn d-btn-primary h-12 min-h-12 shrink-0 px-5" data-test="channel-console-assign-continue" @click="continueOnboarding">
-        {{ t('continue') }}
-      </button>
+      <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
+        <slot name="secondary-action" />
+        <button type="button" class="d-btn d-btn-primary h-12 min-h-12 shrink-0 px-5" data-test="channel-console-assign-continue" @click="continueOnboarding">
+          {{ t('continue') }}
+        </button>
+      </div>
     </footer>
   </main>
 </template>
