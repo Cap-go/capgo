@@ -5,6 +5,12 @@ import { cloudlog } from './logging.ts'
 
 export const CAPGO_API_VERSION_HEADER = 'capgo_api' as const
 export const CAPGO_API_DEFAULT_VERSION = '2025-10-01' as const
+/**
+ * Opt-in: DELETE /bundle answers a missing bundle with 404 bundle_not_found and a linked one
+ * with 409 bundle_linked (bundle id + channel names). Callers on the default version keep the
+ * 400 cannot_delete_version / cannot_delete_linked_version contract.
+ */
+export const CAPGO_API_2026_10_22 = '2026-10-22' as const
 
 type VersionParts = [number, number, number]
 

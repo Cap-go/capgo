@@ -15,6 +15,7 @@ const props = defineProps<{
   appId: string
   userId?: string | null
   initialOnboarding: unknown
+  initialPath?: ChecklistPath
   hiding: boolean
   leaving: boolean
 }>()
@@ -32,13 +33,17 @@ const snapshot = ref(props.initialOnboarding)
 const observedChannel = ref<boolean | null>(null)
 const otaComplete = computed(() => isDualOtaChecklistComplete(snapshot.value, observedChannel.value ?? undefined))
 const resume = computed(() => resolveDualChecklistResume(snapshot.value, preference.value))
-const activePath = ref<ChecklistPath | null>(resume.value.path)
+const activePath = ref<ChecklistPath | null>(props.initialPath ?? resume.value.path)
 const platform = ref<BuilderPlatform | null>(resume.value.platform)
 const visited = ref({ ota: activePath.value === 'ota', builder: activePath.value === 'builder' })
 const paths = ['ota', 'builder'] as const
 const label = (path: ChecklistPath) => t(path === 'ota' ? 'setup-goal-live-updates' : 'setup-goal-builder')
 
 watch(() => props.initialOnboarding, value => snapshot.value = value)
+watch(() => props.initialPath, (path) => {
+  if (path)
+    selectPath(path)
+})
 watch(() => props.userId, (userId) => {
   if (!userId)
     return
@@ -47,19 +52,20 @@ watch(() => props.userId, (userId) => {
   preferenceUserId.value = userId
   if (!hasInteracted.value || changedUser) {
     const next = resolveDualChecklistResume(snapshot.value, saved)
+    const path = !changedUser && !hasInteracted.value ? props.initialPath ?? next.path : next.path
     preference.value = {
       ...saved,
-      ...(next.path ? { path: next.path } : {}),
+      ...(path ? { path } : {}),
       ...(next.platform ? { platform: next.platform } : {}),
     }
-    activePath.value = next.path
+    activePath.value = path
     platform.value = next.platform
     if (changedUser) {
       hasInteracted.value = false
       visited.value = { ota: next.path === 'ota', builder: next.path === 'builder' }
     }
-    else if (next.path) {
-      visited.value[next.path] = true
+    else if (path) {
+      visited.value[path] = true
     }
   }
   else {

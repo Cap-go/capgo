@@ -1,7 +1,7 @@
 import type { OnboardingScanProject } from './notify-app-ready-project'
 import { parentPort } from 'node:worker_threads'
 import { buildCliRequestHeaders, setCurrentCliCommand } from '../analytics/cli-headers'
-import { sendEvent, trimTrailingSlashes } from '../utils'
+import { trimTrailingSlashes } from '../utils'
 import { setupDebug, setupError } from './setup-diagnostics'
 
 interface BackgroundOnboardingCheck {
@@ -22,30 +22,22 @@ export interface PreparedOnboardingCheck {
 export async function runOnboardingCheck(prepared: PreparedOnboardingCheck, check: BackgroundOnboardingCheck): Promise<void> {
   const { project, apiHost, apikey, command, attemptId } = prepared
   setCurrentCliCommand(command)
-  const trackScan = async (event: 'scan_started' | 'scan_ended', timestamp: number, tags: Record<string, string | number> = {}) => {
-    const started = Date.now()
-    setupDebug('scan telemetry started', { scan: check.step, event, budget_ms: 500 })
-    try {
-      await sendEvent(apikey, {
+  const trackScan = (event: 'scan_started' | 'scan_ended', timestamp: number, tags: Record<string, string | number> = {}) => {
+    parentPort?.postMessage({
+      type: 'onboarding-analytics',
+      payload: {
         channel: check.channel,
         event,
         tracking_version: 2,
         timestamp: new Date(timestamp),
         tags: { app_id: project.appId },
         nonPersonTags: { attempt_id: attemptId, command_path: command, ...tags },
-      }, false, AbortSignal.timeout(2_000), apiHost, 'error')
-    }
-    catch (error) {
-      setupDebug('scan telemetry failed', { scan: check.step, error: setupError(error) })
-      // Scan telemetry must never prevent onboarding detection or todo reporting.
-    }
-    finally {
-      setupDebug('scan telemetry finished', { scan: check.step, event, duration_ms: Date.now() - started })
-    }
+      },
+    })
   }
 
-  await trackScan('scan_started', Date.now())
   const scanStartedAt = Date.now()
+  trackScan('scan_started', scanStartedAt)
   let scanEndedAt = scanStartedAt
   let result: 'found' | 'not_found' | 'unknown' | 'error' = 'error'
   let todoReportStatus = 'not_attempted'
@@ -86,7 +78,7 @@ export async function runOnboardingCheck(prepared: PreparedOnboardingCheck, chec
   finally {
     if (result === 'error')
       scanEndedAt = Date.now()
-    await trackScan('scan_ended', scanEndedAt, {
+    trackScan('scan_ended', scanEndedAt, {
       result,
       duration_ms: scanEndedAt - scanStartedAt,
       todo_report_status: todoReportStatus,

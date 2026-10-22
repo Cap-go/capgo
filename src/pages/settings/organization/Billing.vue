@@ -12,6 +12,7 @@ import IconShieldCheck from '~icons/heroicons/shield-check'
 import CancelPlanModal from '~/components/billing/CancelPlanModal.vue'
 import CardFormModal from '~/components/billing/CardFormModal.vue'
 import TrialPlanOfferModal from '~/components/billing/TrialPlanOfferModal.vue'
+import TrialPlanStartNowModal from '~/components/billing/TrialPlanStartNowModal.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { formatLocalDate } from '~/services/date'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
@@ -36,6 +37,7 @@ const isRemovingBackup = ref(false)
 const isUpdatingTrialPlan = ref(false)
 // Org the post-card trial plan offer is for (pinned in case the user switches org).
 const trialPlanOfferOrgId = ref<string | null>(null)
+const showStartNowModal = ref(false)
 // Start the trial plan once the card form saves a card.
 let scheduleAfterCardSave = false
 const showCardModal = ref<'setup' | 'backup' | 'invoice' | null>(null)
@@ -58,6 +60,9 @@ const trialPlan = computed(() => {
 })
 const trialPlanPrice = computed(() => trialPlan.value ? formatStripeAmount(trialPlan.value.amount, trialPlan.value.currency) : '')
 const trialPlanDate = computed(() => trialPlan.value ? formatLocalDate(trialPlan.value.startsAt) : '')
+// Start now charges the saved card immediately, so it needs a card and no subscription yet.
+const canStartTrialPlanNow = computed(() => !!trialPlan.value && !!card.value && !subscription.value)
+const trialDaysLeft = computed(() => currentOrganization.value?.trial_left ?? 0)
 const openInvoiceAmount = computed(() => openInvoice.value ? formatStripeAmount(openInvoice.value.amountDue, openInvoice.value.currency) : '')
 
 const subscriptionLine = computed(() => {
@@ -265,6 +270,17 @@ async function stopTrialPlan() {
   }
 }
 
+async function openStartNow() {
+  if (!await requireUpdateBilling() || isUpdatingTrialPlan.value)
+    return
+  showStartNowModal.value = true
+}
+
+async function onTrialPlanStartedNow() {
+  showStartNowModal.value = false
+  await Promise.all([loadOverview(), refreshOrganization()])
+}
+
 async function onTrialPlanOfferScheduled() {
   const id = trialPlanOfferOrgId.value
   trialPlanOfferOrgId.value = null
@@ -306,6 +322,7 @@ async function onCanceled(sub: BillingSubscription | null) {
 watch(orgId, () => {
   permissionModal.value = null
   trialPlanOfferOrgId.value = null
+  showStartNowModal.value = false
   void loadOverview()
 })
 
@@ -389,6 +406,17 @@ onMounted(async () => {
               >
                 <span v-if="isUpdatingTrialPlan" class="d-loading d-loading-spinner d-loading-xs" />
                 {{ t('trial-plan-start', { plan: trialPlan.planName }) }}
+              </button>
+              <button
+                v-if="canStartTrialPlanNow"
+                type="button"
+                class="d-btn d-btn-sm"
+                :class="trialPlan?.scheduled ? 'd-btn-primary' : 'd-btn-outline'"
+                :disabled="isUpdatingTrialPlan"
+                data-test="billing-trial-plan-start-now"
+                @click="openStartNow"
+              >
+                {{ t('trial-plan-start-now') }}
               </button>
               <router-link
                 to="/settings/organization/plans"
@@ -554,6 +582,17 @@ onMounted(async () => {
       source="billing"
       @close="trialPlanOfferOrgId = null"
       @scheduled="onTrialPlanOfferScheduled"
+    />
+    <TrialPlanStartNowModal
+      v-if="showStartNowModal && trialPlan && card"
+      :org-id="orgId"
+      :plan="trialPlan"
+      :card="card"
+      :trial-days-left="trialDaysLeft"
+      source="billing"
+      @close="showStartNowModal = false"
+      @started="onTrialPlanStartedNow"
+      @stale="onTrialPlanStartedNow"
     />
     <CancelPlanModal
       v-if="showCancelModal"

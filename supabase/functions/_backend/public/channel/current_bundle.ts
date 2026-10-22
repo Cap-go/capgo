@@ -15,6 +15,8 @@ type ChannelVersionRow = {
   id: number
   name: string
   min_update_version: string | null
+  checksum: string | null
+  deleted: boolean
   native_packages: Database['public']['Tables']['app_versions']['Row']['native_packages']
 }
 
@@ -56,7 +58,7 @@ export async function getCurrentBundle(
   if (channelRow.version !== null && channelRow.version !== undefined) {
     const { data: versionRow, error: versionError } = await supabaseAdmin(c)
       .from('app_versions')
-      .select('id, name, min_update_version, native_packages')
+      .select('id, name, min_update_version, checksum, deleted, native_packages')
       .eq('app_id', body.app_id)
       .eq('id', channelRow.version)
       .maybeSingle()
@@ -70,6 +72,8 @@ export async function getCurrentBundle(
     bundle_name: version?.name ?? null,
     bundle_id: version?.id ?? null,
     min_update_version: version?.min_update_version ?? null,
+    // Lets `bundle upload` compare checksums without a second bundle lookup per channel.
+    checksum: version && !version.deleted ? version.checksum : null,
     native_packages: version?.native_packages ?? [],
     disable_auto_update: channelRow.disable_auto_update,
   })

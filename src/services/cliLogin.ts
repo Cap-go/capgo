@@ -171,6 +171,11 @@ export function isMcpAuthorizePath(path: string): boolean {
   return path.replace(/\/+$/, '') === '/oauth/authorize'
 }
 
+/** auth.md agent claim page: also agent-initiated, so it must not detour into onboarding either. */
+export function isAgentClaimPath(path: string): boolean {
+  return path.replace(/\/+$/, '') === '/agent/claim'
+}
+
 export function isMatchingCliLoginEvent(
   payload: { event?: string, channel?: string, description?: string },
   session: string,
