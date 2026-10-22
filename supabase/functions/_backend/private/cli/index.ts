@@ -478,9 +478,11 @@ app.get('/manifest', middlewareKey(), versionedRoute<CliContext>({
         .range(from, from + MANIFEST_PAGE_SIZE - 1), 'cannot_get_manifest', 'Cannot get manifest') ?? []
       rows.push(...data)
       if (data.length < MANIFEST_PAGE_SIZE)
-        break
+        return c.json(rows)
     }
 
-    return c.json(rows)
+    // Every page came back full: more rows than any valid bundle can hold. Fail loudly
+    // rather than return a silently truncated manifest.
+    return quickError(500, 'manifest_too_large', 'Manifest exceeds the maximum number of entries', { app_version_id: appVersionId, max: MAX_MANIFEST_ENTRIES })
   },
 }))

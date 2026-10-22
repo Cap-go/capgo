@@ -207,7 +207,8 @@ export async function check2FAComplianceForApp(
 /**
  * Fail unless the app exists for this key and the key holds `requiredPermissionKey`
  * (2FA policy included unless `skip2FACheck`). One backend preflight call; its result
- * carries the app's org id and the key's user id (null when Capgo was unreachable).
+ * carries the app's org id and the key's user id. The result is null only when Capgo was
+ * unreachable and the check is non-blocking; with `skip2FACheck` a network failure throws.
  */
 export async function checkAppExistsAndHasPermissionOrgErr(
   client: CapgoClient,

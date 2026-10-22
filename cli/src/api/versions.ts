@@ -148,8 +148,10 @@ async function fetchBundlePages(appid: string, options: CapgoHttpOptions & Pick<
       await throwBundleHttpInvokeError(appid, error, 'list', !!options.silent, 'app.read_bundles')
     const batch = Array.isArray(data) ? data : []
     all.push(...batch)
-    // A backend without `limit` support answers fixed 50-row pages: a full one may not be the last.
-    if (batch.length < BUNDLE_LIST_LIMIT && batch.length !== LEGACY_BUNDLE_PAGE_SIZE)
+    // A backend without `limit`/`fields` support answers fixed 50-row pages of full rows (they
+    // carry `native_packages`): only then can a 50-row page be followed by more.
+    const legacyFullPage = batch.length === LEGACY_BUNDLE_PAGE_SIZE && 'native_packages' in batch[0]
+    if (batch.length < BUNDLE_LIST_LIMIT && !legacyFullPage)
       break
     page += 1
   }
