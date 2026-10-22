@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
   inserts: [] as any[],
   delayedApp: '',
   delayedResponse: null as Promise<unknown> | null,
+  permissionChecks: [] as Array<{ permission: string, scope: { appId?: string, channelId?: number } }>,
 }))
 
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
@@ -38,7 +39,10 @@ vi.mock('~/stores/organization', async () => {
   return { useOrganizationStore: defineStore('channel-test-org', () => ({ currentOrganization: ref({ gid: 'preview-org' }) })) }
 })
 vi.mock('~/services/permissions', () => ({
-  checkPermissions: async (permission: string) => permission === 'app.create_channel' ? state.canCreate : true,
+  checkPermissions: async (permission: string, scope: { appId?: string, channelId?: number }) => {
+    state.permissionChecks.push({ permission, scope })
+    return permission === 'app.create_channel' ? state.canCreate : true
+  },
 }))
 vi.mock('~/components/dashboard/ChannelIntroduction.vue', async () => {
   const { defineComponent, h } = await import('vue')
@@ -125,6 +129,7 @@ beforeEach(() => {
   state.canCreate = true
   state.delayedApp = ''
   state.delayedResponse = null
+  state.permissionChecks = []
 })
 afterEach(() => {
   app?.unmount()
@@ -144,6 +149,15 @@ describe('Channels page empty state', () => {
     await mountTable()
     expect(container.querySelector('[data-test="channel-introduction"]')).toBeNull()
     expect(container.textContent).toContain('production')
+  })
+
+  it('checks delete access with both the requested app and each returned channel', async () => {
+    state.rows = [{ id: 17, name: 'production' }, { id: 23, name: 'beta' }]
+    await mountTable()
+    expect(state.permissionChecks.filter(check => check.permission === 'channel.delete')).toEqual([
+      { permission: 'channel.delete', scope: { appId: 'com.example.channels', channelId: 17 } },
+      { permission: 'channel.delete', scope: { appId: 'com.example.channels', channelId: 23 } },
+    ])
   })
 
   it('does not mistake an empty search result for an app without channels', async () => {

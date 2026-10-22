@@ -60,7 +60,11 @@ function continueIntroduction() {
       </button>
     </header>
 
+    <!-- Keep this console surface out of onboarding experiment analytics. -->
     <component :is="animation" embedded @back="goBack" @continue="continueIntroduction">
+      <template #continue-label>
+        {{ t(canCreate ? 'continue' : 'channel-intro-replay') }}
+      </template>
       <template #secondary-action>
         <a
           href="https://capgo.app/docs/live-updates/channels/"

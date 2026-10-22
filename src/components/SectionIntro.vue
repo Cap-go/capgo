@@ -91,12 +91,12 @@ function dismiss() {
 
     <!-- Dismissible callout: the close button is the standard corner "×". -->
     <div
-      v-if="!hideExplanation && open"
+      v-if="(!hideExplanation && open) || (hideExplanation && showFlow)"
       :id="`section-intro-${section}`"
-      class="relative flex flex-col gap-4 p-4 pr-12 rounded-xl bg-white ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10 lg:flex-row lg:items-center lg:justify-between"
-      :class="{ 'lg:mt-3': showHeading }"
+      class="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"
+      :class="[hideExplanation ? 'mt-3' : 'p-4 pr-12 rounded-xl bg-white ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10', { 'lg:mt-3': showHeading }]"
     >
-      <div class="min-w-0">
+      <div v-if="!hideExplanation" class="min-w-0">
         <p class="font-mono text-[11px] font-semibold tracking-widest uppercase text-blue-700 dark:text-azure-400">
           {{ t(config.group) }}
         </p>
@@ -140,6 +140,7 @@ function dismiss() {
       </nav>
 
       <button
+        v-if="!hideExplanation"
         type="button"
         class="absolute flex items-center justify-center rounded-md top-2 right-2 size-8 text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-white/10 dark:hover:text-white transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-azure-500"
         :aria-label="t('section-intro-dismiss')"

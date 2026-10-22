@@ -433,8 +433,7 @@ const {
         </div>
       </section>
 
-      <footer v-if="props.embedded" class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-200 bg-white px-5 py-3 sm:px-6 dark:border-white/10 dark:bg-slate-950">
-        <span class="h-10 w-10 shrink-0" aria-hidden="true" />
+      <footer v-if="props.embedded" class="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 bg-white px-5 py-3 sm:px-6 dark:border-white/10 dark:bg-slate-950">
         <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
           <slot name="secondary-action" />
           <button

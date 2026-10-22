@@ -21,10 +21,12 @@ test('explains channels inline, keeps documentation beside Continue, and creates
       events: (window as any).onboardingSetupPreview.events,
       inserts: (window as any).onboardingSetupPreview.state.channelInserts,
       setupWrites: (window as any).onboardingSetupPreview.state.setupWrites,
+      onboardingEvents: (window as any).onboardingSetupPreview.channelEvents,
     }))
     expect(before.events).not.toContain('channel-create-requested')
     expect(before.inserts).toEqual([])
     expect(before.setupWrites).toEqual([])
+    expect(before.onboardingEvents).toEqual([])
     await next.click()
   }
   expect(await page.evaluate(() => (window as any).onboardingSetupPreview.events)).toContain('channel-create-requested')
@@ -38,6 +40,10 @@ test('allows skipping the explanation and hides the quick create action for read
   await page.goto(`${fixture}&readOnly=1`)
   await expect(page.locator('[data-test="channel-introduction"]')).toBeVisible()
   await expect(page.locator('[data-test="channel-intro-create"]')).toHaveCount(0)
+  await page.locator('[data-test="channel-default-routing-continue"]').click()
+  await page.locator('[data-test="channel-self-assign-continue"]').click()
+  await page.getByRole('button', { name: 'Replay introduction', exact: true }).click()
+  await expect(page.locator('[data-test="channel-default-routing-animation"]')).toBeVisible()
 })
 
 test('keeps the mobile animations within the page and supports back navigation', async ({ page }) => {

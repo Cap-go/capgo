@@ -486,7 +486,9 @@ const { continueOnboarding, goBack, replay } = useOnboardingChannelAnimation({
       <div class="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
         <slot name="secondary-action" />
         <button type="button" class="d-btn d-btn-primary h-12 min-h-12 shrink-0 px-5" data-test="channel-console-assign-continue" @click="continueOnboarding">
-          {{ t('continue') }}
+          <slot name="continue-label">
+            {{ t('continue') }}
+          </slot>
         </button>
       </div>
     </footer>
