@@ -39,6 +39,7 @@ BEGIN
 END;
 $$;
 
+ALTER FUNCTION public.assert_console_daily_window(character varying[], timestamptz, timestamptz) OWNER TO "postgres";
 REVOKE ALL ON FUNCTION public.assert_console_daily_window(character varying[], timestamptz, timestamptz) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.assert_console_daily_window(character varying[], timestamptz, timestamptz) TO authenticated, service_role;
 
@@ -71,10 +72,13 @@ BEGIN
       AND coalesce(v.external_url, '') = ''
       AND v.user_id IS NULL
     )
-  GROUP BY 1, 2;
+  GROUP BY 1, 2
+  -- Stable order so callers can page past PostgREST's max_rows.
+  ORDER BY 1, 2;
 END;
 $$;
 
+ALTER FUNCTION public.get_bundle_upload_daily_counts(character varying[], timestamptz, timestamptz) OWNER TO "postgres";
 REVOKE ALL ON FUNCTION public.get_bundle_upload_daily_counts(character varying[], timestamptz, timestamptz) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_bundle_upload_daily_counts(character varying[], timestamptz, timestamptz) TO authenticated, service_role;
 
@@ -103,9 +107,12 @@ BEGIN
   WHERE d.app_id = ANY (p_app_ids)
     AND d.deployed_at >= p_start
     AND d.deployed_at < p_end
-  GROUP BY 1, 2, 3, 4;
+  GROUP BY 1, 2, 3, 4
+  -- Stable order so callers can page past PostgREST's max_rows.
+  ORDER BY 1, 2, 4;
 END;
 $$;
 
+ALTER FUNCTION public.get_deploy_daily_counts(character varying[], timestamptz, timestamptz) OWNER TO "postgres";
 REVOKE ALL ON FUNCTION public.get_deploy_daily_counts(character varying[], timestamptz, timestamptz) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_deploy_daily_counts(character varying[], timestamptz, timestamptz) TO authenticated, service_role;

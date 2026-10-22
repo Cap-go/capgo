@@ -5,6 +5,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { computeLastDayEvolution } from '~/services/buildCharts'
 import { useConsole } from '~/services/console'
+import { readAllConsoleRows } from '~/services/consoleRows'
 import { normalizeToUtcStartOfDay } from '~/services/date'
 import {
   calculateDemoEvolution,
@@ -166,12 +167,13 @@ async function calculateStats(forceRefetch = false) {
     else {
       // Per-day upload counts for the series window (billing cycle or last 30 UTC
       // days), aggregated in the database instead of downloading every bundle.
-      const result = await useConsole()
+      const result = await readAllConsoleRows<UploadDailyCount>((from, to) => useConsole()
         .rpc('get_bundle_upload_daily_counts', {
           p_app_ids: targetAppIds,
           p_start: last30DaysStart.toISOString(),
           p_end: last30DaysEnd.toISOString(),
         })
+        .range(from, to))
       data = result.data
       error = result.error
 

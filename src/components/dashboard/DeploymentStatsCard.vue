@@ -5,6 +5,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { computeLastDayEvolution } from '~/services/buildCharts'
 import { useConsole } from '~/services/console'
+import { readAllConsoleRows } from '~/services/consoleRows'
 import { normalizeToUtcStartOfDay } from '~/services/date'
 import {
   calculateDemoEvolution,
@@ -181,12 +182,13 @@ async function calculateStats(forceRefetch = false) {
     else {
       // Per-day deploy counts per channel, aggregated in the database instead of
       // downloading every deployment of the window.
-      const result = await capgo
+      const result = await readAllConsoleRows<DeployDailyCount>((from, to) => capgo
         .rpc('get_deploy_daily_counts', {
           p_app_ids: targetAppIds,
           p_start: last30DaysStart.toISOString(),
           p_end: exclusiveEnd.toISOString(),
         })
+        .range(from, to))
 
       if (result.error)
         throw result.error
