@@ -28,8 +28,13 @@ export interface OpenAIFirstPaymentDeps {
 
 // Short waits keep the lookup plus the send inside the background-task budget.
 const DEFAULT_INVOICE_RETRY_DELAYS_MS = [500, 1_500]
-// Matches the API's 7-day limit: an older first payment can no longer be reported.
-const RECOVERY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
+// How old paid_at may be when a later webhook recovers the conversion. The
+// event is timestamped with the payment, so the API's 7-day limit does not
+// apply to paid_at; the window only keeps orgs that paid long ago (and start a
+// new subscription) from being reported. An incomplete subscription is paid or
+// expires within a day; an invoiced one has payment terms of up to ~30 days.
+const INCOMPLETE_RECOVERY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
+const INVOICE_RECOVERY_WINDOW_MS = 60 * 24 * 60 * 60 * 1000
 
 /**
  * Payment proof from the subscription's latest invoice. Only a `paid` invoice
@@ -59,13 +64,13 @@ export function isIncompleteSubscriptionActivation(stripeEvent: Stripe.Event | n
  * payment, so paid_at was set while the invoice was still open.
  */
 export function isFirstSubscriptionInvoicePaid(stripeEvent: Stripe.Event | null | undefined): boolean {
-  if (stripeEvent?.type !== 'invoice.updated' && stripeEvent?.type !== 'invoice.paid')
+  // invoice.updated is the invoice event this webhook already routes (customer
+  // id extraction included); paying an invoice changes its status, so it fires.
+  if (stripeEvent?.type !== 'invoice.updated')
     return false
-  const invoice = stripeEvent.data.object as Stripe.Invoice
+  const invoice = stripeEvent.data.object
   if (invoice.status !== 'paid' || invoice.billing_reason !== 'subscription_create' || invoice.collection_method !== 'send_invoice')
     return false
-  if (stripeEvent.type === 'invoice.paid')
-    return true
   const previousStatus = (stripeEvent.data.previous_attributes as Partial<Stripe.Invoice> | undefined)?.status
   return !!previousStatus && previousStatus !== 'paid'
 }
@@ -75,8 +80,8 @@ export function isFirstSubscriptionInvoicePaid(stripeEvent: Stripe.Event | null 
  * - paid_at went from null to set in this webhook: report at that time.
  * - paid_at was set before the first invoice was paid, and it is paid now: an
  *   `incomplete` subscription became active, or an invoiced subscription's
- *   first invoice was paid. Only for a recent paid_at, so an org that paid long
- *   ago and starts a new subscription is not reported.
+ *   first invoice was paid. Only while paid_at is recent (see the windows), so
+ *   an org that paid long ago and starts a new subscription is not reported.
  * The event id is per org, so OpenAI drops a second send for the same org.
  */
 export function getOpenAIFirstPaymentAt(input: {
@@ -88,16 +93,19 @@ export function getOpenAIFirstPaymentAt(input: {
 }): string | null {
   if (input.firstPaidAt)
     return input.firstPaidAt
-  if (!input.currentPaidAt || !(isIncompleteSubscriptionActivation(input.stripeEvent) || isFirstSubscriptionInvoicePaid(input.stripeEvent)))
+  if (!input.currentPaidAt)
     return null
+  const windowMs = isIncompleteSubscriptionActivation(input.stripeEvent)
+    ? INCOMPLETE_RECOVERY_WINDOW_MS
+    : isFirstSubscriptionInvoicePaid(input.stripeEvent) ? INVOICE_RECOVERY_WINDOW_MS : 0
   const paidAt = Date.parse(input.currentPaidAt)
-  if (!Number.isFinite(paidAt) || (input.now ?? Date.now()) - paidAt > RECOVERY_WINDOW_MS)
+  if (!windowMs || !Number.isFinite(paidAt) || (input.now ?? Date.now()) - paidAt > windowMs)
     return null
   return input.eventOccurredAtIso
 }
 
 function getLatestInvoiceRef(stripeEvent: Stripe.Event | null | undefined): InvoiceRef | null {
-  if (stripeEvent?.type === 'invoice.updated' || stripeEvent?.type === 'invoice.paid')
+  if (stripeEvent?.type === 'invoice.updated')
     return stripeEvent.data.object.id ?? null
   if (!stripeEvent?.type.startsWith('customer.subscription.'))
     return null

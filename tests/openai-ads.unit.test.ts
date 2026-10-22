@@ -218,12 +218,15 @@ describe('openai ads conversions api', () => {
       const invoice = { id: 'in_transfer', status: 'paid', billing_reason: 'subscription_create', collection_method: 'send_invoice' }
       const invoiceUpdated = { type: 'invoice.updated', data: { object: invoice, previous_attributes: { status: 'open' } } } as any
       expect(isFirstSubscriptionInvoicePaid(invoiceUpdated)).toBe(true)
-      expect(isFirstSubscriptionInvoicePaid({ type: 'invoice.paid', data: { object: invoice } } as any)).toBe(true)
+      expect(isFirstSubscriptionInvoicePaid({ type: 'invoice.paid', data: { object: invoice } } as any)).toBe(false)
       // Not a payment transition, a renewal, or a card subscription (handled by the subscription webhooks).
       expect(isFirstSubscriptionInvoicePaid({ ...invoiceUpdated, data: { object: invoice, previous_attributes: { footer: 'x' } } })).toBe(false)
       expect(isFirstSubscriptionInvoicePaid({ ...invoiceUpdated, data: { ...invoiceUpdated.data, object: { ...invoice, billing_reason: 'subscription_cycle' } } })).toBe(false)
       expect(isFirstSubscriptionInvoicePaid({ ...invoiceUpdated, data: { ...invoiceUpdated.data, object: { ...invoice, collection_method: 'charge_automatically' } } })).toBe(false)
       expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: paidAt, stripeEvent: invoiceUpdated, eventOccurredAtIso, now })).toBe(eventOccurredAtIso)
+      // Payment terms: the invoice can be paid weeks after the subscription set paid_at.
+      expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: '2026-09-25T00:00:00.000Z', stripeEvent: invoiceUpdated, eventOccurredAtIso, now })).toBe(eventOccurredAtIso)
+      expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: '2026-06-01T00:00:00.000Z', stripeEvent: invoiceUpdated, eventOccurredAtIso, now })).toBeNull()
 
       envValues.OPENAI_ADS_API_KEY = 'test-key'
       vi.useFakeTimers({ now, toFake: ['Date'] })
