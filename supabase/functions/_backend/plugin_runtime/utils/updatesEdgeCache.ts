@@ -135,8 +135,6 @@ export function updatesCacheTags(c: Context, appId: string) {
 export interface EdgeCacheLookup<T> {
   value: T | null
   hit: boolean
-  /** Set when the loader failed; distinct from a cached or loaded missing app. */
-  lookupFailed?: boolean
 }
 
 async function cachedLookup<T>(
