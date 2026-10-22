@@ -1,4 +1,5 @@
 import { formatAgentPlanRequiredMessage } from './agent-notices'
+import { DIRECT_OFFER_GUARANTEE_MESSAGE } from './plan-copy'
 
 // Direct-offer (paid ads) orgs are created without a free trial: stripe_info.trial_at
 // equals the org creation time (Cap-go/capgo.app#3782). Normal trials last 15 days,
@@ -6,7 +7,7 @@ import { formatAgentPlanRequiredMessage } from './agent-notices'
 // Same rule as the console's isZeroLengthTrial.
 const ZERO_LENGTH_TRIAL_MAX_MS = 24 * 60 * 60 * 1000
 
-export const DIRECT_OFFER_PLAN_MESSAGE = 'Choose a plan to start using Capgo. 14-day money-back guarantee. Cancel anytime.'
+export const DIRECT_OFFER_PLAN_MESSAGE = `Choose a plan to start using Capgo. ${DIRECT_OFFER_GUARANTEE_MESSAGE}`
 
 /** True when the org was created without a free trial (trial_at ~= org created_at). */
 export function isZeroLengthTrial(orgCreatedAt: string | null | undefined, trialAt: string | null | undefined): boolean {

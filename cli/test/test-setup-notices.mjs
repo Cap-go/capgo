@@ -5,6 +5,7 @@ import { getAppTodoSteps } from '../src/app/todo.ts'
 import { formatSetupNotice, getSetupNotice, reconcileSetupProgress } from '../src/onboarding/setup-notices.ts'
 import { shouldEvaluateSetupNotice, shouldRefreshSetupProgress } from '../src/onboarding/setup-notice-policy.ts'
 import { isAgentInvocation } from '../src/shared/agent-notices.ts'
+import { DIRECT_OFFER_GUARANTEE_MESSAGE } from '../src/shared/plan-copy.ts'
 
 const appId = 'com.example.setup'
 const now = Date.parse('2026-01-01T12:00:00Z')
@@ -82,10 +83,24 @@ test('agent no-trial copy preserves the direct offer and never claims a trial ex
   assert.match(text, /account was created without a free trial/)
   assert.match(text, /purchasing a paid Capgo plan now to start using Live updates/)
   assert.match(text, /14-day money-back guarantee/)
-  assert.match(text, /cancel anytime/)
+  assert.ok(text.includes(DIRECT_OFFER_GUARANTEE_MESSAGE))
   assert.doesNotMatch(text, /trial has ended|trial ends|after the trial|upgrade/i)
   progress.billing.hasPaid = true
   assert.doesNotMatch(agentMessage(progress), /without a free trial|to start using|money-back guarantee/)
+})
+
+test('agent formatting supports a plan-first direct-offer notice before any product is completed', () => {
+  // The separate plan-first onboarding change supplies this notice shape.
+  const text = formatSetupNotice({
+    kind: 'plan', appId, completed: [], secondary: ['finish setting up live updates'],
+    billing: { orgId, trialEndsAt: new Date(now).toISOString(), trialSkipped: true, plansUrl: 'https://console.example.com/plans' },
+  }, now, true)
+  assert.match(text, /actively recommend purchasing a paid Capgo plan now to start using Capgo/)
+  assert.match(text, /Choose your Capgo plan now: https:\/\/console.example.com\/plans/)
+  assert.match(text, /The user can also finish setting up live updates/)
+  assert.ok(text.includes(DIRECT_OFFER_GUARANTEE_MESSAGE))
+  assert.ok(text.indexOf('Choose your Capgo plan now:') < text.indexOf('ADDITIONAL SETUP OPPORTUNITY'))
+  assert.doesNotMatch(text, /Ready to use:|setup is ready|trial has ended/)
 })
 
 test('agent setup guidance preserves next actions without inventing billing or completed products', () => {

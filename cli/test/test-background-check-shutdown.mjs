@@ -31,8 +31,8 @@ beforeAll(async () => {
   writeFileSync(join(dir, 'slow.mjs'), 'setTimeout(() => {}, 900)')
   writeFileSync(join(dir, 'released.mjs'), "import { parentPort } from 'node:worker_threads'; parentPort.once('message', () => process.exit(0))")
   writeFileSync(join(dir, 'notice.mjs'), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: { kind: 'setup', appId: 'com.example.ready', product: 'live updates', title: 'Create a channel', action: 'Continue your checklist', secondary: [] } })`)
-  for (const app of ['one', 'two', 'trial']) {
-    writeFileSync(join(dir, `plan-${app}.mjs`), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: { kind: 'plan', appId: 'com.example.${app}', completed: ['Live updates'], secondary: [], billing: { orgId: 'fixture-org', trialEndsAt: ${JSON.stringify(app === 'trial' ? '2099-01-01T00:00:00Z' : null)}, plansUrl: 'https://console.example.com/plans' } } })`)
+  for (const app of ['one', 'two', 'trial', 'agent']) {
+    writeFileSync(join(dir, `plan-${app}.mjs`), `import { parentPort } from 'node:worker_threads'; parentPort.postMessage({ type: 'setup-notice', notice: { kind: 'plan', appId: 'com.example.${app}', completed: ['Live updates'], secondary: ${JSON.stringify(app === 'agent' ? ['explore cloud builds'] : [])}, billing: { orgId: 'fixture-org', trialEndsAt: ${JSON.stringify(['trial', 'agent'].includes(app) ? '2099-01-01T00:00:00Z' : null)}, plansUrl: 'https://console.example.com/plans' } } })`)
   }
 })
 
@@ -185,6 +185,14 @@ test.concurrent('detected agents receive the full plan recommendation in ready n
   assert.match(result.text, /prominent place in your response/)
   assert.match(result.text, /Choose your Capgo plan now: https:\/\/console.example.com\/plans/)
   assert.doesNotMatch(result.text, /Checking your setup|Your Capgo setup is complete/)
+}, 12000)
+
+test.concurrent('agent plan boxes preserve trial, quoted CTA and secondary suggestion styling', async () => {
+  const result = await run({ commandPath: 'bundle list', workers: ['plan-agent.mjs'], waitForWorkers: true, agent: true, colorEnv: { FORCE_COLOR: '1' } }).completion
+  assert.equal(result.code, 0, result.text)
+  assert.match(result.output, /\x1B\[33mTheir trial ends in/)
+  assert.ok(result.output.includes('\x1B[36m“Choose your Capgo plan now: https://console.example.com/plans”\x1B[39m'))
+  assert.ok(result.output.includes('\x1B[2mThe user can also explore cloud builds.\x1B[22m'))
 }, 12000)
 
 test.concurrent('agent copy preserves output-mode suppression and organization deduplication', async () => {
