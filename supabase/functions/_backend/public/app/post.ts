@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { getOrCreateUserABTests } from '../../utils/ab_tests.ts'
 import { addAppCreatorToOnboarding, resolveAppCreatorEmail } from '../../utils/app_creator.ts'
+import { markAppOnboardingLogin } from '../../utils/app_onboarding_login.ts'
 import { applyAppOnboardingPatch, isAppOnboardingSource } from '../../utils/appOnboarding.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
@@ -162,6 +163,13 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp):
 
   if (!data) {
     throw simpleError('cannot_read_app', 'Cannot read created app')
+  }
+
+  // An API key means the CLI or MCP is already logged in; the login event may have
+  // arrived before this app existed, so record it now. Best effort and no-op for JWTs.
+  if (auth.authType === 'apikey') {
+    const source = body.onboarding?.source
+    await markAppOnboardingLogin(c, source === 'mcp' || source === 'ai' ? source : 'cli')
   }
 
   if (data.icon_url) {

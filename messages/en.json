@@ -3933,8 +3933,10 @@
   "ai-onboarding-task-setup": "Add the channel and updater plugin, then send a first test update",
   "ai-onboarding-waiting-for-app": "Waiting for your agent to register your app. This page updates by itself.",
   "ai-onboarding-app-detected-title": "{name} is registered",
-  "ai-onboarding-app-detected-desc": "Your agent is continuing the setup. Follow its progress in the dashboard.",
+  "ai-onboarding-app-detected-desc": "Opening the setup checklist, where your agent's progress shows live…",
   "ai-onboarding-open-app": "Open setup progress",
   "ai-onboarding-switch-manual": "Set up manually instead",
-  "ai-onboarding-explore-dashboard": "Explore the dashboard first"
+  "ai-onboarding-explore-dashboard": "Explore the dashboard first",
+  "ai-onboarding-waiting-agent-connected": "Your agent is logged in. Waiting for it to install Capgo MCP…",
+  "ai-onboarding-waiting-mcp-connected": "Capgo MCP is connected. Waiting for your agent to register your app…"
 }

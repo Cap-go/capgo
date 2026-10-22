@@ -6,6 +6,7 @@ import {
   AI_ONBOARDING_PATH,
   defaultAiOrganizationName,
   initialOnboardingSetupScreen,
+  readAiAgentProgress,
   readOnboardingSetupMode,
   shouldRedirectToAiOnboarding,
   withOnboardingSetupMode,
@@ -116,5 +117,15 @@ describe('buildAiOnboardingPrompt', () => {
 
   it.concurrent('includes the API key only in the login command', () => {
     expect(prompt.split('capgo_test_secret')).toHaveLength(2)
+  })
+})
+
+describe('readAiAgentProgress', () => {
+  it.concurrent('reads the markers written by /private/events', () => {
+    expect(readAiAgentProgress({})).toEqual({ agentConnected: false, mcpConnected: false })
+    expect(readAiAgentProgress({ ai_agent_connected_at: '2026-10-22T12:00:00Z' })).toEqual({ agentConnected: true, mcpConnected: false })
+    // MCP calls imply the agent is connected even if only the MCP marker exists.
+    expect(readAiAgentProgress({ ai_mcp_connected_at: '2026-10-22T12:00:00Z' })).toEqual({ agentConnected: true, mcpConnected: true })
+    expect(readAiAgentProgress(null)).toEqual({ agentConnected: false, mcpConnected: false })
   })
 })

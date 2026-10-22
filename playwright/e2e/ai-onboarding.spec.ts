@@ -69,16 +69,26 @@ test.describe('AI onboarding', () => {
     await page.goto('/dashboard')
     await page.waitForURL(/\/onboarding\/ai$/)
 
-    // What the MCP does: register the app in the new organization.
     const admin = localAdminClient()
-    const { data: user } = await admin.from('users').select('id').eq('email', email).single()
+    const { data: user } = await admin.from('users').select('id, onboarding').eq('email', email).single()
+
+    // What /private/events records when the agent's CLI logs in and its MCP starts.
+    const task = (n: number) => page.locator(`[data-test="onboarding-ai-task-${n}"]`)
+    await expect(task(1)).toHaveAttribute('data-done', 'false')
+    await admin.from('users').update({ onboarding: { ...(user!.onboarding as object), ai_agent_connected_at: new Date().toISOString() } }).eq('id', user!.id)
+    await expect(task(1)).toHaveAttribute('data-done', 'true', { timeout: 15000 })
+    await expect(task(2)).toHaveAttribute('data-done', 'false')
+    await admin.from('users').update({ onboarding: { ...(user!.onboarding as object), ai_agent_connected_at: new Date().toISOString(), ai_mcp_connected_at: new Date().toISOString() } }).eq('id', user!.id)
+    await expect(task(2)).toHaveAttribute('data-done', 'true', { timeout: 15000 })
+
+    // What the MCP does next: register the app in the new organization.
     const { data: org } = await admin.from('orgs').select('id').eq('created_by', user!.id).single()
     const appId = `com.example.ai${Date.now()}`
     const { error } = await admin.from('apps').insert({ app_id: appId, name: 'Agent App', owner_org: org!.id, icon_url: '' })
     expect(error).toBeNull()
 
     await expect(page.locator('[data-test="onboarding-ai-app-detected"]')).toContainText('Agent App', { timeout: 15000 })
-    await page.click('[data-test="onboarding-ai-open-app"]')
+    // No click: the page opens Getting started by itself, where the agent's progress shows live.
     await page.waitForURL(new RegExp(`/app/${appId.replaceAll('.', '\\.')}/getting-started$`))
   })
 

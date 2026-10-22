@@ -3759,7 +3759,7 @@ async function handleMissingBuildScript(buildCommand: string, appId: string, pla
   return await exitAfterFinishingReplay('cancelled', 0)
 }
 
-async function getCompatibleUpdaterVersionForPackage(packageJsonPath: string, pm: PackageManagerInfo): Promise<string> {
+export async function getCompatibleUpdaterVersionForPackage(packageJsonPath: string, pm: PackageManagerInfo): Promise<string> {
   try {
     const dependencies = await getAllPackagesDependencies(undefined, packageJsonPath)
     const blocker = getUpdaterInstallBlocker(dependencies, pm)

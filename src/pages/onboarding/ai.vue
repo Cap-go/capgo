@@ -22,9 +22,11 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { allowOnboardingDashboardExploration, getAppGettingStartedPath } from '~/utils/onboardingRedirect'
-import { withOnboardingSetupMode } from '~/utils/onboardingSetupMode'
+import { readAiAgentProgress, withOnboardingSetupMode } from '~/utils/onboardingSetupMode'
 
-const APP_POLL_INTERVAL_MS = 4000
+const APP_POLL_INTERVAL_MS = 3000
+// Long enough to read the confirmation, short enough to feel automatic.
+const AUTO_OPEN_DELAY_MS = 2500
 const MASKED_KEY = 'capgo_••••••••••••••••'
 
 const { t } = useI18n()
@@ -41,9 +43,11 @@ const loadFailed = ref(false)
 const apiKey = ref<string | null>(null)
 const copied = ref(false)
 const detectedApp = ref<{ app_id: string, name: string | null } | null>(null)
+const agentProgress = ref(readAiAgentProgress(main.user?.onboarding))
 const organization = computed(() => organizationStore.currentOrganization)
 const assistantIcons = developmentEnvironmentOptions.find(option => option.value === 'ai_assistant')?.icons ?? []
 let pollTimer: ReturnType<typeof setInterval> | undefined
+let autoOpenTimer: ReturnType<typeof setTimeout> | undefined
 let disposed = false
 
 const steps = computed(() => [
@@ -52,12 +56,23 @@ const steps = computed(() => [
   { id: 'plan', label: t('ai-onboarding-step-plan') },
   { id: 'agent', label: t('ai-onboarding-step-agent') },
 ])
-const agentTasks = computed(() => [
-  t('ai-onboarding-task-login'),
-  t('ai-onboarding-task-mcp'),
-  t('ai-onboarding-task-app'),
-  t('ai-onboarding-task-setup'),
-])
+// Each task ticks off live from what the agent's CLI and MCP report to Capgo.
+const agentTasks = computed(() => {
+  const appDone = !!detectedApp.value
+  return [
+    { label: t('ai-onboarding-task-login'), done: appDone || agentProgress.value.agentConnected },
+    { label: t('ai-onboarding-task-mcp'), done: appDone || agentProgress.value.mcpConnected },
+    { label: t('ai-onboarding-task-app'), done: appDone },
+    { label: t('ai-onboarding-task-setup'), done: false },
+  ]
+})
+const waitingMessage = computed(() => {
+  if (agentProgress.value.mcpConnected)
+    return t('ai-onboarding-waiting-mcp-connected')
+  if (agentProgress.value.agentConnected)
+    return t('ai-onboarding-waiting-agent-connected')
+  return t('ai-onboarding-waiting-for-app')
+})
 
 function promptFor(key: string) {
   const org = organization.value
@@ -116,21 +131,42 @@ async function copyPrompt() {
   }
 }
 
+async function refreshAgentProgress(userId: string) {
+  const { data, error } = await supabase.from('users').select('onboarding').eq('id', userId).maybeSingle()
+  if (disposed || error || !data)
+    return
+  const next = readAiAgentProgress(data.onboarding)
+  if (next.agentConnected && !agentProgress.value.agentConnected)
+    sendOnboardingEvent('onboarding_ai_agent_connected', { org_id: organization.value?.gid ?? '' })
+  if (next.mcpConnected && !agentProgress.value.mcpConnected)
+    sendOnboardingEvent('onboarding_ai_mcp_connected', { org_id: organization.value?.gid ?? '' })
+  agentProgress.value = next
+  // Keep the store current so later onboarding writes compare against the latest row.
+  if (main.user?.id === userId)
+    main.user = { ...main.user, onboarding: data.onboarding }
+}
+
 async function checkForApp() {
   const orgId = organization.value?.gid
+  const userId = main.user?.id
   if (!orgId || detectedApp.value || document.visibilityState === 'hidden')
     return
-  const { data, error } = await supabase
-    .from('apps')
-    .select('app_id, name')
-    .eq('owner_org', orgId)
-    .order('created_at', { ascending: true })
-    .limit(1)
-  if (disposed || error || !data?.[0])
+  const [{ data, error }] = await Promise.all([
+    supabase
+      .from('apps')
+      .select('app_id, name')
+      .eq('owner_org', orgId)
+      .order('created_at', { ascending: true })
+      .limit(1),
+    userId ? refreshAgentProgress(userId) : Promise.resolve(),
+  ])
+  if (disposed || error || !data?.[0] || detectedApp.value)
     return
   detectedApp.value = data[0]
   stopPolling()
   sendOnboardingEvent('onboarding_ai_app_detected', { org_id: orgId, app_id: data[0].app_id })
+  // Getting started is where the agent's progress shows live, so go there on our own.
+  autoOpenTimer = setTimeout(() => void openApp(), AUTO_OPEN_DELAY_MS)
 }
 
 function stopPolling() {
@@ -175,7 +211,9 @@ async function exploreDashboard() {
 }
 
 async function openApp() {
-  if (detectedApp.value)
+  clearTimeout(autoOpenTimer)
+  autoOpenTimer = undefined
+  if (!disposed && detectedApp.value)
     await router.push(getAppGettingStartedPath(detectedApp.value.app_id))
 }
 
@@ -218,6 +256,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   disposed = true
   stopPolling()
+  clearTimeout(autoOpenTimer)
 })
 </script>
 
@@ -242,7 +281,8 @@ onBeforeUnmount(() => {
                 <p class="mt-1 break-all text-sm text-slate-600 dark:text-slate-300">
                   {{ detectedApp.app_id }}
                 </p>
-                <p class="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                <p class="mt-2 flex items-center gap-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  <IconLoader class="h-4 w-4 animate-spin" aria-hidden="true" />
                   {{ t('ai-onboarding-app-detected-desc') }}
                 </p>
               </div>
@@ -311,14 +351,15 @@ onBeforeUnmount(() => {
               {{ t('ai-onboarding-tasks-title') }}
             </h3>
             <ol class="mt-4 space-y-3">
-              <li v-for="(task, index) in agentTasks" :key="task" class="flex items-start gap-3 text-sm leading-6 text-slate-700 dark:text-slate-200">
-                <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-500/10 text-xs font-semibold text-primary-500">{{ index + 1 }}</span>
-                <span>{{ task }}</span>
+              <li v-for="(task, index) in agentTasks" :key="task.label" class="flex items-start gap-3 text-sm leading-6" :class="task.done ? 'text-slate-500 dark:text-slate-400' : 'text-slate-700 dark:text-slate-200'" :data-test="`onboarding-ai-task-${index + 1}`" :data-done="task.done">
+                <span v-if="task.done" class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white"><IconCheck class="h-3.5 w-3.5" aria-hidden="true" /></span>
+                <span v-else class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-500/10 text-xs font-semibold text-primary-500">{{ index + 1 }}</span>
+                <span :class="{ 'line-through decoration-slate-300 dark:decoration-slate-600': task.done }">{{ task.label }}</span>
               </li>
             </ol>
             <div v-if="!detectedApp" class="mt-5 flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:bg-slate-950/60 dark:text-slate-300" role="status" data-test="onboarding-ai-waiting">
               <IconLoader class="h-4 w-4 animate-spin text-primary-500" aria-hidden="true" />
-              {{ t('ai-onboarding-waiting-for-app') }}
+              {{ waitingMessage }}
             </div>
           </div>
 

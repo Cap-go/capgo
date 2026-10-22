@@ -77,3 +77,13 @@ export function defaultAiOrganizationName(firstName: string | null | undefined, 
   const candidate = name ? template(name) : fallback
   return candidate.length >= 3 ? candidate : fallback
 }
+
+/** Live AI agent progress written by `/private/events` when the agent's CLI or MCP reaches Capgo. */
+export function readAiAgentProgress(onboarding: Json | unknown) {
+  const value = asObject(onboarding)
+  const mcpConnected = typeof value.ai_mcp_connected_at === 'string'
+  return {
+    agentConnected: mcpConnected || typeof value.ai_agent_connected_at === 'string',
+    mcpConnected,
+  }
+}
