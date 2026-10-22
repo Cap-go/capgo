@@ -22,3 +22,12 @@ describe('public API key headers', () => {
     await expect(response.json()).resolves.toMatchObject({ error: 'invalid_apikey' })
   })
 })
+
+describe('rate limit headers on console sessions', () => {
+  it('does not advertise the API key or failed-auth quota on JWT-authenticated responses', async () => {
+    const { getAuthHeaders } = await import('./test-utils.ts')
+    const response = await fetch(`${BASE_URL}/user/`, { headers: await getAuthHeaders() })
+    expect(response.status, await response.clone().text()).toBe(200)
+    expect(response.headers.get('RateLimit-Policy')).toBeNull()
+  })
+})

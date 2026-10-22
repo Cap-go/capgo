@@ -866,6 +866,8 @@ export function middlewareAuth(options: { preferApiKey?: boolean } = {}) {
       if (res) {
         return res
       }
+      // JWT sessions are not covered by the failed-auth or API key quotas advertised for keys.
+      c.header('RateLimit-Policy', undefined)
     }
     else if (capgkey) {
       const res = await foundAPIKey(c, capgkey)

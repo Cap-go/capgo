@@ -43,6 +43,16 @@ describe('RateLimit headers', () => {
     expect(response.headers.get('RateLimit-Policy')).toBe('"apikey";q=100;w=60')
   })
 
+  it('honours the RATE_LIMIT_API_KEY_UPLOAD override', async () => {
+    vi.stubEnv('RATE_LIMIT_API_KEY_UPLOAD', '500')
+    const response = await appWith((c) => {
+      setAPIKeyRateLimitHeaders(c, 'upload', { count: 499 })
+      return c.json({ ok: true })
+    }).request('/')
+    expect(response.headers.get('RateLimit-Policy')).toBe('"apikey-upload";q=500;w=60')
+    expect(response.headers.get('RateLimit')).toBe('"apikey-upload";r=1;t=60')
+  })
+
   it('advertises the failed-auth policy', async () => {
     const response = await appWith((c) => {
       setFailedAuthRateLimitPolicyHeader(c)

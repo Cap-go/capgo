@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CliLoginOrganization, CliSkippedOrganization } from '~/services/cliLogin'
+import type { CliLoginKeyDependencies, CliLoginOrganization, CliSkippedOrganization } from '~/services/cliLogin'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
@@ -125,18 +125,50 @@ async function approve(): Promise<void> {
       state.value = await stateForError(verify.error)
       return
     }
-    const apikey = await createMcpOAuthKey(organizations, dependencies(), AGENT_CLIENT_NAME)
+    const apikey = await createMcpOAuthKey(organizations, { createKey: createTrackedKey }, AGENT_CLIENT_NAME)
     const { error } = await invokeCapgoApi('private/agent_identity/approve', {
       client: supabase,
       method: 'POST',
       body: { claim_attempt_token: attemptToken.value, apikey },
     })
-    state.value = error ? await stateForError(error) : 'approved'
+    if (error) {
+      await deleteUnusedKey()
+      state.value = await stateForError(error)
+      return
+    }
+    createdKeyId = null
+    state.value = 'approved'
   }
   catch (error) {
     console.error('Cannot approve agent claim request', error)
+    await deleteUnusedKey()
     state.value = 'error'
   }
+}
+
+// The key is minted before approval; if approval fails, delete it so no unused credential stays behind.
+let createdKeyId: number | null = null
+
+const createTrackedKey: CliLoginKeyDependencies['createKey'] = async (input) => {
+  const { data, error } = await invokeCapgoApi<{ id?: number, key?: string | null }>('apikey', {
+    client: supabase,
+    method: 'POST',
+    body: input,
+  })
+  if (error)
+    throw error
+  createdKeyId = typeof data?.id === 'number' ? data.id : null
+  return { key: data?.key ?? null }
+}
+
+async function deleteUnusedKey(): Promise<void> {
+  if (createdKeyId === null)
+    return
+  const id = createdKeyId
+  createdKeyId = null
+  const { error } = await invokeCapgoApi(`apikey/${id}`, { client: supabase, method: 'DELETE' })
+  if (error)
+    console.error('Cannot delete the unused agent API key', error)
 }
 
 async function deny(): Promise<void> {

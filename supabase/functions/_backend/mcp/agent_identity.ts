@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { McpContext } from './oauth_shared.ts'
 import { Hono } from 'hono/tiny'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { recordFailedAuth } from '../utils/rate_limit.ts'
+import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
 import { getEnv } from '../utils/utils.ts'
 import {
   AGENT_POLL_INTERVAL_SECONDS,
@@ -105,14 +105,13 @@ app.post(AGENT_IDENTITY_PATH, async (c) => {
   }
 
   const claimToken = newClaimToken()
-  const [keys, attempt, claimTokenHash, ipHash] = await Promise.all([
-    createClaimKeyPair(claimToken),
-    newClaimAttempt(),
-    sha256Hex(claimToken),
-    getClientIpHash(c),
-  ])
-  const row = await insertWithIpLimit(c, 'agent_identity_registrations', ipHash, REGISTRATION_RATE_LIMIT, async (tx) => {
+  const ipHash = await getClientIpHash(c)
+  const created = await insertWithIpLimit(c, 'agent_identity_registrations', ipHash, REGISTRATION_RATE_LIMIT, async (tx) => {
+    // Key generation runs only after the per-IP limit passed, so rejected floods cost no crypto work.
+    const [keys, attempt, claimTokenHash] = await Promise.all([createClaimKeyPair(claimToken), newClaimAttempt(), sha256Hex(claimToken)])
     await tx.query(`DELETE FROM public.agent_identity_registrations WHERE status <> 'exchanged' AND expires_at < now() - interval '1 day'`)
+    // IP hashes only feed the hourly registration limit: drop them once they are a day old.
+    await tx.query(`UPDATE public.agent_identity_registrations SET ip_hash = NULL WHERE ip_hash IS NOT NULL AND created_at < now() - interval '1 day'`)
     const { rows } = await tx.query<{ id: string, expires_at: Date }>(
       `INSERT INTO public.agent_identity_registrations
          (login_hint, claim_token_hash, public_key, encrypted_private_key, claim_attempt_token_hash, user_code_hash,
@@ -121,10 +120,11 @@ app.post(AGENT_IDENTITY_PATH, async (c) => {
        RETURNING id, expires_at`,
       [loginHint, claimTokenHash, keys.publicKey, keys.encryptedPrivateKey, attempt.claimAttemptTokenHash, attempt.userCodeHash, AGENT_USER_CODE_TTL_SECONDS, ipHash, AGENT_REGISTRATION_TTL_SECONDS],
     )
-    return rows[0] ?? null
+    return rows[0] ? { row: rows[0], attempt } : null
   })
-  if (row === null)
+  if (!created)
     return agentError(c, 429, 'rate_limited', 'Too many registrations, try again later')
+  const { row, attempt } = created
 
   cloudlog({ requestId: c.get('requestId'), message: 'agent_identity_registered', registrationId: row.id })
   c.header('Cache-Control', 'no-store')
@@ -143,6 +143,9 @@ app.post(AGENT_IDENTITY_PATH, async (c) => {
 // Step 4a: mint a fresh user_code when the previous one expired. The email must match the registration.
 // ---------------------------------------------------------------------------
 app.post(`${AGENT_IDENTITY_PATH}/claim`, async (c) => {
+  // Invalid claim tokens count as failed auth: stop flagged IPs before parsing or querying.
+  if ((await isIPRateLimited(c)).limited)
+    return agentError(c, 429, 'rate_limited', 'Too many failed attempts, try again later')
   const params = await readParams(c)
   const claimToken = params.claim_token ?? ''
   const email = normalizeLoginHint(params.email)

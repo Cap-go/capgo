@@ -54,8 +54,8 @@ async function withPg<T>(c: Context<MiddlewareKeyVariables>, fn: (pg: Awaited<Re
 }
 
 /**
- * The key handed to a third-party client must be one the signed-in user just created, and it must
- * expire: the consent pages set at most 90 days. Shared with auth.md agent registration.
+ * The key handed to a third-party client must belong to the signed-in user and expire within 90 days
+ * (the consent pages create it just before approving). Shared with auth.md agent registration.
  */
 export async function requireDelegatableApiKey(c: Context<MiddlewareKeyVariables>, userId: string, key: string) {
   const apikey = await checkKey(c, key, supabaseAdmin(c))

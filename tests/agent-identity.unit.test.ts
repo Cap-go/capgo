@@ -10,6 +10,7 @@ import {
   openWithClaimToken,
   sealToClaimKey,
 } from '../supabase/functions/_backend/mcp/agent_identity_utils.ts'
+import { decryptWithCode } from '../supabase/functions/_backend/mcp/oauth_utils.ts'
 
 const API = 'https://api.capgo.app'
 
@@ -28,7 +29,11 @@ describe('auth.md agent identity helpers', () => {
     const sealed = await sealToClaimKey(publicKey, 'ae6e7458-c46d-4c00-aa3b-153b0b8520ea')
 
     expect(sealed).not.toContain('ae6e7458')
-    expect(encryptedPrivateKey).not.toContain('"d"')
+    // The stored private key only opens with the claim_token: another token cannot recover the JWK.
+    const privateJwk = JSON.parse(await decryptWithCode(encryptedPrivateKey, claimToken) ?? '{}') as JsonWebKey
+    expect(privateJwk).toMatchObject({ kty: 'EC', crv: 'P-256' })
+    expect(privateJwk.d).toBeTruthy()
+    await expect(decryptWithCode(encryptedPrivateKey, newClaimToken())).resolves.toBeNull()
     await expect(openWithClaimToken(sealed, encryptedPrivateKey, claimToken)).resolves.toBe('ae6e7458-c46d-4c00-aa3b-153b0b8520ea')
     await expect(openWithClaimToken(sealed, encryptedPrivateKey, newClaimToken())).resolves.toBeNull()
     await expect(openWithClaimToken('broken', encryptedPrivateKey, claimToken)).resolves.toBeNull()

@@ -110,7 +110,8 @@ export async function isIPRateLimited(c: Context): Promise<RateLimitStatus> {
     return { limited: false }
 
   const limit = getFailedAuthLimit(c)
-  const isLimited = data.count >= limit
+  // Usage is recorded before this check, so the request that brings the count to the limit is still allowed.
+  const isLimited = data.count > limit
 
   if (isLimited) {
     cloudlog({
@@ -303,12 +304,15 @@ export async function recordAPIKeyUsage(c: Context, apiKeyId: number, scope: API
   const cacheKey = cacheHelper.buildRequest(getAPIKeyRateLimitPath(scope), { id: String(apiKeyId) })
   const existingData = await cacheHelper.matchJson<RateLimitData>(cacheKey)
 
+  // Fixed window: keep the running window's reset time so continued (or rejected) calls cannot extend it.
+  const now = Date.now()
+  const windowOpen = typeof existingData?.resetAt === 'number' && existingData.resetAt > now
   const newData: RateLimitData = {
-    count: (existingData?.count ?? 0) + 1,
-    resetAt: Date.now() + API_KEY_RATE_LIMIT_TTL * 1000,
+    count: (windowOpen ? existingData.count : 0) + 1,
+    resetAt: windowOpen ? existingData.resetAt : now + API_KEY_RATE_LIMIT_TTL * 1000,
   }
 
-  await cacheHelper.putJson(cacheKey, newData, API_KEY_RATE_LIMIT_TTL)
+  await cacheHelper.putJson(cacheKey, newData, getRateLimitWindowSeconds(newData.resetAt!, now))
   return newData
 }
 

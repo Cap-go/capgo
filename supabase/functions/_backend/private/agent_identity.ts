@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { z } from 'zod'
 import { AGENT_USER_CODE_MAX_ATTEMPTS, maskEmail, sealToClaimKey } from '../mcp/agent_identity_utils.ts'
-import { sha256Hex } from '../mcp/oauth_utils.ts'
+import { sha256Hex, timingSafeEqual } from '../mcp/oauth_utils.ts'
 import { honoFactory, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -64,15 +64,6 @@ async function findRegistration(pg: Pick<Pg, 'query'>, claimAttemptToken: string
 async function getUserEmail(pg: Pick<Pg, 'query'>, userId: string): Promise<string> {
   const { rows } = await pg.query<{ email: string | null }>('SELECT email FROM auth.users WHERE id = $1', [userId])
   return (rows[0]?.email ?? '').trim().toLowerCase()
-}
-
-function timingSafeEqual(left: string, right: string): boolean {
-  if (left.length !== right.length)
-    return false
-  let diff = 0
-  for (let i = 0; i < left.length; i++)
-    diff |= left.charCodeAt(i) ^ right.charCodeAt(i)
-  return diff === 0
 }
 
 app.get('/', middlewareAuth(), async (c) => {

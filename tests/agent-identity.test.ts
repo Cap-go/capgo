@@ -44,14 +44,18 @@ function poll(claimToken: string) {
   })
 }
 
-async function createUserKey(): Promise<string> {
+async function createUserKey(): Promise<{ id: number, key: string }> {
   const response = await postJson('/apikey', {
     name: `MCP · auth.md vitest-${randomUUID().slice(0, 8)}`,
     expires_at: new Date(Date.now() + 30 * 86_400_000).toISOString(),
     bindings: [{ role_name: 'org_super_admin', scope_type: 'org', org_id: ORG_ID }],
   }, jwtHeaders)
   expect(response.status, await response.clone().text()).toBe(200)
-  return (await response.json() as { key: string }).key
+  return await response.json() as { id: number, key: string }
+}
+
+async function deleteUserKey(id: number) {
+  await fetchTestRequest(getEndpointUrl(`/apikey/${id}`), { method: 'DELETE', headers: jwtHeaders })
 }
 
 beforeAll(async () => {
@@ -79,43 +83,49 @@ describe.skipIf(!USE_CLOUDFLARE)('auth.md service_auth agent registration', () =
     await expect(details.json()).resolves.toMatchObject({ registration_id: registration.registration_id, email_matches: true })
 
     // Approving needs the user_code first.
-    const apikey = await createUserKey()
-    const early = await postJson('/private/agent_identity/approve', { claim_attempt_token: registration.attemptToken, apikey }, jwtHeaders)
-    expect(early.status).toBe(410)
+    const { id: keyId, key: apikey } = await createUserKey()
+    try {
+      const early = await postJson('/private/agent_identity/approve', { claim_attempt_token: registration.attemptToken, apikey }, jwtHeaders)
+      expect(early.status).toBe(410)
 
-    const wrongCode = registration.claim.user_code === '000000' ? '111111' : '000000'
-    const wrong = await postJson('/private/agent_identity/verify', { claim_attempt_token: registration.attemptToken, user_code: wrongCode }, jwtHeaders)
-    expect(wrong.status).toBe(400)
-    await expect(wrong.json()).resolves.toMatchObject({ error: 'invalid_user_code' })
+      const wrongCode = registration.claim.user_code === '000000' ? '111111' : '000000'
+      const wrong = await postJson('/private/agent_identity/verify', { claim_attempt_token: registration.attemptToken, user_code: wrongCode }, jwtHeaders)
+      expect(wrong.status).toBe(400)
+      await expect(wrong.json()).resolves.toMatchObject({ error: 'invalid_user_code' })
 
-    const verify = await postJson('/private/agent_identity/verify', { claim_attempt_token: registration.attemptToken, user_code: registration.claim.user_code }, jwtHeaders)
-    expect(verify.status, await verify.clone().text()).toBe(200)
-    const approve = await postJson('/private/agent_identity/approve', { claim_attempt_token: registration.attemptToken, apikey }, jwtHeaders)
-    expect(approve.status, await approve.clone().text()).toBe(200)
+      const verify = await postJson('/private/agent_identity/verify', { claim_attempt_token: registration.attemptToken, user_code: registration.claim.user_code }, jwtHeaders)
+      expect(verify.status, await verify.clone().text()).toBe(200)
+      const approve = await postJson('/private/agent_identity/approve', { claim_attempt_token: registration.attemptToken, apikey }, jwtHeaders)
+      expect(approve.status, await approve.clone().text()).toBe(200)
 
-    await new Promise(resolve => setTimeout(resolve, 4_100))
-    const token = await poll(registration.claim_token)
-    expect(token.status, await token.clone().text()).toBe(200)
-    const tokenJson = await token.json() as { access_token: string, token_type: string, scope: string, expires_in: number }
-    expect(tokenJson).toMatchObject({ access_token: apikey, token_type: 'Bearer', scope: 'capgo' })
-    expect(tokenJson.expires_in).toBeGreaterThan(29 * 86_400)
-    expect(token.headers.get('cache-control')).toBe('no-store')
+      await new Promise(resolve => setTimeout(resolve, 4_100))
+      const token = await poll(registration.claim_token)
+      expect(token.status, await token.clone().text()).toBe(200)
+      const tokenJson = await token.json() as { access_token: string, token_type: string, scope: string, expires_in: number }
+      expect(tokenJson).toMatchObject({ access_token: apikey, token_type: 'Bearer', scope: 'capgo' })
+      expect(tokenJson.expires_in).toBeGreaterThan(29 * 86_400)
+      expect(token.headers.get('cache-control')).toBe('no-store')
 
-    const apps = await fetchTestRequest(getEndpointUrl('/app/'), { headers: { authorization: `Bearer ${tokenJson.access_token}` } })
-    expect(apps.status).toBe(200)
+      const apps = await fetchTestRequest(getEndpointUrl('/app/'), { headers: { authorization: `Bearer ${tokenJson.access_token}` } })
+      expect(apps.status).toBe(200)
 
-    // The claim_token is single use.
-    const replay = await poll(registration.claim_token)
-    await expect(replay.json()).resolves.toMatchObject({ error: 'invalid_grant' })
+      // The claim_token is single use.
+      const replay = await poll(registration.claim_token)
+      await expect(replay.json()).resolves.toMatchObject({ error: 'invalid_grant' })
 
-    const revoke = await fetchTestRequest(getEndpointUrl('/mcp/oauth/revoke'), {
-      method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ token: tokenJson.access_token }).toString(),
-    })
-    expect(revoke.status).toBe(200)
-    const afterRevoke = await fetchTestRequest(getEndpointUrl('/app/'), { headers: { authorization: `Bearer ${tokenJson.access_token}` } })
-    expect(afterRevoke.status).toBe(401)
+      const revoke = await fetchTestRequest(getEndpointUrl('/mcp/oauth/revoke'), {
+        method: 'POST',
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ token: tokenJson.access_token }).toString(),
+      })
+      expect(revoke.status).toBe(200)
+      const afterRevoke = await fetchTestRequest(getEndpointUrl('/app/'), { headers: { authorization: `Bearer ${tokenJson.access_token}` } })
+      expect(afterRevoke.status).toBe(401)
+    }
+    finally {
+      // Revoked above on success; this also removes the org_super_admin key if an assertion failed first.
+      await deleteUserKey(keyId)
+    }
   }, 30_000)
 
   it('only lets the named account claim the registration', async () => {
