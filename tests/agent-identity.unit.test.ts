@@ -70,11 +70,18 @@ describe('auth.md agent identity endpoints', () => {
     const response = await apiWorker.fetch(new Request(`${API}/mcp/oauth/metadata`))
     const metadata = await response.json() as Record<string, any>
     expect(metadata.grant_types_supported).toEqual(['authorization_code', AGENT_AUTH_CLAIM_GRANT])
+    // Endpoints sit on the issuer origin (capgo.app forwards them to the API worker), with the v0.1 aliases.
     expect(metadata.agent_auth).toEqual({
       skill: 'https://capgo.app/auth.md',
-      identity_endpoint: 'https://api.capgo.app/agent/identity',
-      claim_endpoint: 'https://api.capgo.app/agent/identity/claim',
-      identity_types_supported: ['service_auth'],
+      identity_endpoint: 'https://capgo.app/agent/identity',
+      claim_endpoint: 'https://capgo.app/agent/identity/claim',
+      register_uri: 'https://capgo.app/agent/identity',
+      claim_uri: 'https://capgo.app/agent/identity/claim',
+      identity_types_supported: ['service_auth', 'identity_assertion'],
+      identity_assertion: {
+        assertion_types_supported: ['verified_email'],
+        credential_types_supported: ['access_token'],
+      },
     })
   })
 
@@ -84,6 +91,7 @@ describe('auth.md agent identity endpoints', () => {
     [{ type: 'magic' }, 'invalid_request'],
     [{ type: 'service_auth', login_hint: 'nope' }, 'invalid_login_hint'],
     [{ type: 'service_auth' }, 'invalid_login_hint'],
+    [{ type: 'identity_assertion', assertion_type: 'verified_email', assertion: 'nope' }, 'invalid_login_hint'],
   ])('rejects %j with %s before touching the database', async (body, error) => {
     const response = await postJson('/agent/identity', body)
     expect(response.status).toBe(400)
