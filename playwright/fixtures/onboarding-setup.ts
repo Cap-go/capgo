@@ -1,4 +1,5 @@
 import type { OnboardingChannelEvent, OnboardingChannelEventProperties } from '../../src/utils/onboardingChannelAnalytics'
+import gsap from 'gsap'
 import { createPinia } from 'pinia'
 import { createApp, defineComponent, h, onMounted, ref } from 'vue'
 import { createRouter, createWebHistory, RouterView } from 'vue-router'
@@ -7,6 +8,7 @@ import AppOnboardingCliSteps from '../../src/components/dashboard/AppOnboardingC
 import AppOnboardingFlow from '../../src/components/dashboard/AppOnboardingFlow.vue'
 import AppOnboardingSetupChecklist from '../../src/components/dashboard/AppOnboardingSetupChecklist.vue'
 import BuilderIntroduction from '../../src/components/dashboard/BuilderIntroduction.vue'
+import ChannelIntroduction from '../../src/components/dashboard/ChannelIntroduction.vue'
 import GettingStartedNav from '../../src/components/dashboard/GettingStartedNav.vue'
 import OnboardingExploreBanner from '../../src/components/dashboard/OnboardingExploreBanner.vue'
 import OnboardingExploreReminder from '../../src/components/dashboard/OnboardingExploreReminder.vue'
@@ -98,7 +100,7 @@ if (params.get('otaComplete') === '1') {
   state.channels.push({ id: 1, app_id: previewAppId, name: 'staging', public: true })
 }
 const channelEvents: Array<{ event: OnboardingChannelEvent, properties: OnboardingChannelEventProperties }> = []
-const preview = { state, events, copyAiPlacements, channelEvents, appId: ref(previewAppId), command: ref('npx @capgo/cli@latest i [API_KEY]'), hiding: ref(false), selectedOrgId: ref('') }
+const preview = { state, events, copyAiPlacements, channelEvents, gsap, appId: ref(previewAppId), command: ref('npx @capgo/cli@latest i [API_KEY]'), hiding: ref(false), selectedOrgId: ref('') }
 const previewUserOnboarding = {
   profile_completed_at: '2026-09-25T00:00:00.000Z',
   abtests: {
@@ -283,7 +285,12 @@ const app = createApp(defineComponent({
       h('div', { class: 'mx-auto max-w-6xl' }, [
         navigationView
           ? h(RouterView)
-          : params.get('view') === 'flow'
+          : params.get('view') === 'channel-introduction'
+            ? h(ChannelIntroduction, {
+                canCreate: params.get('readOnly') !== '1',
+                onCreate: () => events.push('channel-create-requested'),
+              })
+            : params.get('view') === 'flow'
             ? h(AppOnboardingFlow, { onboarding: true, setupAppId: params.get('resume') ?? undefined })
             : builderComponentView
               ? h(AppOnboardingBuilderChecklist, {

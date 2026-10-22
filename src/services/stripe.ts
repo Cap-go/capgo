@@ -330,6 +330,19 @@ export async function scheduleTrialPlan(orgId: string, productId?: string) {
   })
 }
 
+// Starts the trial plan today: charges the saved card now and restarts the billing cycle.
+export async function startTrialPlanNow(orgId: string, productId?: string) {
+  const datafastAttribution = await getDatafastAttribution()
+  const affonsoReferral = await getAffonsoReferral()
+  return callBilling<{ plan: TrialPlan, subscriptionId: string }>('trial-plan/start-now', {
+    orgId,
+    ...(productId ? { productId } : {}),
+    affonsoReferral,
+    datafastVisitorId: datafastAttribution.visitorId,
+    datafastSessionId: datafastAttribution.sessionId,
+  })
+}
+
 export function cancelTrialPlan(orgId: string) {
   return callBilling<{ plan: TrialPlan | null }>('trial-plan/cancel', { orgId })
 }

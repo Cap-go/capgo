@@ -4,6 +4,7 @@ import type { GetLatest } from './get.ts'
 import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { aiBumpLevel } from './ai_bump_level.ts'
+import { cleanupBundles } from './cleanup.ts'
 import { createBundle } from './create.ts'
 import { deleteBundle } from './delete.ts'
 import { get } from './get.ts'
@@ -46,6 +47,13 @@ app.post('/upsert', writeBundleMiddleware, async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return upsertBundle(c, body, apikey)
+})
+
+// Server-side `bundle cleanup`: picks and soft-deletes old bundles in one request.
+app.post('/cleanup', writeBundleMiddleware, async (c) => {
+  const body = await getBodyOrQuery<unknown>(c)
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return cleanupBundles(c, body, apikey)
 })
 
 app.post('/ai_bump_level', writeBundleMiddleware, async (c) => {

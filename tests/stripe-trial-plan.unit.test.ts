@@ -6,8 +6,10 @@ import {
   isTrialPlanFirstInvoiceUnpaid,
   releaseTrialPlanSchedule,
   cancelTrialPlanScheduleForSubscription,
+  createStartNowSubscription,
   findPendingTrialPlanSchedule,
   getTrialPlanStartDate,
+  holdTrialPlanLock,
   settleTrialPlanFirstInvoice,
 } from '../supabase/functions/_backend/utils/stripe_trial_plan.ts'
 
@@ -96,6 +98,31 @@ describe('trial plan schedules', () => {
   it('keeps the schedule while the checkout subscription is still incomplete', async () => {
     const { stripe, cancel, list } = fakeStripe([{ id: 'sub_sched_trial', status: 'not_started', metadata: { capgo_trial_plan: 'true' } }])
     await cancelTrialPlanScheduleForSubscription(context, stripe, { id: 'sub_1', customer: 'cus_1', schedule: null, status: 'incomplete' } as unknown as Stripe.Subscription)
+    expect(list).not.toHaveBeenCalled()
+    expect(cancel).not.toHaveBeenCalled()
+  })
+
+  it('cancels the pending trial-end schedule once the plan was started now', async () => {
+    const { stripe, cancel } = fakeStripe([{ id: 'sub_sched_trial', status: 'not_started', metadata: { capgo_trial_plan: 'true' } }])
+    await cancelTrialPlanScheduleForSubscription(context, stripe, {
+      id: 'sub_now',
+      customer: 'cus_1',
+      schedule: null,
+      status: 'active',
+      metadata: { capgo_trial_plan: 'true', capgo_trial_started_now: 'true' },
+    } as unknown as Stripe.Subscription)
+    expect(cancel).toHaveBeenCalledWith('sub_sched_trial')
+  })
+
+  it('keeps the schedule for the subscription a trial plan schedule started', async () => {
+    const { stripe, cancel, list } = fakeStripe([{ id: 'sub_sched_trial', status: 'not_started', metadata: { capgo_trial_plan: 'true' } }])
+    await cancelTrialPlanScheduleForSubscription(context, stripe, {
+      id: 'sub_trial',
+      customer: 'cus_1',
+      schedule: null,
+      status: 'active',
+      metadata: { capgo_trial_plan: 'true' },
+    } as unknown as Stripe.Subscription)
     expect(list).not.toHaveBeenCalled()
     expect(cancel).not.toHaveBeenCalled()
   })
@@ -263,5 +290,140 @@ describe('schedulable trial plans', () => {
   it('exposes Solo, Maker and Team for the plan picker', async () => {
     const { SCHEDULABLE_TRIAL_PLAN_NAMES } = await import('../supabase/functions/_backend/utils/stripe_trial_plan.ts')
     expect([...SCHEDULABLE_TRIAL_PLAN_NAMES]).toEqual(['Solo', 'Maker', 'Team'])
+  })
+})
+
+describe('start trial plan now', () => {
+  const input = {
+    customerId: 'cus_1',
+    orgId: 'org_1',
+    priceId: 'price_solo',
+    paymentMethodId: 'pm_1',
+    automaticTax: true,
+    metadata: { affonso_referral: 'ref_example' },
+  }
+
+  it('charges the first invoice now and marks the subscription as a trial plan started now', async () => {
+    const create = vi.fn(async () => ({ id: 'sub_now', created: 1 }))
+    const stripe = { subscriptions: { create, list: vi.fn(async () => ({ data: [] })) } } as unknown as Stripe
+    await createStartNowSubscription(stripe, input)
+    expect(create).toHaveBeenCalledWith({
+      customer: 'cus_1',
+      items: [{ price: 'price_solo', quantity: 1 }],
+      default_payment_method: 'pm_1',
+      collection_method: 'charge_automatically',
+      payment_behavior: 'error_if_incomplete',
+      automatic_tax: { enabled: true },
+      metadata: { affonso_referral: 'ref_example', org_id: 'org_1', capgo_trial_plan: 'true', capgo_trial_started_now: 'true' },
+    })
+  })
+
+  it('returns the started-now subscription instead of charging again', async () => {
+    const live = { id: 'sub_now', status: 'active', metadata: { capgo_trial_plan: 'true', capgo_trial_started_now: 'true' } }
+    const create = vi.fn()
+    const list = vi.fn(async () => ({ data: [{ id: 'sub_old', status: 'canceled', metadata: {} }, live] }))
+    const stripe = { subscriptions: { create, list } } as unknown as Stripe
+    await expect(createStartNowSubscription(stripe, { ...input, paymentMethodId: 'pm_other' })).resolves.toEqual({ subscription: live, reused: true })
+    expect(list).toHaveBeenCalledWith({ customer: 'cus_1', status: 'all', limit: 100 })
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('refuses to start now when another subscription is live', async () => {
+    const create = vi.fn()
+    const list = vi.fn(async () => ({ data: [{ id: 'sub_checkout', status: 'past_due', metadata: {} }] }))
+    const stripe = { subscriptions: { create, list } } as unknown as Stripe
+    await expect(createStartNowSubscription(stripe, input)).rejects.toMatchObject({ cause: { error: 'trial_plan_already_subscribed' } })
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('lets a declined card be retried instead of replaying the decline', async () => {
+    const create = vi.fn(async () => ({ id: 'sub_now', created: 1 }))
+    const stripe = { subscriptions: { create, list: vi.fn(async () => ({ data: [] })) } } as unknown as Stripe
+    await createStartNowSubscription(stripe, input)
+    expect(create.mock.calls[0]).toHaveLength(1)
+  })
+
+  it('reports a declined card without leaving a subscription behind', async () => {
+    const create = vi.fn(async () => {
+      throw Object.assign(new Error('Your card was declined.'), { type: 'StripeCardError', statusCode: 402, code: 'card_declined' })
+    })
+    const stripe = { subscriptions: { create, list: vi.fn(async () => ({ data: [] })) } } as unknown as Stripe
+    await expect(createStartNowSubscription(stripe, input)).rejects.toMatchObject({
+      status: 400,
+      cause: { error: 'trial_plan_payment_failed', moreInfo: { code: 'card_declined' } },
+    })
+  })
+
+  it('rethrows other Stripe failures', async () => {
+    const create = vi.fn(async () => {
+      throw Object.assign(new Error('rate limited'), { type: 'StripeRateLimitError', statusCode: 429 })
+    })
+    const stripe = { subscriptions: { create, list: vi.fn(async () => ({ data: [] })) } } as unknown as Stripe
+    await expect(createStartNowSubscription(stripe, input)).rejects.toThrow('rate limited')
+  })
+})
+
+describe('trial plan lock', () => {
+  function fakeLockClient(failOn?: string) {
+    const queries: string[] = []
+    const query = vi.fn(async (text: string) => {
+      queries.push(text)
+      if (failOn && text.startsWith(failOn))
+        throw new Error('connection terminated')
+      return { rows: [] }
+    })
+    return { client: { query }, queries }
+  }
+
+  it('locks per customer and keeps the transaction busy while Stripe is slow', async () => {
+    vi.useFakeTimers()
+    try {
+      const { client, queries } = fakeLockClient()
+      const run = vi.fn(() => new Promise<string>(resolve => setTimeout(() => resolve('sub_now'), 40_000)))
+      const held = holdTrialPlanLock(context, client, 'cus_1', run, 5_000)
+      await vi.advanceTimersByTimeAsync(40_000)
+      await expect(held).resolves.toEqual({ result: 'sub_now', connectionLost: false })
+      expect(client.query).toHaveBeenCalledWith(expect.stringContaining('pg_advisory_xact_lock'), ['trial_plan:cus_1'])
+      expect(queries.filter(text => text === 'SELECT 1').length).toBeGreaterThanOrEqual(7)
+      expect(queries.at(-1)).toBe('COMMIT')
+    }
+    finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('returns the Stripe result when a heartbeat finds the connection lost', async () => {
+    vi.useFakeTimers()
+    try {
+      const { client, queries } = fakeLockClient('SELECT 1')
+      const run = vi.fn(() => new Promise<string>(resolve => setTimeout(() => resolve('sub_now'), 20_000)))
+      const held = holdTrialPlanLock(context, client, 'cus_1', run, 5_000)
+      await vi.advanceTimersByTimeAsync(20_000)
+      await expect(held).resolves.toEqual({ result: 'sub_now', connectionLost: true })
+      // The heartbeat stops after the first failure.
+      expect(queries.filter(text => text === 'SELECT 1')).toHaveLength(1)
+    }
+    finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('bounds the lock transaction with the idle timeout', async () => {
+    const { client, queries } = fakeLockClient()
+    await holdTrialPlanLock(context, client, 'cus_1', async () => 'sub_now')
+    expect(queries[0]).toMatch(/^BEGIN READ WRITE; SET LOCAL statement_timeout = \d+; SET LOCAL idle_in_transaction_session_timeout = \d+$/)
+  })
+
+  it('returns the Stripe result when the connection drops before COMMIT', async () => {
+    const { client } = fakeLockClient('COMMIT')
+    await expect(holdTrialPlanLock(context, client, 'cus_1', async () => 'sub_now')).resolves.toEqual({ result: 'sub_now', connectionLost: true })
+  })
+
+  it('rolls back and rethrows when the guarded call fails', async () => {
+    const { client, queries } = fakeLockClient()
+    await expect(holdTrialPlanLock(context, client, 'cus_1', async () => {
+      throw new Error('card_declined')
+    })).rejects.toThrow('card_declined')
+    expect(queries.at(-1)).toBe('ROLLBACK')
   })
 })

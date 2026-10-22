@@ -284,10 +284,14 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.route('**/rest/v1/build_requests?*', route => route.fulfill({ json: [], headers: { 'content-range': '*/0' } }))
       await page.route('**/app/com.demo.app/onboarding/builder', route => route.fulfill({ json: { canEnable: true } }))
       await page.reload()
-      if (process.env.VISUAL_DIFF_PHASE === 'before')
-        await page.getByRole('heading', { name: 'Start a native build', exact: true }).waitFor({ state: 'visible' })
-      else
-        await page.locator('[data-test="builder-introduction"]').waitFor({ state: 'visible' })
+      const introduction = page.locator('[data-test="builder-introduction"]')
+      if (process.env.VISUAL_DIFF_PHASE === 'after') {
+        await introduction.waitFor({ state: 'visible' })
+        return
+      }
+      // The base can already include the introduction after the Builder PR merges.
+      await page.getByRole('heading', { name: 'Start a native build', exact: true })
+        .or(introduction).waitFor({ state: 'visible' })
     },
   },
   ...[
@@ -548,6 +552,30 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
       await page.locator('[data-test="billing-subscription"]').waitFor()
     },
   },
+  {
+    slug: 'org-billing-trial-plan-start-now',
+    path: '/settings/organization/billing',
+    auth: true,
+    prepare: async (page) => {
+      await page.route('**/private/stripe_billing/overview', route => route.fulfill({ json: {
+        publishableKey: '',
+        card: { id: 'pm_visual', brand: 'visa', last4: '4242', expMonth: 12, expYear: 2030 },
+        subscription: null,
+        invoices: [],
+        openInvoice: null,
+        trialPlan: visualTrialPlan(true),
+      } }))
+      await page.reload()
+      // The base revision has no Start now button: capture Billing there instead.
+      if (process.env.VISUAL_DIFF_PHASE === 'after') {
+        await page.locator('[data-test="billing-trial-plan-start-now"]').click()
+        await page.locator('[data-test="trial-plan-start-now-confirm"]').waitFor()
+      }
+      else {
+        await page.locator('[data-test="billing-subscription"]').waitFor()
+      }
+    },
+  },
   { slug: 'account-settings', path: '/settings/account', auth: true },
   {
     slug: 'email-verification-send',
@@ -670,6 +698,24 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
   { slug: 'org-settings-team', path: '/settings/organization/members', auth: true },
   { slug: 'org-settings-billing', path: '/settings/organization/plans', auth: true },
   { slug: 'channels', path: '/app/com.demo.app/channels', auth: true },
+  {
+    slug: 'channels-empty',
+    path: '/app/com.demo.app/channels',
+    auth: true,
+    prepare: async (page) => {
+      await page.emulateMedia({ reducedMotion: 'reduce' })
+      await page.route('**/rest/v1/channels?*', route => route.fulfill({ json: [], headers: { 'content-range': '*/0' } }))
+      await page.reload()
+      const introduction = page.locator('[data-test="channel-introduction"]')
+      if (process.env.VISUAL_DIFF_PHASE === 'after') {
+        await introduction.waitFor({ state: 'visible' })
+        return
+      }
+      // The base can leave the loaded empty table visible while create permission resolves.
+      await introduction
+        .or(page.getByRole('cell', { name: 'No elements found', exact: true })).waitFor({ state: 'visible' })
+    },
+  },
   {
     slug: 'devices',
     path: '/app/com.demo.app/devices',

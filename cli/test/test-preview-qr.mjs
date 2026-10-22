@@ -42,10 +42,14 @@ function createHttpStub({ apps = [], bundles = [], channels = [] }) {
 
       if (pathname === 'bundle') {
         const appId = url.searchParams.get('app_id')
-        const page = Number(url.searchParams.get('page') || '0')
-        const rows = bundles.filter(row => row.app_id === appId && row.deleted === false)
-        const slice = rows.slice(page * 50, page * 50 + 50)
-        return { data: slice, error: null }
+        const id = url.searchParams.get('id')
+        const version = url.searchParams.get('version')
+        // Preview lookups must filter server-side, never page through every bundle.
+        if (!id && !version)
+          return { data: null, error: new Error(`unfiltered bundle list ${path}`) }
+        const rows = bundles.filter(row => row.app_id === appId && row.deleted === false
+          && (id ? row.id === Number(id) : row.name === version))
+        return { data: rows.slice(0, 1), error: null }
       }
 
       if (pathname === 'channel') {

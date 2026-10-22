@@ -40,26 +40,28 @@ export async function deleteAppInternal(
   }
 
   const client = await createCapgoClient(options.apikey, options.apiHost)
-  const userId = await resolveUserIdFromApiKey(client, options.apikey)
+  // The preflight already resolves the key's user and the app's org: look them up only if it could not.
+  const preflight = await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'app.delete', silent)
+  const userId = preflight?.userId ?? await resolveUserIdFromApiKey(client, options.apikey)
 
-  await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'app.delete', silent)
+  let orgId = preflight?.orgId ?? undefined
+  if (!orgId) {
+    const { data: appData, error: appError } = await invokeCapgoCliApi<{
+      owner_org?: string
+      app_id?: string
+    } & Record<string, unknown>>(`app/${encodeURIComponent(appId)}`, {
+      apikey: options.apikey,
+      method: 'GET',
+      body: undefined,
+      apiHost: options.apiHost,
+    })
 
-  const { data: appData, error: appError } = await invokeCapgoCliApi<{
-    owner_org?: string
-    app_id?: string
-  } & Record<string, unknown>>(`app/${encodeURIComponent(appId)}`, {
-    apikey: options.apikey,
-    method: 'GET',
-    body: undefined,
-    apiHost: options.apiHost,
-  })
-
-  if (appError && getCapgoCliHttpStatus(appError) !== 404) {
-    if (!silent)
-      log.warn(`Cannot get the app owner ${formatError(appError)}`)
+    if (appError && getCapgoCliHttpStatus(appError) !== 404) {
+      if (!silent)
+        log.warn(`Cannot get the app owner ${formatError(appError)}`)
+    }
+    orgId = typeof appData?.owner_org === 'string' ? appData.owner_org : undefined
   }
-
-  const orgId = typeof appData?.owner_org === 'string' ? appData.owner_org : undefined
   if (!orgId) {
     const message = `Cannot verify organization ownership for app ${appId}`
     if (!silent)
