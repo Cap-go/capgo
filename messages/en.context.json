@@ -3949,5 +3949,8 @@
   "ai-onboarding-task-setup-both": "Used in Capgo web console areas: pages/onboarding, components/dashboard. Onboarding: choosing Capgo Live Updates or Capgo Builder. Role: helper or description text. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "ai-onboarding-task-setup-unsure": "Used in Capgo web console areas: pages/onboarding, components/dashboard. Onboarding: choosing Capgo Live Updates or Capgo Builder. Role: helper or description text. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
   "setup-checklist-next-step": "Used in Capgo web console areas: components/dashboard. Onboarding: choosing Capgo Live Updates or Capgo Builder. Role: UI label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
-  "login-signing-in": "Used in Capgo web console areas: pages. Shown on the login page while a saved session signs the user in automatically. Role: status message. Translate for UI; keep Capgo product names unchanged."
+  "login-signing-in": "Used in Capgo web console areas: pages. Shown on the login page while a saved session signs the user in automatically. Role: status message. Translate for UI; keep Capgo product names unchanged.",
+  "ai-onboarding-copy-failed": "Used in Capgo web console areas: pages/onboarding. AI-agent onboarding (Capgo MCP) prompt page. Role: toast or status message. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "ai-onboarding-show-key": "Used in Capgo web console areas: pages/onboarding. AI-agent onboarding (Capgo MCP) prompt page. Role: button label. Translate for UI; keep Capgo product names, code, and placeholders unchanged.",
+  "ai-onboarding-hide-key": "Used in Capgo web console areas: pages/onboarding. AI-agent onboarding (Capgo MCP) prompt page. Role: button label. Translate for UI; keep Capgo product names, code, and placeholders unchanged."
 }

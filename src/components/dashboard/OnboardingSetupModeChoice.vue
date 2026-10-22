@@ -93,24 +93,28 @@ async function rememberSetupMode(mode: OnboardingSetupMode) {
   await rememberOnboarding(current => withOnboardingSetupMode(current, mode))
 }
 
-async function rememberOnboarding(update: (current: Json) => Json) {
+/** Returns whether the update was saved. Conflicts and write errors count as not saved. */
+async function rememberOnboarding(update: (current: Json) => Json): Promise<boolean> {
   const userId = main.user?.id
   if (!userId)
-    return
+    return false
   try {
-    await serializeUserOnboardingWrite(userId, async () => {
+    return await serializeUserOnboardingWrite(userId, async () => {
       const result = await replaceUserOnboardingWithRetry(
         userId,
         main.user!.onboarding,
         update,
         () => main.user?.id === userId,
       )
-      if (result.status === 'persisted' && main.user?.id === userId)
-        main.user = { ...main.user, onboarding: result.onboarding }
+      if (result.status !== 'persisted' || main.user?.id !== userId)
+        return false
+      main.user = { ...main.user, onboarding: result.onboarding }
+      return true
     })
   }
   catch (error) {
-    console.warn('Cannot remember onboarding setup mode', error)
+    console.warn('Cannot save onboarding choice', error)
+    return false
   }
 }
 
@@ -143,8 +147,12 @@ async function createOrganization() {
   try {
     const intent = aiGoalToIntent(chosenGoal)
     // Saved before the agent registers the app: app creation reads it to pick the
-    // matching Getting started checklist (live updates, Builder or both).
-    await rememberOnboarding(current => withOnboardingFields(current, { intent }))
+    // matching Getting started checklist (live updates, Builder or both). Without it the
+    // app could get the wrong checklist, so stop here and let the user retry.
+    if (!await rememberOnboarding(current => withOnboardingFields(current, { intent }))) {
+      toast.error(t('account-error'))
+      return
+    }
     const { data, error } = await invokeCapgoApi<{ id: string }>('organization', {
       method: 'POST',
       body: {

@@ -3950,5 +3950,8 @@
   "ai-onboarding-task-setup-both": "Set up cloud builds and live updates, in the order you confirm",
   "ai-onboarding-task-setup-unsure": "Recommend live updates or Builder, then set it up with you",
   "setup-checklist-next-step": "Your next step",
-  "login-signing-in": "Signing you in…"
+  "login-signing-in": "Signing you in…",
+  "ai-onboarding-copy-failed": "Couldn't copy automatically. Use “Show API key” below and copy the prompt by hand.",
+  "ai-onboarding-show-key": "Show API key",
+  "ai-onboarding-hide-key": "Hide API key"
 }

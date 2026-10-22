@@ -662,6 +662,9 @@ app.post('/', middlewareAuth(), async (c) => {
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
   if (notifyConsole) {
     await handleNotifyConsole(c, trackedBody, icon, appId, verifiedOrgId)
+    // Browser-login confirmations skip analytics (no queue write), and with CLI telemetry
+    // disabled they are the only login signal, so the AI onboarding page must see them too.
+    await markAiOnboardingAgentConnected(c, trackedBody.channel, trackedBody.event)
     logAcceptedEvent(c, identity, acceptedAt)
     return c.json({ ...BRES, event_id: identity.event_id })
   }

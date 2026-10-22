@@ -6,6 +6,7 @@ import type { Database, Json } from '~/types/supabase.types'
 import type { ChecklistPath } from '~/utils/dualOnboardingChecklists'
 import type { OnboardingABTestAssignment } from '~/utils/onboardingABTests'
 import type { OnboardingChannelEvent, OnboardingChannelEventProperties, OnboardingChannelStage } from '~/utils/onboardingChannelAnalytics'
+import type { OnboardingPlanStop } from '~/utils/onboardingPlanStops'
 import type {
   OnboardingAnalyticsStep,
   OnboardingCopyEvent,
@@ -85,6 +86,7 @@ import {
 } from '~/utils/onboardingAppDraft'
 import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { withOnboardingChannelOrigin } from '~/utils/onboardingChannelAnalytics'
+import { onboardingPlanStops } from '~/utils/onboardingPlanStops'
 import { canEditInitialOnboardingName, consumeProfileOnboardingHandoff, initialProfileOnboardingProgressSteps, initialProfileOnboardingSteps, needsInitialOnboardingName, PROFILE_ONBOARDING_HANDOFF_KEY } from '~/utils/onboardingProfile'
 import {
   createOnboardingDetailsFieldDebouncer,
@@ -192,12 +194,7 @@ const APP_DETAILS_ANALYTICS_STEPS: Record<AppDetailsStep, AppDetailsAnalyticsSte
   icon: 'app_icon',
 }
 
-interface UserCountStop {
-  value: number
-  label: string
-  planName: string
-  startingOut?: boolean
-}
+type UserCountStop = OnboardingPlanStop
 
 interface OrganizationWebsitePreview {
   hostname: string
@@ -298,20 +295,6 @@ const hasSelectedDevelopmentEnvironment = computed(() => Boolean(
 const publishAppQuestionPrimaryActionLabel = computed(() => hasSelectedDevelopmentEnvironment.value
   ? t('unified-onboarding-continue-intent')
   : t('organization-onboarding-development-environment-skip'))
-
-const fallbackUserCountStops: UserCountStop[] = [
-  { value: 2000, label: '2K', planName: 'Solo' },
-  { value: 10000, label: '10K', planName: 'Maker' },
-  { value: 100000, label: '100K', planName: 'Team' },
-  { value: 1000000, label: '1M+', planName: 'Enterprise' },
-]
-const startingOutUserCountStop: UserCountStop = {
-  value: 0,
-  label: '0',
-  planName: 'Solo',
-  startingOut: true,
-}
-const planNameOrder = ['Solo', 'Maker', 'Team', 'Enterprise'] as const
 
 const localCommand = isLocal(config.supaHost) ? ` --api-host ${defaultApiHost}` : ''
 // TODO(2027-03-19): Remove v3 compatibility after all existing OTA checklists have migrated.
@@ -590,20 +573,8 @@ const onboardingProgressSteps = computed<Array<{ id: OnboardingProgressStepId, l
   ? initialProfileOnboardingProgressSteps(onboardingForABTests.value).map(step => ({ id: step.id, label: t(step.labelKey) }))
   : appOnboardingSteps.value)
 const currentProgressStepId = computed<OnboardingProgressStepId>(() => stepperStepId.value)
-const userCountStops = computed<UserCountStop[]>(() => {
-  const planStops = planNameOrder.map(planName => main.plans.find(plan => plan.name === planName)).flatMap((plan) => {
-    if (!plan?.mau)
-      return []
-    const mau = Number(plan.mau)
-    if (!Number.isFinite(mau) || mau <= 0)
-      return []
-    return [{ value: mau, label: formatUserCount(mau, plan.name === 'Enterprise'), planName: plan.name }]
-  })
-  return [
-    startingOutUserCountStop,
-    ...(planStops.length === planNameOrder.length ? planStops : fallbackUserCountStops),
-  ]
-})
+// Shared with AI onboarding so both paths offer the same plan tiers.
+const userCountStops = computed<UserCountStop[]>(() => onboardingPlanStops(main.plans))
 const selectedUserCountStop = computed<UserCountStop | null>(() => estimatedUsersIndex.value === null ? null : userCountStops.value[Math.min(estimatedUsersIndex.value, userCountStops.value.length - 1)] ?? null)
 const showWebNativeRecommendation = computed(() => shouldShowWebNativeRecommendation({
   developmentEnvironment: selectedDevelopmentEnvironment.value,
@@ -1123,13 +1094,6 @@ function whiteCardPrimaryButtonClass() {
   return onboardingPrimaryButtonClass
 }
 
-function formatUserCount(value: number, plus = false) {
-  if (value >= 1_000_000)
-    return plus ? '1M+' : '1M'
-  if (value >= 1000)
-    return `${value / 1000}K`
-  return String(value)
-}
 function getUserCountStopTitle(stop: UserCountStop) {
   if (stop.startingOut)
     return t('organization-onboarding-starting-out')

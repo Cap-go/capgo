@@ -164,16 +164,19 @@ export async function findUsablePlainApiKey(
   userId: string,
   orgId?: string | null,
   appId?: string | null,
+  options: { name?: string } = {},
 ): Promise<string | null> {
   const isLiveKey = (expiresAt: string | null) => !expiresAt || new Date(expiresAt).getTime() > Date.now()
   let appUuid: string | null = null
 
-  const { data: keys, error } = await supabase
+  let query = supabase
     .from('apikeys')
     .select('key, expires_at, rbac_id, created_at')
     .eq('user_id', userId)
     .not('key', 'is', null)
-    .order('created_at', { ascending: false })
+  if (options.name)
+    query = query.eq('name', options.name)
+  const { data: keys, error } = await query.order('created_at', { ascending: false })
 
   if (error || !keys?.length)
     return null

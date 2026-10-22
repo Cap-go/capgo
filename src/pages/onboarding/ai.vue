@@ -17,13 +17,14 @@ import { buildAiOnboardingPrompt } from '~/services/cliAiPrompt'
 import { sendOnboardingEvent } from '~/services/onboardingTracking'
 import { useSupabase } from '~/services/supabase'
 import { replaceUserOnboardingWithRetry, serializeUserOnboardingWrite } from '~/services/userOnboardingWriteQueue'
-import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 import { onboardingPrimaryButtonClass, onboardingSecondaryButtonClass } from '~/utils/onboardingButtonClasses'
 import { allowOnboardingDashboardExploration, getAppGettingStartedPath } from '~/utils/onboardingRedirect'
 import { readAiAgentProgress, readAiOnboardingGoal, withOnboardingSetupMode } from '~/utils/onboardingSetupMode'
 
+// Must match AI_ONBOARDING_API_KEY_NAME in the backend agent marker.
+const AI_ONBOARDING_API_KEY_NAME = 'ai-onboarding'
 const APP_POLL_INTERVAL_MS = 3000
 // Long enough to read the confirmation, short enough to feel automatic.
 const AUTO_OPEN_DELAY_MS = 2500
@@ -34,12 +35,12 @@ const router = useRouter()
 const supabase = useSupabase()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
-const dialogStore = useDialogV2Store()
 
 const isLoading = ref(true)
 const isLoggingOut = ref(false)
 const isLeaving = ref(false)
 const loadFailed = ref(false)
+const orgLoadFailed = ref(false)
 const apiKey = ref<string | null>(null)
 const copied = ref(false)
 const detectedApp = ref<{ app_id: string, name: string | null } | null>(null)
@@ -84,16 +85,20 @@ function promptFor(key: string) {
 
 const prompt = computed(() => apiKey.value ? promptFor(apiKey.value) : '')
 // Show the prompt without the secret; the real key only goes to the clipboard.
-const promptPreview = computed(() => apiKey.value ? promptFor(MASKED_KEY) : '')
+// The key only appears after an explicit reveal, for copying by hand when the clipboard is blocked.
+const revealKey = ref(false)
+const promptPreview = computed(() => apiKey.value ? promptFor(revealKey.value ? apiKey.value : MASKED_KEY) : '')
 
 async function ensureApiKey(userId: string, orgId: string) {
-  const existing = await findUsablePlainApiKey(supabase, userId, orgId)
+  // Always hand out the dedicated key: the backend recognizes the agent's first CLI/MCP
+  // events by this key name to tick off live progress on this page.
+  const existing = await findUsablePlainApiKey(supabase, userId, orgId, null, { name: AI_ONBOARDING_API_KEY_NAME })
   if (existing)
     return existing
-  const { data, error } = await createDefaultApiKey(supabase, 'ai-onboarding', { orgId })
+  const { data, error } = await createDefaultApiKey(supabase, AI_ONBOARDING_API_KEY_NAME, { orgId })
   if (error)
     throw error
-  return typeof data?.key === 'string' ? data.key : await findUsablePlainApiKey(supabase, userId, orgId)
+  return typeof data?.key === 'string' ? data.key : await findUsablePlainApiKey(supabase, userId, orgId, null, { name: AI_ONBOARDING_API_KEY_NAME })
 }
 
 async function loadApiKey() {
@@ -123,12 +128,9 @@ async function copyPrompt() {
     sendOnboardingEvent('onboarding_ai_setup_prompt_copied', { org_id: organization.value?.gid ?? '' })
   }
   catch (error) {
+    // Never put the key in a dialog: it would bypass the masked preview. Point to the reveal toggle instead.
     console.error('Failed to copy AI onboarding prompt', error)
-    dialogStore.openDialog({
-      title: t('cannot-copy'),
-      description: prompt.value,
-      buttons: [{ text: t('button-cancel'), role: 'cancel' }],
-    })
+    toast.error(t('ai-onboarding-copy-failed'))
   }
 }
 
@@ -167,7 +169,9 @@ async function checkForApp() {
   stopPolling()
   sendOnboardingEvent('onboarding_ai_app_detected', { org_id: orgId, app_id: data[0].app_id })
   // Getting started is where the agent's progress shows live, so go there on our own.
-  autoOpenTimer = setTimeout(() => void openApp(), AUTO_OPEN_DELAY_MS)
+  autoOpenTimer = setTimeout(() => {
+    openApp().catch(error => console.error('Failed to open setup progress after AI onboarding', error))
+  }, AUTO_OPEN_DELAY_MS)
 }
 
 function stopPolling() {
@@ -206,6 +210,10 @@ async function switchToManual() {
   }
 }
 
+function reloadPage() {
+  window.location.reload()
+}
+
 async function exploreDashboard() {
   allowOnboardingDashboardExploration(main.user?.id ?? main.auth?.id)
   await router.push('/dashboard')
@@ -241,9 +249,22 @@ onMounted(async () => {
     if (disposed)
       return
     if (!organization.value) {
-      // No organization yet: the plan step creates it.
-      await router.replace('/onboarding/app')
-      return
+      // The plan step may have created the org but failed to refresh the list. Refetch before
+      // sending anyone back there, or a retry could create a second organization.
+      try {
+        await organizationStore.fetchOrganizations()
+      }
+      catch (error) {
+        console.error('Cannot load organizations for AI onboarding', error)
+        orgLoadFailed.value = true
+        return
+      }
+      if (disposed)
+        return
+      if (!organization.value) {
+        await router.replace('/onboarding/app')
+        return
+      }
     }
     await Promise.all([loadApiKey(), checkForApp()])
     if (!detectedApp.value)
@@ -269,6 +290,13 @@ onBeforeUnmount(() => {
 
         <div v-if="isLoading" class="flex min-h-[40vh] items-center justify-center">
           <Spinner size="w-16 h-16" />
+        </div>
+
+        <div v-else-if="orgLoadFailed" role="alert" class="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-300" data-test="onboarding-ai-org-load-error">
+          {{ t('organization-onboarding-refresh-failed') }}
+          <button type="button" class="ml-2 font-semibold underline" data-test="onboarding-ai-org-retry" @click="reloadPage">
+            {{ t('retry') }}
+          </button>
         </div>
 
         <template v-else>
@@ -324,6 +352,7 @@ onBeforeUnmount(() => {
               <pre
                 v-else
                 class="max-h-56 overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-slate-950 p-4 font-mono text-xs leading-5 text-slate-200 dark:border-white/10"
+                :class="{ 'select-all': revealKey }"
                 data-test="onboarding-ai-prompt"
               >{{ promptPreview || '…' }}</pre>
 
@@ -340,10 +369,22 @@ onBeforeUnmount(() => {
                 {{ copied ? t('ai-onboarding-prompt-copied') : t('ai-onboarding-copy-prompt') }}
               </button>
 
-              <p class="flex items-start gap-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                <IconShieldCheck class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                {{ t('ai-onboarding-prompt-key-note') }}
-              </p>
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <p class="flex items-start gap-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                  <IconShieldCheck class="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  {{ t('ai-onboarding-prompt-key-note') }}
+                </p>
+                <button
+                  v-if="prompt"
+                  type="button"
+                  class="d-btn d-btn-ghost d-btn-xs shrink-0 text-slate-600 dark:text-slate-300"
+                  :aria-pressed="revealKey"
+                  data-test="onboarding-ai-reveal-key"
+                  @click="revealKey = !revealKey"
+                >
+                  {{ revealKey ? t('ai-onboarding-hide-key') : t('ai-onboarding-show-key') }}
+                </button>
+              </div>
             </div>
           </div>
 

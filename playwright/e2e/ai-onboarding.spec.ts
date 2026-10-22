@@ -17,7 +17,28 @@ function localAdminClient() {
   return createClient(localSupabaseUrl, key, { auth: { persistSession: false } })
 }
 
+// Every test signs up a fresh user; remove it and everything it created afterwards.
+const createdEmails: string[] = []
+
+async function deleteSignup(email: string) {
+  const admin = localAdminClient()
+  const { data: user } = await admin.from('users').select('id').eq('email', email).maybeSingle()
+  if (!user)
+    return
+  const { data: orgs } = await admin.from('orgs').select('id, customer_id').eq('created_by', user.id)
+  for (const org of orgs ?? []) {
+    await admin.from('apps').delete().eq('owner_org', org.id)
+    await admin.from('org_users').delete().eq('org_id', org.id)
+    await admin.from('orgs').delete().eq('id', org.id)
+    if (org.customer_id)
+      await admin.from('stripe_info').delete().eq('customer_id', org.customer_id)
+  }
+  await admin.from('apikeys').delete().eq('user_id', user.id)
+  await admin.auth.admin.deleteUser(user.id)
+}
+
 async function registerAndName(page: Page, email: string) {
+  createdEmails.push(email)
   await page.goto('/register/')
   await page.fill('[data-test="email"]', email)
   await page.fill('[data-test="password"]', 'Password123!')
@@ -36,6 +57,11 @@ async function registerAndName(page: Page, email: string) {
 }
 
 test.describe('AI onboarding', () => {
+  test.afterEach(async () => {
+    for (const email of createdEmails.splice(0))
+      await deleteSignup(email).catch(error => console.warn('AI onboarding e2e cleanup failed', email, error))
+  })
+
   test('creates the organization with the chosen plan and waits for the agent to register the app', async ({ page }) => {
     const email = `ai-onboarding-${Date.now()}@example.com`
     await registerAndName(page, email)

@@ -5,7 +5,7 @@ export interface OnboardingPlanStop {
   startingOut?: boolean
 }
 
-export const ONBOARDING_PLAN_NAME_ORDER = ['Solo', 'Maker', 'Team', 'Enterprise'] as const
+const ONBOARDING_PLAN_NAME_ORDER = ['Solo', 'Maker', 'Team', 'Enterprise'] as const
 
 const FALLBACK_PLAN_STOPS: OnboardingPlanStop[] = [
   { value: 2000, label: '2K', planName: 'Solo' },
@@ -14,14 +14,14 @@ const FALLBACK_PLAN_STOPS: OnboardingPlanStop[] = [
   { value: 1000000, label: '1M+', planName: 'Enterprise' },
 ]
 
-export const STARTING_OUT_PLAN_STOP: OnboardingPlanStop = {
+const STARTING_OUT_PLAN_STOP: OnboardingPlanStop = {
   value: 0,
   label: '0',
   planName: 'Solo',
   startingOut: true,
 }
 
-export function formatOnboardingUserCount(value: number, plus = false) {
+function formatOnboardingUserCount(value: number, plus = false) {
   if (value >= 1_000_000)
     return plus ? '1M+' : '1M'
   if (value >= 1000)
@@ -32,7 +32,7 @@ export function formatOnboardingUserCount(value: number, plus = false) {
 /**
  * Monthly-active-user tiers offered in onboarding. The chosen `value` is sent as
  * `estimatedMau` to `POST /organization`, which picks the org's initial trial plan from it.
- * Mirrors the tiers of the manual wizard's organization step.
+ * Used by both the manual wizard and AI onboarding.
  */
 export function onboardingPlanStops(plans: Array<{ name: string, mau: number | string | null }>): OnboardingPlanStop[] {
   const planStops = ONBOARDING_PLAN_NAME_ORDER.map(planName => plans.find(plan => plan.name === planName)).flatMap((plan) => {

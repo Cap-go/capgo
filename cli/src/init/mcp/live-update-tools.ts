@@ -13,10 +13,10 @@ import { createKeyInternal } from '../../key.js'
 import { isAppAlreadyExistsError } from '../app-conflict.js'
 import {
   applyInitAutoTestChange,
-  getCompatibleUpdaterVersionForPackage,
   getGitRepoStatus,
   getInitSuggestedOtaVersion,
   getInitUpdaterPluginConfig,
+  resolveCompatibleUpdaterInstall,
   resolveInitTargetPath,
 } from '../command.js'
 import { getUpdaterInstallState } from '../updater.js'
@@ -143,9 +143,12 @@ export function buildDeps(
         const installState = getUpdaterInstallState(packageJsonPath)
         if (!installState.ready) {
           const pm = getPMAndCommand()
-          // Match the project's Capacitor major, like interactive `init` (Capacitor 7 needs updater v7).
-          const version = await getCompatibleUpdaterVersionForPackage(packageJsonPath, pm)
-          const install = spawnSync(pm.pm, ['add', `@capgo/capacitor-updater@${version}`], { cwd: projectDir, stdio: 'pipe' })
+          // Match the project's Capacitor major, like interactive `init` (Capacitor 7 needs updater v7),
+          // and stop with the same reason `init` gives when Capgo cannot be installed at all.
+          const resolved = await resolveCompatibleUpdaterInstall(packageJsonPath, pm)
+          if (!resolved.ok)
+            throw new Error(resolved.error)
+          const install = spawnSync(pm.pm, ['add', `@capgo/capacitor-updater@${resolved.version}`], { cwd: projectDir, stdio: 'pipe' })
           if (install.status !== 0)
             throw new Error(install.stderr?.toString() || 'Package install failed')
         }

@@ -36,10 +36,6 @@ async function submit(form: { password: string, email: string }) {
     const { error } = await supabase.auth.setSession(registered.session)
     if (error)
       throw error
-    // Keep the spinner until onboarding has loaded; the button must not look idle meanwhile.
-    const failure = await router.push('/dashboard')
-    if (failure)
-      isLoading.value = false
   }
   catch (error) {
     isLoading.value = false
@@ -51,6 +47,20 @@ async function submit(form: { password: string, email: string }) {
         message = body.message
     }
     setErrors('register-account', [code === 'account_deleted' ? t('used-to-create') : message], {})
+    return
+  }
+
+  // The account exists and the user is signed in from here on: a navigation problem is not a
+  // signup failure. Keep the spinner until onboarding has loaded, and fall back to a full page
+  // load if the in-app navigation fails.
+  try {
+    const failure = await router.push('/dashboard')
+    if (failure)
+      isLoading.value = false
+  }
+  catch (navigationError) {
+    console.error('Navigation after registration failed', navigationError)
+    window.location.assign('/dashboard')
   }
 }
 </script>

@@ -13,6 +13,9 @@ import { closeClient, getDrizzleClient, getPgClient } from './pg.ts'
  * Published CLIs already send these events, so no CLI release is needed. The update only
  * matches users in AI setup mode who are not marked yet, so it is a no-op for everyone else.
  */
+/** Name of the API key the console creates for the AI onboarding prompt. */
+export const AI_ONBOARDING_API_KEY_NAME = 'ai-onboarding'
+
 export async function markAiOnboardingAgentConnected(
   c: Context<MiddlewareKeyVariables>,
   channel: string,
@@ -22,6 +25,11 @@ export async function markAiOnboardingAgentConnected(
   // Any MCP event (including "MCP Server Started" when the agent loads it) proves MCP is installed.
   const source = channel === 'mcp' ? 'mcp' : getAppOnboardingLoginSource(channel, event)
   if (!source || auth?.authType !== 'apikey')
+    return
+  // Only the key the AI onboarding prompt hands out can be the agent we are waiting for. This
+  // in-memory check keeps every other CLI/MCP event free of an extra database query.
+  const keyName = auth.apikey?.name ?? c.get('apikey')?.name
+  if (keyName !== AI_ONBOARDING_API_KEY_NAME)
     return
 
   let pool: Awaited<ReturnType<typeof getPgClient>> | undefined

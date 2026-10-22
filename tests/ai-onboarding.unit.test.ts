@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import messages from '../messages/en.json'
 import { buildAiOnboardingPrompt } from '../src/services/cliAiPrompt'
@@ -69,9 +71,22 @@ describe('onboarding setup mode', () => {
     expect(defaultAiOrganizationName('A', 'My organization', () => 'A')).toBe('My organization')
   })
 
-  it.concurrent('ships every AI onboarding message key', () => {
-    const keys = Object.keys(messages).filter(key => key.startsWith('ai-onboarding-'))
-    expect(keys.length).toBeGreaterThan(20)
+  it.concurrent('ships every AI onboarding message key the screens use', () => {
+    const used = new Set<string>()
+    for (const file of ['src/components/dashboard/OnboardingSetupModeChoice.vue', 'src/pages/onboarding/ai.vue']) {
+      const source = readFileSync(resolve(__dirname, '..', file), 'utf8')
+      for (const match of source.matchAll(/t\(['`](ai-onboarding-[\w-]+?)(?:\$\{|['`])/g))
+        used.add(match[1]!)
+    }
+    // Keys built from a variable: every goal option and goal-specific task must exist.
+    for (const goal of ['ota', 'builder', 'both', 'unsure']) {
+      used.add(`ai-onboarding-goal-${goal}-label`)
+      used.add(`ai-onboarding-goal-${goal}-desc`)
+      used.add(`ai-onboarding-task-setup-${goal}`)
+    }
+    const shipped = new Set(Object.keys(messages).filter(key => key.startsWith('ai-onboarding-')))
+    expect([...used].filter(key => !key.endsWith('-') && !shipped.has(key))).toEqual([])
+    expect([...shipped].filter(key => !used.has(key))).toEqual([])
     expect(messages['ai-onboarding-default-org-name']).toContain('{name}')
   })
 })
