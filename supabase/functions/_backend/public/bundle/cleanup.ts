@@ -3,7 +3,9 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { greaterThan, increment, lessThan, tryParse } from '@std/semver'
 import { z } from 'zod'
+import { HTTPException } from 'hono/http-exception'
 import { quickError, simpleError } from '../../utils/hono.ts'
+import { beginWriteTransaction, checkoutPgClient, closeClient, getPgClient, logPgError, releasePgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { integerLikeSchema, safeParseSchema } from '../../utils/schema_validation.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
@@ -108,22 +110,18 @@ async function fetchActiveVersions(c: Context<MiddlewareKeyVariables>, apikey: D
 
 /**
  * Bundle ids targeted by a channel (`version` or `rollout_version`). Pages by last seen id so
- * a concurrently deleted channel cannot shift a later page and hide a link. `onlyIds` limits
- * the scan to channels pointing at those bundles.
+ * a concurrently deleted channel cannot shift a later page and hide a link.
  */
-async function fetchLinkedVersionIds(c: Context<MiddlewareKeyVariables>, apikey: Database['public']['Tables']['apikeys']['Row'], appId: string, onlyIds?: number[]) {
+async function fetchLinkedVersionIds(c: Context<MiddlewareKeyVariables>, apikey: Database['public']['Tables']['apikeys']['Row'], appId: string) {
   const supabase = supabaseApikey(c, apikey.key)
   const linked = new Set<number>()
   let lastId = 0
   while (true) {
-    let query = supabase
+    const { data, error } = await supabase
       .from('channels')
       .select('id, version, rollout_version')
       .eq('app_id', appId)
       .gt('id', lastId)
-    if (onlyIds)
-      query = query.or(`version.in.(${onlyIds.join(',')}),rollout_version.in.(${onlyIds.join(',')})`)
-    const { data, error } = await query
       .order('id', { ascending: true })
       .limit(SELECT_PAGE_SIZE)
     if (error)
@@ -137,6 +135,79 @@ async function fetchLinkedVersionIds(c: Context<MiddlewareKeyVariables>, apikey:
     if (!data || data.length < SELECT_PAGE_SIZE)
       return linked
     lastId = data[data.length - 1].id
+  }
+}
+
+/**
+ * Soft-deletes one batch in a single transaction. Each bundle's lifecycle lock (the same
+ * `pg_advisory_xact_lock(version_id)` channel promotion takes) is held while the channel links
+ * are checked and the rows updated, so a concurrent promotion either commits first and keeps
+ * its bundle, or waits and then sees it deleted. With `ignoreChannel`, linked bundles are
+ * deleted too and the unlink_channels_from_deleted_version trigger clears their links.
+ */
+async function softDeleteBatch(
+  c: Context<MiddlewareKeyVariables>,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+  appId: string,
+  ids: number[],
+  ignoreChannel: boolean,
+): Promise<number[]> {
+  const effectiveApikey = apikey.key ?? c.get('capgkey')
+  if (!effectiveApikey)
+    throw simpleError('cannot_delete_bundle', 'You can\'t access this app', { app_id: appId })
+  const pgClient = await getPgClient(c)
+  let dbClient: Awaited<ReturnType<typeof checkoutPgClient>> | null = null
+  let transactionStarted = false
+  try {
+    dbClient = await checkoutPgClient(pgClient)
+    await beginWriteTransaction(dbClient)
+    transactionStarted = true
+    // Sorted so concurrent cleanups take the locks in the same order (PG evaluates volatile
+    // output expressions after ORDER BY).
+    await dbClient.query(
+      'SELECT pg_catalog.pg_advisory_xact_lock(id) FROM pg_catalog.unnest($1::bigint[]) AS t(id) ORDER BY id',
+      [ids],
+    )
+    // Same caller identity the delete-permission trigger checks on the REST path.
+    await dbClient.query(
+      'SELECT set_config(\'request.headers\', $1, true)',
+      [JSON.stringify({ capgkey: effectiveApikey })],
+    )
+    const result = await dbClient.query<{ id: number }>(
+      `UPDATE public.app_versions AS v
+       SET deleted = true
+       WHERE v.app_id = $1
+         AND v.id = ANY($2::bigint[])
+         AND v.deleted = false
+         AND ($3::boolean OR NOT EXISTS (
+           SELECT 1
+           FROM public.channels AS ch
+           WHERE ch.app_id = v.app_id
+             AND (ch.version = v.id OR ch.rollout_version = v.id)
+         ))
+       RETURNING v.id`,
+      [appId, ids, ignoreChannel],
+    )
+    await dbClient.query('COMMIT')
+    return result.rows.map(row => Number(row.id))
+  }
+  catch (error) {
+    if (dbClient && transactionStarted) {
+      try {
+        await dbClient.query('ROLLBACK')
+      }
+      catch {
+        // Preserve the original error when rollback itself fails.
+      }
+    }
+    if (error instanceof HTTPException)
+      throw error
+    logPgError(c, 'cleanup_bundles_soft_delete', error)
+    throw error
+  }
+  finally {
+    releasePgClient(pgClient, dbClient)
+    await closeClient(c, pgClient)
   }
 }
 
@@ -166,31 +237,21 @@ export async function cleanupBundles(c: Context<MiddlewareKeyVariables>, bodyRaw
   if (body.dry_run === true || !plan.removed.length)
     return c.json({ ...plan, dry_run: body.dry_run === true })
 
-  // Soft-delete in batches. Linked bundles are only in `removed` with ignore_channel, which
-  // means "unlink and delete": the unlink_channels_from_deleted_version trigger clears those
-  // links, including links made after planning. Without it, re-check each batch's links right
-  // before deleting it so a bundle linked in the meantime is kept.
-  const supabase = supabaseApikey(c, apikey.key)
+  // Soft-delete in batches, each its own locked transaction (see softDeleteBatch).
   const removedIds = new Set<number>()
   for (let i = 0; i < plan.removed.length; i += DELETE_BATCH_SIZE) {
-    let ids = plan.removed.slice(i, i + DELETE_BATCH_SIZE).map(row => row.id)
-    if (!ignoreChannel) {
-      const linkedNow = await fetchLinkedVersionIds(c, apikey, body.app_id, ids)
-      ids = ids.filter(id => !linkedNow.has(id))
+    const ids = plan.removed.slice(i, i + DELETE_BATCH_SIZE).map(row => row.id)
+    let deleted: number[]
+    try {
+      deleted = await softDeleteBatch(c, apikey, body.app_id, ids, ignoreChannel)
     }
-    if (!ids.length)
-      continue
-    const { data, error } = await supabase
-      .from('app_versions')
-      .update({ deleted: true })
-      .eq('app_id', body.app_id)
-      .eq('deleted', false)
-      .in('id', ids)
-      .select('id')
-    if (error)
-      quickError(500, 'cannot_delete_version', 'Cannot delete bundles', { supabaseError: error, removed_ids: [...removedIds] })
-    for (const row of data ?? [])
-      removedIds.add(row.id)
+    catch (error) {
+      if (error instanceof HTTPException)
+        throw error
+      quickError(500, 'cannot_delete_version', 'Cannot delete bundles', { error: (error as Error)?.message, removed_ids: [...removedIds] })
+    }
+    for (const id of deleted)
+      removedIds.add(id)
   }
 
   const removed = plan.removed.filter(row => removedIds.has(row.id))
