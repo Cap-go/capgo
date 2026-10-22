@@ -79,7 +79,7 @@ async function fetchChannelsPage(appid: string, page: number, options: CapgoHttp
 export async function checkVersionNotUsedInChannel(
   client: CapgoClient,
   appid: string,
-  versionData: AppVersionRow,
+  versionData: Pick<AppVersionRow, 'id' | 'name'>,
   options: CheckVersionOptions = {},
 ) {
   const { silent = false, autoUnlink = false, channelName, requireMatch = false, apikey, apiHost } = options

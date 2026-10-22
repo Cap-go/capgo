@@ -64,48 +64,51 @@ describe('bundle lookups use one filtered request', () => {
 })
 
 describe('deleteSpecificVersion', () => {
-  it('deletes with a single DELETE /bundle request', async () => {
-    const { calls, invoke } = recordingInvoke([{ data: { status: 'ok' }, error: null }])
+  it('deletes with a single request to the CLI delete endpoint', async () => {
+    const { calls, invoke } = recordingInvoke([{ data: { id: 7, name: '1.2.3' }, error: null }])
     await deleteSpecificVersion(client, 'com.test.app', '1.2.3', { silent: true, apikey: 'key', invoke })
-    expect(calls).toEqual([{ path: 'bundle', method: 'DELETE', body: { app_id: 'com.test.app', version: '1.2.3' } }])
+    expect(calls).toEqual([{ path: 'private/cli/bundles/delete', method: 'POST', body: { app_id: 'com.test.app', name: '1.2.3' } }])
   })
 
-  it('reports a missing bundle after one filtered lookup', async () => {
+  it('reports a missing bundle from the single request', async () => {
     const { calls, invoke } = recordingInvoke([
-      { data: null, error: makeBundleApiError({ error: 'cannot_delete_version', message: 'Cannot delete version' }, 400) },
-      { data: [], error: null },
+      { data: null, error: makeBundleApiError({ error: 'bundle_not_found', message: 'Bundle not found' }, 404) },
     ])
     await expect(deleteSpecificVersion(client, 'com.test.app', '9.9.9', { silent: true, apikey: 'key', invoke }))
       .rejects
       .toThrow('App version com.test.app@9.9.9 doesn\'t exist')
-    expect(calls).toHaveLength(2)
-    expect(new URL(calls[1].path, 'https://example.test/').searchParams.get('version')).toBe('9.9.9')
+    expect(calls).toHaveLength(1)
   })
 
-  it('reports the delete failure when the follow-up lookup fails too', async () => {
-    const { invoke } = recordingInvoke([
-      { data: null, error: makeBundleApiError({ error: 'cannot_delete_version', message: 'Cannot delete version' }, 400) },
-      { data: null, error: makeBundleApiError({ error: 'cannot_get_bundle', message: 'Cannot get bundle' }, 500) },
-    ])
+  it('reports a backend without the endpoint as unsupported, not as a missing app', async () => {
+    const { invoke } = recordingInvoke([{ data: null, error: makeBundleApiError({ error: 'not_found', message: 'Not Found' }, 404) }])
     await expect(deleteSpecificVersion(client, 'com.test.app', '1.2.3', { silent: true, apikey: 'key', invoke }))
       .rejects
-      .toThrow(/Could not delete bundle for app com\.test\.app: cannot_delete_version/)
+      .toThrow(/does not support the CLI bundle delete endpoint/)
   })
 
-  it('does not report a backend failure as a missing bundle', async () => {
-    const { invoke } = recordingInvoke([
-      { data: null, error: makeBundleApiError({ error: 'cannot_delete_version', message: 'Cannot delete version' }, 400) },
-      { data: [bundleRow], error: null },
-    ])
+  it('surfaces a linked refusal without a bundle id as a delete error', async () => {
+    const { calls, invoke } = recordingInvoke([{
+      data: null,
+      error: makeBundleApiError({ error: 'bundle_linked', message: 'Bundle is linked to a channel' }, 409),
+    }])
     await expect(deleteSpecificVersion(client, 'com.test.app', '1.2.3', { silent: true, apikey: 'key', invoke }))
       .rejects
-      .toThrow(/Could not delete bundle for app com\.test\.app/)
+      .toThrow(/Could not delete bundle for app com\.test\.app: bundle_linked/)
+    expect(calls).toHaveLength(1)
   })
 
-  it('surfaces permission errors from DELETE /bundle', async () => {
+  it('surfaces database failures as delete errors', async () => {
+    const { invoke } = recordingInvoke([{ data: null, error: makeBundleApiError({ error: 'cannot_get_bundle', message: 'Cannot get bundle' }, 400) }])
+    await expect(deleteSpecificVersion(client, 'com.test.app', '1.2.3', { silent: true, apikey: 'key', invoke }))
+      .rejects
+      .toThrow(/Could not delete bundle for app com\.test\.app: cannot_get_bundle/)
+  })
+
+  it('surfaces permission errors', async () => {
     const { invoke } = recordingInvoke([{
       data: null,
-      error: makeBundleApiError({ error: 'cannot_delete_bundle', message: 'You can\'t access this app' }, 403),
+      error: makeBundleApiError({ error: 'cannot_delete_bundle', message: 'You can\'t delete bundles of this app' }, 403),
     }])
     await expect(deleteSpecificVersion(client, 'com.test.app', '1.2.3', { silent: true, apikey: 'key', invoke }))
       .rejects

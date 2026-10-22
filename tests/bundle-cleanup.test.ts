@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, createAppVersions, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { APIKEY_TEST_ALL, BASE_URL, createAppVersions, getEndpointUrl, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const APPNAME = `com.app.cleanup.${randomUUID()}`
 // Scope every request to 5.x so the seeded bundles of the app are never touched.
@@ -106,5 +106,39 @@ describe('[POST] /bundle/cleanup', () => {
     expect(data.total).toBe(0)
     expect(data.active).toBeGreaterThan(0)
     expect(data.removed).toEqual([])
+  })
+})
+
+// Runs after the cleanup cases above: 5.0.3 is linked to a channel, 5.0.4 is active.
+describe('[POST] /private/cli/bundles/delete', () => {
+  function cliDelete(name: string) {
+    return fetch(getEndpointUrl('/private/cli/bundles/delete'), {
+      method: 'POST',
+      headers: { 'capgkey': APIKEY_TEST_ALL, 'capgo_api': '2025-10-01', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ app_id: APPNAME, name }),
+    })
+  }
+
+  it('reports a missing bundle as bundle_not_found', async () => {
+    const response = await cliDelete('5.9.9')
+    expect(response.status).toBe(404)
+    expect((await response.json() as { error: string }).error).toBe('bundle_not_found')
+  })
+
+  it('refuses a linked bundle with its id and channels', async () => {
+    const response = await cliDelete('5.0.3')
+    expect(response.status).toBe(409)
+    const data = await response.json() as { error: string, moreInfo: { bundle_id: number, channels: string[] } }
+    expect(data.error).toBe('bundle_linked')
+    expect(data.moreInfo.bundle_id).toEqual(expect.any(Number))
+    expect(data.moreInfo.channels).toHaveLength(1)
+    expect(await deletedNames()).not.toContain('5.0.3')
+  })
+
+  it('soft-deletes an unlinked bundle in one request', async () => {
+    const response = await cliDelete('5.0.4')
+    expect(response.status).toBe(200)
+    expect((await response.json() as { name: string }).name).toBe('5.0.4')
+    expect(await deletedNames()).toContain('5.0.4')
   })
 })

@@ -210,6 +210,23 @@ async function softDeleteBatch(
   }
 }
 
+/** Locked soft-delete of `ids` (see softDeleteBatch) on a pool of its own. Returns the deleted ids. */
+export async function softDeleteBundles(
+  c: Context<MiddlewareKeyVariables>,
+  effectiveApikey: string,
+  appId: string,
+  ids: number[],
+  ignoreChannel: boolean,
+): Promise<number[]> {
+  const pgClient = await getPgClient(c)
+  try {
+    return await softDeleteBatch(c, pgClient, effectiveApikey, appId, ids, ignoreChannel)
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
 export async function cleanupBundles(c: Context<MiddlewareKeyVariables>, bodyRaw: unknown, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const parsed = safeParseSchema(cleanupBundleBodySchema, bodyRaw)
   if (!parsed.success)
