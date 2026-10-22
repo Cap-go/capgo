@@ -54,20 +54,26 @@ afterEach(() => {
 
 describe('dashboard exploration banner eligibility', () => {
   it.each([
-    { scenario: 'first app created in this session', orgCount: 1, cachedCount: 0, indexedCount: 1, show: true },
-    { scenario: 'one pending app after reload', orgCount: 1, cachedCount: 1, indexedCount: 1, show: true },
-    { scenario: 'second app created in this session', orgCount: 1, cachedCount: 1, indexedCount: 2, show: false },
-    { scenario: 'multiple organizations with a route app', orgCount: 2, cachedCount: 1, indexedCount: 1, show: false },
-    { scenario: 'multiple apps with a route app', orgCount: 1, cachedCount: 2, indexedCount: 2, show: false },
-    { scenario: 'org count includes an app absent from the index', orgCount: 1, cachedCount: 2, indexedCount: 1, show: false },
-  ])('$scenario', async ({ orgCount, cachedCount, indexedCount, show }) => {
+    { scenario: 'first app created in this session', orgCount: 1, cachedCount: 0, indexedCount: 1, liveCount: 1, show: true },
+    { scenario: 'one pending app after reload', orgCount: 1, cachedCount: 1, indexedCount: 1, liveCount: 1, show: true },
+    { scenario: 'one remaining app after deletion with a stale index', orgCount: 1, cachedCount: 1, indexedCount: 2, liveCount: 1, show: true },
+    { scenario: 'second app created in this session', orgCount: 1, cachedCount: 1, indexedCount: 2, liveCount: 2, show: false },
+    { scenario: 'second app before the index refreshes', orgCount: 1, cachedCount: 1, indexedCount: 1, liveCount: 2, show: false },
+    { scenario: 'no apps after deletion', orgCount: 1, cachedCount: 0, indexedCount: 1, liveCount: 0, show: false },
+    { scenario: 'multiple organizations with a route app', orgCount: 2, cachedCount: 1, indexedCount: 1, liveCount: 1, show: false },
+    { scenario: 'multiple apps with a route app', orgCount: 1, cachedCount: 2, indexedCount: 2, liveCount: 2, show: false },
+    { scenario: 'org count includes an app absent from the index', orgCount: 1, cachedCount: 2, indexedCount: 1, liveCount: 2, show: false },
+  ])('$scenario', async ({ orgCount, cachedCount, indexedCount, liveCount, show }) => {
     state.organizations = Array.from({ length: orgCount }, (_, i) => ({ gid: `example-org-${i}`, app_count: cachedCount }))
     state.indexedApps = Array.from({ length: indexedCount }, (_, i) => ({ app_id: `com.example.app${i}` }))
+    const limit = vi.fn(async () => ({
+      data: Array.from({ length: liveCount }, (_, i) => ({ ...state.app, app_id: i === 0 ? state.app.app_id : `com.example.other${i}` })),
+      error: null,
+    }))
     const query = {
       select: () => query,
       eq: state.eq.mockImplementation(() => query),
-      limit: () => query,
-      maybeSingle: async () => ({ data: state.app, error: null }),
+      limit,
     }
     state.from.mockReturnValue(query)
 
@@ -80,8 +86,11 @@ describe('dashboard exploration banner eligibility', () => {
     await nextTick()
 
     expect(container.querySelector('[data-test="explore-banner"]')?.textContent ?? null).toBe(show ? state.app.app_id : null)
-    expect(state.from).toHaveBeenCalledTimes(show ? 1 : 0)
-    if (show)
-      expect(state.eq).toHaveBeenCalledWith('app_id', state.app.app_id)
+    const lookupExpected = orgCount === 1 && cachedCount <= 1
+    expect(state.from).toHaveBeenCalledTimes(lookupExpected ? 1 : 0)
+    if (lookupExpected) {
+      expect(state.eq).toHaveBeenCalledWith('owner_org', 'example-org-0')
+      expect(limit).toHaveBeenCalledWith(2)
+    }
   })
 })

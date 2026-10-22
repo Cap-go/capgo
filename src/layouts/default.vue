@@ -51,21 +51,16 @@ async function refreshPendingOnboardingApp() {
   const singleOrganization = selectableOrganizations.value.length === 1
     ? selectableOrganizations.value[0]
     : undefined
-  const organizationAppCount = singleOrganization
-    ? Math.max(singleOrganization.app_count, organizationStore.getAppsByOrgId(singleOrganization.gid).length)
-    : 0
-  if (!singleOrganization || organizationAppCount !== 1)
+  if (!singleOrganization || singleOrganization.app_count > 1)
     return
 
   const routeAppId = 'app' in route.params && typeof route.params.app === 'string' ? route.params.app : null
   const candidateAppId = routeAppId ?? getOnboardingResumeAppId(main.user?.id ?? main.auth?.id)
 
-  let query = supabase.from('apps').select('app_id, need_onboarding, onboarding')
-  if (candidateAppId)
-    query = query.eq('app_id', candidateAppId)
-  else
-    query = query.eq('owner_org', singleOrganization!.gid)
-  const { data, error } = await query.limit(1).maybeSingle()
+  const { data, error } = await supabase.from('apps')
+    .select('app_id, need_onboarding, onboarding')
+    .eq('owner_org', singleOrganization.gid)
+    .limit(2)
 
   if (lookupRun !== onboardingLookupRun)
     return
@@ -75,12 +70,19 @@ async function refreshPendingOnboardingApp() {
     return
   }
 
-  if (data && shouldSkipOnboardingResume(data.onboarding))
+  if (!data || data.length !== 1)
+    return
+
+  const app = data[0]
+  if (candidateAppId && app.app_id !== candidateAppId)
+    return
+
+  if (shouldSkipOnboardingResume(app.onboarding))
     return
 
   pendingOnboardingAppId.value = getOnboardingExploreBannerAppId({
-    app: data,
-    organizationAppCount,
+    app,
+    organizationAppCount: data.length,
     organizationCount: selectableOrganizations.value.length,
   }) ?? ''
 }
