@@ -39,7 +39,7 @@ afterEach(() => {
 describe('self-assignment animation path alignment', () => {
   it.each([0, 287])('uses the packet canvas origin with a %i px centered margin', (margin) => {
     const container = document.createElement('div')
-    document.body.append(container)
+    document.body.appendChild(container)
     app = createApp(ChannelSelfAssignMockup, { embedded: true })
     app.use(createI18n({ legacy: false, locale: 'en', messages: { en } }))
     app.mount(container)

@@ -95,10 +95,10 @@ async function settle() {
 
 async function mountTable(appId = 'com.example.channels') {
   container = document.createElement('div')
-  document.body.append(container)
+  document.body.appendChild(container)
   const target = document.createElement('div')
   target.id = 'dialog-v2-content'
-  document.body.append(target)
+  document.body.appendChild(target)
   const pinia = createPinia()
   currentAppId = ref(appId)
   app = createApp({ setup: () => () => h(ChannelTable, { appId: currentAppId.value }) })

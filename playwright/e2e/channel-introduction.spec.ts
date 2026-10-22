@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 const fixture = '/playwright/fixtures/onboarding-setup.html?view=channel-introduction'
 
 test('explains channels inline, keeps documentation beside Continue, and creates only on request', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 1200 })
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.goto(fixture)
   const intro = page.locator('[data-test="channel-introduction"]')
