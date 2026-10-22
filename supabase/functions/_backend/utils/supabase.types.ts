@@ -2227,6 +2227,8 @@ export type Database = {
       }
       org_invitation_email_requests: {
         Row: {
+          bento_email: string | null
+          bento_synced_at: string | null
           id: string
           invited_by_user_id: string | null
           message_id: string | null
@@ -2236,6 +2238,8 @@ export type Database = {
           tmp_user_id: number | null
         }
         Insert: {
+          bento_email?: string | null
+          bento_synced_at?: string | null
           id?: string
           invited_by_user_id?: string | null
           message_id?: string | null
@@ -2245,6 +2249,8 @@ export type Database = {
           tmp_user_id?: number | null
         }
         Update: {
+          bento_email?: string | null
+          bento_synced_at?: string | null
           id?: string
           invited_by_user_id?: string | null
           message_id?: string | null
