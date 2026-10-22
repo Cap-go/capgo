@@ -91,8 +91,12 @@ export function getSetupNotice(appId: string, progress: AppTodoProgress, webHost
   setupDebug('checklists evaluated', { ota_available: !!ota, builder_available: !!builder, ota_complete: otaComplete, builder_complete: finishedBuilder.length > 0 })
   const billing = readBilling(progress.billing, webHost)
   // Direct-offer orgs (no free trial, never paid) cannot upload or build until
-  // they subscribe: choosing a plan is their first step, before setup.
-  if (!completed.length && billing?.trialSkipped) {
+  // they subscribe: choosing a plan is their first step, before setup. Keep the
+  // guards below for unreliable snapshots (OTA check errors, an all-pending
+  // dual checklist) so the setup mention is never invented.
+  if (!completed.length && billing?.trialSkipped
+    && (!lists.includes('ota') || ota)
+    && !(ota && builder && !otaStarted && !builderStarted)) {
     const secondary = [
       ...(ota ? [otaStarted ? 'finish setting up live updates' : 'set up live updates'] : []),
       ...(builder ? [builderStarted ? 'continue setting up cloud builds' : 'explore cloud builds with Capgo Builder'] : []),

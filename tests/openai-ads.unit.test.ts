@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { buildOpenAIRegistrationEvent, buildOpenAISubscriptionEvent, getOpenAISubscriptionSourceUrl, normalizeOpenAICurrency, normalizeOpenAIName, trackOpenAIRegistration, trackOpenAISubscription } from '../supabase/functions/_backend/utils/openai_ads.ts'
-import { getInvoicePayment, trackOpenAIFirstPayment } from '../supabase/functions/_backend/utils/openai_ads_first_payment.ts'
+import { getInvoicePayment, getOpenAIFirstPaymentAt, isIncompleteSubscriptionActivation, trackOpenAIFirstPayment } from '../supabase/functions/_backend/utils/openai_ads_first_payment.ts'
 
 const envValues: Record<string, string> = {}
 
@@ -189,8 +189,27 @@ describe('openai ads conversions api', () => {
 
     it('reads the amount actually paid from a paid invoice only', () => {
       expect(getInvoicePayment({ status: 'paid', amount_paid: 11880, currency: 'usd' })).toEqual({ amount: 11880, currency: 'USD' })
-      expect(getInvoicePayment({ status: 'open', amount_paid: 0, currency: 'usd' })).toEqual({})
-      expect(getInvoicePayment(null)).toEqual({})
+      expect(getInvoicePayment({ status: 'open', amount_paid: 0, currency: 'usd' })).toBeNull()
+      expect(getInvoicePayment({ status: 'paid', amount_paid: 0, currency: 'usd' })).toBeNull()
+      expect(getInvoicePayment(null)).toBeNull()
+    })
+
+    it('reports a first payment once, and recovers one first recorded by an incomplete subscription', () => {
+      const eventOccurredAtIso = '2026-10-19T11:45:00.000Z'
+      const activation = { type: 'customer.subscription.updated', data: { object: { status: 'active' }, previous_attributes: { status: 'incomplete' } } } as any
+      const renewal = { type: 'customer.subscription.updated', data: { object: { status: 'active' }, previous_attributes: { items: {} } } } as any
+      expect(isIncompleteSubscriptionActivation(activation)).toBe(true)
+      expect(isIncompleteSubscriptionActivation(renewal)).toBe(false)
+      expect(isIncompleteSubscriptionActivation({ ...activation, type: 'customer.subscription.created' })).toBe(false)
+      // paid_at moved from null to set in this webhook.
+      expect(getOpenAIFirstPaymentAt({ firstPaidAt: paidAt, currentPaidAt: null, stripeEvent: renewal, eventOccurredAtIso, now })).toBe(paidAt)
+      // Renewals and retries: paid_at already set, nothing to report.
+      expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: paidAt, stripeEvent: renewal, eventOccurredAtIso, now })).toBeNull()
+      // The incomplete subscription that set paid_at is now paid.
+      expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: paidAt, stripeEvent: activation, eventOccurredAtIso, now })).toBe(eventOccurredAtIso)
+      // An org that first paid long ago is not a new conversion.
+      expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: '2026-01-01T00:00:00.000Z', stripeEvent: activation, eventOccurredAtIso, now })).toBeNull()
+      expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: null, stripeEvent: activation, eventOccurredAtIso, now })).toBeNull()
     })
 
     it('uses the console plans page as source url', () => {
@@ -260,7 +279,7 @@ describe('openai ads conversions api', () => {
       })
     })
 
-    it('still reports the conversion without a value when the invoice lookup fails, and never throws', async () => {
+    it('never reports without proof of payment, and never throws', async () => {
       envValues.OPENAI_ADS_API_KEY = 'test-key'
       vi.useFakeTimers({ now, toFake: ['Date'] })
       const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))
@@ -270,8 +289,16 @@ describe('openai ads conversions api', () => {
         expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent }, {
           loadUser: async () => record,
           retrieveInvoice: async () => { throw new Error('stripe down') },
-        })).toBe(true)
-        expect(JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string).events[0].data).toEqual({ type: 'plan_enrollment', plan_id: 'Solo' })
+        })).toBe(false)
+        // An incomplete subscription: paid_at is set but the invoice is still open.
+        expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent }, {
+          loadUser: async () => record,
+          retrieveInvoice: async () => ({ status: 'open' as const, amount_paid: 0, currency: 'usd' }),
+        })).toBe(false)
+        expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent: null }, {
+          loadUser: async () => record,
+          retrieveInvoice: async () => ({ status: 'paid' as const, amount_paid: 1400, currency: 'usd' }),
+        })).toBe(false)
 
         expect(await trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt, planId: 'Solo', stripeEvent }, {
           loadUser: async () => { throw new Error('db down') },
@@ -285,7 +312,7 @@ describe('openai ads conversions api', () => {
       finally {
         vi.useRealTimers()
       }
-      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(fetchMock).not.toHaveBeenCalled()
     })
   })
 })

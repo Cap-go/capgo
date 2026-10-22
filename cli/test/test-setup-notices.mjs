@@ -325,3 +325,16 @@ test('trial orgs, churned orgs, paying orgs and orgs with credits keep the setup
     assert.equal(getSetupNotice(appId, progress, 'https://console.example.com')?.kind, 'setup')
   }
 })
+
+test('the plan-first notice keeps the unreliable-snapshot guards', () => {
+  const direct = (progress) => {
+    Object.assign(progress.billing, { trialEndsAt: '2025-12-01T00:00:05Z', orgCreatedAt: '2025-12-01T00:00:00Z', hasPaid: false })
+    return progress
+  }
+  const withErrors = direct(fixture(['ota']))
+  withErrors.checkErrors = ['add_channel']
+  assert.equal(getSetupNotice(appId, withErrors, 'https://console.example.com'), undefined)
+  const dualPending = direct(fixture(['ota', 'builder']))
+  dualPending.onboarding.setup.steps.ota.login_cli_mcp.status = 'pending'
+  assert.equal(getSetupNotice(appId, dualPending, 'https://console.example.com'), undefined)
+})

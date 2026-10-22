@@ -15,7 +15,7 @@ import { getFallbackCreditProductId } from '../utils/credits.ts'
 import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { trackOpenAIFirstPayment } from '../utils/openai_ads_first_payment.ts'
+import { getOpenAIFirstPaymentAt, trackOpenAIFirstPayment } from '../utils/openai_ads_first_payment.ts'
 import { getOrgAdminMemberEmailsForTags } from '../utils/org_email_notifications.ts'
 import { beginWriteTransaction, closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
@@ -1233,7 +1233,13 @@ async function createdOrUpdated(
     if (didPersist === 'missing')
       return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { stripeData })
 
-    if (firstPaidAt) {
+    const openAIFirstPaymentAt = getOpenAIFirstPaymentAt({
+      firstPaidAt,
+      currentPaidAt: currentStripeInfo?.paid_at,
+      stripeEvent: c.get('stripeEvent'),
+      eventOccurredAtIso,
+    })
+    if (openAIFirstPaymentAt) {
       // Paid conversion for OpenAI Ads, for every first payment (direct offer
       // or converted trial). Scheduled right after the commit, before any step
       // that can fail the webhook: a Stripe retry no longer sees paid_at as new.
@@ -1241,7 +1247,7 @@ async function createdOrUpdated(
       await backgroundTask(c, trackOpenAIFirstPayment(c, {
         orgId: org.id,
         ownerUserId: org.created_by,
-        paidAt: firstPaidAt,
+        paidAt: openAIFirstPaymentAt,
         planId: plan.name || stripeData.data.price_id,
         stripeEvent: c.get('stripeEvent'),
       }, {
