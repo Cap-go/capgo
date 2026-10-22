@@ -1662,6 +1662,9 @@ async function scheduleOpenAIFirstPayment(c: Context, org: Org, paidAt: string, 
 // An invoiced subscription's first invoice was paid after paid_at was set:
 // report the conversion the subscription webhook had to skip.
 async function recoverOpenAIFirstPaymentFromInvoice(c: Context<MiddlewareKeyVariablesStripe>, org: Org, stripeEvent: Stripe.Event, customer: StripeInfoRow) {
+  // Subscription events are handled (with their stale-event checks) by createdOrUpdated.
+  if (stripeEvent.type !== 'invoice.updated')
+    return
   const paidAt = getOpenAIFirstPaymentAt({
     firstPaidAt: null,
     currentPaidAt: customer.paid_at,

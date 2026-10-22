@@ -202,6 +202,12 @@ describe('openai ads conversions api', () => {
       expect(isIncompleteSubscriptionActivation(activation)).toBe(true)
       expect(isIncompleteSubscriptionActivation(renewal)).toBe(false)
       expect(isIncompleteSubscriptionActivation({ ...activation, type: 'customer.subscription.created' })).toBe(false)
+      // A Stripe trial that converts: its first real invoice was just paid.
+      const trialConverted = { type: 'customer.subscription.updated', data: { object: { status: 'active' }, previous_attributes: { status: 'trialing' } } } as any
+      expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: '2026-10-01T00:00:00.000Z', stripeEvent: trialConverted, eventOccurredAtIso, now })).toBe(eventOccurredAtIso)
+      expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: '2026-06-01T00:00:00.000Z', stripeEvent: trialConverted, eventOccurredAtIso, now })).toBeNull()
+      // An incomplete subscription is paid or expires within a day: a 2-week-old paid_at is another subscription.
+      expect(getOpenAIFirstPaymentAt({ firstPaidAt: null, currentPaidAt: '2026-10-01T00:00:00.000Z', stripeEvent: activation, eventOccurredAtIso, now })).toBeNull()
       // paid_at moved from null to set in this webhook.
       expect(getOpenAIFirstPaymentAt({ firstPaidAt: paidAt, currentPaidAt: null, stripeEvent: renewal, eventOccurredAtIso, now })).toBe(paidAt)
       // Renewals and retries: paid_at already set, nothing to report.
@@ -395,6 +401,26 @@ describe('openai ads conversions api', () => {
         },
         budgetMs: 20,
       })).toBe(false)
+      expect(fetchMock).not.toHaveBeenCalled()
+    })
+
+    it('bounds the owner lookup inside the shared budget', async () => {
+      envValues.OPENAI_ADS_API_KEY = 'test-key'
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+      const fetchMock = vi.fn()
+      vi.stubGlobal('fetch', fetchMock)
+      const stripeEvent = { type: 'customer.subscription.created', data: { object: { status: 'active', latest_invoice: 'in_first' } } } as any
+      try {
+        const result = trackOpenAIFirstPayment(createContext(), { orgId, ownerUserId: record.id, paidAt: new Date().toISOString(), planId: 'Solo', stripeEvent }, {
+          loadUser: () => new Promise(() => {}),
+          retrieveInvoice: async () => ({ status: 'paid' as const, amount_paid: 1400, currency: 'usd' }),
+        })
+        await vi.advanceTimersByTimeAsync(5_000)
+        expect(await result).toBe(false)
+      }
+      finally {
+        vi.useRealTimers()
+      }
       expect(fetchMock).not.toHaveBeenCalled()
     })
   })

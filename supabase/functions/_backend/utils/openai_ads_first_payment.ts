@@ -35,9 +35,12 @@ const FIRST_PAYMENT_BUDGET_MS = 25_000
 // event is timestamped with the payment, so the API's 7-day limit does not
 // apply to paid_at; the window only keeps orgs that paid long ago (and start a
 // new subscription) from being reported. An incomplete subscription is paid or
-// expires within a day; an invoiced one has payment terms of up to ~30 days.
+// expires within a day; an invoiced one has payment terms, and a Stripe trial
+// lasts weeks.
 const INCOMPLETE_RECOVERY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
-const INVOICE_RECOVERY_WINDOW_MS = 60 * 24 * 60 * 60 * 1000
+const LONG_RECOVERY_WINDOW_MS = 60 * 24 * 60 * 60 * 1000
+// The owner lookup runs beside the invoice lookup, inside the shared budget.
+const USER_LOOKUP_TIMEOUT_MS = 5_000
 
 /**
  * Payment proof from the subscription's latest invoice. Only a `paid` invoice
@@ -53,12 +56,20 @@ export function getInvoicePayment(invoice: InvoicePayment | null | undefined): {
   return { amount: invoice.amount_paid, currency: invoice.currency.toUpperCase() }
 }
 
-/** An `incomplete` subscription became active: its first invoice was just paid. */
-export function isIncompleteSubscriptionActivation(stripeEvent: Stripe.Event | null | undefined): boolean {
-  if (stripeEvent?.type !== 'customer.subscription.updated')
-    return false
+/**
+ * The subscription that set paid_at before any payment became active, so its
+ * first real invoice was just paid: `incomplete` (payment pending) or
+ * `trialing` (Stripe-managed trial) to `active`.
+ */
+export function getSubscriptionActivationSource(stripeEvent: Stripe.Event | null | undefined): 'incomplete' | 'trialing' | null {
+  if (stripeEvent?.type !== 'customer.subscription.updated' || stripeEvent.data.object.status !== 'active')
+    return null
   const previousStatus = (stripeEvent.data.previous_attributes as Partial<Stripe.Subscription> | undefined)?.status
-  return previousStatus === 'incomplete' && stripeEvent.data.object.status === 'active'
+  return previousStatus === 'incomplete' || previousStatus === 'trialing' ? previousStatus : null
+}
+
+export function isIncompleteSubscriptionActivation(stripeEvent: Stripe.Event | null | undefined): boolean {
+  return getSubscriptionActivationSource(stripeEvent) === 'incomplete'
 }
 
 /**
@@ -82,8 +93,8 @@ export function isFirstSubscriptionInvoicePaid(stripeEvent: Stripe.Event | null 
  * When to report the first payment, or null when this webhook must not.
  * - paid_at went from null to set in this webhook: report at that time.
  * - paid_at was set before the first invoice was paid, and it is paid now: an
- *   `incomplete` subscription became active, or an invoiced subscription's
- *   first invoice was paid. Only while paid_at is recent (see the windows), so
+ *   `incomplete` or `trialing` subscription became active, or an invoiced
+ *   subscription's first invoice was paid. Only while paid_at is recent (see the windows), so
  *   an org that paid long ago and starts a new subscription is not reported.
  * The event id is per org, so OpenAI drops a second send for the same org.
  */
@@ -98,9 +109,10 @@ export function getOpenAIFirstPaymentAt(input: {
     return input.firstPaidAt
   if (!input.currentPaidAt)
     return null
-  const windowMs = isIncompleteSubscriptionActivation(input.stripeEvent)
+  const activation = getSubscriptionActivationSource(input.stripeEvent)
+  const windowMs = activation === 'incomplete'
     ? INCOMPLETE_RECOVERY_WINDOW_MS
-    : isFirstSubscriptionInvoicePaid(input.stripeEvent) ? INVOICE_RECOVERY_WINDOW_MS : 0
+    : activation === 'trialing' || isFirstSubscriptionInvoicePaid(input.stripeEvent) ? LONG_RECOVERY_WINDOW_MS : 0
   const paidAt = Date.parse(input.currentPaidAt)
   if (!windowMs || !Number.isFinite(paidAt) || (input.now ?? Date.now()) - paidAt > windowMs)
     return null
@@ -144,6 +156,14 @@ async function loadInvoicePayment(c: Context, stripeEvent: Stripe.Event | null |
   return null
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
 /**
  * Report an org's first payment to OpenAI Ads as `subscription_created`.
  * Call when getOpenAIFirstPaymentAt returns a time, from backgroundTask. Sends
@@ -155,7 +175,7 @@ export async function trackOpenAIFirstPayment(c: Context, input: OpenAIFirstPaym
       return false
     const deadlineMs = Date.now() + (deps.budgetMs ?? FIRST_PAYMENT_BUDGET_MS)
     const [user, payment] = await Promise.all([
-      deps.loadUser(input.ownerUserId),
+      withTimeout(deps.loadUser(input.ownerUserId), USER_LOOKUP_TIMEOUT_MS, 'owner lookup timed out'),
       loadInvoicePayment(c, input.stripeEvent, deps, deadlineMs),
     ])
     if (!payment) {
