@@ -500,7 +500,7 @@ export async function syncBillingBentoTagsFromStoredStripeInfo(c: Context, org: 
   const plans = await getBillingPlans(c)
   const plan = plans.find(candidate => candidate.stripe_id === stripeInfo.product_id || candidate.stripe_id_us === stripeInfo.product_id) ?? null
   const trialPlanNames = plans.map(candidate => candidate.name)
-  const segment = await customerToSegmentOrg(c, org.id, stripeInfo.price_id, plan, trialPlanNames)
+  const segment = await customerToSegmentOrg(c, org, stripeInfo.price_id, plan, trialPlanNames)
   await syncBillingBentoTags(c, org, customerId, segment)
 }
 
@@ -1263,7 +1263,7 @@ async function createdOrUpdated(
       await writePaidAtAtomically(c, stripeData.data.customer_id, paidAt)
     }
 
-    const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan, billingPlans.map(candidate => candidate.name))
+    const segment = await customerToSegmentOrg(c, org, stripeData.data.price_id, plan, billingPlans.map(candidate => candidate.name))
     const isMonthly = getPlanType(plan, stripeData.data.price_id) === 'monthly'
     const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
     const subscriptionMetadata = buildSubscriptionEventMetadata(stripeData, plan, previousPlan)
@@ -1322,7 +1322,7 @@ async function createdOrUpdated(
     }
   }
   else {
-    const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id)
+    const segment = await customerToSegmentOrg(c, org, stripeData.data.price_id)
     await syncBillingBentoTags(c, org, stripeData.data.customer_id, segment)
   }
 }
@@ -1340,7 +1340,7 @@ async function updateStripeInfo(c: Context, stripeData: StripeData) {
 }
 
 async function didCancel(c: Context, org: Org, customerId: string) {
-  const segment = await customerToSegmentOrg(c, org.id, 'canceled')
+  const segment = await customerToSegmentOrg(c, org, 'canceled')
   await syncBillingBentoTags(c, org, customerId, segment)
   await sendEventToTracking(c, {
     bento: {

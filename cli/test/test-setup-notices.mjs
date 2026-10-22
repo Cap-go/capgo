@@ -240,6 +240,48 @@ test('expired and unknown trials have the approved plan wording', () => {
   }
 })
 
+test('orgs created without a trial (direct offer) never see trial wording', () => {
+  const progress = finish(fixture(['ota']), 'ota')
+  progress.billing.trialEndsAt = '2025-12-01T00:00:05Z'
+  progress.billing.orgCreatedAt = '2025-12-01T00:00:00Z'
+  progress.billing.hasPaid = false
+  const text = message(progress)
+  assert.ok(text.includes('Choose a plan to start using Capgo. 14-day money-back guarantee. Cancel anytime.'), text)
+  assert.doesNotMatch(text, /trial/i)
+  assert.ok(text.includes('View plans: https://console.example.com/settings/organization/plans?oid='))
+})
+
+test('a churned direct-offer org (paid before) or an older server without hasPaid keeps the trial wording', () => {
+  for (const hasPaid of [true, undefined]) {
+    const progress = finish(fixture(['ota']), 'ota')
+    progress.billing.trialEndsAt = '2025-12-01T00:00:05Z'
+    progress.billing.orgCreatedAt = '2025-12-01T00:00:00Z'
+    if (hasPaid !== undefined)
+      progress.billing.hasPaid = hasPaid
+    const text = message(progress)
+    assert.ok(text.includes('Your trial has ended.'), text)
+    assert.ok(!text.includes('money-back'), text)
+  }
+})
+
+test('a null orgCreatedAt (as returned by the server when unknown) keeps the trial wording', () => {
+  const progress = finish(fixture(['ota']), 'ota')
+  progress.billing.trialEndsAt = '2025-12-01T00:00:05Z'
+  progress.billing.orgCreatedAt = null
+  const text = message(progress)
+  assert.ok(text.includes('Your trial has ended.'), text)
+  assert.ok(!text.includes('money-back'), text)
+})
+
+test('a normal 15-day trial with orgCreatedAt keeps the trial wording', () => {
+  const progress = finish(fixture(['ota']), 'ota')
+  progress.billing.trialEndsAt = '2025-12-16T00:00:00Z'
+  progress.billing.orgCreatedAt = '2025-12-01T00:00:00Z'
+  const text = message(progress)
+  assert.ok(text.includes('Your trial has ended.'), text)
+  assert.ok(text.includes('Choose a Capgo plan to continue using Capgo.'), text)
+})
+
 
 test('trial reminders handle the last minute and the exact expiration instant', () => {
   const progress = finish(fixture(['ota']), 'ota')
