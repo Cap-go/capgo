@@ -23,6 +23,7 @@ import { backgroundTask, INVALID_STRING_APP_ID, isInternalVersionName, isLimited
 import { isRunningVersionAction } from './stats_actions.ts'
 
 const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
+const STATS_OWNER_PG_OPTIONS = { rethrowReadOnlyConnectionErrors: true } as const
 const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION = parse('7.17.0')
 const DOWNLOAD_FAIL_FIXED_PLUGIN_VERSION_V6 = parse('6.14.25')
 
@@ -134,9 +135,9 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
   // Same plan actions as /updates, so both endpoints share the cached owner entry.
   const appOwner = edgeCache
-    ? (await getAppOwnerWithEdgeCache(c, app_id, drizzleClient, planActions)).value
+    ? (await getAppOwnerWithEdgeCache(c, app_id, drizzleClient, planActions, STATS_OWNER_PG_OPTIONS)).value
     // Snippet fills must not outlive a trial: they need its end date.
-    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions, { includeTrialAt: getSnippetEdgeAnswerBps(c) > 0 })
+    : await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions, { ...STATS_OWNER_PG_OPTIONS, includeTrialAt: getSnippetEdgeAnswerBps(c) > 0 })
   const allowDeviceCustomId = appOwner?.allow_device_custom_id
   const device = makeDevice(body, allowDeviceCustomId)
   const deviceDataCollection = parseDeviceDataCollection(appOwner?.device_data_collection ?? cachedAppStatus.device_data_collection)
