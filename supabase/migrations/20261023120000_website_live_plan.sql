@@ -96,7 +96,8 @@ ALTER TABLE public.apps
       AND website_url ~ '^https://([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+([A-Za-z]{2,63}|xn--[A-Za-z0-9-]{1,59})(:[0-9]{1,5})?/?$'
       AND (
         website_url !~ ':[0-9]'
-        OR pg_catalog.substring(website_url from ':(\d+)')::integer <= 65535
+        -- regexp_match (not substring … from): Tinbase's SQL parser rejects the latter.
+        OR (regexp_match(website_url, ':([0-9]+)(/|$)'))[1]::integer BETWEEN 0 AND 65535
       )
     )
   ) NOT VALID;
