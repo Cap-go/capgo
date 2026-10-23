@@ -135,6 +135,8 @@ export function updatesCacheTags(c: Context, appId: string) {
 export interface EdgeCacheLookup<T> {
   value: T | null
   hit: boolean
+  /** Set when a stats replay owner read failed and must not be treated as on-prem. */
+  lookupFailed?: boolean
 }
 
 async function cachedLookup<T>(
