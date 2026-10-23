@@ -517,6 +517,9 @@ function buttonName(p: Database['public']['Tables']['plans']['Row']) {
   if (isTrial.value || organizationStore.currentOrganizationFailed) {
     return t('plan-upgrade')
   }
+  // No active plan (credits-only, canceled, unpaid): nothing to upgrade/downgrade from.
+  if (!currentPlanLabel.value)
+    return t('choose-plan-name', { plan: p.name })
   return p.price_m >= (currentPlan.value?.price_m ?? 0) ? (t('plan-upgrade-v2')) : (t('downgrade'))
 }
 
