@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const executeMock = vi.fn()
 const getPgClientMock = vi.fn((_c: unknown, _readOnly?: boolean) => ({}))
 const getUserIdFromApikeyMock = vi.fn()
-const checkPermissionPgMock = vi.fn(async () => true)
+const checkPermissionPgFreshRetryMock = vi.fn(async () => true)
 
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class {
@@ -52,7 +52,8 @@ vi.mock('../supabase/functions/_backend/utils/rate_limit.ts', () => ({
 }))
 
 vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
-  checkPermissionPg: checkPermissionPgMock,
+  checkPermissionPg: vi.fn(async () => true),
+  checkPermissionPgFreshRetry: checkPermissionPgFreshRetryMock,
 }))
 
 const attackerPrefix = 'orgs/attacker-org/apps/com.attacker.app'
@@ -149,7 +150,7 @@ describe('attachment upload routes reject traversal keys before authorization', 
     expect(await result.response.json()).toMatchObject({ error: 'invalid_file_path' })
     expect(result.durableObject.fetch).not.toHaveBeenCalled()
     expect(getUserIdFromApikeyMock).not.toHaveBeenCalled()
-    expect(checkPermissionPgMock).not.toHaveBeenCalled()
+    expect(checkPermissionPgFreshRetryMock).not.toHaveBeenCalled()
   }
 
   it.each([
@@ -181,7 +182,7 @@ describe('attachment upload routes reject traversal keys before authorization', 
     expect(response.status).toBe(400)
     expect(durableObject.fetch).not.toHaveBeenCalled()
     expect(getUserIdFromApikeyMock).not.toHaveBeenCalled()
-    expect(checkPermissionPgMock).not.toHaveBeenCalled()
+    expect(checkPermissionPgFreshRetryMock).not.toHaveBeenCalled()
   })
 })
 
@@ -238,7 +239,7 @@ describe('upload durable object binds the created key', () => {
 
   it('refuses HEAD for a different key', async () => {
     const { request } = await setup(key)
-    const response = await request('GET', otherKey)
+    const response = await request('HEAD', otherKey)
     expect(response.status).toBe(400)
   })
 
