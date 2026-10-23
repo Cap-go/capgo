@@ -156,6 +156,27 @@ BEGIN
           )
         END
       )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM public.notifications AS n
+        WHERE n.owner_org = o.id
+          AND n.event = v_event
+          AND n.uniq_id = (
+            'retention:'
+            || p_alert_type
+            || ':'
+            || to_char(
+              GREATEST(si.canceled_at, si.subscription_anchor_end, si.trial_at) AT TIME ZONE 'UTC',
+              'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+            )
+          )
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pgmq.q_canceled_org_retention_alerts AS q
+        WHERE q.message -> 'payload' ->> 'org_id' = o.id::text
+          AND q.message -> 'payload' ->> 'alert_type' = p_alert_type
+      )
     ORDER BY o.id
     LIMIT v_batch_size
     FOR UPDATE OF o
