@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(56);
+SELECT plan(57);
 
 -- pgmq schema is not granted to service_role; use postgres-owned helpers.
 CREATE OR REPLACE FUNCTION pg_temp.delete_canceled_org_retention_alerts(
@@ -170,6 +170,7 @@ SELECT
   'a0c1e2f3-1111-4aaa-8bbb-000000000009'::uuid AS spent_credits_org,
   'a0c1e2f3-1111-4aaa-8bbb-00000000000a'::uuid AS spent100_credits_org,
   'a0c1e2f3-1111-4aaa-8bbb-00000000000b'::uuid AS late_grant_org,
+  'a0c1e2f3-1111-4aaa-8bbb-00000000000c'::uuid AS spent87_credits_org,
   'cus_canceled_cleanup_long'::varchar AS long_customer,
   'cus_canceled_cleanup_recent'::varchar AS recent_customer,
   'cus_canceled_cleanup_trial'::varchar AS trial_customer,
@@ -181,6 +182,7 @@ SELECT
   'cus_canceled_cleanup_spent'::varchar AS spent_customer,
   'cus_canceled_cleanup_spent100'::varchar AS spent100_customer,
   'cus_canceled_cleanup_late_grant'::varchar AS late_grant_customer,
+  'cus_canceled_cleanup_spent87'::varchar AS spent87_customer,
   'com.test.canceled.cleanup.long'::varchar AS long_app,
   'com.test.canceled.cleanup.recent'::varchar AS recent_app,
   'com.test.canceled.cleanup.trial'::varchar AS trial_app,
@@ -192,6 +194,7 @@ SELECT
   'com.test.canceled.cleanup.spent'::varchar AS spent_app,
   'com.test.canceled.cleanup.spent100'::varchar AS spent100_app,
   'com.test.canceled.cleanup.lategrant'::varchar AS late_grant_app,
+  'com.test.canceled.cleanup.spent87'::varchar AS spent87_app,
   '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid AS user_id,
   'prod_LQIregjtNduh4q'::varchar AS product_id;
 
@@ -331,6 +334,18 @@ SELECT
   now() - interval '200 days',
   now() - interval '100 days',
   now() - interval '100 days'
+FROM canceled_cleanup_ctx
+UNION ALL
+-- 87 days canceled, bought usage credits after access end and used them up (bundle warning window).
+SELECT
+  spent87_customer,
+  'canceled'::public.stripe_status,
+  product_id,
+  now() - interval '200 days',
+  false,
+  now() - interval '200 days',
+  now() - interval '87 days',
+  now() - interval '87 days'
 FROM canceled_cleanup_ctx;
 
 INSERT INTO public.orgs (id, created_by, name, management_email, customer_id, has_usage_credits)
@@ -365,6 +380,9 @@ SELECT spent100_credits_org, user_id, 'Spent100 Credits Cleanup Org', 'canceled-
 FROM canceled_cleanup_ctx
 UNION ALL
 SELECT late_grant_org, user_id, 'Late Grant Cleanup Org', 'canceled-lategrant@test.local', late_grant_customer, false
+FROM canceled_cleanup_ctx
+UNION ALL
+SELECT spent87_credits_org, user_id, 'Spent87 Credits Cleanup Org', 'canceled-spent87@test.local', spent87_customer, false
 FROM canceled_cleanup_ctx;
 
 INSERT INTO public.apps (app_id, icon_url, owner_org, name, user_id)
@@ -388,7 +406,9 @@ SELECT spent_app, '', spent_credits_org, 'Spent Credits App', user_id FROM cance
 UNION ALL
 SELECT spent100_app, '', spent100_credits_org, 'Spent100 Credits App', user_id FROM canceled_cleanup_ctx
 UNION ALL
-SELECT late_grant_app, '', late_grant_org, 'Late Grant App', user_id FROM canceled_cleanup_ctx;
+SELECT late_grant_app, '', late_grant_org, 'Late Grant App', user_id FROM canceled_cleanup_ctx
+UNION ALL
+SELECT spent87_app, '', spent87_credits_org, 'Spent87 Credits App', user_id FROM canceled_cleanup_ctx;
 
 INSERT INTO public.app_versions (id, app_id, name, storage_provider, owner_org, user_id, deleted)
 SELECT 970101, long_app, '1.0.0', 'r2', long_canceled_org, user_id, false FROM canceled_cleanup_ctx
@@ -415,7 +435,9 @@ SELECT 970901, spent_app, '1.0.0', 'r2', spent_credits_org, user_id, false FROM 
 UNION ALL
 SELECT 971001, spent100_app, '1.0.0', 'r2', spent100_credits_org, user_id, false FROM canceled_cleanup_ctx
 UNION ALL
-SELECT 971101, late_grant_app, '1.0.0', 'r2', late_grant_org, user_id, false FROM canceled_cleanup_ctx;
+SELECT 971101, late_grant_app, '1.0.0', 'r2', late_grant_org, user_id, false FROM canceled_cleanup_ctx
+UNION ALL
+SELECT 971201, spent87_app, '1.0.0', 'r2', spent87_credits_org, user_id, false FROM canceled_cleanup_ctx;
 
 -- Fully consumed grants: spent bought after access end (exempt), ultra bought
 -- before its subscription ended (still eligible for retention).
@@ -423,6 +445,8 @@ INSERT INTO public.usage_credit_grants (org_id, credits_total, credits_consumed,
 SELECT spent_credits_org, 5, 5, now() - interval '80 days', 'stripe_top_up' FROM canceled_cleanup_ctx
 UNION ALL
 SELECT spent100_credits_org, 5, 5, now() - interval '90 days', 'stripe_top_up' FROM canceled_cleanup_ctx
+UNION ALL
+SELECT spent87_credits_org, 5, 5, now() - interval '80 days', 'stripe_top_up' FROM canceled_cleanup_ctx
 UNION ALL
 SELECT ultra_canceled_org, 5, 5, now() - interval '150 days', 'stripe_top_up' FROM canceled_cleanup_ctx;
 
@@ -632,7 +656,8 @@ SELECT pg_temp.delete_canceled_org_retention_alerts(ARRAY[
   (SELECT credits_canceled_org::text FROM canceled_cleanup_ctx),
   (SELECT spent_credits_org::text FROM canceled_cleanup_ctx),
   (SELECT spent100_credits_org::text FROM canceled_cleanup_ctx),
-  (SELECT late_grant_org::text FROM canceled_cleanup_ctx)
+  (SELECT late_grant_org::text FROM canceled_cleanup_ctx),
+  (SELECT spent87_credits_org::text FROM canceled_cleanup_ctx)
 ]);
 
 SELECT public.cleanup_long_canceled_org_data();
@@ -827,6 +852,15 @@ SELECT is(
   ),
   0,
   'orgs that bought credits after access end do not get retention deletion warnings'
+);
+
+SELECT is(
+  pg_temp.count_canceled_org_retention_alerts(
+    'bundles_deletion_warning',
+    ARRAY[(SELECT spent87_credits_org FROM canceled_cleanup_ctx)]
+  ),
+  0,
+  'spent credit buyers in the 85-day bundle warning window do not get retention deletion warnings'
 );
 
 SELECT ok(

@@ -156,32 +156,38 @@ BEGIN
           )
         END
       )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM public.notifications AS n
-        WHERE n.owner_org = o.id
-          AND n.event = v_event
-          AND n.uniq_id = (
-            'retention:'
-            || p_alert_type
-            || ':'
-            || to_char(
-              GREATEST(si.canceled_at, si.subscription_anchor_end, si.trial_at) AT TIME ZONE 'UTC',
-              'YYYY-MM-DD"T"HH24:MI:SS"Z"'
-            )
-          )
-      )
-      AND NOT EXISTS (
-        SELECT 1
-        FROM pgmq.q_canceled_org_retention_alerts AS q
-        WHERE q.message -> 'payload' ->> 'org_id' = o.id::text
-          AND q.message -> 'payload' ->> 'alert_type' = p_alert_type
-      )
     ORDER BY o.id
     LIMIT v_batch_size
     FOR UPDATE OF o
   LOOP
     IF public.canceled_org_retention_credit_purchase_exempt(org_record.org_id) THEN
+      CONTINUE;
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM public.notifications AS n
+      WHERE n.owner_org = org_record.org_id
+        AND n.event = v_event
+        AND n.uniq_id = (
+          'retention:'
+          || p_alert_type
+          || ':'
+          || to_char(
+            org_record.access_end AT TIME ZONE 'UTC',
+            'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+          )
+        )
+    ) THEN
+      CONTINUE;
+    END IF;
+
+    IF EXISTS (
+      SELECT 1
+      FROM pgmq.q_canceled_org_retention_alerts AS q
+      WHERE q.message -> 'payload' ->> 'org_id' = org_record.org_id::text
+        AND q.message -> 'payload' ->> 'alert_type' = p_alert_type
+    ) THEN
       CONTINUE;
     END IF;
 
