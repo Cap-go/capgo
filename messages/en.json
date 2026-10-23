@@ -3000,6 +3000,7 @@
   "sso-role-mapping-value": "contains",
   "sso-role-mapping-value-placeholder": "e.g. capgo-mobile-team",
   "sso-error-sharing": "Failed to share the SSO provider",
+  "sso-managed-role": "Managed by the SSO role mapping: change it in the role mapping or in your identity provider",
   "sso-share": "Share",
   "sso-share-description": "Use this identity provider for another organization of your company. That organization's super admins then set its own role mapping. You must be super admin of both organizations.",
   "sso-share-no-orgs": "You are not super admin of any other organization. Ask a super admin of the other organization to make you super admin there, then share the provider.",
