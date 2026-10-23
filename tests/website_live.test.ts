@@ -82,4 +82,20 @@ describe('apps website mode constraints', () => {
       .eq('app_id', CLASSIC_APP)
     expect(error?.code).toBe('23514')
   })
+
+  it('rejects private-TLD website hosts', async () => {
+    for (const websiteUrl of [
+      'https://app.localhost/',
+      'https://printer.local/',
+      'https://api.internal/',
+      'https://nas.lan/',
+      'https://router.home.arpa/',
+    ]) {
+      const { error } = await getSupabaseClient()
+        .from('apps')
+        .update({ website_url: websiteUrl })
+        .eq('app_id', CLASSIC_APP)
+      expect(error?.code, websiteUrl).toBe('23514')
+    }
+  })
 })

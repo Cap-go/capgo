@@ -3920,6 +3920,7 @@ export type Database = {
           platform: string
           secret_ciphertext: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           app_id: string
@@ -3930,6 +3931,7 @@ export type Database = {
           platform: string
           secret_ciphertext: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           app_id?: string
@@ -3940,6 +3942,7 @@ export type Database = {
           platform?: string
           secret_ciphertext?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {

@@ -306,7 +306,7 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     path: '/app/com.demo.app/builds',
     auth: true,
     prepare: async (page) => {
-      await page.route('**/rest/v1/build_requests?*', route => route.fulfill({ json: [], headers: { 'content-range': '*/0' } }))
+      await routeConsoleQuery(page, 'build_requests', route => route.fulfill(consoleQueryJson([], 0)))
       await page.route('**/app/com.demo.app/onboarding/builder', route => route.fulfill({ json: { canEnable: true } }))
       await page.reload()
       const introduction = page.locator('[data-test="builder-introduction"]')
@@ -737,7 +737,8 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     auth: true,
     prepare: async (page) => {
       await page.emulateMedia({ reducedMotion: 'reduce' })
-      await page.route('**/rest/v1/channels?*', route => route.fulfill({ json: [], headers: { 'content-range': '*/0' } }))
+      // Console reads channels via Capgo `/console/query`, not PostgREST.
+      await routeConsoleQuery(page, 'channels', route => route.fulfill(consoleQueryJson([], 0)))
       await page.reload()
       const introduction = page.locator('[data-test="channel-introduction"]')
       if (process.env.VISUAL_DIFF_PHASE === 'after') {
