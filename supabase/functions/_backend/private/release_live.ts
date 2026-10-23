@@ -9,7 +9,7 @@ import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_jwt.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { closeClient, getPgClient, logPgError } from '../utils/pg.ts'
-import { checkPermission } from '../utils/rbac.ts'
+import { checkPermission, getDeniedChannelIdsForPermission } from '../utils/rbac.ts'
 import { readDeviceVersionCounts } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -737,13 +737,29 @@ function toChannelContext(candidates: ReleaseCandidates, channel: CandidateChann
   }
 }
 
+// Candidates are cached per app and shared by every reader, so deploy history
+// of channels where this caller is denied channel.read_history is dropped per
+// request, after the cache.
+function withoutDeniedHistory(candidates: ReleaseCandidates, deniedChannelIds: Set<number>): ReleaseCandidates {
+  if (deniedChannelIds.size === 0)
+    return candidates
+  return {
+    ...candidates,
+    deployments: candidates.deployments.filter(deployment => deployment.channel_id === null || !deniedChannelIds.has(deployment.channel_id)),
+  }
+}
+
 async function readReleaseLive(
   c: Context<MiddlewareKeyVariables>,
   appId: string,
   channelId?: number,
   versionName?: string,
 ): Promise<ReleaseLiveResponse | ReleaseLiveEmptyResponse> {
-  const candidates = await loadReleaseCandidates(c, appId)
+  const [allCandidates, deniedHistoryChannelIds] = await Promise.all([
+    loadReleaseCandidates(c, appId),
+    getDeniedChannelIdsForPermission(c, 'channel.read_history', appId),
+  ])
+  const candidates = withoutDeniedHistory(allCandidates, deniedHistoryChannelIds)
   const channel = pickChannel(candidates, channelId, versionName)
   const context = toChannelContext(candidates, channel)
   if (!channel)
@@ -865,6 +881,7 @@ app.post('/', middlewareAuth, async (c) => {
 })
 
 export const releaseLiveTestUtils = {
+  withoutDeniedHistory,
   pickDefaultChannel,
   pickChannel,
   pickRelease,
