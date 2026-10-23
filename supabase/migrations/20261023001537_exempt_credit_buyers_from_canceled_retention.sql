@@ -257,38 +257,44 @@ DECLARE
 BEGIN
   PERFORM set_config('capgo.seed_channel_targets', 'true', true);
 
-  WITH locked_orgs AS (
-    SELECT o.id
-    FROM public.orgs AS o
-    WHERE public.canceled_org_may_receive_retention_deletion(o.id, 90)
-    FOR UPDATE OF o
-  ),
-  candidates AS (
-    SELECT av.id, av.app_id
+  WITH candidates AS (
+    SELECT av.id, av.app_id, av.owner_org
     FROM public.app_versions AS av
-    JOIN locked_orgs AS lo ON lo.id = av.owner_org
     WHERE av.deleted = false
       AND av.name NOT IN ('builtin', 'unknown')
+      AND public.canceled_org_may_receive_retention_deletion(av.owner_org, 90)
       AND NOT public.canceled_org_retention_credit_purchase_exempt(av.owner_org)
     ORDER BY av.id
     LIMIT v_batch_size
+  ),
+  locked_orgs AS (
+    SELECT o.id
+    FROM public.orgs AS o
+    JOIN (SELECT DISTINCT c.owner_org FROM candidates AS c) AS batch_orgs ON batch_orgs.owner_org = o.id
+    FOR UPDATE OF o
+  ),
+  eligible AS (
+    SELECT c.id, c.app_id
+    FROM candidates AS c
+    JOIN locked_orgs AS lo ON lo.id = c.owner_org
+    WHERE NOT public.canceled_org_retention_credit_purchase_exempt(c.owner_org)
   ),
   cleared AS (
     UPDATE public.channels AS c
     SET
       version = CASE
-        WHEN EXISTS (SELECT 1 FROM candidates AS x WHERE x.id = c.version) THEN NULL
+        WHEN EXISTS (SELECT 1 FROM eligible AS x WHERE x.id = c.version) THEN NULL
         ELSE c.version
       END,
       rollout_version = CASE
-        WHEN EXISTS (SELECT 1 FROM candidates AS x WHERE x.id = c.rollout_version) THEN NULL
+        WHEN EXISTS (SELECT 1 FROM eligible AS x WHERE x.id = c.rollout_version) THEN NULL
         ELSE c.rollout_version
       END,
       updated_at = pg_catalog.now()
-    WHERE c.app_id IN (SELECT DISTINCT x.app_id FROM candidates AS x)
+    WHERE c.app_id IN (SELECT DISTINCT x.app_id FROM eligible AS x)
       AND EXISTS (
         SELECT 1
-        FROM candidates AS x
+        FROM eligible AS x
         WHERE x.id = c.version OR x.id = c.rollout_version
       )
     RETURNING c.id
@@ -296,8 +302,8 @@ BEGIN
   soft_deleted AS (
     UPDATE public.app_versions AS av
     SET deleted = true
-    FROM candidates
-    WHERE av.id = candidates.id
+    FROM eligible
+    WHERE av.id = eligible.id
       AND NOT public.canceled_org_retention_credit_purchase_exempt(av.owner_org)
     RETURNING av.id
   )
@@ -338,13 +344,7 @@ DECLARE
   v_batch_size integer := GREATEST(1, COALESCE(p_batch_size, 500));
   deleted_count bigint := 0;
 BEGIN
-  WITH locked_orgs AS (
-    SELECT o.id
-    FROM public.orgs AS o
-    WHERE public.canceled_org_may_receive_retention_deletion(o.id, 95)
-    FOR UPDATE OF o
-  ),
-  candidates AS (
+  WITH candidates AS (
     SELECT
       a.app_id,
       a.owner_org,
@@ -352,12 +352,24 @@ BEGIN
       a.created_at AS app_created_at,
       COALESCE(u.email::text, o.management_email) AS email
     FROM public.apps AS a
-    JOIN locked_orgs AS lo ON lo.id = a.owner_org
     JOIN public.orgs AS o ON o.id = a.owner_org
     LEFT JOIN public.users AS u ON u.id = a.user_id
-    WHERE NOT public.canceled_org_retention_credit_purchase_exempt(a.owner_org)
+    WHERE public.canceled_org_may_receive_retention_deletion(a.owner_org, 95)
+      AND NOT public.canceled_org_retention_credit_purchase_exempt(a.owner_org)
     ORDER BY a.app_id
     LIMIT v_batch_size
+  ),
+  locked_orgs AS (
+    SELECT o.id
+    FROM public.orgs AS o
+    JOIN (SELECT DISTINCT c.owner_org FROM candidates AS c) AS batch_orgs ON batch_orgs.owner_org = o.id
+    FOR UPDATE OF o
+  ),
+  eligible AS (
+    SELECT c.*
+    FROM candidates AS c
+    JOIN locked_orgs AS lo ON lo.id = c.owner_org
+    WHERE NOT public.canceled_org_retention_credit_purchase_exempt(c.owner_org)
   ),
   archived AS (
     INSERT INTO public.old_apps (app_id, email, owner_org, user_id, app_created_at)
@@ -367,8 +379,7 @@ BEGIN
       c.owner_org,
       c.user_id,
       c.app_created_at
-    FROM candidates AS c
-    WHERE NOT public.canceled_org_retention_credit_purchase_exempt(c.owner_org)
+    FROM eligible AS c
     ON CONFLICT (app_id, owner_org) DO UPDATE
     SET
       email = EXCLUDED.email,
@@ -379,7 +390,7 @@ BEGIN
   ),
   deleted AS (
     DELETE FROM public.apps AS a
-    USING candidates AS c
+    USING eligible AS c
     WHERE a.app_id = c.app_id
       AND a.owner_org = c.owner_org
       AND NOT public.canceled_org_retention_credit_purchase_exempt(a.owner_org)
