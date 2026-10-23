@@ -60,4 +60,12 @@ const exhausted = await invokeCapgoCliApiResultWithRetry(async () => {
 assert.equal(calls, CAPGO_API_RETRY_MAX_ATTEMPTS)
 assert.ok(exhausted.error)
 
+calls = 0
+const networkOnly = await invokeCapgoCliApiResultWithRetry(async () => {
+  calls += 1
+  return { data: null, error: new TypeError('fetch failed') }
+}, async () => {}, { retryTransientNetwork: false })
+assert.equal(calls, 1)
+assert.ok(networkOnly.error)
+
 console.log('retryable Capgo API error tests passed')

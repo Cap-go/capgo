@@ -187,7 +187,7 @@ export async function upsertAppVersion(
       ...(versionData.r2_path !== undefined ? { r2_path: versionData.r2_path } : {}),
     },
     apiHost: options.apiHost,
-  }))
+  }), undefined, { retryTransientNetwork: false })
 
   if (error)
     throw error

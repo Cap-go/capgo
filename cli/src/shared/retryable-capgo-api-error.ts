@@ -15,6 +15,11 @@ const NETWORK_RETRY_DELAYS_MS = [500, 1000]
 const DEFAULT_503_RETRY_MS = 2000
 export const CAPGO_API_MAX_RETRY_DELAY_MS = 10_000
 
+export type CapgoApiRetryOptions = {
+  /** When false, only explicit transient 503 responses are retried (not transport errors). */
+  retryTransientNetwork?: boolean
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -50,8 +55,11 @@ function retryAfterFromPayload(payload: { moreInfo?: Record<string, unknown> } |
 }
 
 /** Transport failures and curated transient 503 responses from the Capgo API. */
-export async function isRetryableCapgoApiError(error: unknown): Promise<boolean> {
-  if (isTransientNetworkError(error))
+export async function isRetryableCapgoApiError(
+  error: unknown,
+  options: CapgoApiRetryOptions = {},
+): Promise<boolean> {
+  if (options.retryTransientNetwork !== false && isTransientNetworkError(error))
     return true
   if (getCapgoCliHttpStatus(error) !== 503)
     return false
@@ -91,13 +99,14 @@ export async function getCapgoApiRetryDelayMs(error: unknown, attemptIndex: numb
 export async function invokeCapgoCliApiResultWithRetry<T>(
   call: () => PromiseLike<{ data: T | null, error: { message?: string } | null }>,
   sleepFn: (ms: number) => Promise<void> = sleep,
+  options: CapgoApiRetryOptions = {},
 ): Promise<{ data: T | null, error: { message?: string } | null }> {
   let lastResult = await call()
   if (!lastResult.error)
     return lastResult
 
   for (let attempt = 1; attempt < CAPGO_API_RETRY_MAX_ATTEMPTS; attempt++) {
-    if (!(await isRetryableCapgoApiError(lastResult.error)))
+    if (!(await isRetryableCapgoApiError(lastResult.error, options)))
       return lastResult
     await sleepFn(await getCapgoApiRetryDelayMs(lastResult.error, attempt - 1))
     lastResult = await call()
