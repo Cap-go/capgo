@@ -3,11 +3,12 @@ import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { BillingAccount } from '../../utils/stripe_billing.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod'
+import { resolveNewOrgTrialEnd } from '../../utils/direct_offer.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { assertJwtMfaAssurance } from '../../utils/jwt_mfa_assurance.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
 import { parseOrgOnboardingDevelopmentEnvironment, parseOrgOnboardingIntent } from '../../utils/org_onboarding_intent.ts'
-import { checkoutPgClient, closeClient, getPgClient, releasePgClient } from '../../utils/pg.ts'
+import { beginWriteTransaction, checkoutPgClient, closeClient, getPgClient, releasePgClient } from '../../utils/pg.ts'
 import { safeParseSchema } from '../../utils/schema_validation.ts'
 import { getPlanProductId } from '../../utils/stripe.ts'
 import { canChooseUsBillingAccount, resolveNewOrgBillingAccount } from '../../utils/stripe_billing.ts'
@@ -70,12 +71,15 @@ function resolvePlanBillingAccount(c: Context<MiddlewareKeyVariables>, plan: { n
   }
 }
 
-async function createPendingStripeInfo(c: Context<MiddlewareKeyVariables>, orgId: string, estimatedMau: number, requestedBillingAccount: BillingAccount, explicit: boolean) {
+async function createPendingStripeInfo(c: Context<MiddlewareKeyVariables>, orgId: string, creatorId: string, estimatedMau: number, requestedBillingAccount: BillingAccount, explicit: boolean) {
   const plan = await getInitialPlanForMau(c, estimatedMau)
   const billingAccount = resolvePlanBillingAccount(c, plan, requestedBillingAccount, explicit)
   const pendingCustomerId = `pending_${orgId}`
-  const trialAt = new Date()
-  trialAt.setDate(trialAt.getDate() + 15)
+  // Direct-offer (paid ads) creators get no trial; everyone else gets the standard trial.
+  // A failed lookup aborts org creation rather than granting a trial by mistake.
+  const trialAt = await resolveNewOrgTrialEnd(c, supabaseAdmin(c), creatorId).catch((error: unknown) => {
+    throw simpleError('cannot_create_org_plan', 'Cannot create org plan', { error: error instanceof Error ? error.message : String(error) })
+  })
 
   const { error } = await supabaseAdmin(c)
     .from('stripe_info')
@@ -196,7 +200,7 @@ async function insertOrgForApiKey(
       throw quickError(403, 'permission_denied', 'Permission denied: org.create')
     }
 
-    await dbClient.query('BEGIN')
+    await beginWriteTransaction(dbClient)
     transactionStarted = true
     await dbClient.query(
       'SELECT set_config($1, $2, true)',
@@ -297,7 +301,7 @@ export async function post(
   if (body.billingAccount === 'us' && !canChooseUsBillingAccount(c))
     throw simpleError('billing_account_unavailable', 'US billing is not available', { billingAccount: 'us' })
   const billingAccount = resolveNewOrgBillingAccount(c, body.billingAccount)
-  const pendingCustomerId = await createPendingStripeInfo(c, orgId, estimatedMau, billingAccount, body.billingAccount === 'us')
+  const pendingCustomerId = await createPendingStripeInfo(c, orgId, auth.userId, estimatedMau, billingAccount, body.billingAccount === 'us')
   const onboarding = {
     intent: parseOrgOnboardingIntent({ intent: body.intent }),
     starting_out: body.startingOut ?? false,

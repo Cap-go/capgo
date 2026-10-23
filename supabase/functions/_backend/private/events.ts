@@ -3,11 +3,13 @@ import type { AcceptedEventIdentity } from '../utils/event_identity.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { BentoTrackingPayload, SendEventToTrackingPayload, TrackOptions } from '../utils/tracking.ts'
 import { Hono } from 'hono/tiny'
+import { markAiOnboardingAgentConnected } from '../utils/ai_onboarding_agent.ts'
 import { markAppOnboardingLoginFromTracking } from '../utils/app_onboarding_login.ts'
 import { APP_TOO_LARGE_EVENT, buildAppTooLargeBentoEvent } from '../utils/app_too_large_tracking.ts'
 import { markBuilderChecklistFromAnalytics } from '../utils/builder_onboarding_checklist.ts'
 import { buildBuilderOnboardingBentoEvent, BUILDER_RECOVERY_MILESTONES } from '../utils/builder_onboarding_recovery.ts'
 import { buildBundleCompatibilityBentoEvent, BUNDLE_INCOMPATIBLE_EVENT, bundleIncompatibleEmailOutcome, isBreakingChangeGatedByChannelStrategy, isCliTrueTag } from '../utils/bundle_compatibility_recovery.ts'
+import { buildPlanCheckoutStartedBentoEvent, PLAN_CHECKOUT_STARTED_EVENT } from '../utils/checkout_tracking.ts'
 import { acceptEventIdentity, isValidClientEventId } from '../utils/event_identity.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_middleware.ts'
@@ -350,6 +352,46 @@ function optionalNonEmptyTagString(value: unknown): string | undefined {
   return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
+function optionalTagNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+async function buildPlanCheckoutStartedTrackedBentoEvent(
+  c: Context<MiddlewareKeyVariables>,
+  supabase: ReturnType<typeof supabaseWithAuth>,
+  onboardingOrgId: string | undefined,
+  trackedBody: TrackOptions,
+) {
+  if (!onboardingOrgId || trackedBody.event !== PLAN_CHECKOUT_STARTED_EVENT)
+    return undefined
+
+  const { data: orgData, error: orgError } = await supabase
+    .from('orgs')
+    .select('id, name')
+    .eq('id', onboardingOrgId)
+    .single()
+
+  if (orgError || !orgData) {
+    cloudlog({ requestId: c.get('requestId'), message: 'plan checkout bento lookup failed; skipping signal', org: orgError })
+    return undefined
+  }
+
+  const tags = trackedBody.tags ?? {}
+  return buildPlanCheckoutStartedBentoEvent({
+    event: trackedBody.event,
+    orgId: onboardingOrgId,
+    orgName: orgData.name,
+    productId: optionalTagString(tags.product_id),
+    planName: optionalTagString(tags.plan_name),
+    recurrence: optionalTagString(tags.recurrence),
+    checkoutSource: optionalTagString(tags.checkout_source),
+    currentPlanName: optionalTagString(tags.current_plan_name),
+    planPrice: optionalTagNumber(tags.plan_price),
+    planPriceMonthly: optionalTagNumber(tags.plan_price_monthly),
+    planPriceYearly: optionalTagNumber(tags.plan_price_yearly),
+  })
+}
+
 async function trackBundleIncompatibleEmail(
   c: Context<MiddlewareKeyVariables>,
   input: {
@@ -611,9 +653,18 @@ app.post('/', middlewareAuth(), async (c) => {
     timestamp: Date.parse(identity.occurred_at),
   })
 
+  if (trackedBody.event === PLAN_CHECKOUT_STARTED_EVENT) {
+    if (!verifiedOrgId || !(await checkPermission(c, 'org.update_billing', { orgId: verifiedOrgId }))) {
+      throw quickError(403, 'no_permission', 'You cannot send checkout events for this organization')
+    }
+  }
+
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
   if (notifyConsole) {
     await handleNotifyConsole(c, trackedBody, icon, appId, verifiedOrgId)
+    // Browser-login confirmations skip analytics (no queue write), and with CLI telemetry
+    // disabled they are the only login signal, so the AI onboarding page must see them too.
+    await markAiOnboardingAgentConnected(c, trackedBody.channel, trackedBody.event)
     logAcceptedEvent(c, identity, acceptedAt)
     return c.json({ ...BRES, event_id: identity.event_id })
   }
@@ -645,6 +696,10 @@ app.post('/', middlewareAuth(), async (c) => {
   // steps trigger the org/app lookup.
   const builderBentoEvent: BentoTrackingPayload | undefined = await buildBuilderBentoEvent(c, supabase, body, onboardingOrgId, appId, trackedBody)
 
+  // Plan checkout start: the frontend emits this only when the user accepts the
+  // Stripe navigation, not when the checkout URL is prefetched.
+  const planCheckoutBentoEvent: BentoTrackingPayload | undefined = await buildPlanCheckoutStartedTrackedBentoEvent(c, supabase, onboardingOrgId, trackedBody)
+
   // Bundle compatibility failure (capgo bundle upload / bundle compatibility):
   // when the CLI reports an incompatible bundle, emit a Bento signal so a
   // lifecycle automation can react. Mirrors the builder block above; resolves
@@ -672,7 +727,7 @@ app.post('/', middlewareAuth(), async (c) => {
   const appTooLargeBentoEvent: BentoTrackingPayload | undefined = await buildAppTooLargeTrackedBentoEvent(c, supabase, onboardingOrgId, appId, trackedBody)
 
   // Exactly one of these is ever set (distinct event names); `??` picks the active one.
-  const bentoEvent = appOnboardingReadyBentoEvent ?? onboardingBentoEvent ?? builderBentoEvent ?? bundleIncompatibleBentoEvent ?? aiInstructionsCopiedBentoEvent ?? appTooLargeBentoEvent
+  const bentoEvent = appOnboardingReadyBentoEvent ?? onboardingBentoEvent ?? builderBentoEvent ?? planCheckoutBentoEvent ?? bundleIncompatibleBentoEvent ?? aiInstructionsCopiedBentoEvent ?? appTooLargeBentoEvent
   await sendEventToTracking(c, addAuthenticatedApiKeyIdToTrackingPayload({
     ...trackedBody,
     bento: bentoEvent === bundleIncompatibleBentoEvent && bentoEvent?.data.gated ? { ...bentoEvent, event: 'bundle_safe_expected' } : bentoEvent,
@@ -683,6 +738,8 @@ app.post('/', middlewareAuth(), async (c) => {
   await markBuilderChecklistFromAnalytics(c, appId, trackedBody)
 
   await markAppOnboardingLoginFromTracking(c, trackedBody.channel, trackedBody.event)
+  // AI onboarding page: tick "logged in" / "MCP installed" from the agent's first events.
+  await markAiOnboardingAgentConnected(c, trackedBody.channel, trackedBody.event)
 
   await recordUserBentoEvent(c, {
     userId: c.get('auth')!.userId,

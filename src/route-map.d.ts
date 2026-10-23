@@ -346,6 +346,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/onboarding/ai': RouteRecordInfo<
+      '/onboarding/ai',
+      '/onboarding/ai',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/onboarding/app': RouteRecordInfo<
       '/onboarding/app',
       '/onboarding/app',
@@ -377,6 +384,13 @@ declare module 'vue-router/auto-routes' {
     '/onboarding/set_password': RouteRecordInfo<
       '/onboarding/set_password',
       '/onboarding/set_password',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/preview/builder': RouteRecordInfo<
+      '/preview/builder',
+      '/preview/builder',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -956,6 +970,14 @@ declare module 'vue-router/auto-routes' {
       pathParamNames:
         | never
     }
+    'src/pages/onboarding/ai.vue': {
+      routes:
+        | '/onboarding/ai'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
     'src/pages/onboarding/app.vue': {
       routes:
         | '/onboarding/app'
@@ -991,6 +1013,14 @@ declare module 'vue-router/auto-routes' {
     'src/pages/onboarding/set_password.vue': {
       routes:
         | '/onboarding/set_password'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/preview/builder.vue': {
+      routes:
+        | '/preview/builder'
       views:
         | never
       pathParamNames:

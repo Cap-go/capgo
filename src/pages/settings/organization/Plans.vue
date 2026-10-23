@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CreditPricingStep } from '~/services/creditPricing'
-import type { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/database.types'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -14,6 +14,7 @@ import CreditsCta from '~/components/CreditsCta.vue'
 import CreditsOnlyTip from '~/components/CreditsOnlyTip.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { useBillingPaidAt } from '~/composables/useBillingPaidAt'
+import { getCreditPricingSteps, getCurrentPlanNameOrg } from '~/services/console'
 import { ENTERPRISE_MAU_STOPS, formatMau, getOrgExtraMau, quoteEnterpriseScale } from '~/services/enterpriseScale'
 import { formatNumber, formatNumberValue } from '~/services/formatLocale'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
@@ -22,7 +23,6 @@ import { checkPermissions } from '~/services/permissions'
 import { createPlansVisitTracker } from '~/services/plansVisitTracking'
 import { getSignupAttributionEventTags } from '~/services/signupAttribution'
 import { startSubscriptionCheckout } from '~/services/stripe'
-import { getCreditPricingSteps, getCurrentPlanNameOrg } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -56,10 +56,12 @@ const embeddedCheckout = ref<{ clientSecret: string, publishableKey: string, pla
 
 const { currentOrganization } = storeToRefs(organizationStore)
 const billingOrgId = computed(() => currentOrganization.value?.gid)
-const { paidAt, billingLookupFailed } = useBillingPaidAt(billingOrgId, isMobile)
+const { paidAt, billingLookupFailed, trialSkipped } = useBillingPaidAt(billingOrgId, isMobile)
 const showExpiredTrialState = computed(() => {
   return shouldShowExpiredTrialPlansState(organizationStore.currentOrganizationFailed, isMobile, paidAt.value)
 })
+// Direct-offer orgs never had a trial: invite them to start instead of saying it ended.
+const showNoTrialState = computed(() => showExpiredTrialState.value && trialSkipped.value)
 const showPlanFailureBanner = computed(() => {
   return shouldShowPlanFailureBanner(organizationStore.currentOrganizationFailed, isMobile, paidAt.value, billingLookupFailed.value)
 })
@@ -552,7 +554,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
         <div class="flex-1">
           <div class="flex flex-wrap items-center gap-3">
             <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-              {{ t(showExpiredTrialState ? 'trial-ended-title' : 'plan-pricing-plans') }}
+              {{ t(showNoTrialState ? 'no-trial-choose-plan-title' : showExpiredTrialState ? 'trial-ended-title' : 'plan-pricing-plans') }}
             </h1>
             <span
               v-if="isCreditsOnly"
@@ -578,7 +580,10 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
             </button>
           </div>
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            {{ t(showExpiredTrialState ? 'trial-ended-plans-description' : isCreditsOnly ? 'credits-only-plan-page-desc' : 'plan-desc') }}
+            {{ t(showNoTrialState ? 'no-trial-choose-plan-description' : showExpiredTrialState ? 'trial-ended-plans-description' : isCreditsOnly ? 'credits-only-plan-page-desc' : 'plan-desc') }}
+          </p>
+          <p v-if="showNoTrialState" class="mt-1 text-sm font-medium text-gray-700 dark:text-gray-300" data-test="no-trial-money-back">
+            {{ t('no-trial-money-back-guarantee-description') }}
           </p>
           <p v-if="!isMobile" class="mt-2 text-sm">
             <a class="font-medium text-blue-600 hover:underline dark:text-blue-300" href="https://capgo.app/pricing/#compare-plans">

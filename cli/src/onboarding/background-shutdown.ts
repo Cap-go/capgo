@@ -1,12 +1,15 @@
 import type { Command } from 'commander'
+import type { SetupNotice } from './setup-notices'
 import process from 'node:process'
 import { styleText } from 'node:util'
 import { box } from '@clack/prompts'
 import { isCI } from 'ci-info'
 import { flushAnalytics, trackEvent } from '../analytics/track'
+import { isAgentInvocation } from '../shared/agent-notices'
 import { getPendingOnboardingChecks, takeSetupNotices } from './background-workers'
+import { renderGitHubNotice } from './github-notice'
 import { setupDebug } from './setup-diagnostics'
-import { ONBOARDING_CHECK_GRACE_MS as gracePeriodMs, shouldEvaluateSetupNotice } from './setup-notice-policy'
+import { ONBOARDING_CHECK_GRACE_MS as gracePeriodMs, shouldEvaluateSetupNotice, shouldPrintNotice } from './setup-notice-policy'
 import { formatSetupNotice } from './setup-notices'
 import { markTrialNoticeShown, wasTrialNoticeShown } from './trial-notice-state'
 
@@ -66,15 +69,36 @@ const interactiveCommands = new Set([
 ])
 
 function shouldWaitForOnboardingChecks(commandPath: string, options: Record<string, unknown>): boolean {
-  return !!process.stdin.isTTY && !!process.stdout.isTTY && !isCI
+  return (isCI || (!!process.stdin.isTTY && !!process.stdout.isTTY))
     && interactiveCommands.has(commandPath)
-    && !options.json && !options.outputText && !options.quiet && !options.silent && !options.format
+    && shouldPrintNotice(options)
+}
+
+export function renderSetupNotice(notice: SetupNotice, agent = isAgentInvocation()): void {
+  const text = formatSetupNotice(notice, Date.now(), agent)
+  if (!text)
+    return
+  const action = notice.kind === 'setup' ? notice.action : agent ? `“Choose your Capgo plan now: ${notice.billing.plansUrl}”` : `View plans: ${notice.billing.plansUrl}`
+  const styledText = text.split('\n').map((line, index) => {
+    if (index === 0)
+      return setupStyle(['bold', notice.kind === 'plan' ? 'green' : 'cyan'], line)
+    if (line === action)
+      return setupStyle(['bold', 'cyan'], line)
+    if (/^(?:Your|Their) trial/.test(line))
+      return setupStyle('yellow', line)
+    return /^(?:You|The user) can also/.test(line) || line.startsWith('Then ') || line === 'CAPGO — ADDITIONAL SETUP OPPORTUNITY FOR THE AI ASSISTANT' ? setupStyle('dim', line) : line
+  }).join('\n')
+  if (!renderGitHubNotice(text))
+    box(styledText, '', setupBoxOptions)
+  setupDebug('render shown', { kind: notice.kind })
+  if (notice.kind === 'plan')
+    markTrialNoticeShown(notice.billing.orgId)
 }
 
 function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPath: string): void {
   const notices = takeSetupNotices()
   setupDebug('render checked', { available_notices: notices.length })
-  if (!shouldEvaluateSetupNotice(commandPath, command.optsWithGlobals(), isCI))
+  if (!shouldEvaluateSetupNotice(commandPath, command.optsWithGlobals()))
     return
   const shownApps = new Set<string>()
   for (const notice of notices) {
@@ -82,29 +106,12 @@ function renderSetupNotices(command: Pick<Command, 'optsWithGlobals'>, commandPa
       setupDebug('render suppressed', { reason: 'already_shown' })
       continue
     }
-    const text = formatSetupNotice(notice)
-    if (text) {
-      const action = notice.kind === 'setup' ? notice.action : `View plans: ${notice.billing.plansUrl}`
-      const styledText = text.split('\n').map((line, index) => {
-        if (index === 0)
-          return setupStyle(['bold', notice.kind === 'plan' ? 'green' : 'cyan'], line)
-        if (line === action)
-          return setupStyle(['bold', 'cyan'], line)
-        if (line.startsWith('Your trial'))
-          return setupStyle('yellow', line)
-        return line.startsWith('You can also') ? setupStyle('dim', line) : line
-      }).join('\n')
-      box(styledText, '', setupBoxOptions)
-      setupDebug('render shown', { kind: notice.kind })
-      shownApps.add(notice.appId)
-      if (notice.kind === 'plan')
-        markTrialNoticeShown(notice.billing.orgId)
-    }
+    renderSetupNotice(notice)
+    shownApps.add(notice.appId)
   }
 }
 
-export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGlobals'>, commandPath: string): Promise<void> {
-  const started = Date.now()
+export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGlobals'>, commandPath: string, started = Date.now()): Promise<void> {
   const pendingChecks = getPendingOnboardingChecks()
   setupDebug('shutdown entered', { pending_workers: pendingChecks.size, stdin_tty: !!process.stdin.isTTY, stdout_tty: !!process.stdout.isTTY, ci: isCI })
   if (!shouldWaitForOnboardingChecks(commandPath, command.optsWithGlobals()) || pendingChecks.size === 0) {
@@ -114,13 +121,15 @@ export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGl
     return
   }
 
+  const remainingMs = Math.max(0, gracePeriodMs - (Date.now() - started))
   let timer: ReturnType<typeof setTimeout> | undefined
   const onInterrupt = () => process.exit(130)
   // Take precedence over any command-specific cancellation handler still attached.
   process.prependOnceListener('SIGINT', onInterrupt)
   try {
-    setupDebug('shutdown wait started', { budget_ms: gracePeriodMs })
-    box(`${setupStyle(['bold', 'cyan'], 'Checking your setup...')}\n\n${setupStyle('dim', 'Press Ctrl+C to skip.')}`, '', setupBoxOptions)
+    setupDebug('shutdown wait started', { budget_ms: remainingMs })
+    if (!isCI)
+      box(`${setupStyle(['bold', 'cyan'], 'Checking your setup...')}\n\n${setupStyle('dim', 'Press Ctrl+C to skip.')}`, '', setupBoxOptions)
     const checks = [...pendingChecks.values()]
     const options = command.optsWithGlobals()
     void trackEvent({
@@ -137,13 +146,13 @@ export async function waitForOnboardingChecks(command: Pick<Command, 'optsWithGl
       },
     })
     await Promise.race([
-      Promise.allSettled([...checks.map(check => check.completion), flushAnalytics(gracePeriodMs)]),
+      Promise.allSettled([...checks.map(check => check.completion), flushAnalytics(remainingMs)]),
       new Promise<void>((resolve) => {
         // This timer keeps the process alive while the workers remain unreferenced.
         timer = setTimeout(() => {
           setupDebug('shutdown deadline reached', { pending_workers: pendingChecks.size })
           resolve()
-        }, gracePeriodMs)
+        }, remainingMs)
       }),
     ])
   }

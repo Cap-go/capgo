@@ -15,14 +15,18 @@ import { getFallbackCreditProductId } from '../utils/credits.ts'
 import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { getOpenAIFirstPaymentAt, trackOpenAIFirstPayment } from '../utils/openai_ads_first_payment.ts'
 import { getOrgAdminMemberEmailsForTags } from '../utils/org_email_notifications.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { beginWriteTransaction, closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { getRetryablePostgrestStatus, isRetryablePostgrestError } from '../utils/retry.ts'
 import { signupAttributionTagsForOrg } from '../utils/signup_attribution.ts'
-import { ensureCustomerMetadata, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionCharge, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
+import { ensureCustomerMetadata, findInvoiceForCharge, getBillingAccountForCustomer, getCreditCheckoutDetails, getLatestOpenSubscriptionInvoice, getStripe, isStripeConfiguredForAccount, isSubscriptionCharge, isSubscriptionInvoice, normalizeBillingAccount, planProductIdOrFilter, resolvePlanCreditProductId, syncStripeCustomerCountry, toOpenSubscriptionInvoiceSummary } from '../utils/stripe.ts'
+import { payInvoiceWithBackupCard } from '../utils/stripe_in_app.ts'
 import { buildTransferInvoiceFooter, getStripeCustomerEmailFromEvent, getTransferInvoiceFooterUpdate, isTransferInvoice, normalizeBillingEmail, shouldStampTransferInvoiceFooter, TRANSFER_INVOICE_FOOTER, TRANSFER_INVOICE_FOOTER_MAX_LENGTH } from '../utils/stripe_event.ts'
+import type { TrialPlanFirstInvoiceState } from '../utils/stripe_trial_plan.ts'
+import { cancelTrialPlanScheduleForSubscription, isTrialPlanFirstInvoiceUnpaid, isTrialPlanSubscription, settleTrialPlanFirstInvoice } from '../utils/stripe_trial_plan.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 import { trackUsChargeRefunded, trackUsChargeSucceeded } from '../utils/us_revenue_tracking.ts'
@@ -98,7 +102,12 @@ interface RevenueMovement {
   lostPlan: RevenuePlanKey | null
 }
 
-type PersistRevenueMovementResult = 'applied' | 'duplicate' | 'missing' | 'stale'
+type PersistRevenueMovementStatus = 'applied' | 'duplicate' | 'missing' | 'stale'
+interface PersistRevenueMovementResult {
+  status: PersistRevenueMovementStatus
+  /** Set only by the write that moved paid_at from null to a value: the org's first payment. */
+  firstPaidAt: string | null
+}
 interface BentoSegmentUpdate { segments: string[], deleteSegments: string[] }
 interface BentoSubscriberTagUpdate { email: string, segments: string[], deleteSegments: string[] }
 const BENTO_CHARGE_SUCCEEDED_EVENT = 'org:charge_succeeded'
@@ -221,6 +230,20 @@ function getPaidAtUpdate(
     return undefined
 
   return eventOccurredAtIso
+}
+
+/**
+ * paid_at moves from null to a value at most once per org. Decided under the
+ * stripe_info row lock, so concurrent webhooks and Stripe retries report the
+ * first payment once.
+ */
+function resolveFirstPaidAt(
+  lockedPaidAt: string | Date | null | undefined,
+  nextPaidAt: string | null | undefined,
+): string | null {
+  if (lockedPaidAt || !nextPaidAt)
+    return null
+  return nextPaidAt
 }
 
 function toStripeInfoUpdate(data: StripeData['data']): StripeInfoUpdate {
@@ -497,7 +520,7 @@ export async function syncBillingBentoTagsFromStoredStripeInfo(c: Context, org: 
   const plans = await getBillingPlans(c)
   const plan = plans.find(candidate => candidate.stripe_id === stripeInfo.product_id || candidate.stripe_id_us === stripeInfo.product_id) ?? null
   const trialPlanNames = plans.map(candidate => candidate.name)
-  const segment = await customerToSegmentOrg(c, org.id, stripeInfo.price_id, plan, trialPlanNames)
+  const segment = await customerToSegmentOrg(c, org, stripeInfo.price_id, plan, trialPlanNames)
   await syncBillingBentoTags(c, org, customerId, segment)
 }
 
@@ -668,31 +691,36 @@ async function persistStripeInfoAndRevenueMovement(
   const shouldRecordMovement = hasRevenueMovement(movement)
 
   if (Object.keys(transactionUpdateData).length === 0 && !shouldRecordMovement)
-    return 'applied'
+    return { status: 'applied', firstPaidAt: null }
 
   const pgClient = await getPgClient(c, false)
 
   try {
-    await pgClient.query('BEGIN')
+    await beginWriteTransaction(pgClient)
 
     // Lock the row so concurrent retries serialize before we classify
     // the event as missing/stale/duplicate. The admin dashboard derives revenue
     // movement from the persisted stripe_info changes.
-    const stripeInfoRow = await pgClient.query<Pick<StripeInfoRow, 'last_stripe_event_at' | 'past_due_at' | 'status'>>(
-      'SELECT last_stripe_event_at, past_due_at, status FROM public.stripe_info WHERE customer_id = $1 FOR UPDATE',
+    const stripeInfoRow = await pgClient.query<Pick<StripeInfoRow, 'last_stripe_event_at' | 'past_due_at' | 'status'> & { paid_at: string | Date | null }>(
+      'SELECT last_stripe_event_at, past_due_at, status, paid_at FROM public.stripe_info WHERE customer_id = $1 FOR UPDATE',
       [customerId],
     )
     const lockedStripeInfo = stripeInfoRow.rows[0]
 
     if (!lockedStripeInfo) {
       await pgClient.query('ROLLBACK')
-      return 'missing'
+      return { status: 'missing', firstPaidAt: null }
     }
 
     if (isStaleStripeEvent(lockedStripeInfo, eventOccurredAtIso)) {
       await pgClient.query('ROLLBACK')
-      return 'stale'
+      return { status: 'stale', firstPaidAt: null }
     }
+
+    const firstPaidAt = resolveFirstPaidAt(lockedStripeInfo.paid_at, transactionUpdateData.paid_at)
+    // A concurrent webhook already recorded the first payment: keep its paid_at.
+    if (lockedStripeInfo.paid_at)
+      delete transactionUpdateData.paid_at
 
     const churnReason = getChurnReason(lockedStripeInfo, transactionUpdateData)
     if (churnReason) {
@@ -723,7 +751,7 @@ async function persistStripeInfoAndRevenueMovement(
 
       if ((processedEvent.rowCount ?? 0) === 0) {
         await pgClient.query('ROLLBACK')
-        return 'duplicate'
+        return { status: 'duplicate', firstPaidAt: null }
       }
     }
 
@@ -731,12 +759,12 @@ async function persistStripeInfoAndRevenueMovement(
       const result = await pgClient.query(updateStatement.text, updateStatement.values)
       if ((result.rowCount ?? 0) === 0) {
         await pgClient.query('ROLLBACK')
-        return 'missing'
+        return { status: 'missing', firstPaidAt: null }
       }
     }
 
     await pgClient.query('COMMIT')
-    return 'applied'
+    return { status: 'applied', firstPaidAt }
   }
   catch (error) {
     try {
@@ -1173,7 +1201,7 @@ async function createdOrUpdated(
     const revenueMovement = classifyRevenueMovement(currentStripeInfo, updateData, revenuePlans)
     if (shouldTrackOrganizationUpgrade(stripeData.isUpgrade, revenueMovement))
       updateData.upgraded_at = eventOccurredAtIso
-    const didPersist = await persistStripeInfoAndRevenueMovement(
+    const { status: didPersist, firstPaidAt } = await persistStripeInfoAndRevenueMovement(
       c,
       stripeData.data.customer_id,
       c.get('stripeEvent')!.id,
@@ -1204,6 +1232,20 @@ async function createdOrUpdated(
     }
     if (didPersist === 'missing')
       return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { stripeData })
+
+    const openAIFirstPaymentAt = getOpenAIFirstPaymentAt({
+      firstPaidAt,
+      currentPaidAt: currentStripeInfo?.paid_at,
+      stripeEvent: c.get('stripeEvent'),
+      eventOccurredAtIso,
+    })
+    if (openAIFirstPaymentAt) {
+      // Paid conversion for OpenAI Ads, for every first payment (direct offer
+      // or converted trial). Scheduled right after the commit, before any step
+      // that can fail the webhook: a Stripe retry no longer sees paid_at as new.
+      // Background only: it never fails the webhook.
+      await scheduleOpenAIFirstPayment(c, org, openAIFirstPaymentAt, plan.name || stripeData.data.price_id)
+    }
 
     if (status === 'past_due')
       return
@@ -1260,7 +1302,7 @@ async function createdOrUpdated(
       await writePaidAtAtomically(c, stripeData.data.customer_id, paidAt)
     }
 
-    const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan, billingPlans.map(candidate => candidate.name))
+    const segment = await customerToSegmentOrg(c, org, stripeData.data.price_id, plan, billingPlans.map(candidate => candidate.name))
     const isMonthly = getPlanType(plan, stripeData.data.price_id) === 'monthly'
     const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
     const subscriptionMetadata = buildSubscriptionEventMetadata(stripeData, plan, previousPlan)
@@ -1319,7 +1361,7 @@ async function createdOrUpdated(
     }
   }
   else {
-    const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id)
+    const segment = await customerToSegmentOrg(c, org, stripeData.data.price_id)
     await syncBillingBentoTags(c, org, stripeData.data.customer_id, segment)
   }
 }
@@ -1337,7 +1379,7 @@ async function updateStripeInfo(c: Context, stripeData: StripeData) {
 }
 
 async function didCancel(c: Context, org: Org, customerId: string) {
-  const segment = await customerToSegmentOrg(c, org.id, 'canceled')
+  const segment = await customerToSegmentOrg(c, org, 'canceled')
   await syncBillingBentoTags(c, org, customerId, segment)
   await sendEventToTracking(c, {
     bento: {
@@ -1592,12 +1634,64 @@ async function handleCustomerSourceStripeEvent(
   return null
 }
 
+// Paid conversion for OpenAI Ads, in the background: it never fails the webhook.
+async function scheduleOpenAIFirstPayment(c: Context, org: Org, paidAt: string, planId: string | null | undefined) {
+  const billingAccount = getWebhookBillingAccount(c)
+  await backgroundTask(c, trackOpenAIFirstPayment(c, {
+    orgId: org.id,
+    ownerUserId: org.created_by,
+    paidAt,
+    planId,
+    stripeEvent: c.get('stripeEvent'),
+  }, {
+    loadUser: async (userId) => {
+      const { data, error } = await supabaseAdmin(c)
+        .from('users')
+        .select('id, email, first_name, last_name, country')
+        .eq('id', userId)
+        .maybeSingle()
+      if (error)
+        throw error
+      return data
+    },
+    // Short, single-shot requests: the helper retries, inside the background budget.
+    retrieveInvoice: invoiceId => getStripe(c, billingAccount).invoices.retrieve(invoiceId, {}, { timeout: 3_000, maxNetworkRetries: 0 }),
+  }))
+}
+
+// An invoiced subscription's first invoice was paid after paid_at was set:
+// report the conversion the subscription webhook had to skip.
+async function recoverOpenAIFirstPaymentFromInvoice(c: Context<MiddlewareKeyVariablesStripe>, org: Org, stripeEvent: Stripe.Event, customer: StripeInfoRow) {
+  // Subscription events are handled (with their stale-event checks) by createdOrUpdated.
+  if (stripeEvent.type !== 'invoice.updated')
+    return
+  const paidAt = getOpenAIFirstPaymentAt({
+    firstPaidAt: null,
+    currentPaidAt: customer.paid_at,
+    stripeEvent,
+    eventOccurredAtIso: new Date(stripeEvent.created * 1000).toISOString(),
+  })
+  if (!paidAt)
+    return
+  try {
+    const plans = await getBillingPlans(c)
+    const plan = plans.find(candidate => candidate.stripe_id === customer.product_id || candidate.stripe_id_us === customer.product_id)
+    await scheduleOpenAIFirstPayment(c, org, paidAt, plan?.name || customer.price_id)
+  }
+  catch (error) {
+    // Ads reporting must never fail the webhook.
+    cloudlogErr({ requestId: c.get('requestId'), message: 'OpenAI Ads invoice recovery failed', orgId: org.id, error })
+  }
+}
+
 async function handleInvoiceStripeEvent(
   c: Context<MiddlewareKeyVariablesStripe>,
   org: Org,
   stripeEvent: Stripe.Event,
   stripeData: StripeData,
+  customer: StripeInfoRow,
 ) {
+  await recoverOpenAIFirstPaymentFromInvoice(c, org, stripeEvent, customer)
   if (stripeEvent.type === 'invoice.upcoming')
     return invoiceUpcoming(c, org, stripeEvent, stripeData)
   if (stripeEvent.type === 'invoice.created' || stripeEvent.type === 'invoice.updated')
@@ -1634,11 +1728,46 @@ async function handleActiveSubscriptionUpdate(
   return null
 }
 
+type BackupRecovery = 'recovered' | 'backup_attempt_failed' | 'not_recovered'
+
+// Stripe only retries the default card; charge the backup before the org is marked failed.
+// Stripe errors propagate so the webhook is retried; the backup charge is idempotent per failed charge.
+async function chargeBackupCard(c: Context<MiddlewareKeyVariablesStripe>, stripeEvent: Stripe.Event, customerId: string): Promise<BackupRecovery> {
+  if (stripeEvent.type !== 'charge.failed')
+    return 'not_recovered'
+  const charge = stripeEvent.data.object
+  const stripe = getStripe(c, getWebhookBillingAccount(c))
+  // Retry the invoice this charge was for, not whichever invoice is newest.
+  const invoice = await findInvoiceForCharge(stripe, charge)
+  if (!invoice?.id || !isSubscriptionInvoice(invoice))
+    return 'not_recovered'
+  // Already settled (for example Pay now charged the backup first): nothing failed anymore.
+  if (invoice.status === 'paid')
+    return 'recovered'
+  if (invoice.status !== 'open')
+    return 'not_recovered'
+  const result = await payInvoiceWithBackupCard(c, stripe, customerId, invoice.id, {
+    chargeId: charge.id,
+    paymentMethodId: typeof charge.payment_method === 'string' ? charge.payment_method : null,
+  })
+  if (result === 'paid')
+    return 'recovered'
+  // The default card's failure already sent dunning; the backup's own failure must not send it twice.
+  return result === 'failed_card_is_backup' ? 'backup_attempt_failed' : 'not_recovered'
+}
+
 async function handleFailedSubscriptionPayment(
   c: Context<MiddlewareKeyVariablesStripe>,
+  stripeEvent: Stripe.Event,
   stripeData: StripeData,
   org: Org,
 ) {
+  const recovery = await chargeBackupCard(c, stripeEvent, stripeData.data.customer_id)
+  if (recovery !== 'not_recovered') {
+    // recovered: charge.succeeded keeps the plan active. backup_attempt_failed: dunning already ran.
+    cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment handling', recovery, orgId: org.id })
+    return null
+  }
   if (await orgHasActiveUsageCredits(c, org.id)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Skipping failed payment email because org has active usage credits', orgId: org.id })
   }
@@ -1683,13 +1812,16 @@ async function handleCanceledSubscriptionStripeEvent(
     return null
   }
 
-  if (stripeData.data.subscription_anchor_end && new Date(stripeData.data.subscription_anchor_end) > new Date()) {
+  // Paid access runs to period end, but a never-paid trial plan grants none.
+  const neverPaidTrialPlan = (stripeEvent.type === 'customer.subscription.deleted' || stripeEvent.type === 'customer.subscription.updated')
+    && await isTrialPlanFirstInvoiceUnpaid(getStripe(c, getWebhookBillingAccount(c)), stripeEvent.data.object)
+  if (!neverPaidTrialPlan && stripeData.data.subscription_anchor_end && new Date(stripeData.data.subscription_anchor_end) > new Date()) {
     stripeData.data.status = 'succeeded'
   }
   const updateData = toStripeInfoUpdate(stripeData.data)
   const revenuePlans = await getRevenuePlans(c)
   const revenueMovement = classifyRevenueMovement(customer, updateData, revenuePlans)
-  const didPersist = await persistStripeInfoAndRevenueMovement(
+  const { status: didPersist } = await persistStripeInfoAndRevenueMovement(
     c,
     stripeData.data.customer_id,
     stripeEvent.id,
@@ -1725,6 +1857,35 @@ async function handleCanceledSubscriptionStripeEvent(
   return null
 }
 
+// The trial plan subscription only converts the org once its first invoice is paid.
+async function getTrialPlanPaymentState(c: Context<MiddlewareKeyVariablesStripe>, stripeEvent: Stripe.Event): Promise<TrialPlanFirstInvoiceState | null> {
+  if (stripeEvent.type !== 'customer.subscription.created' && stripeEvent.type !== 'customer.subscription.updated')
+    return null
+  const subscription = stripeEvent.data.object
+  if (!isTrialPlanSubscription(subscription))
+    return null
+  return await settleTrialPlanFirstInvoice(c, getStripe(c, getWebhookBillingAccount(c)), subscription)
+}
+
+// Keep the live subscription visible to Billing (pay now, cancel) without converting the org.
+// Same row-locked, ordered write as other subscription events, so an older unpaid event
+// cannot overwrite a newer paid state.
+async function persistUnpaidTrialPlanSubscription(c: Context<MiddlewareKeyVariablesStripe>, stripeEvent: Stripe.Event, stripeData: StripeData) {
+  cloudlog({ requestId: c.get('requestId'), message: 'Trial plan subscription waits for its first payment', subscriptionId: stripeData.data.subscription_id })
+  stripeData.data.status = 'failed'
+  const { status: persisted } = await persistStripeInfoAndRevenueMovement(
+    c,
+    stripeData.data.customer_id,
+    stripeEvent.id,
+    toStripeInfoUpdate(stripeData.data),
+    new Date(stripeEvent.created * 1000).toISOString(),
+    ZERO_REVENUE_MOVEMENT,
+  )
+  if (persisted === 'missing')
+    return quickError(404, 'customer_id_not_found', 'customer_id not found', { stripeData })
+  return c.json(BRES)
+}
+
 async function handleSubscriptionStripeEvent(
   c: Context<MiddlewareKeyVariablesStripe>,
   stripeEvent: Stripe.Event,
@@ -1733,12 +1894,25 @@ async function handleSubscriptionStripeEvent(
   customer: StripeInfoRow,
 ) {
   if (isSubscriptionUpdateStatus(stripeData.data.status) && stripeData.data.price_id && stripeData.data.product_id) {
+    // An obsolete event must not reach the trial plan settlement, which can charge a card.
+    if (isStaleStripeEvent(customer, new Date(stripeEvent.created * 1000).toISOString())) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Skipping stale Stripe subscription event', subscriptionId: stripeData.data.subscription_id })
+      return c.json(BRES)
+    }
+    const trialPlanPayment = await getTrialPlanPaymentState(c, stripeEvent)
+    // A first payment recovered after a decline arrives as an update: record it as the
+    // conversion (paid_at, new business, subscribe event) the deferred create skipped.
+    // Renewals (including a failed one reported as past_due) keep the normal flow.
+    if (trialPlanPayment === 'first_paid' && customer.status !== 'succeeded' && stripeData.data.status !== 'past_due')
+      stripeData.data.status = 'created'
+    if (trialPlanPayment === 'unpaid')
+      return persistUnpaidTrialPlanSubscription(c, stripeEvent, stripeData)
     const response = await handleActiveSubscriptionUpdate(c, stripeEvent, stripeData, org, customer)
     if (response)
       return response
   }
   else if (stripeData.data.status === 'failed') {
-    await handleFailedSubscriptionPayment(c, stripeData, org)
+    await handleFailedSubscriptionPayment(c, stripeEvent, stripeData, org)
   }
   else if (isSubscriptionUpdateStatus(stripeData.data.status) && (!stripeData.data.price_id || !stripeData.data.product_id)) {
     handleSubscriptionMissingPriceData(c, stripeData)
@@ -1786,7 +1960,7 @@ async function stripeEventHandler(c: Context<MiddlewareKeyVariablesStripe>) {
   if (customerSourceResponse)
     return customerSourceResponse
 
-  const invoiceResponse = await handleInvoiceStripeEvent(c, org, stripeEvent, stripeData)
+  const invoiceResponse = await handleInvoiceStripeEvent(c, org, stripeEvent, stripeData, customer)
   if (invoiceResponse)
     return invoiceResponse
 
@@ -1800,6 +1974,13 @@ async function stripeEventHandler(c: Context<MiddlewareKeyVariablesStripe>) {
     // A failed credit top-up or one-off purchase must not mark the plan as failed.
     cloudlog({ requestId: c.get('requestId'), message: 'Ignoring failed non-subscription charge', orgId: org.id, chargeId: stripeEvent.data.object.id })
     return c.json(BRES)
+  }
+
+  // Fails the webhook on error so Stripe retries: a leftover schedule would bill the customer twice.
+  // Checkout subscriptions can start incomplete, so also check when one becomes active.
+  if (stripeEvent.type === 'customer.subscription.created'
+    || (stripeEvent.type === 'customer.subscription.updated' && stripeEvent.data.previous_attributes?.status)) {
+    await cancelTrialPlanScheduleForSubscription(c, getStripe(c, getWebhookBillingAccount(c)), stripeEvent.data.object)
   }
 
   const subscriptionResponse = await handleSubscriptionStripeEvent(c, stripeEvent, stripeData, org, customer)
@@ -1824,6 +2005,7 @@ export const stripeEventTestUtils = {
   classifyRevenueMovement,
   getEventDateId,
   getPaidAtUpdate,
+  resolveFirstPaidAt,
   getPlanChangeTrackingEventName,
   getChurnReason,
   getSubscriptionMrr,

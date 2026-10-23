@@ -14,6 +14,7 @@ import {
   isStripeConfiguredForAccount,
   planProductIdOrFilter,
   resolveCheckoutPlanProductId,
+  TRIAL_PLAN_SCHEDULE_METADATA_KEY,
 } from './stripe_billing.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv, isStripeConfigured, trimTrailingSlashes } from './utils.ts'
@@ -264,7 +265,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
 
     // Retrieve the specific subscription from Stripe
     const subscription = await stripeContext.stripe.subscriptions.retrieve(subscriptionId, {
-      expand: ['items.data.price'], // Correct expand path for retrieve
+      expand: ['items.data.price', 'latest_invoice'], // Correct expand path for retrieve
     })
 
     cloudlog({
@@ -281,10 +282,17 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
     const cycleEnd = stripeTimestampToIso(currentItem?.current_period_end)
     const canceledAt = getSubscriptionEndDate(subscription, currentItem)
 
+    // A trial plan subscription only converts once its first invoice is paid (see stripe_trial_plan.ts).
+    const latestInvoice = typeof subscription.latest_invoice === 'object' ? subscription.latest_invoice : null
+    const trialPlanFirstInvoiceUnpaid = subscription.metadata?.[TRIAL_PLAN_SCHEDULE_METADATA_KEY] === 'true'
+      && latestInvoice?.billing_reason === 'subscription_create'
+      && latestInvoice.status !== 'paid'
+
     return {
       productId,
       extraMau: getExtraMau(subscription.items.data),
       status: subscription.status,
+      trialPlanFirstInvoiceUnpaid,
       cycleStart,
       cycleEnd,
       canceledAt,
@@ -352,8 +360,13 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 
     if (subscriptionData) {
       if (subscriptionData.status === 'canceled') {
-        if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date())
+        // Paid access runs to period end, but a never-paid trial plan grants none.
+        if (subscriptionData.cycleEnd && new Date(subscriptionData.cycleEnd) > new Date() && !subscriptionData.trialPlanFirstInvoiceUnpaid)
           dbStatus = 'succeeded'
+      }
+      else if (subscriptionData.trialPlanFirstInvoiceUnpaid) {
+        // Live in Stripe but never paid: keep the org non-paying, as the webhook does.
+        dbStatus = 'failed'
       }
       else if (subscriptionData.status === 'active' || subscriptionData.status === 'trialing' || subscriptionData.status === 'past_due') {
         dbStatus = 'succeeded'
@@ -421,7 +434,9 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 
 export type PortalFlow = 'cancel_subscription'
 
-export async function getActiveSubscriptionId(c: Context, customerId: string) {
+// known is false on a stripe_info read error: the subscription may exist, so callers must not
+// treat null as "no subscription" for destructive work (e.g. spare-card detach).
+export async function lookupActiveSubscriptionId(c: Context, customerId: string) {
   const { data, error } = await supabaseAdmin(c)
     .from('stripe_info')
     .select('subscription_id, status')
@@ -429,11 +444,16 @@ export async function getActiveSubscriptionId(c: Context, customerId: string) {
     .maybeSingle()
   if (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getActiveSubscriptionId', error })
-    return null
+    return { subscriptionId: null as string | null, known: false }
   }
   if (!data?.subscription_id || data.status === 'canceled' || data.status === 'deleted')
-    return null
-  return data.subscription_id
+    return { subscriptionId: null as string | null, known: true }
+  return { subscriptionId: data.subscription_id, known: true }
+}
+
+export async function getActiveSubscriptionId(c: Context, customerId: string) {
+  const { subscriptionId } = await lookupActiveSubscriptionId(c, customerId)
+  return subscriptionId
 }
 
 export async function createPortal(c: Context, customerId: string, callbackUrl: string, flow?: PortalFlow) {
@@ -614,11 +634,25 @@ export function isSubscriptionInvoice(invoice: Pick<OpenInvoiceShape, 'billing_r
 // charge.failed fires for every charge, including credit auto top-ups and one-off
 // purchases. Only a failed subscription invoice says anything about the plan.
 // Errors propagate so the webhook is retried instead of guessing.
-export async function isSubscriptionCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
+// One webhook checks the same charge twice (subscription check, backup retry): look it up once.
+const chargeInvoiceLookups = new WeakMap<object, Promise<Stripe.Invoice | null>>()
+
+// The invoice a charge paid (or tried to pay), through its PaymentIntent.
+export function findInvoiceForCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
+  let lookup = chargeInvoiceLookups.get(charge)
+  if (!lookup) {
+    lookup = lookupInvoiceForCharge(stripe, charge)
+    chargeInvoiceLookups.set(charge, lookup)
+    // Errors must not stick: a retried webhook delivery parses a new charge object anyway.
+    lookup.catch(() => chargeInvoiceLookups.delete(charge))
+  }
+  return lookup
+}
+
+async function lookupInvoiceForCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
   const paymentIntentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
-  // Legacy charges without a PaymentIntent keep the previous behavior.
   if (!paymentIntentId)
-    return true
+    return null
   const payments = await stripe.invoicePayments.list({
     payment: { type: 'payment_intent', payment_intent: paymentIntentId },
     limit: 1,
@@ -626,8 +660,16 @@ export async function isSubscriptionCharge(stripe: Stripe, charge: Pick<Stripe.C
   })
   const invoice = payments.data[0]?.invoice
   if (!invoice || typeof invoice === 'string' || invoice.deleted)
-    return false
-  return isSubscriptionInvoice(invoice)
+    return null
+  return invoice
+}
+
+export async function isSubscriptionCharge(stripe: Stripe, charge: Pick<Stripe.Charge, 'payment_intent'>) {
+  // Legacy charges without a PaymentIntent keep the previous behavior.
+  if (!charge.payment_intent)
+    return true
+  const invoice = await findInvoiceForCharge(stripe, charge)
+  return !!invoice && isSubscriptionInvoice(invoice)
 }
 
 export function toOpenSubscriptionInvoiceSummary(invoice: OpenInvoiceShape): OpenSubscriptionInvoiceSummary {

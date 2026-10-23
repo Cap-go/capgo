@@ -1,4 +1,4 @@
-import type { Database } from '../src/types/supabase.types'
+import type { Database } from '../src/types/database.types'
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { Pool } from 'pg'
@@ -1995,8 +1995,8 @@ describe('[POST] /private/sso/provision-user', () => {
       )
 
       const ssoAuthHeaders = await getAuthHeadersForCredentials(email, password)
-      const supabase = getSupabaseClient()
-      const { data: existingPublicUser, error: existingPublicUserError } = await supabase
+      const capgo = getSupabaseClient()
+      const { data: existingPublicUser, error: existingPublicUserError } = await capgo
         .from('users')
         .select('id')
         .eq('id', createdUser.user.id)
@@ -2005,7 +2005,7 @@ describe('[POST] /private/sso/provision-user', () => {
       expect(existingPublicUserError).toBeNull()
 
       if (existingPublicUser) {
-        const { error: deletePublicUserError } = await supabase
+        const { error: deletePublicUserError } = await capgo
           .from('users')
           .delete()
           .eq('id', createdUser.user.id)
@@ -2013,7 +2013,7 @@ describe('[POST] /private/sso/provision-user', () => {
         expect(deletePublicUserError).toBeNull()
       }
 
-      const { data: missingPublicUser, error: missingPublicUserError } = await supabase
+      const { data: missingPublicUser, error: missingPublicUserError } = await capgo
         .from('users')
         .select('id')
         .eq('id', createdUser.user.id)

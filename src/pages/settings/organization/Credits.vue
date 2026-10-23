@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CreditMetricType, CreditPricingStep } from '~/services/creditPricing'
-import type { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/database.types'
 import { FormKit } from '@formkit/vue'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -15,15 +15,16 @@ import ScaleIcon from '~icons/heroicons/scale'
 import UserGroupIcon from '~icons/heroicons/user-group'
 import CardFormModal from '~/components/billing/CardFormModal.vue'
 import EmbeddedCheckoutModal from '~/components/billing/EmbeddedCheckoutModal.vue'
+import TrialPlanOfferModal from '~/components/billing/TrialPlanOfferModal.vue'
 import CreditsOnlyTip from '~/components/CreditsOnlyTip.vue'
 import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
+import { getCreditPricingSteps, useConsole } from '~/services/console'
 import { creditPricingMetricOrder, formatCreditPricingPrice, formatCreditPricingTierLabel } from '~/services/creditPricing'
 import { formatLocalDate } from '~/services/date'
 import { formatNumber, formatNumberValue } from '~/services/formatLocale'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { completeCreditTopUp, getCreditAutoTopUp, saveCreditAutoTopUp, startCreditTopUp } from '~/services/stripe'
-import { getCreditPricingSteps, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 import { isCreditsOnlyOrg } from '~/utils/organizationBilling'
@@ -65,7 +66,7 @@ interface DailyLedgerRow {
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
-const supabase = useSupabase()
+const capgo = useConsole()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const isCreditsOnly = computed(() => isCreditsOnlyOrg(currentOrganization.value))
@@ -86,10 +87,15 @@ const creditUsdRate = ref(1)
 const isStartingCheckout = ref(false)
 const embeddedCheckout = ref<{ clientSecret: string, publishableKey: string, sessionId: string } | null>(null)
 const showCardModal = ref(false)
+const showTrialPlanOffer = ref(false)
 const isCompletingTopUp = ref(false)
 const isProcessingCheckout = computed(() => isStartingCheckout.value || isCompletingTopUp.value)
 const currentPage = ref(1)
 const pageSize = 5
+// The ledger loads newest-first in batches of whole days instead of the full history.
+const LEDGER_BATCH_ROWS = 500
+const hasMoreTransactions = ref(false)
+const isLoadingMoreTransactions = ref(false)
 const CREDIT_PRICING_HASH = '#credit-pricing'
 const isCreditPricingOpen = ref(route.hash === CREDIT_PRICING_HASH)
 const DEFAULT_TOP_UP_QUANTITY = 100
@@ -412,33 +418,82 @@ function metricsWithData(day: DailyLedgerRow) {
   })
 }
 
+/**
+ * One newest-first batch of ledger rows older than `before`. When more rows exist,
+ * the oldest (possibly partial) day is held back so every shown day is complete;
+ * the next batch starts below the oldest kept row and fetches that day in full.
+ */
+async function fetchLedgerBatch(orgId: string, before?: string) {
+  let query = capgo
+    .from('usage_credit_ledger')
+    .select('*')
+    .eq('org_id', orgId)
+    .order('occurred_at', { ascending: false })
+    .limit(LEDGER_BATCH_ROWS + 1)
+  if (before)
+    query = query.lt('occurred_at', before)
+  const { data, error } = await query
+  if (error)
+    return { rows: [] as UsageCreditLedgerRow[], hasMore: false, error }
+  const rows = (data ?? []) as UsageCreditLedgerRow[]
+  if (rows.length <= LEDGER_BATCH_ROWS)
+    return { rows, hasMore: false, error: null }
+  const batch = rows.slice(0, LEDGER_BATCH_ROWS)
+  const oldestDay = batch[batch.length - 1].occurred_at.slice(0, 10)
+  const completeDays = batch.filter(row => row.occurred_at.slice(0, 10) !== oldestDay)
+  // A single day larger than a batch is shown as loaded rather than never progressing.
+  return { rows: completeDays.length ? completeDays : batch, hasMore: true, error: null }
+}
+
 async function loadTransactions() {
   const orgId = currentOrganization.value?.gid
   if (!orgId) {
     transactions.value = []
+    hasMoreTransactions.value = false
     return
   }
 
   isLoadingTransactions.value = true
   loadError.value = null
 
-  const { data, error } = await supabase
-    .from('usage_credit_ledger')
-    .select('*')
-    .eq('org_id', orgId)
-    .order('occurred_at', { ascending: false })
+  const { rows, hasMore, error } = await fetchLedgerBatch(orgId)
 
   if (error) {
     console.error('Failed to load usage credit ledger entries', error)
     loadError.value = error.message
     transactions.value = []
+    hasMoreTransactions.value = false
   }
   else {
-    transactions.value = (data ?? []) as UsageCreditLedgerRow[]
+    transactions.value = rows
+    hasMoreTransactions.value = hasMore
     currentPage.value = 1
   }
 
   isLoadingTransactions.value = false
+}
+
+async function loadMoreTransactions() {
+  const orgId = currentOrganization.value?.gid
+  const oldest = transactions.value[transactions.value.length - 1]?.occurred_at
+  if (!orgId || !oldest || isLoadingMoreTransactions.value)
+    return
+  isLoadingMoreTransactions.value = true
+  const { rows, hasMore, error } = await fetchLedgerBatch(orgId, oldest)
+  isLoadingMoreTransactions.value = false
+  if (error) {
+    console.error('Failed to load older usage credit ledger entries', error)
+    toast.error(error.message)
+    return
+  }
+  transactions.value = [...transactions.value, ...rows]
+  hasMoreTransactions.value = hasMore
+}
+
+async function goToNextLedgerPage() {
+  if (currentPage.value >= totalPages.value && hasMoreTransactions.value)
+    await loadMoreTransactions()
+  currentPage.value = Math.min(totalPages.value, currentPage.value + 1)
 }
 
 async function loadPricingSteps() {
@@ -613,6 +668,8 @@ async function openCardForm() {
 
 async function onCardSaved() {
   showCardModal.value = false
+  // Trial orgs that add a card here are offered to start their plan when the trial ends.
+  showTrialPlanOffer.value = !!currentOrganization.value && !currentOrganization.value.paying && (currentOrganization.value.trial_left ?? 0) > 0
   await loadAutoTopUpSettings()
 }
 
@@ -1254,7 +1311,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
             </table>
             <div class="mt-4 flex items-center justify-between px-6 py-4 text-sm">
               <span>
-                {{ t('credits-pagination-label', { current: currentPage, total: totalPages }) }}
+                {{ t('credits-pagination-label', { current: currentPage, total: hasMoreTransactions ? `${totalPages}+` : totalPages }) }}
               </span>
               <div class="flex items-center gap-2">
                 <button
@@ -1268,8 +1325,8 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
                 <button
                   type="button"
                   class="d-btn d-btn-sm"
-                  :disabled="currentPage >= totalPages"
-                  @click="currentPage = Math.min(totalPages, currentPage + 1)"
+                  :disabled="(currentPage >= totalPages && !hasMoreTransactions) || isLoadingMoreTransactions"
+                  @click="goToNextLedgerPage"
                 >
                   {{ t('next') }}
                 </button>
@@ -1294,6 +1351,13 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
       mode="setup"
       @close="showCardModal = false"
       @saved="onCardSaved"
+    />
+    <TrialPlanOfferModal
+      v-if="showTrialPlanOffer && currentOrganization?.gid"
+      :org-id="currentOrganization.gid"
+      source="credits"
+      @close="showTrialPlanOffer = false"
+      @scheduled="showTrialPlanOffer = false"
     />
     <RbacPermissionOnlyModal
       v-if="showAdminModal"

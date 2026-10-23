@@ -40,7 +40,6 @@ import { resolveAutoBumpLevelFromAi } from './auto-bump-ai'
 import { maybePromptBuilderCta, shouldBlockIncompatibleUpload } from './builder-cta'
 import { checkIndexPosition, searchInDirectory } from './check'
 import { summarizeUploadCompatibility } from './compatibility'
-import { finalizeUploadedBundle } from './finalize-upload'
 import { isManifestUploadAutoEnabled, MANIFEST_UPLOAD_PROTOCOL_VERSION, manifestUploadFileHashFormat, requestManifestUpload } from './manifest-upload'
 import { PartialUploadValidationError, prepareBundlePartialFiles, prepareManifestUploadEntries, uploadPartial } from './partial'
 import { clackUploadReporter, getUploadReporter, runWithUploadReporter } from './reporter'
@@ -252,7 +251,7 @@ async function verifyCompatibility(apikey: string, pm: pmType, options: OptionsU
     const {
       finalCompatibility: finalCompatibilityWithChannel,
       localDependencies: localDependenciesWithChannel,
-    } = await checkCompatibilityCloud(apikey, appid, channel, options.packageJson, options.nodeModules, cliHost)
+    } = await checkCompatibilityCloud(apikey, appid, channel, options.packageJson, options.nodeModules, cliHost, channelData.version.native_packages)
 
     finalCompatibility = finalCompatibilityWithChannel
     localDependencies = localDependenciesWithChannel
@@ -923,23 +922,6 @@ function formatRolloutPercentage(bps: number) {
   return `${Number((bps / 100).toFixed(2))}%`
 }
 
-async function getVersionIdForChannelUpdate(
-  apikey: string,
-  appid: string,
-  bundle: string,
-  httpOptions?: { apiHost?: string },
-) {
-  const version = await fetchBundleVersionRow(apikey, appid, bundle, {
-    ...httpOptions,
-    includeDeleted: true,
-  })
-
-  if (!version?.id)
-    uploadFail('Cannot get version id, cannot set channel')
-
-  return version.id
-}
-
 async function versionExistsOnRemote(
   apikey: string,
   appid: string,
@@ -1242,6 +1224,7 @@ async function setVersionInChannel(
   apikey: string,
   displayBundleUrl: boolean,
   bundle: string,
+  versionId: number,
   channel: string,
   userId: string,
   orgId: string,
@@ -1266,7 +1249,6 @@ async function setVersionInChannel(
   }
 
   if (targetChannel && canPromoteTargetChannel) {
-    const versionId = await getVersionIdForChannelUpdate(apikey, appid, bundle, cliHost)
     if (selfAssign) {
       const canUpdateChannelSettings = await hasCliPermission(client, apikey, 'channel.update_settings', { appId: appid, channelId: targetChannel.id })
       if (!canUpdateChannelSettings) {
@@ -1371,6 +1353,7 @@ async function setRolloutVersionInChannel(
   apikey: string,
   displayBundleUrl: boolean,
   bundle: string,
+  versionId: number,
   channel: string,
   appid: string,
   localConfig: localConfigType,
@@ -1388,7 +1371,6 @@ async function setRolloutVersionInChannel(
   if (promoteCurrentRollout && targetChannel.rollout_version == null)
     uploadFail(`Cannot advance rollout, channel ${channel} has no rollout target to promote to stable`)
 
-  const versionId = await getVersionIdForChannelUpdate(apikey, appid, bundle, cliHost)
   const [canPromote, canUpdateSettings] = await Promise.all([
     hasCliPermission(client, apikey, 'channel.promote_bundle', { appId: appid, channelId: targetChannel.id }),
     hasCliPermission(client, apikey, 'channel.update_settings', { appId: appid, channelId: targetChannel.id }),
@@ -2176,15 +2158,7 @@ async function uploadBundleInternalWithReporter(preAppid: string, options: Optio
     if (options.verbose)
       log.info(`[Verbose] Updating version record with storage provider...`)
 
-    await finalizeUploadedBundle({
-      apikey,
-      appId: appid,
-      bundle,
-      apiHost: options.apiHost,
-      reporter: getUploadReporter(),
-    }, async () => {
-      await persistVersionData(apikey, versionData, 'update', options)
-    })
+    await persistVersionData(apikey, versionData, 'update', options)
 
     if (options.verbose)
       log.info(`[Verbose] Version record updated successfully`)
@@ -2227,8 +2201,8 @@ async function uploadBundleInternalWithReporter(preAppid: string, options: Optio
     if (options.rolloutAdvance && rolloutPercentageBps == null && !((previousRolloutPercentageBps ?? 0) > 0))
       uploadFail(`Cannot advance rollout, channel ${targetChannel} has no rollout percentage to reuse. Pass --rollout or --rollout-percentage-bps`)
     const targetChannelVersionSet = shouldAssignRollout
-      ? await setRolloutVersionInChannel(client, apikey, !!options.bundleUrl, bundle, targetChannel, appid, localConfig, uploadTargetChannel, nextRolloutPercentageBps, options.rolloutCacheTtlSeconds, options.selfAssign, options, !!options.rolloutAdvance)
-      : await setVersionInChannel(client, apikey, !!options.bundleUrl, bundle, targetChannel, userId, orgId, appid, localConfig, uploadTargetChannel, channelAssignmentRequired, options.selfAssign, options)
+      ? await setRolloutVersionInChannel(client, apikey, !!options.bundleUrl, bundle, versionId, targetChannel, appid, localConfig, uploadTargetChannel, nextRolloutPercentageBps, options.rolloutCacheTtlSeconds, options.selfAssign, options, !!options.rolloutAdvance)
+      : await setVersionInChannel(client, apikey, !!options.bundleUrl, bundle, versionId, targetChannel, userId, orgId, appid, localConfig, uploadTargetChannel, channelAssignmentRequired, options.selfAssign, options)
     if (targetChannelVersionSet)
       channelVersionSet.add(targetChannel)
     if (options.verbose)

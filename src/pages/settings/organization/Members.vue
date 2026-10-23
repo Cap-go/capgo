@@ -2,7 +2,6 @@
 import type { TableColumn } from '~/components/comp_def'
 import type { SsoManagedAccess } from '~/services/ssoManaged'
 import type { ExtendedOrganizationMember } from '~/stores/organization'
-
 import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, h, onMounted, ref, watch } from 'vue'
@@ -18,10 +17,10 @@ import RoleCapabilitiesHint from '~/components/forms/RoleCapabilitiesHint.vue'
 import RoleSelect from '~/components/forms/RoleSelect.vue'
 import SearchInput from '~/components/forms/SearchInput.vue'
 import { invokeCapgoApi } from '~/services/capgoApi'
+import { defaultApiHost, useConsole } from '~/services/console'
 import { checkPermissions } from '~/services/permissions'
 import { fetchSsoManagedAccess } from '~/services/ssoManaged'
 import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { getRbacRoleI18nKey, isAdminRole, isSuperAdminRole, useOrganizationStore } from '~/stores/organization'
@@ -33,7 +32,7 @@ const { t } = useI18n()
 const router = useRouter()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
-const supabase = useSupabase()
+const capgo = useConsole()
 const main = useMainStore()
 const search = ref('')
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
@@ -419,7 +418,7 @@ async function reloadData() {
 
     const orgId = currentOrganization.value.gid
     const [{ data: rbacMembers, error: rbError }, managed] = await Promise.all([
-      supabase.rpc('get_org_members_rbac', { p_org_id: orgId }),
+      capgo.rpc('get_org_members_rbac', { p_org_id: orgId }),
       fetchSsoManagedAccess(orgId),
     ])
     // The org may have changed while loading.
@@ -634,7 +633,7 @@ async function sendInvitation(email: string, type: string): Promise<boolean> {
 
   isLoading.value = true
   try {
-    const { data, error } = await supabase.rpc('invite_user_to_org_rbac', {
+    const { data, error } = await capgo.rpc('invite_user_to_org_rbac', {
       email,
       org_id: orgId,
       role_name: type,
@@ -666,7 +665,7 @@ async function handleExistingUserInviteNotification(output: string, email: strin
   if (!orgId || !shouldAttemptExistingUserInviteNotification(output, hasPendingInvite))
     return false
 
-  const notified = await notifyExistingUserInvite(supabase, email, orgId)
+  const notified = await notifyExistingUserInvite(capgo, email, orgId)
   if (!notified) {
     console.warn('Failed to send invite email notification')
     toast.warning(t('org-invite-email-notification-failed'))
@@ -726,7 +725,7 @@ async function handleSendInvitationOutput(output: string, email: string, type: s
 }
 
 async function rescindInvitation(email: string) {
-  const { data, error } = await supabase.rpc('rescind_invitation', {
+  const { data, error } = await capgo.rpc('rescind_invitation', {
     email,
     org_id: currentOrganization.value?.gid ?? '',
   })
@@ -861,7 +860,7 @@ async function deleteRbacMember(member: OrganizationMemberRow) {
     return false
   }
 
-  const { data: currentSession } = await supabase.auth.getSession()
+  const { data: currentSession } = await capgo.auth.getSession()
   const currentJwt = currentSession.session?.access_token
   if (!currentJwt) {
     toast.error(t('cannot-delete-member'))
@@ -999,7 +998,7 @@ function handleRbacInviteUpdateError(error: { message?: string }, options: { toa
 }
 
 async function updateRbacMemberRole(member: OrganizationMemberRow, perm: string) {
-  const { data, error } = await supabase.rpc('update_org_member_role', {
+  const { data, error } = await capgo.rpc('update_org_member_role', {
     p_org_id: currentOrganization.value?.gid ?? '',
     p_user_id: member.uid,
     p_new_role_name: perm,
@@ -1025,12 +1024,12 @@ async function updateRbacInviteRole(member: OrganizationMemberRow, perm: string)
   }
 
   const { data, error } = member.is_tmp
-    ? await supabase.rpc('update_tmp_invite_role_rbac', {
+    ? await capgo.rpc('update_tmp_invite_role_rbac', {
         p_org_id: orgId,
         p_email: member.email,
         p_new_role_name: perm,
       })
-    : await supabase.rpc('update_org_invite_role_rbac', {
+    : await capgo.rpc('update_org_invite_role_rbac', {
         p_org_id: orgId,
         p_user_id: member.uid,
         p_new_role_name: perm,
@@ -1195,7 +1194,7 @@ async function fetchAppAccessApps() {
   if (!currentOrganization.value)
     return
   try {
-    const { data, error } = await supabase
+    const { data, error } = await capgo
       .from('apps')
       .select('id, app_id, name')
       .eq('owner_org', currentOrganization.value.gid)
@@ -1213,7 +1212,7 @@ async function fetchAppAccessApps() {
 
 async function fetchAvailableAppRoles() {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await capgo
       .from('roles')
       .select('id, name, scope_type, description, priority_rank')
       .eq('scope_type', 'app')
