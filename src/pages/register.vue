@@ -48,7 +48,7 @@ async function submit(form: { password: string, email: string }) {
     // Storage survives the /onboarding/name step that drops the query string.
     // Scoped to this account so another signup on the same browser cannot inherit it.
     if (web2AppArrival)
-      rememberWeb2AppArrival(web2AppArrival, Date.now(), registered.session.user.id)
+      rememberWeb2AppArrival(web2AppArrival, Date.now(), registered.user.id)
   }
   catch (error) {
     const code = await getCapgoApiErrorCode(error)

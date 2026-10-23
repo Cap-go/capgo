@@ -5,7 +5,7 @@ import { buildWebsiteLiveResponse } from '../supabase/functions/_backend/plugin_
 
 describe('buildWebsiteLiveResponse', () => {
   it('allows website apps with an active plan', () => {
-    expect(buildWebsiteLiveResponse({ update_mode: 'website', website_url: 'https://a.example.com/', plan_valid: true })).toEqual({
+    expect(buildWebsiteLiveResponse({ update_mode: 'website', website_url: 'https://a.example.com/', plan_valid: true, plan_trial_at: null })).toEqual({
       allowed: true,
       mode: 'website',
       website_url: 'https://a.example.com/',
@@ -15,20 +15,20 @@ describe('buildWebsiteLiveResponse', () => {
 
   it('treats unknown and classic apps as full Capgo', () => {
     expect(buildWebsiteLiveResponse(null)).toEqual({ allowed: false, mode: 'capgo', reason: 'full_capgo' })
-    expect(buildWebsiteLiveResponse({ update_mode: 'capgo', website_url: 'https://a.example.com/', plan_valid: true }))
+    expect(buildWebsiteLiveResponse({ update_mode: 'capgo', website_url: 'https://a.example.com/', plan_valid: true, plan_trial_at: null }))
       .toEqual({ allowed: false, mode: 'capgo', reason: 'full_capgo' })
     // Replica without the new column yet.
-    expect(buildWebsiteLiveResponse({ update_mode: null, website_url: null, plan_valid: true }).mode).toBe('capgo')
+    expect(buildWebsiteLiveResponse({ update_mode: null, website_url: null, plan_valid: true, plan_trial_at: null }).mode).toBe('capgo')
   })
 
   it('blocks website apps without an active plan unless Stripe is not configured', () => {
-    const row = { update_mode: 'website', website_url: 'https://a.example.com/', plan_valid: false }
+    const row = { update_mode: 'website', website_url: 'https://a.example.com/', plan_valid: false, plan_trial_at: null }
     expect(buildWebsiteLiveResponse(row)).toEqual({ allowed: false, mode: 'website', reason: 'need_plan_upgrade', check_interval_seconds: 600 })
     expect(buildWebsiteLiveResponse(row, false).allowed).toBe(true)
   })
 
   it('blocks website apps without a URL', () => {
-    expect(buildWebsiteLiveResponse({ update_mode: 'website', website_url: null, plan_valid: true }))
+    expect(buildWebsiteLiveResponse({ update_mode: 'website', website_url: null, plan_valid: true, plan_trial_at: null }))
       .toEqual({ allowed: false, mode: 'website', reason: 'missing_website_url', check_interval_seconds: 600 })
   })
 })

@@ -195,16 +195,16 @@ describe('asc resources', () => {
     expect(error.cause.error).toBe('asc_certificate_limit')
   })
 
-  it('createAppStoreProfile deletes same-name profiles then creates', async () => {
+  it('createAppStoreProfile creates then deletes same-name profiles', async () => {
     const calls = mockFetch([
       { method: 'GET', match: /\/profiles\?filter\[name\]=/, body: { data: [{ id: 'P_OLD', attributes: { name: 'Capgo com.x.app AppStore' } }, { id: 'P_OTHER', attributes: { name: 'Capgo com.x.app AppStore 2' } }] } },
-      { method: 'DELETE', match: /\/profiles\/P_OLD$/, status: 204 },
       { method: 'POST', match: /\/profiles$/, status: 201, body: { data: { id: 'P_NEW', attributes: { name: 'Capgo com.x.app AppStore', profileContent: 'QUJD' } } } },
+      { method: 'DELETE', match: /\/profiles\/P_OLD$/, status: 204 },
     ])
     const result = await createAppStoreProfile(creds, { bundleIdResourceId: 'B1', certificateId: 'C1', name: 'Capgo com.x.app AppStore' })
     expect(result).toEqual({ profileId: 'P_NEW', name: 'Capgo com.x.app AppStore', profileContentBase64: 'QUJD' })
-    expect(calls.map(c => c.method)).toEqual(['GET', 'DELETE', 'POST'])
-    const sent = calls[2].body.data
+    expect(calls.map(c => c.method)).toEqual(['GET', 'POST', 'DELETE'])
+    const sent = calls[1].body.data
     expect(sent.attributes.profileType).toBe('IOS_APP_STORE')
     expect(sent.relationships.bundleId.data.id).toBe('B1')
     expect(sent.relationships.certificates.data[0].id).toBe('C1')

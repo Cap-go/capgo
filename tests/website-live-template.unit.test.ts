@@ -63,7 +63,8 @@ function ensurePackedWebsiteLiveTemplate() {
   if (existsSync(packedTemplateZip))
     return
   if (!existsSync(resolve(templateDir, 'node_modules/@capacitor/ios'))) {
-    const install = spawnSync('bun', ['install', '--frozen-lockfile'], { cwd: templateDir, encoding: 'utf8' })
+    // CI Bun may be older than the template lockfileVersion; install without --frozen-lockfile.
+    const install = spawnSync('bun', ['install'], { cwd: templateDir, encoding: 'utf8' })
     if (install.status !== 0)
       throw new Error(`website-live-app bun install failed: ${install.stderr || install.stdout || `exit ${install.status}`}`)
   }

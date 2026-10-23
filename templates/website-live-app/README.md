@@ -84,10 +84,11 @@ xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator -conf
 
 ## Packing
 
-From the repo root:
-
 ```sh
-bunx cap sync                                        # in templates/website-live-app
+# From templates/website-live-app/
+bunx cap sync
+
+# From the repo root/
 bun scripts/pack-website-live-template.ts            # -> dist/website-live-template.zip
 ```
 

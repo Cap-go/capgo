@@ -109,7 +109,7 @@ describe('web2App arrival query params', () => {
     // Stored only once the account exists, never on page load.
     const sessionSet = registerSource.indexOf('capgo.auth.setSession(registered.session)')
     expect(sessionSet).toBeGreaterThan(registerSource.indexOf('async function submit('))
-    expect(registerSource.indexOf('rememberWeb2AppArrival(web2AppArrival, Date.now(), registered.session.user.id)')).toBeGreaterThan(sessionSet)
+    expect(registerSource.indexOf('rememberWeb2AppArrival(web2AppArrival, Date.now(), registered.user.id)')).toBeGreaterThan(sessionSet)
     expect(registerSource).toMatch(/window\.location\.href = `https:\/\/capgo\.app\/register\/\$\{window\.location\.search\}`/)
   })
 })

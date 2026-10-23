@@ -1341,7 +1341,9 @@ describe('[POST] /organization', () => {
   it('starts Web2App requests on the Web2App plan', async () => {
     // Not in seed: the console hides Web2App until real Stripe prices exist. Insert here so this
     // path can be tested without turning on publish-intent Web2App for Playwright.
+    // plans_pkey is (name, stripe_id, id); delete-then-insert keeps the test idempotent.
     const web2AppPlanId = '0c7e3a54-5b2f-4f4e-9d77-3f0d2b6c1a11'
+    await executeSQL('DELETE FROM public.plans WHERE id = $1::uuid', [web2AppPlanId])
     await executeSQL(
       `INSERT INTO public.plans (
          created_at, updated_at, name, description, price_m, price_y, stripe_id, credit_id, id,
@@ -1351,11 +1353,7 @@ describe('[POST] /organization', () => {
          NOW(), NOW(), 'Web2App', 'plan.website_live.desc', 12, 120, 'prod_website_live_todo',
          'prod_TJRd2hFHZsBIPK', $1::uuid, 'price_website_live_month_todo', 'price_website_live_year_todo',
          0, 0, 0, 'Best for teams shipping from their website', 0, 1, 'website'
-       )
-       ON CONFLICT (id) DO UPDATE SET
-         name = EXCLUDED.name,
-         stripe_id = EXCLUDED.stripe_id,
-         kind = EXCLUDED.kind`,
+       )`,
       [web2AppPlanId],
     )
     try {
