@@ -26,9 +26,12 @@ export async function shouldSkipVersionNotifications(c: Context, appId: string, 
             AND v.r2_path IS NULL AND v.external_url IS NULL
             AND v.checksum IS NULL AND v.session_key IS NULL
           THEN COALESCE((
-            SELECT bool_and(COALESCE(starts_with(m.s3_path, 'demo/' || v.app_id || '/'), false))
-            FROM public.manifest m
-            WHERE m.app_version_id = v.id
+            SELECT bool_and(COALESCE(starts_with(paths.s3_path, 'demo/' || v.app_id || '/'), false))
+            FROM (
+              SELECT m.s3_path FROM public.manifest m WHERE m.app_version_id = v.id
+              UNION ALL
+              SELECT entry.s3_path FROM pg_catalog.unnest(v.manifest) entry
+            ) paths
           ), false)
           ELSE false
         END

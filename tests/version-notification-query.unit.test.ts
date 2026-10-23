@@ -16,10 +16,12 @@ const appId = 'com.example.notifications'
 beforeAll(async () => {
   database = new PGlite()
   await database.exec(`
+    CREATE TYPE public.manifest_entry AS (file_name varchar, s3_path varchar, file_hash varchar);
     CREATE TABLE public.app_versions (
       id bigint PRIMARY KEY, app_id text NOT NULL, name text DEFAULT '1.0.0',
       deleted boolean DEFAULT false, deleted_at timestamptz,
       storage_provider text DEFAULT 'r2', r2_path text, external_url text,
+      manifest public.manifest_entry[],
       checksum text, session_key text
     );
     CREATE TABLE public.manifest (
@@ -95,6 +97,27 @@ describe('version notification provenance on Postgres', () => {
   })
 
   it.each([
+    ['demo-only', ['demo/com.example.notifications/index.html'], true],
+    ['mixed', ['demo/com.example.notifications/index.html', 'orgs/example/main.js'], false],
+    ['empty', [], false],
+    ['null path', [null], false],
+  ])('classifies an inline-only %s legacy manifest', async (_name, paths, expected) => {
+    await database.query(`UPDATE public.app_versions SET manifest = ARRAY(
+      SELECT ROW('index.html', path, 'hash')::public.manifest_entry
+      FROM unnest($1::text[]) path
+    ) WHERE id = 123`, [paths])
+    expect(await shouldSkipVersionNotifications(context, appId, 123)).toBe(expected)
+  })
+
+  it('preserves real inline files when relational files look like a demo', async () => {
+    await addManifest([`demo/${appId}/index.html`])
+    await database.query(`UPDATE public.app_versions
+      SET manifest = ARRAY[ROW('main.js', 'orgs/example/main.js', 'hash')::public.manifest_entry]
+      WHERE id = 123`)
+    expect(await shouldSkipVersionNotifications(context, appId, 123)).toBe(false)
+  })
+
+  it.each([
     ['mixed real and demo paths', ['demo/com.example.notifications/index.html', 'orgs/example/main.js']],
     ['a missing storage path', ['demo/com.example.notifications/index.html', null]],
     ['a different app demo prefix', ['demo/com.example.other/index.html']],
@@ -144,6 +167,10 @@ describe('version notification provenance on Postgres', () => {
     await database.exec(`
       INSERT INTO public.app_versions(id, app_id)
       SELECT id, 'com.example.noise' FROM generate_series(1000, 10999) id;
+      UPDATE public.app_versions SET manifest = ARRAY(
+        SELECT ROW('file-' || id, 'demo/com.example.notifications/file-' || id, 'hash')::public.manifest_entry
+        FROM generate_series(1, 5000) id
+      ) WHERE id = 123;
       INSERT INTO public.deploy_history(id, app_id, version_id)
       SELECT id, 'com.example.noise', id FROM generate_series(1000, 10999) id;
       INSERT INTO public.manifest(app_version_id, s3_path)
