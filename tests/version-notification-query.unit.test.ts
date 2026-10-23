@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { PGlite } from '@electric-sql/pglite'
+import { createPgliteEngine } from 'tinbase'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ query: vi.fn(), getPgClient: vi.fn(), closeClient: vi.fn() }))
@@ -10,11 +10,11 @@ vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
 
 const { shouldSkipVersionNotifications } = await import('../supabase/functions/_backend/utils/version_notifications.ts')
 const context = {} as Context
-let database: PGlite
+let database: Awaited<ReturnType<typeof createPgliteEngine>>
 const appId = 'com.example.notifications'
 
 beforeAll(async () => {
-  database = new PGlite()
+  database = await createPgliteEngine()
   await database.exec(`
     CREATE TYPE public.manifest_entry AS (file_name varchar, s3_path varchar, file_hash varchar);
     CREATE TABLE public.app_versions (
@@ -57,7 +57,7 @@ async function track(relation = 'app_versions', key = '123', app = appId) {
 }
 
 describe('version notification provenance on Postgres', () => {
-  it('allows a real version even when its name matches a seeded version', async () => {
+  it('allows a real version whose manifest paths are not demo paths', async () => {
     await addManifest(['orgs/example/apps/example/index.html'])
     expect(await shouldSkipVersionNotifications(context, appId, 123)).toBe(false)
     expect(mocks.getPgClient).toHaveBeenCalledExactlyOnceWith(context)

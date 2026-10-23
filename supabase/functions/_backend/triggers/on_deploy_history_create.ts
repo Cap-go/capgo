@@ -48,7 +48,7 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
     }
 
     if (await shouldSkipVersionNotifications(c, record.app_id, record.version_id, record.id)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Demo or removed deployment, skipping deploy notifications' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Demo or removed deployment, skipping deployment events' })
       return c.json(BRES)
     }
 

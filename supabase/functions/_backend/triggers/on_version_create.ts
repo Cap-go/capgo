@@ -25,7 +25,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
   let shouldSkipNotifications = false
 
   if (await shouldSkipVersionNotifications(c, record.app_id, record.id)) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Demo or removed version, skipping email notifications' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Demo or removed version, skipping bundle tracking and email notifications' })
     shouldSkipNotifications = true
   }
 
