@@ -7,7 +7,7 @@
 CREATE OR REPLACE FUNCTION public.canceled_org_retention_credit_purchase_exempt(p_org_id uuid)
 RETURNS boolean
 LANGUAGE sql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -40,7 +40,7 @@ CREATE OR REPLACE FUNCTION public.canceled_org_may_receive_retention_deletion(
 )
 RETURNS boolean
 LANGUAGE sql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $$
@@ -252,13 +252,16 @@ SET search_path = ''
 AS $$
 DECLARE
   v_batch_size integer := GREATEST(1, COALESCE(p_batch_size, 5000));
+  v_batch_org_ids uuid[];
   unlinked_count bigint := 0;
   deleted_count bigint := 0;
 BEGIN
   PERFORM set_config('capgo.seed_channel_targets', 'true', true);
 
-  WITH candidates AS (
-    SELECT av.id, av.app_id, av.owner_org
+  SELECT COALESCE(pg_catalog.array_agg(DISTINCT batch.owner_org), '{}'::uuid[])
+  INTO v_batch_org_ids
+  FROM (
+    SELECT av.owner_org
     FROM public.app_versions AS av
     WHERE av.deleted = false
       AND av.name NOT IN ('builtin', 'unknown')
@@ -266,18 +269,28 @@ BEGIN
       AND NOT public.canceled_org_retention_credit_purchase_exempt(av.owner_org)
     ORDER BY av.id
     LIMIT v_batch_size
-  ),
-  locked_orgs AS (
-    SELECT o.id
-    FROM public.orgs AS o
-    JOIN (SELECT DISTINCT c.owner_org FROM candidates AS c) AS batch_orgs ON batch_orgs.owner_org = o.id
-    FOR UPDATE OF o
-  ),
-  eligible AS (
-    SELECT c.id, c.app_id
-    FROM candidates AS c
-    JOIN locked_orgs AS lo ON lo.id = c.owner_org
-    WHERE NOT public.canceled_org_retention_credit_purchase_exempt(c.owner_org)
+  ) AS batch;
+
+  IF pg_catalog.cardinality(v_batch_org_ids) = 0 THEN
+    RETURN 0;
+  END IF;
+
+  PERFORM 1
+  FROM public.orgs AS o
+  WHERE o.id = ANY (v_batch_org_ids)
+  ORDER BY o.id
+  FOR UPDATE;
+
+  WITH eligible AS (
+    SELECT av.id, av.app_id
+    FROM public.app_versions AS av
+    WHERE av.deleted = false
+      AND av.name NOT IN ('builtin', 'unknown')
+      AND av.owner_org = ANY (v_batch_org_ids)
+      AND public.canceled_org_may_receive_retention_deletion(av.owner_org, 90)
+      AND NOT public.canceled_org_retention_credit_purchase_exempt(av.owner_org)
+    ORDER BY av.id
+    LIMIT v_batch_size
   ),
   cleared AS (
     UPDATE public.channels AS c
@@ -342,9 +355,31 @@ SET search_path = ''
 AS $$
 DECLARE
   v_batch_size integer := GREATEST(1, COALESCE(p_batch_size, 500));
+  v_batch_org_ids uuid[];
   deleted_count bigint := 0;
 BEGIN
-  WITH candidates AS (
+  SELECT COALESCE(pg_catalog.array_agg(DISTINCT batch.owner_org), '{}'::uuid[])
+  INTO v_batch_org_ids
+  FROM (
+    SELECT a.owner_org
+    FROM public.apps AS a
+    WHERE public.canceled_org_may_receive_retention_deletion(a.owner_org, 95)
+      AND NOT public.canceled_org_retention_credit_purchase_exempt(a.owner_org)
+    ORDER BY a.app_id
+    LIMIT v_batch_size
+  ) AS batch;
+
+  IF pg_catalog.cardinality(v_batch_org_ids) = 0 THEN
+    RETURN 0;
+  END IF;
+
+  PERFORM 1
+  FROM public.orgs AS o
+  WHERE o.id = ANY (v_batch_org_ids)
+  ORDER BY o.id
+  FOR UPDATE;
+
+  WITH eligible AS (
     SELECT
       a.app_id,
       a.owner_org,
@@ -354,22 +389,11 @@ BEGIN
     FROM public.apps AS a
     JOIN public.orgs AS o ON o.id = a.owner_org
     LEFT JOIN public.users AS u ON u.id = a.user_id
-    WHERE public.canceled_org_may_receive_retention_deletion(a.owner_org, 95)
+    WHERE a.owner_org = ANY (v_batch_org_ids)
+      AND public.canceled_org_may_receive_retention_deletion(a.owner_org, 95)
       AND NOT public.canceled_org_retention_credit_purchase_exempt(a.owner_org)
     ORDER BY a.app_id
     LIMIT v_batch_size
-  ),
-  locked_orgs AS (
-    SELECT o.id
-    FROM public.orgs AS o
-    JOIN (SELECT DISTINCT c.owner_org FROM candidates AS c) AS batch_orgs ON batch_orgs.owner_org = o.id
-    FOR UPDATE OF o
-  ),
-  eligible AS (
-    SELECT c.*
-    FROM candidates AS c
-    JOIN locked_orgs AS lo ON lo.id = c.owner_org
-    WHERE NOT public.canceled_org_retention_credit_purchase_exempt(c.owner_org)
   ),
   archived AS (
     INSERT INTO public.old_apps (app_id, email, owner_org, user_id, app_created_at)
