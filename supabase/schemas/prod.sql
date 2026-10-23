@@ -2988,21 +2988,6 @@ COMMENT ON FUNCTION "public"."channel_forced_devices_readable_channel_ids"() IS 
 
 
 
-CREATE OR REPLACE FUNCTION "public"."channel_history_denied_channel_ids"() RETURNS bigint[]
-    LANGUAGE "sql" STABLE SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-  SELECT public.rbac_denied_channel_ids_for_permission(public.rbac_perm_channel_read_history())
-$$;
-
-
-ALTER FUNCTION "public"."channel_history_denied_channel_ids"() OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."channel_history_denied_channel_ids"() IS 'Returns explicit false channel.read_history overrides so app-level deploy history visibility excludes denied channels.';
-
-
-
 CREATE OR REPLACE FUNCTION "public"."channel_permission_override_readable_channel_ids"() RETURNS bigint[]
     LANGUAGE "sql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
@@ -28353,14 +28338,6 @@ CREATE POLICY "Deny delete on trial_extension_events" ON "public"."trial_extensi
 
 
 
-CREATE POLICY "Deny deploy history for channels without read_history" ON "public"."deploy_history" AS RESTRICTIVE FOR SELECT TO "anon", "authenticated" USING ((NOT ("channel_id" = ANY (COALESCE(( SELECT "public"."channel_history_denied_channel_ids"() AS "channel_history_denied_channel_ids"), '{}'::bigint[])))));
-
-
-
-COMMENT ON POLICY "Deny deploy history for channels without read_history" ON "public"."deploy_history" IS 'Hides deploy history rows for channels where the request principal has an explicit channel.read_history deny override.';
-
-
-
 CREATE POLICY "Deny direct group delete" ON "public"."groups" AS RESTRICTIVE FOR DELETE TO "anon", "authenticated" USING (false);
 
 
@@ -29697,13 +29674,6 @@ REVOKE ALL ON FUNCTION "public"."channel_forced_devices_readable_channel_ids"() 
 GRANT ALL ON FUNCTION "public"."channel_forced_devices_readable_channel_ids"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."channel_forced_devices_readable_channel_ids"() TO "anon";
 GRANT ALL ON FUNCTION "public"."channel_forced_devices_readable_channel_ids"() TO "authenticated";
-
-
-
-REVOKE ALL ON FUNCTION "public"."channel_history_denied_channel_ids"() FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."channel_history_denied_channel_ids"() TO "service_role";
-GRANT ALL ON FUNCTION "public"."channel_history_denied_channel_ids"() TO "anon";
-GRANT ALL ON FUNCTION "public"."channel_history_denied_channel_ids"() TO "authenticated";
 
 
 

@@ -231,15 +231,22 @@ describe('release live helpers', () => {
     expect(releaseLiveTestUtils.computeRollout(rolloutProduction.rollout, prodNew, { '1.2.0': 60, '1.1.0': 40 }, null).reach_percent).toBe(100)
   })
 
-  it.concurrent('drops deploy history of channels where history reads are denied', () => {
+  it.concurrent('drops channels and deploy history where history reads are denied', () => {
     const candidates = {
-      channels: [],
+      channels: [
+        { id: 10, name: 'production', public: true, current: null, rollout: null },
+        { id: 20, name: 'beta', public: false, current: null, rollout: null },
+      ],
       deployments: [
         { bundle_id: 1, version_name: '1.0.0', channel_id: 10, channel_name: 'production', deployed_at: '2026-09-29T10:00:00.000Z' },
         { bundle_id: 2, version_name: '1.1.0', channel_id: 20, channel_name: 'beta', deployed_at: '2026-09-29T11:00:00.000Z' },
       ],
     }
     expect(releaseLiveTestUtils.withoutDeniedHistory(candidates, new Set())).toBe(candidates)
-    expect(releaseLiveTestUtils.withoutDeniedHistory(candidates, new Set([10])).deployments.map(row => row.channel_id)).toEqual([20])
+    const filtered = releaseLiveTestUtils.withoutDeniedHistory(candidates, new Set([10]))
+    expect(filtered.deployments.map(row => row.channel_id)).toEqual([20])
+    expect(filtered.channels.map(channel => channel.id)).toEqual([20])
+    // A denied public channel is no longer picked as the default.
+    expect(releaseLiveTestUtils.pickDefaultChannel(filtered)?.id).toBe(20)
   })
 })

@@ -4,6 +4,7 @@ import type { UpdateDeliveryTimingEventCF } from '../utils/cloudflare.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc.js'
+import { HTTPException } from 'hono/http-exception'
 import { Hono } from 'hono/tiny'
 import { parseStatsDurationMs, readDevicePlatformChannelByIdsCF, readNativeObservePluginVersionsCF, readUpdateDeliveryTimingEventsCF, resolveUpdateDeliveryTimingDurationMs } from '../utils/cloudflare.ts'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
@@ -1047,6 +1048,8 @@ app.post('/', middlewareAuth, async (c) => {
     ))
   }
   catch (error) {
+    if (error instanceof HTTPException)
+      throw error
     cloudlog({ requestId: c.get('requestId'), message: 'Error fetching native observe stats', error })
     throw simpleError('fetch_error', 'Failed to fetch native observe statistics', { error: String(error) })
   }

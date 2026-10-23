@@ -801,7 +801,7 @@ app.post('/', middlewareAuth, async (c) => {
   // A channel filter is derived from that channel's deploy history, and the
   // cached response is shared per app + channel, so check the channel-scoped
   // history permission before any cache lookup.
-  if (channelId && !(await checkPermission(c, 'channel.read_history', { appId, channelId }))) {
+  if (channelId !== undefined && !(await checkPermission(c, 'channel.read_history', { appId, channelId }))) {
     throw quickError(403, 'channel_access_denied', 'You can\'t access this channel history', { app_id: appId, channel_id: channelId })
   }
 

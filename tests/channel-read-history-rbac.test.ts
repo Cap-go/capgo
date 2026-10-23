@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   executeSQL,
+  fetchTestRequest,
   getAuthHeaders,
   getEndpointUrl,
   getSupabaseClient,
@@ -38,8 +39,9 @@ async function readDeployHistory(channelId: number) {
 }
 
 function postJson(path: string, body: Record<string, unknown>) {
-  return fetch(getEndpointUrl(path), {
+  return fetchTestRequest(getEndpointUrl(path), {
     method: 'POST',
+    retryUnsafe: true,
     headers: { ...authHeaders, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
@@ -119,10 +121,25 @@ describe('channel.read_history enforcement', () => {
       expect(installStats.status, JSON.stringify(installStatsBody)).toBe(403)
       expect(installStatsBody.error).toBe('channel_access_denied')
 
+      type ReleaseLiveBody = { error?: string, channel?: { id: number } | null, channels?: Array<{ id: number }>, recent_deployments?: Array<{ channel_id: number | null }> }
       const releaseLive = await postJson('/private/release_live', { app_id: APPNAME })
-      const releaseLiveBody = await releaseLive.json() as { recent_deployments?: Array<{ channel_id: number | null }> }
+      const releaseLiveBody = await releaseLive.json() as ReleaseLiveBody
       expect(releaseLive.status, JSON.stringify(releaseLiveBody)).toBe(200)
+      expect(releaseLiveBody.channel?.id).not.toBe(deniedChannelId)
+      expect((releaseLiveBody.channels ?? []).map(channel => channel.id)).not.toContain(deniedChannelId)
       expect((releaseLiveBody.recent_deployments ?? []).some(deployment => deployment.channel_id === deniedChannelId)).toBe(false)
+
+      const releaseLiveDenied = await postJson('/private/release_live', { app_id: APPNAME, channel_id: deniedChannelId })
+      const releaseLiveDeniedBody = await releaseLiveDenied.json() as ReleaseLiveBody
+      expect(releaseLiveDenied.status, JSON.stringify(releaseLiveDeniedBody)).toBe(403)
+      expect(releaseLiveDeniedBody.error).toBe('channel_access_denied')
+
+      // History of permitted channels is still returned.
+      const releaseLiveAllowed = await postJson('/private/release_live', { app_id: APPNAME, channel_id: allowedChannelId })
+      const releaseLiveAllowedBody = await releaseLiveAllowed.json() as ReleaseLiveBody
+      expect(releaseLiveAllowed.status, JSON.stringify(releaseLiveAllowedBody)).toBe(200)
+      expect(releaseLiveAllowedBody.channel?.id).toBe(allowedChannelId)
+      expect((releaseLiveAllowedBody.recent_deployments ?? []).some(deployment => deployment.channel_id === allowedChannelId)).toBe(true)
     }
     finally {
       await setHistoryOverride(deniedChannelId, null)
