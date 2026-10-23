@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(49);
+SELECT plan(56);
 
 -- pgmq schema is not granted to service_role; use postgres-owned helpers.
 CREATE OR REPLACE FUNCTION pg_temp.delete_canceled_org_retention_alerts(
@@ -61,6 +61,16 @@ SELECT ok(
 SELECT ok(
   to_regprocedure('public.canceled_org_ids_past_grace(integer)') IS NOT NULL,
   'canceled_org_ids_past_grace exists'
+);
+
+SELECT ok(
+  to_regprocedure('public.canceled_org_retention_credit_purchase_exempt(uuid)') IS NOT NULL,
+  'canceled_org_retention_credit_purchase_exempt exists'
+);
+
+SELECT ok(
+  to_regprocedure('public.canceled_org_may_receive_retention_deletion(uuid, integer)') IS NOT NULL,
+  'canceled_org_may_receive_retention_deletion exists'
 );
 
 SELECT ok(
@@ -146,6 +156,7 @@ SELECT ok(
 -- credits = 100d canceled + has_usage_credits (must be fully exempt)
 -- spent = 92d canceled, bought credits after access end, balance used up (exempt)
 -- spent100 = same as spent but 100d canceled (past the 95-day app delete)
+-- late_grant = 100d canceled with no grant until the atomic delete re-check test
 CREATE TEMP TABLE canceled_cleanup_ctx AS
 SELECT
   'a0c1e2f3-1111-4aaa-8bbb-000000000001'::uuid AS long_canceled_org,
@@ -158,6 +169,7 @@ SELECT
   'a0c1e2f3-1111-4aaa-8bbb-000000000008'::uuid AS credits_canceled_org,
   'a0c1e2f3-1111-4aaa-8bbb-000000000009'::uuid AS spent_credits_org,
   'a0c1e2f3-1111-4aaa-8bbb-00000000000a'::uuid AS spent100_credits_org,
+  'a0c1e2f3-1111-4aaa-8bbb-00000000000b'::uuid AS late_grant_org,
   'cus_canceled_cleanup_long'::varchar AS long_customer,
   'cus_canceled_cleanup_recent'::varchar AS recent_customer,
   'cus_canceled_cleanup_trial'::varchar AS trial_customer,
@@ -168,6 +180,7 @@ SELECT
   'cus_canceled_cleanup_credits'::varchar AS credits_customer,
   'cus_canceled_cleanup_spent'::varchar AS spent_customer,
   'cus_canceled_cleanup_spent100'::varchar AS spent100_customer,
+  'cus_canceled_cleanup_late_grant'::varchar AS late_grant_customer,
   'com.test.canceled.cleanup.long'::varchar AS long_app,
   'com.test.canceled.cleanup.recent'::varchar AS recent_app,
   'com.test.canceled.cleanup.trial'::varchar AS trial_app,
@@ -178,6 +191,7 @@ SELECT
   'com.test.canceled.cleanup.credits'::varchar AS credits_app,
   'com.test.canceled.cleanup.spent'::varchar AS spent_app,
   'com.test.canceled.cleanup.spent100'::varchar AS spent100_app,
+  'com.test.canceled.cleanup.lategrant'::varchar AS late_grant_app,
   '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid AS user_id,
   'prod_LQIregjtNduh4q'::varchar AS product_id;
 
@@ -305,6 +319,18 @@ SELECT
   now() - interval '200 days',
   now() - interval '100 days',
   now() - interval '100 days'
+FROM canceled_cleanup_ctx
+UNION ALL
+-- 100 days canceled; credit purchase is inserted later in the atomic re-check test.
+SELECT
+  late_grant_customer,
+  'canceled'::public.stripe_status,
+  product_id,
+  now() - interval '200 days',
+  false,
+  now() - interval '200 days',
+  now() - interval '100 days',
+  now() - interval '100 days'
 FROM canceled_cleanup_ctx;
 
 INSERT INTO public.orgs (id, created_by, name, management_email, customer_id, has_usage_credits)
@@ -336,6 +362,9 @@ SELECT spent_credits_org, user_id, 'Spent Credits Cleanup Org', 'canceled-spent@
 FROM canceled_cleanup_ctx
 UNION ALL
 SELECT spent100_credits_org, user_id, 'Spent100 Credits Cleanup Org', 'canceled-spent100@test.local', spent100_customer, false
+FROM canceled_cleanup_ctx
+UNION ALL
+SELECT late_grant_org, user_id, 'Late Grant Cleanup Org', 'canceled-lategrant@test.local', late_grant_customer, false
 FROM canceled_cleanup_ctx;
 
 INSERT INTO public.apps (app_id, icon_url, owner_org, name, user_id)
@@ -357,7 +386,9 @@ SELECT credits_app, '', credits_canceled_org, 'Credits Canceled App', user_id FR
 UNION ALL
 SELECT spent_app, '', spent_credits_org, 'Spent Credits App', user_id FROM canceled_cleanup_ctx
 UNION ALL
-SELECT spent100_app, '', spent100_credits_org, 'Spent100 Credits App', user_id FROM canceled_cleanup_ctx;
+SELECT spent100_app, '', spent100_credits_org, 'Spent100 Credits App', user_id FROM canceled_cleanup_ctx
+UNION ALL
+SELECT late_grant_app, '', late_grant_org, 'Late Grant App', user_id FROM canceled_cleanup_ctx;
 
 INSERT INTO public.app_versions (id, app_id, name, storage_provider, owner_org, user_id, deleted)
 SELECT 970101, long_app, '1.0.0', 'r2', long_canceled_org, user_id, false FROM canceled_cleanup_ctx
@@ -382,7 +413,9 @@ SELECT 970801, credits_app, '1.0.0', 'r2', credits_canceled_org, user_id, false 
 UNION ALL
 SELECT 970901, spent_app, '1.0.0', 'r2', spent_credits_org, user_id, false FROM canceled_cleanup_ctx
 UNION ALL
-SELECT 971001, spent100_app, '1.0.0', 'r2', spent100_credits_org, user_id, false FROM canceled_cleanup_ctx;
+SELECT 971001, spent100_app, '1.0.0', 'r2', spent100_credits_org, user_id, false FROM canceled_cleanup_ctx
+UNION ALL
+SELECT 971101, late_grant_app, '1.0.0', 'r2', late_grant_org, user_id, false FROM canceled_cleanup_ctx;
 
 -- Fully consumed grants: spent bought after access end (exempt), ultra bought
 -- before its subscription ended (still eligible for retention).
@@ -543,6 +576,53 @@ SELECT is(
   'process_free_trial_expired leaves paying orgs unchanged'
 );
 
+-- Post-access credit purchase must block destructive retention at delete time.
+SELECT ok(
+  public.canceled_org_may_receive_retention_deletion(
+    (SELECT late_grant_org FROM canceled_cleanup_ctx),
+    95
+  ),
+  'late-grant org is eligible for retention delete before any credit purchase'
+);
+
+INSERT INTO public.usage_credit_grants (org_id, credits_total, credits_consumed, granted_at, source)
+SELECT late_grant_org, 10, 0, now() - interval '90 days', 'stripe_top_up'
+FROM canceled_cleanup_ctx;
+
+SELECT ok(
+  public.canceled_org_retention_credit_purchase_exempt(
+    (SELECT late_grant_org FROM canceled_cleanup_ctx)
+  ),
+  'late-grant org is exempt after post-access credit purchase'
+);
+
+SELECT ok(
+  NOT public.canceled_org_may_receive_retention_deletion(
+    (SELECT late_grant_org FROM canceled_cleanup_ctx),
+    95
+  ),
+  'late-grant org is removed from retention delete eligibility after purchase'
+);
+
+SELECT public.delete_apps_for_long_canceled_orgs(500);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE app_id = (SELECT late_grant_app FROM canceled_cleanup_ctx)
+  ),
+  'late-grant org keeps its app when delete re-checks exemption at delete time'
+);
+
+SELECT public.soft_delete_versions_for_long_canceled_orgs(500);
+
+SELECT is(
+  (SELECT deleted FROM public.app_versions WHERE id = 971101),
+  false,
+  'late-grant org keeps versions when soft-delete re-checks exemption'
+);
+
 -- Full canceled-org cleanup (warnings + versions + app delete + audit logs)
 SELECT pg_temp.delete_canceled_org_retention_alerts(ARRAY[
   (SELECT long_canceled_org::text FROM canceled_cleanup_ctx),
@@ -551,7 +631,8 @@ SELECT pg_temp.delete_canceled_org_retention_alerts(ARRAY[
   (SELECT recent_canceled_org::text FROM canceled_cleanup_ctx),
   (SELECT credits_canceled_org::text FROM canceled_cleanup_ctx),
   (SELECT spent_credits_org::text FROM canceled_cleanup_ctx),
-  (SELECT spent100_credits_org::text FROM canceled_cleanup_ctx)
+  (SELECT spent100_credits_org::text FROM canceled_cleanup_ctx),
+  (SELECT late_grant_org::text FROM canceled_cleanup_ctx)
 ]);
 
 SELECT public.cleanup_long_canceled_org_data();
