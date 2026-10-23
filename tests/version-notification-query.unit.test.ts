@@ -68,6 +68,17 @@ describe('version notification provenance on Postgres', () => {
     expect(await shouldSkipVersionNotifications(context, appId, 123)).toBe(false)
   })
 
+  it('skips a nonexistent app and bigint version without failing the trigger lookup', async () => {
+    expect(await shouldSkipVersionNotifications(context, 'nonexistent.app', Number.MAX_SAFE_INTEGER)).toBe(true)
+  })
+
+  it('propagates a rejected primary query and still closes the client', async () => {
+    const failure = new Error('temporary primary query failure')
+    mocks.query.mockRejectedValueOnce(failure)
+    await expect(shouldSkipVersionNotifications(context, appId, 123)).rejects.toBe(failure)
+    expect(mocks.closeClient).toHaveBeenCalledOnce()
+  })
+
   it('suppresses an exactly tracked demo version', async () => {
     await track()
     expect(await shouldSkipVersionNotifications(context, appId, 123)).toBe(true)
