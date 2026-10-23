@@ -7,6 +7,7 @@ import { CONSOLE_RPCS, CONSOLE_TABLES } from '../utils/console_query_allowlist.t
 import { parseBody, quickError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_jwt.ts'
 import { emptySupabase, supabaseClient } from '../utils/supabase.ts'
+import { getStorageAllowedOrigins, normalizeImagePath } from '../utils/storage.ts'
 import { getEnv } from '../utils/utils.ts'
 import { app as consoleAuthProxy } from './console_auth_proxy.ts'
 
@@ -101,7 +102,16 @@ app.post('/images/sign', middlewareAuth, async (c) => {
   const body = z.object({ path: imagePathSchema, expiresIn: z.number().int().min(1).max(604800) }).safeParse(await parseBody(c))
   if (!body.success)
     return quickError(400, 'invalid_body', 'Invalid image request')
-  const result = await supabaseClient(c, c.get('authorization')!).storage.from('images').createSignedUrl(body.data.path, body.data.expiresIn)
+  // Legacy values are full storage URLs. Only this server knows the storage origin,
+  // so it extracts the key here and refuses storage-shaped URLs from any other host.
+  let path = body.data.path
+  if (path.includes('://')) {
+    const key = imagePathSchema.safeParse(normalizeImagePath(path, { allowedOrigins: getStorageAllowedOrigins(c) }))
+    if (!key.success)
+      return quickError(400, 'invalid_path', 'Image URL is not from Capgo storage')
+    path = key.data
+  }
+  const result = await supabaseClient(c, c.get('authorization')!).storage.from('images').createSignedUrl(path, body.data.expiresIn)
   if (result.error || !result.data)
     return c.json(result)
   const token = new URL(result.data.signedUrl).searchParams.get('token')
@@ -111,7 +121,7 @@ app.post('/images/sign', middlewareAuth, async (c) => {
   const signedUrl = new URL(c.req.url)
   signedUrl.pathname = signedUrl.pathname.replace(/\/images\/sign\/?$/, '/images/read')
   signedUrl.search = ''
-  signedUrl.searchParams.set('path', body.data.path)
+  signedUrl.searchParams.set('path', path)
   signedUrl.searchParams.set('token', token)
   return c.json({ ...result, data: { signedUrl: signedUrl.href } })
 })

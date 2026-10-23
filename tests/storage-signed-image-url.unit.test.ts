@@ -25,16 +25,13 @@ describe('resolveImagePath', () => {
     })
   })
 
-  it('signs storage URLs whose route is percent-encoded, decoding the key once', async () => {
+  it('hands storage URLs, encoded routes included, to the API whole so it can check their origin', async () => {
     const { resolveImagePath } = await import('../src/services/storage.ts')
-    expect(resolveImagePath('https://db.example.com/storage/v1/object/public/%69mages/org%2Flogo%2520x.png')).toEqual({
-      normalized: 'org/logo%20x.png',
-      shouldSign: true,
-    })
-    expect(resolveImagePath('https://db.example.com/storage/v1/object/public/images/org/logo%20x.png')).toEqual({
-      normalized: 'org/logo x.png',
-      shouldSign: true,
-    })
+    for (const url of [
+      'https://db.example.com/storage/v1/object/public/%69mages/org%2Flogo%2520x.png',
+      'https://db.example.com/storage/v1/object/public/images/org/logo%20x.png',
+    ])
+      expect(resolveImagePath(url)).toEqual({ normalized: url, shouldSign: true })
   })
 
   it('leaves a foreign URL that only looks like the relay untouched', async () => {
@@ -56,7 +53,7 @@ describe('createSignedImageUrl', () => {
     vi.useRealTimers()
   })
 
-  it('extracts the storage path from signed image URLs before refreshing them', async () => {
+  it('sends signed storage URLs to the API to be re-signed', async () => {
     mockCreateSignedUrl.mockResolvedValueOnce({
       data: {
         signedUrl: 'https://example.supabase.co/storage/v1/object/sign/images/org/org-1/logo/logo.png?token=fresh',
@@ -69,7 +66,7 @@ describe('createSignedImageUrl', () => {
 
     expect(result).toBe('https://example.supabase.co/storage/v1/object/sign/images/org/org-1/logo/logo.png?token=fresh')
     expect(mockFrom).toHaveBeenCalledWith('images')
-    expect(mockCreateSignedUrl).toHaveBeenCalledWith('org/org-1/logo/logo.png', 60 * 60 * 24 * 7)
+    expect(mockCreateSignedUrl).toHaveBeenCalledWith('https://example.supabase.co/storage/v1/object/sign/images/org/org-1/logo/logo.png?token=stale', 60 * 60 * 24 * 7)
   })
 
   it('bypasses the cached signed URL when forceRefresh is requested', async () => {

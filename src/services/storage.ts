@@ -4,7 +4,7 @@ import { resolveConsoleApiBase } from './consoleAuth'
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24 * 7
 const SIGNED_URL_CACHE_MAX_AGE_MS = 15 * 60 * 1000
 const MAX_CACHE_ENTRIES = 500
-const STORAGE_URL_REGEX = /\/storage\/v1\/object(?:\/(?:public|sign))?\/images\/(.+)$/
+const STORAGE_URL_REGEX = /\/storage\/v1\/object(?:\/(?:public|sign))?\/images\/./
 const CONSOLE_READ_PATH = '/private/console/images/read'
 const signedUrlCache = new Map<string, { url: string, expiresAt: number }>()
 
@@ -43,12 +43,11 @@ export function resolveImagePath(raw?: string | null) {
     // A URL this console signed earlier carries the storage path; re-sign from it.
     if (isConsoleReadUrl(url))
       return { normalized: url.searchParams.get('path')!.replace(/^\/+/, ''), shouldSign: true }
-    // Match the decoded pathname so an encoded storage route still goes through
-    // signing; the key comes out of that single decode.
-    const match = STORAGE_URL_REGEX.exec(decodePathname(url.pathname))
-    if (match?.[1]) {
+    // Storage URLs (encoded routes included) are signed by the API, which checks
+    // the URL comes from Capgo storage before extracting its key.
+    if (STORAGE_URL_REGEX.test(decodePathname(url.pathname))) {
       return {
-        normalized: match[1].replace(/^\/+/, ''),
+        normalized: trimmed,
         shouldSign: true,
       }
     }

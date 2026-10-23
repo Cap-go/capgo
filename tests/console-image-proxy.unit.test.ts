@@ -43,6 +43,25 @@ describe('console image proxy', () => {
     expect(mocks.client).toHaveBeenCalledWith(expect.anything(), 'Bearer caller-rls-jwt')
   })
 
+  it('signs a legacy storage URL only when it comes from the storage origin', async () => {
+    mocks.sign.mockResolvedValue({ data: { signedUrl: 'https://storage.example.com/storage/v1/object/sign/images/org/logo.png?token=fixture-capability' }, error: null })
+    const sign = (path: string) => app.request('https://api.example.com/images/sign', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ path, expiresIn: 60 }),
+    })
+
+    const ours = await sign('https://storage.example.com/storage/v1/object/public/%69mages/org/my%20logo.png')
+    const { data } = await ours.json() as { data: { signedUrl: string } }
+    expect(mocks.sign).toHaveBeenCalledWith('org/my logo.png', 60)
+    expect(new URL(data.signedUrl).searchParams.get('path')).toBe('org/my logo.png')
+
+    mocks.sign.mockClear()
+    const foreign = await sign('https://evil.example/storage/v1/object/public/%69mages/org/logo.png')
+    expect(foreign.status).toBe(400)
+    expect(mocks.sign).not.toHaveBeenCalled()
+  })
+
   it('streams image bytes from the fixed storage bucket without redirects', async () => {
     mocks.fetch.mockResolvedValue(new Response('fixture-image', { headers: { 'content-type': 'image/png' } }))
     const response = await app.request('https://api.example.com/images/read?path=org%2Fmy%20logo.png&token=fixture-capability')
