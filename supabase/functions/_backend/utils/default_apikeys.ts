@@ -11,9 +11,12 @@
  *   children) at the same org/app scope, checked with rbac_has_permission();
  * - "default org admin" gets org_admin only where the owner already has all
  *   org_admin permissions (org_admin / org_super_admin). In other orgs it
- *   mirrors the owner's own org-scoped roles instead;
+ *   mirrors the owner's own highest-priority org-scoped role instead;
  * - "default app uploader" / "default app reader" get org_member and
- *   app_uploader / app_reader only where the owner already has those rights.
+ *   app_uploader / app_reader only where the owner already has those rights;
+ * - a binding never outlives the owner's own rights: when a permission of the
+ *   role is only granted to the owner by expiring bindings, the key binding
+ *   expires when the earliest such permission does.
  */
 export const CREATE_DEFAULT_API_KEYS_SQL = `WITH RECURSIVE default_keys(name) AS (
   VALUES
@@ -80,6 +83,27 @@ owner_org_roles AS (
     AND rb.org_id IS NOT NULL
     AND (rb.expires_at IS NULL OR rb.expires_at > now())
 ),
+owner_bindings AS (
+  SELECT rb.org_id, rb.scope_type, rb.app_id, rb.role_id, rb.expires_at
+  FROM public.role_bindings rb
+  WHERE rb.principal_type = public.rbac_principal_user()
+    AND rb.principal_id = $1::uuid
+    AND rb.org_id IS NOT NULL
+    AND (rb.expires_at IS NULL OR rb.expires_at > now())
+
+  UNION ALL
+
+  SELECT rb.org_id, rb.scope_type, rb.app_id, rb.role_id, rb.expires_at
+  FROM public.group_members gm
+  INNER JOIN public.groups g ON g.id = gm.group_id
+  INNER JOIN public.role_bindings rb
+    ON rb.principal_type = public.rbac_principal_group()
+    AND rb.principal_id = gm.group_id
+    AND rb.org_id = g.org_id
+  WHERE gm.user_id = $1::uuid
+    AND rb.org_id IS NOT NULL
+    AND (rb.expires_at IS NULL OR rb.expires_at > now())
+),
 base_candidates AS (
   SELECT
     candidate.name,
@@ -127,6 +151,12 @@ candidate_roles AS (
 
   SELECT DISTINCT owner_org_roles.role_id, public.rbac_scope_org()
   FROM owner_org_roles
+
+  UNION
+
+  SELECT DISTINCT owner_bindings.role_id, owner_bindings.scope_type
+  FROM owner_bindings
+  WHERE owner_bindings.scope_type IN (public.rbac_scope_org(), public.rbac_scope_app())
 ),
 role_closure(root_role_id, scope_type, role_id) AS (
   SELECT candidate_roles.role_id, candidate_roles.scope_type, candidate_roles.role_id
@@ -170,7 +200,9 @@ owner_covered_candidates AS (
 mirrored_admin_candidates AS (
   -- Orgs where the owner is not an org admin: the admin key mirrors the
   -- owner's own org-scoped roles, never anything above them.
-  SELECT DISTINCT
+  -- One org-scoped binding per principal and org: keep the owner's
+  -- highest-priority covered role.
+  SELECT DISTINCT ON (owner_org_roles.org_id)
     'default org admin'::text AS name,
     owner_org_roles.role_id,
     public.rbac_scope_org() AS scope_type,
@@ -200,6 +232,7 @@ mirrored_admin_candidates AS (
           NULL::bigint
         )
     )
+  ORDER BY owner_org_roles.org_id, roles.priority_rank DESC, roles.name
 ),
 allowed_bindings AS (
   SELECT name, role_id, scope_type, org_id, app_uuid FROM owner_covered_candidates
@@ -213,6 +246,7 @@ INSERT INTO public.role_bindings (
   scope_type,
   org_id,
   app_id,
+  expires_at,
   granted_by,
   reason,
   is_direct
@@ -224,6 +258,7 @@ SELECT
   allowed_bindings.scope_type,
   allowed_bindings.org_id,
   allowed_bindings.app_uuid,
+  owner_expiry.expires_at,
   inserted.user_id,
   CASE
     WHEN allowed_bindings.scope_type = public.rbac_scope_app() THEN 'Default API key RBAC app binding'
@@ -232,4 +267,32 @@ SELECT
   true
 FROM inserted
 JOIN allowed_bindings ON allowed_bindings.name = inserted.name
+CROSS JOIN LATERAL (
+  -- The owner keeps every permission of the role until the earliest moment
+  -- one of them is no longer granted by any covering owner binding.
+  SELECT min(permission_expiry.expires_at) AS expires_at
+  FROM (
+    SELECT
+      CASE
+        WHEN bool_or(owner_bindings.expires_at IS NULL) THEN NULL::timestamptz
+        ELSE max(owner_bindings.expires_at)
+      END AS expires_at
+    FROM role_permission_keys AS key_permission
+    JOIN owner_bindings
+      ON owner_bindings.org_id = allowed_bindings.org_id
+      AND (
+        owner_bindings.scope_type = public.rbac_scope_org()
+        OR (
+          allowed_bindings.app_uuid IS NOT NULL
+          AND owner_bindings.scope_type = public.rbac_scope_app()
+          AND owner_bindings.app_id = allowed_bindings.app_uuid
+        )
+      )
+    JOIN role_permission_keys AS owner_permission
+      ON owner_permission.root_role_id = owner_bindings.role_id
+      AND owner_permission.key = key_permission.key
+    WHERE key_permission.root_role_id = allowed_bindings.role_id
+    GROUP BY key_permission.key
+  ) AS permission_expiry
+) AS owner_expiry
 ON CONFLICT DO NOTHING`

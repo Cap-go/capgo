@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg'
  * Default API keys provisioned by createApiKey() must never hold more rights
  * than their owner in any organization or app.
  */
+import { readFileSync } from 'node:fs'
 import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { CREATE_DEFAULT_API_KEYS_SQL } from '../supabase/functions/_backend/utils/default_apikeys.ts'
@@ -11,6 +12,10 @@ import { ORG_ID, ORG_ID_2, POSTGRES_URL, USER_ID, USER_ID_2 } from './test-utils
 // Seed: ORG_ID owns com.demo.app; USER_ID_2 is org_super_admin of ORG_ID_2
 // and only org_member of ORG_ID.
 const MEMBER_ORG_APP_ID = 'com.demo.app'
+const REMEDIATION_MIGRATION_SQL = readFileSync(
+  new URL('../supabase/migrations/20261023002055_cap_default_apikey_bindings_at_owner_rights.sql', import.meta.url),
+  'utf8',
+)
 
 interface KeyBinding {
   name: string
@@ -26,9 +31,9 @@ describe('default API keys are capped at the owner rights', () => {
 
   const query = (text: string, params?: unknown[]) => client.query(text, params)
 
-  const bindUser = async (userId: string, roleName: string, orgId: string, appId?: string) => {
+  const bindUser = async (userId: string, roleName: string, orgId: string, appId?: string, expiresAt?: string) => {
     const result = await query(`
-      INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, app_id, granted_by, reason, is_direct)
+      INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, app_id, expires_at, granted_by, reason, is_direct)
       SELECT
         public.rbac_principal_user(),
         $1::uuid,
@@ -36,13 +41,14 @@ describe('default API keys are capped at the owner rights', () => {
         roles.scope_type,
         $3::uuid,
         (SELECT apps.id FROM public.apps WHERE apps.app_id = $4::varchar),
+        $6::timestamptz,
         $5::uuid,
         'default apikey owner cap test',
         true
       FROM public.roles
       WHERE roles.name = $2
       RETURNING id
-    `, [userId, roleName, orgId, appId ?? null, USER_ID])
+    `, [userId, roleName, orgId, appId ?? null, USER_ID, expiresAt ?? null])
     expect(result.rowCount).toBe(1)
   }
 
@@ -156,5 +162,82 @@ describe('default API keys are capped at the owner rights', () => {
     expect(bindings).toContainEqual({ name: 'default org admin', role_name: 'org_admin', scope_type: 'org', org_id: ORG_ID, app_id: null })
     expect(bindings).toContainEqual({ name: 'default app uploader', role_name: 'app_uploader', scope_type: 'app', org_id: ORG_ID, app_id: MEMBER_ORG_APP_ID })
     expect(bindings).toContainEqual({ name: 'default app reader', role_name: 'app_reader', scope_type: 'app', org_id: ORG_ID, app_id: MEMBER_ORG_APP_ID })
+  })
+
+  it('never lets a default key binding outlive the owner access it is derived from', async () => {
+    const expiresAt = '2099-01-01T00:00:00.000Z'
+    await bindUser(USER_ID_2, 'app_developer', ORG_ID, MEMBER_ORG_APP_ID, expiresAt)
+
+    await provisionDefaultKeys(USER_ID_2)
+
+    const result = await query(`
+      SELECT apikeys.name, rb.scope_type, rb.expires_at
+      FROM public.apikeys
+      JOIN public.role_bindings rb
+        ON rb.principal_type = public.rbac_principal_apikey()
+        AND rb.principal_id = apikeys.rbac_id
+      WHERE apikeys.user_id = $1::uuid
+        AND NOT (apikeys.id = ANY($3::bigint[]))
+        AND rb.org_id = $2::uuid
+      ORDER BY apikeys.name, rb.scope_type
+    `, [USER_ID_2, ORG_ID, preexistingKeyIds])
+    const rows = result.rows.map(row => ({
+      name: row.name as string,
+      scope_type: row.scope_type as string,
+      expires_at: row.expires_at ? (row.expires_at as Date).toISOString() : null,
+    }))
+    // org_member is permanent for the owner, while the app rights only come
+    // from the expiring app_developer binding.
+    expect(rows).toEqual([
+      { name: 'default app reader', scope_type: 'app', expires_at: expiresAt },
+      { name: 'default app reader', scope_type: 'org', expires_at: null },
+      { name: 'default app uploader', scope_type: 'app', expires_at: expiresAt },
+      { name: 'default app uploader', scope_type: 'org', expires_at: null },
+      { name: 'default org admin', scope_type: 'org', expires_at: null },
+    ])
+  })
+
+  it('remediates existing default-key bindings that exceed the owner rights', async () => {
+    await provisionDefaultKeys(USER_ID_2)
+    // Recreate the bindings earlier provisioning produced in an org where the
+    // owner is only org_member.
+    await query(`
+      DELETE FROM public.role_bindings rb
+      USING public.apikeys
+      WHERE rb.principal_type = public.rbac_principal_apikey()
+        AND rb.principal_id = apikeys.rbac_id
+        AND apikeys.user_id = $1::uuid
+        AND NOT (apikeys.id = ANY($3::bigint[]))
+        AND rb.org_id = $2::uuid
+    `, [USER_ID_2, ORG_ID, preexistingKeyIds])
+    await query(`
+      INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, app_id, granted_by, reason, is_direct)
+      SELECT public.rbac_principal_apikey(), apikeys.rbac_id, roles.id, roles.scope_type, $2::uuid,
+        CASE WHEN roles.scope_type = public.rbac_scope_app() THEN (SELECT apps.id FROM public.apps WHERE apps.app_id = $4::varchar) END,
+        $1::uuid,
+        CASE WHEN roles.scope_type = public.rbac_scope_app() THEN 'Default API key RBAC app binding' ELSE 'Default API key RBAC org binding' END,
+        true
+      FROM public.apikeys
+      JOIN public.roles ON roles.name = CASE apikeys.name
+        WHEN 'default org admin' THEN 'org_admin'
+        WHEN 'default app uploader' THEN 'app_uploader'
+        ELSE 'app_reader'
+      END
+      WHERE apikeys.user_id = $1::uuid
+        AND NOT (apikeys.id = ANY($3::bigint[]))
+    `, [USER_ID_2, ORG_ID, preexistingKeyIds, MEMBER_ORG_APP_ID])
+    // A renamed key is still identified through its binding reason.
+    await query(`UPDATE public.apikeys SET name = 'renamed admin key' WHERE user_id = $1::uuid AND name = 'default org admin' AND NOT (id = ANY($2::bigint[]))`, [USER_ID_2, preexistingKeyIds])
+    expect(await keyHasPermission(USER_ID_2, 'renamed admin key', 'org.update_user_roles', ORG_ID)).toBe(true)
+
+    await query(REMEDIATION_MIGRATION_SQL)
+
+    expect(await keyBindings(USER_ID_2, ORG_ID)).toEqual([
+      { name: 'renamed admin key', role_name: 'org_member', scope_type: 'org', org_id: ORG_ID, app_id: null },
+    ])
+    expect(await keyHasPermission(USER_ID_2, 'renamed admin key', 'org.update_user_roles', ORG_ID)).toBe(false)
+    expect(await keyHasPermission(USER_ID_2, 'renamed admin key', 'org.read', ORG_ID)).toBe(true)
+    // Bindings within the owner's rights are untouched.
+    expect(await keyBindings(USER_ID_2, ORG_ID_2)).toContainEqual({ name: 'default app uploader', role_name: 'org_member', scope_type: 'org', org_id: ORG_ID_2, app_id: null })
   })
 })
