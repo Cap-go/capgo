@@ -1,19 +1,11 @@
-import type { SemVer } from '@std/semver'
-import type { CapgoClient } from '../utils'
+import type { CleanupBundleRow, CleanupBundlesResult } from '../api/versions'
 import type { BundleCleanupOptions } from '../schemas/bundle'
-import type { AppVersionRow } from '../types/api'
 import { confirm as confirmC, intro, isCancel, log, outro } from '@clack/prompts'
-import {
-  format,
-  greaterThan,
-  increment,
-  lessThan,
-  parse,
-} from '@std/semver'
+import { format, increment, parse } from '@std/semver'
 import { trackEvent } from '../analytics/track'
 import { checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { checkAlerts } from '../api/update'
-import { deleteSpecificVersion, displayBundles, getActiveAppVersions, getChannelsVersion } from '../api/versions'
+import { cleanupAppVersions, displayBundles } from '../api/versions'
 import { CliUserError } from '../shared/cli-user-error'
 import {
   createCapgoClient,
@@ -21,40 +13,26 @@ import {
   getAppId,
   getConfig,
   getHumanDate,
-  } from '../utils'
+} from '../utils'
 
-async function removeVersions(
-  toRemove: AppVersionRow[],
-  client: CapgoClient,
-  appId: string,
-  silent: boolean,
-  http: { apikey: string, apiHost?: string },
-) {
-  for await (const row of toRemove) {
-    if (!silent)
-      log.warn(`Removing ${row.name} created on ${getHumanDate(row.created_at)}`)
-    await deleteSpecificVersion(client, appId, row.name, {
-      silent,
-      apikey: http.apikey,
-      apiHost: http.apiHost,
-    })
-  }
+function toDisplayRows(kept: CleanupBundleRow[], removed: CleanupBundleRow[]) {
+  return [
+    ...kept.map(row => ({ ...row, keep: row.linked ? '✅ (Linked to channel)' : '✅' })),
+    ...removed.map(row => ({ ...row, keep: '❌' })),
+  ].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
 }
 
-function getRemovableVersionsInSemverRange(
-  data: AppVersionRow[],
-  bundleVersion: SemVer,
-  nextMajorVersion: SemVer,
-) {
-  const toRemove: AppVersionRow[] = []
-
-  for (const row of data ?? []) {
-    const rowVersion = parse(row.name)
-    if (greaterThan(rowVersion, bundleVersion) && lessThan(rowVersion, nextMajorVersion))
-      toRemove.push(row)
+function nothingToRemove(result: CleanupBundlesResult, silent: boolean) {
+  if (!result.active) {
+    if (!silent)
+      log.error('No versions found, aborting cleanup')
+    throw new Error('No versions found')
   }
-
-  return toRemove
+  if (result.removed.length)
+    return null
+  if (!silent)
+    log.warn('Nothing to be removed, aborting removal...')
+  return { removed: 0, kept: result.kept.length }
 }
 
 export async function cleanupBundleInternal(appId: string, options: BundleCleanupOptions, silent = false) {
@@ -86,83 +64,58 @@ export async function cleanupBundleInternal(appId: string, options: BundleCleanu
   const client = await createCapgoClient(options.apikey, options.apiHost)
   await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'bundle.delete', silent)
 
-  if (!silent)
-    log.info('Querying all available versions in Capgo')
-
-  let allVersions: (AppVersionRow & { keep?: string })[] = await getActiveAppVersions(options.apikey!, appId, { silent, apikey: options.apikey!, apiHost: options.apiHost })
-  const versionInUse = await getChannelsVersion({ apikey: options.apikey!, silent, apiHost: options.apiHost }, appId)
-
-  if (!silent)
-    log.info(`Total active versions in Capgo: ${allVersions?.length ?? 0}`)
-
-  if (!allVersions?.length) {
-    if (!silent)
-      log.error('No versions found, aborting cleanup')
-    throw new Error('No versions found')
-  }
-
   if (bundle) {
     const bundleVersion = parse(bundle)
-    const nextMajorVersion = increment(bundleVersion, 'major')
-
     if (!silent)
-      log.info(`Querying available versions in Capgo between ${format(bundleVersion)} and ${format(nextMajorVersion)}`)
-
-    allVersions = getRemovableVersionsInSemverRange(allVersions, bundleVersion, nextMajorVersion) as (AppVersionRow & { keep: string })[]
-
-    if (!silent)
-      log.info(`Active versions in Capgo between ${format(bundleVersion)} and ${format(nextMajorVersion)}: ${allVersions?.length ?? 0}`)
+      log.info(`Cleaning versions in Capgo between ${format(bundleVersion)} and ${format(increment(bundleVersion, 'major'))}`)
   }
 
-  const toRemove: (AppVersionRow & { keep?: string })[] = []
-  let kept = 0
+  // The API selects (and, once confirmed, soft-deletes) the bundles itself: no client-side
+  // listing of every bundle and no per-bundle round trips.
+  const http = { apikey: options.apikey, silent, apiHost: options.apiHost }
+  const request = { keep, bundle, ignoreChannel }
 
-  for (const v of allVersions) {
-    const isInUse = versionInUse.find(vi => vi === v.id)
-
-    if (kept < keep || (isInUse && !ignoreChannel)) {
-      v.keep = isInUse ? '✅ (Linked to channel)' : '✅'
-      kept += 1
-    }
-    else {
-      v.keep = '❌'
-      toRemove.push(v)
-    }
-  }
-
-  if (!toRemove.length) {
-    if (!silent)
-      log.warn('Nothing to be removed, aborting removal...')
-    return { removed: 0, kept }
-  }
-
-  if (!silent)
-    displayBundles(allVersions)
-
+  let confirmedIds: number[] | undefined
   if (!force) {
-    if (!silent) {
-      const doDelete = await confirmC({ message: 'Do you want to continue removing the versions specified?' })
-      if (isCancel(doDelete) || !doDelete) {
-        log.warn('Not confirmed, aborting removal...')
-        throw new CliUserError('Cleanup cancelled by user')
-      }
-    }
-    else {
+    if (!silent)
+      log.info('Querying available versions in Capgo')
+    const plan = await cleanupAppVersions(appId, { ...request, dryRun: true }, http)
+    if (!silent)
+      log.info(`Total active versions in Capgo: ${plan.active}${bundle ? ` (${plan.total} in range)` : ''}`)
+    const nothing = nothingToRemove(plan, silent)
+    if (nothing)
+      return nothing
+    if (silent)
       throw new Error('Cleanup requires force=true in SDK mode to prevent accidental deletions')
+
+    displayBundles(toDisplayRows(plan.kept, plan.removed))
+    const doDelete = await confirmC({ message: `Do you want to continue removing the ${plan.removed.length} versions specified?` })
+    if (isCancel(doDelete) || !doDelete) {
+      log.warn('Not confirmed, aborting removal...')
+      throw new CliUserError('Cleanup cancelled by user')
     }
+    log.success('You have confirmed removal, removing versions now')
+    // Delete exactly what was shown, never a set recomputed after the prompt.
+    confirmedIds = plan.removed.map(row => row.id)
   }
 
-  if (!silent)
-    log.success('You have confirmed removal, removing versions now')
+  const result = await cleanupAppVersions(appId, { ...request, dryRun: false, ids: confirmedIds }, http)
+  const nothing = nothingToRemove(result, silent)
+  if (nothing)
+    return nothing
+  if (!silent) {
+    for (const row of result.removed)
+      log.warn(`Removed ${row.name} created on ${getHumanDate(row.created_at)}`)
+  }
+  const kept = result.kept.length
+  const removed = result.removed.length
 
-  await removeVersions(toRemove, client, appId, silent, { apikey: options.apikey!, apiHost: options.apiHost })
-
-  void trackEvent({ channel: 'bundle', event: 'Bundles Cleaned', tags: { kept_count: kept, deleted_count: toRemove.length } })
+  void trackEvent({ channel: 'bundle', event: 'Bundles Cleaned', tags: { kept_count: kept, deleted_count: removed } })
 
   if (!silent)
     outro('Done ✅')
 
-  return { removed: toRemove.length, kept }
+  return { removed, kept }
 }
 
 export async function cleanupBundle(appId: string, options: BundleCleanupOptions) {

@@ -481,7 +481,8 @@ const bundleTools: McpTool[] = [
   apiTool({
     name: 'capgo_list_bundles',
     title: 'List bundles',
-    description: 'List the uploaded bundles (live update versions) of an app, newest first.',
+    description: 'List the uploaded bundles (live update versions) of an app, newest first. '
+      + 'Pages leave out the per-file manifest and native package list; pass version or id to get one bundle with every field.',
     input: {
       appId,
       page,
@@ -489,11 +490,16 @@ const bundleTools: McpTool[] = [
       id: z.number().int().positive().optional().describe('Numeric bundle id (app_versions.id)'),
     },
     annotations: READ,
-    request: input => ({
-      method: 'GET',
-      path: '/bundle',
-      query: compact({ app_id: input.appId, page: input.page, version: input.version, id: input.id }),
-    }),
+    request: (input) => {
+      // A full page of complete rows (native_packages, manifest) can be megabytes and would be cut
+      // at the tool result size cap; single-bundle lookups keep every field.
+      const single = input.version !== undefined || input.id !== undefined
+      return {
+        method: 'GET',
+        path: '/bundle',
+        query: compact({ app_id: input.appId, page: input.page, version: input.version, id: input.id, fields: single ? undefined : 'summary' }),
+      }
+    },
   }),
   apiTool({
     name: 'capgo_create_bundle_from_url',

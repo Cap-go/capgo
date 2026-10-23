@@ -1,4 +1,4 @@
-import type { Json } from '~/types/supabase.types'
+import type { Json } from '~/types/database.types'
 import type { OnboardingAnalyticsStep } from '~/utils/onboardingProgressAnalytics'
 import { hasNewChannelTreatment } from '~/utils/onboardingABTests'
 

@@ -367,6 +367,26 @@ describe('private/cli data routes', () => {
     expect(await ok.json()).toEqual([{ file_name: 'index.html', file_hash: 'abc' }])
     expect(mocks.calls.at(-1)?.ops).toContainEqual(['eq', 'app_version_id', 7])
   })
+
+  it('gET /manifest pages past the PostgREST row cap', async () => {
+    const fullPage = Array.from({ length: 1000 }, (_, index) => ({ file_name: `f${index}`, file_hash: 'h' }))
+    let call = 0
+    const pages = [fullPage, fullPage, [{ file_name: 'last', file_hash: 'h' }]]
+    const original = mocks.result
+    Object.defineProperty(mocks, 'result', {
+      configurable: true,
+      get: () => ({ data: pages[Math.min(call++, pages.length - 1)], error: null }),
+      set: () => {},
+    })
+    try {
+      const response = await app.request('http://local/manifest?app_version_id=7')
+      expect((await response.json() as unknown[]).length).toBe(2001)
+      expect(mocks.calls.map(entry => entry.ops.find(([op]) => op === 'range'))).toEqual([['range', 0, 999], ['range', 1000, 1999], ['range', 2000, 2999]])
+    }
+    finally {
+      Object.defineProperty(mocks, 'result', { configurable: true, writable: true, enumerable: true, value: original })
+    }
+  })
 })
 
 describe('private/cli storage icon upload', () => {

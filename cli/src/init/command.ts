@@ -5,7 +5,6 @@ import type { Organization } from '../utils'
 import type { SupportedPackageManager } from './command-execution'
 import type { InitCodeDiff, InitEncryptionPhase, InitEncryptionSummary } from './runtime'
 import type { PackageInstallState } from './updater'
-import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path, { dirname, join } from 'node:path'
 import { chdir, cwd, env, exit, platform, stderr, stdin, stdout } from 'node:process'
@@ -42,7 +41,7 @@ import { buildAppIdConflictSuggestions, isAppAlreadyExistsError } from './app-co
 import { readBuilderOnlyInitAssignment, tryBuilderOnlyInit } from './builder-setup'
 import { loginInitInBrowser, shouldStartInitBrowserLogin } from './browser-login'
 import { selectOnboardingChannel } from './channel-selection'
-import { createMissingExecutableError, getAvailablePackageManagers, getMissingPackageManagerExecutable, getPackageManagerInfo, preparePackageManagerCommandEnvironment, probeExecutable, probePackageManagerCommand, resolveExecutableProbeError, waitForCommandResult } from './command-execution'
+import { assertNoWindowsCommandLineBreaks, createMissingExecutableError, getAvailablePackageManagers, getMissingPackageManagerExecutable, getPackageManagerInfo, preparePackageManagerCommandEnvironment, probeExecutable, probePackageManagerCommand, resolveExecutableProbeError, spawnCommand as spawn, spawnCommandSync as spawnSync, waitForCommandResult } from './command-execution'
 import { reportInitOnboardingStep } from './onboarding-report'
 import { cancel as pCancel, confirm as pConfirm, intro as pIntro, isCancel as pIsCancel, log as pLog, outro as pOutro, select as pSelect, spinner as pSpinner, text as pText } from './prompts'
 import { finishActiveCliReplay, getActiveCliReplaySessionId, isCliTelemetryDisabled, startInitReplay } from './replay'
@@ -1164,7 +1163,7 @@ async function maybeRunCapacitorInit(projectDir: string, projectType: string, in
     }
 
     spinner.message(`Running: ${pm.runner} cap init "${appName}" "${capacitorAppId}" --web-dir ${webDir}`)
-    const initResult = spawnSync(pm.runner, ['cap', 'init', appName, capacitorAppId, '--web-dir', webDir], { stdio: 'pipe', cwd: projectDir })
+    const initResult = runPackageRunnerSync(pm.runner, ['cap', 'init', appName, capacitorAppId, '--web-dir', webDir], { stdio: 'pipe', cwd: projectDir })
     if (initResult.error)
       throw initResult.error
     if (initResult.status !== 0) {
@@ -2130,7 +2129,7 @@ async function ensureCapacitorProjectReady(
       const spinner = pSpinner()
       spinner.start(`Running: ${pm.runner} cap init "${appName}" "${appId}"`)
       try {
-        const initResult = spawnSync(pm.runner, ['cap', 'init', appName, appId], { stdio: 'pipe' as const })
+        const initResult = runPackageRunnerSync(pm.runner, ['cap', 'init', appName, appId], { stdio: 'pipe' as const })
         if (initResult.error)
           throw initResult.error
         if (initResult.status !== 0) {
@@ -3527,9 +3526,8 @@ async function streamCommandInInitPanel(params: {
   // rendered by Ink rather than surfacing as a bare terminal error.
   startInitStreamingOutput({ title: params.title, command: displayCommand })
 
-  // `pm.runner` can contain a space ("yarn dlx", "pnpm exec"). `spawn`
-  // without `shell:true` can't handle that, and `shell:true` brings
-  // quoting risk, so we split the runner into its own head + tail args.
+  // Split multi-word runners so cross-spawn can escape each argument when
+  // invoking Windows command shims ("yarn dlx", "pnpm exec").
   let runnerCommand: { command: string, args: string[] }
   try {
     runnerCommand = params.command
@@ -3759,6 +3757,25 @@ async function handleMissingBuildScript(buildCommand: string, appId: string, pla
   return await exitAfterFinishingReplay('cancelled', 0)
 }
 
+/**
+ * Updater release that matches the project's Capacitor major, or the reason Capgo cannot be
+ * installed (Capacitor below 5, an unparsable version, an unknown package manager). Used by the
+ * MCP live-update flow, which must stop instead of installing an incompatible @latest.
+ */
+export async function resolveCompatibleUpdaterInstall(packageJsonPath: string, pm: PackageManagerInfo): Promise<{ ok: true, version: string } | { ok: false, error: string }> {
+  try {
+    const dependencies = await getAllPackagesDependencies(undefined, packageJsonPath)
+    const blocker = getUpdaterInstallBlocker(dependencies, pm)
+    if (blocker)
+      return { ok: false, error: blocker }
+    const coreVersion = normalizeConcreteVersion(dependencies.get('@capacitor/core'))!
+    return { ok: true, version: getUpdaterVersionToInstall(coreVersion, false).versionToInstall }
+  }
+  catch (error) {
+    return { ok: false, error: `Cannot read the project's dependencies: ${formatError(error)}` }
+  }
+}
+
 async function getCompatibleUpdaterVersionForPackage(packageJsonPath: string, pm: PackageManagerInfo): Promise<string> {
   try {
     const dependencies = await getAllPackagesDependencies(undefined, packageJsonPath)
@@ -3958,6 +3975,7 @@ interface InheritedCommandOptions {
 }
 
 export async function runInheritedCommand(command: string, args: string[], options: InheritedCommandOptions = {}): Promise<InheritedCommandResult> {
+  assertNoWindowsCommandLineBreaks(command, args)
   if (options.forcePty || (stdin.isTTY && stdout.isTTY))
     return runPtyInheritedCommand(command, args, options)
   return runPipedInheritedCommand(command, args, options)
@@ -5234,7 +5252,7 @@ async function maybeInstallCapgoSkills() {
   spinner.start(`Running: ${installCommand}`)
 
   try {
-    const result = spawnSync(pm.runner, ['skills', 'add', capgoSkillsRepository, '-g', '-y'], {
+    const result = runPackageRunnerSync(pm.runner, ['skills', 'add', capgoSkillsRepository, '-g', '-y'], {
       stdio: 'pipe',
       encoding: 'utf8',
     })
@@ -5246,7 +5264,7 @@ async function maybeInstallCapgoSkills() {
 
     spinner.stop('Capgo skills install failed ❌')
     const commandError = [result.stderr, result.stdout]
-      .find(value => typeof value === 'string' && value.trim().length > 0)
+      .find((value): value is string => typeof value === 'string' && value.trim().length > 0)
       ?.trim()
     pLog.warn(`Could not install Capgo skills automatically: ${commandError || 'Unknown error'}`)
     pLog.info(`Run it yourself with: "${installCommand}"`)

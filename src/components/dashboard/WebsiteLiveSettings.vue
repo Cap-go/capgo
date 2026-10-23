@@ -9,7 +9,7 @@ import IconCheck from '~icons/lucide/check'
 import IconGlobe from '~icons/lucide/globe'
 import IconLoader from '~icons/lucide/loader-circle'
 import { checkPermissions } from '~/services/permissions'
-import { useSupabase } from '~/services/supabase'
+import { useConsole } from '~/services/console'
 import { normalizeWebsiteLiveUrl, useAppUpdateModeStore } from '~/stores/appUpdateMode'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
@@ -45,7 +45,7 @@ const isPlanLoading = ref(false)
 const currentPlanName = computedAsync(async () => {
   if (!appOrgId.value)
     return null
-  const { data, error } = await useSupabase()
+  const { data, error } = await useConsole()
     .rpc('get_current_plan_name_org', { orgid: appOrgId.value })
     .single()
   if (error || typeof data !== 'string' || !data)

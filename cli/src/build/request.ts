@@ -67,7 +67,11 @@ import { appendInternalLog, getInternalLogPath, startInternalLog } from '../supp
 import { uploadSupportLogs } from '../support/support-upload.js'
 import { offerSupportUploadBeforeAi } from '../support/support-upload-prompt.js'
 import { buildCliRequestHeaders } from '../analytics/cli-headers'
-import { assertCliPermission, canPromptInteractively, createCapgoClient, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, trimTrailingSlashes, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
+import { isDirectOfferApp } from '../api/direct-offer'
+import { isAgentInvocation } from '../shared/agent-notices'
+import { DIRECT_OFFER_PLAN_MESSAGE, formatPlanRequiredMessage } from '../shared/direct-offer'
+import { normalizePlansUrl } from '../shared/plan-url'
+import { assertCliPermission, canPromptInteractively, createCapgoClient, defaultHostWeb, findSavedKey, getConfig, getOrganizationId, getRemoteConfig, sendEvent, trimTrailingSlashes, TUS_UPLOAD_RETRY_DELAYS } from '../utils'
 import { getBuilderAppId } from './app-id'
 import { parseBuildEnv } from './build-env'
 import { syncAndroidVersion } from './android-version'
@@ -218,6 +222,7 @@ interface CapgoApiErrorBody {
   message?: string
   moreInfo?: {
     upgrade_url?: string
+    org_id?: string
     reason?: string
     activeBuilds?: number
     limit?: number
@@ -238,11 +243,12 @@ function parseCapgoApiErrorBody(errorText: string): CapgoApiErrorBody | null {
 }
 
 /** Surface plan / concurrency limit errors with a clear upgrade CTA, then throw. */
-async function throwIfBuildPlanLimitError(
+export async function throwIfBuildPlanLimitError(
   status: number,
   errorText: string,
   action: 'request' | 'start',
   logger: BuildLogger,
+  isDirectOffer?: () => Promise<boolean>,
 ): Promise<void> {
   if (status !== 429)
     return
@@ -253,14 +259,22 @@ async function throwIfBuildPlanLimitError(
     return
 
   const config = await getRemoteConfig()
-  const upgradeUrl = body?.moreInfo?.upgrade_url || `${config.hostWeb}/settings/organization/plans`
-  const message = body?.message
-    || (errorCode === 'native_build_concurrency_limit_exceeded'
-      ? `Native build concurrency limit reached for your plan. Upgrade here: ${upgradeUrl}`
-      : `Cannot ${action} native build, upgrade plan to continue: ${upgradeUrl}`)
+  const fallbackUrl = normalizePlansUrl(`${config.hostWeb}/settings/organization/plans`, `${defaultHostWeb}/settings/organization/plans`)
+  const upgradeUrl = normalizePlansUrl(body?.moreInfo?.upgrade_url, fallbackUrl)
+  // Orgs created without a free trial (direct offer) get "choose a plan" copy, not "upgrade".
+  const directOffer = errorCode === 'need_plan_upgrade' && !!isDirectOffer && await isDirectOffer()
+  const message = directOffer
+    ? `${DIRECT_OFFER_PLAN_MESSAGE} Choose a plan here: ${upgradeUrl}`
+    : body?.message
+      || (errorCode === 'native_build_concurrency_limit_exceeded'
+        ? `Native build concurrency limit reached for your plan. Upgrade here: ${upgradeUrl}`
+        : `Cannot ${action} native build, upgrade plan to continue: ${upgradeUrl}`)
 
-  logger.error(message)
-  if (!message.includes(upgradeUrl))
+  const displayMessage = errorCode === 'need_plan_upgrade' && isAgentInvocation()
+    ? formatPlanRequiredMessage(upgradeUrl, directOffer, true)
+    : message
+  logger.error(displayMessage)
+  if (!displayMessage.includes(upgradeUrl))
     logger.error(`Upgrade here: ${upgradeUrl}`)
 
   try {
@@ -2079,7 +2093,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
     if (!response.ok) {
       const errorText = await response.text()
-      await throwIfBuildPlanLimitError(response.status, errorText, 'request', log)
+      await throwIfBuildPlanLimitError(response.status, errorText, 'request', log, () => isDirectOfferApp(client, appId))
       if (errorText.includes('build_machine_version_unavailable')) {
         let message = errorText
         try {
@@ -2330,7 +2344,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
       if (!startResponse.ok) {
         const errorText = await startResponse.text()
-        await throwIfBuildPlanLimitError(startResponse.status, errorText, 'start', log)
+        await throwIfBuildPlanLimitError(startResponse.status, errorText, 'start', log, () => isDirectOfferApp(client, appId))
         throw new Error(`Failed to start build: ${startResponse.status} - ${errorText}`)
       }
 

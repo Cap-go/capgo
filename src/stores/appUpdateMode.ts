@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { useSupabase } from '~/services/supabase'
+import { useConsole } from '~/services/console'
 
 export type AppUpdateMode = 'capgo' | 'website'
 
@@ -56,7 +56,7 @@ export const useAppUpdateModeStore = defineStore('appUpdateMode', () => {
       return inflight
     const generation = writeGeneration.get(appId) ?? 0
     const request = (async () => {
-      const { data, error } = await useSupabase()
+      const { data, error } = await useConsole()
         .from('apps')
         .select('update_mode, website_url')
         .eq('app_id', appId)
@@ -87,7 +87,7 @@ export const useAppUpdateModeStore = defineStore('appUpdateMode', () => {
   async function save(appId: string, state: AppUpdateModeState) {
     writeGeneration.set(appId, (writeGeneration.get(appId) ?? 0) + 1)
     // RLS denials and missing rows return no error but no row either.
-    const { data, error } = await useSupabase()
+    const { data, error } = await useConsole()
       .from('apps')
       .update({ update_mode: state.updateMode, website_url: state.websiteUrl })
       .eq('app_id', appId)

@@ -12,8 +12,10 @@ const router = useRouter()
 const hideExternalPurchaseFlows = isNativeAppStoreContext()
 const organizationStore = useOrganizationStore()
 const billingOrgId = computed(() => organizationStore.currentOrganization?.gid)
-const { paidAt } = useBillingPaidAt(billingOrgId, hideExternalPurchaseFlows)
+const { paidAt, trialSkipped } = useBillingPaidAt(billingOrgId, hideExternalPurchaseFlows)
 const showExpiredTrialCopy = computed(() => shouldShowExpiredTrialCopy(hideExternalPurchaseFlows, paidAt.value))
+// Direct-offer orgs never had a trial: invite them to start instead of saying it ended.
+const showNoTrialCopy = computed(() => showExpiredTrialCopy.value && trialSkipped.value)
 
 function goToPlans() {
   router.push('/settings/organization/plans')
@@ -35,9 +37,15 @@ function goToPlans() {
         </div>
       </div>
       <h2 class="mb-2 text-2xl font-bold text-gray-900 dark:text-white">
-        {{ t(showExpiredTrialCopy ? 'trial-ended-title' : 'subscription-required') }}
+        {{ t(showNoTrialCopy ? 'no-trial-choose-plan-title' : showExpiredTrialCopy ? 'trial-ended-title' : 'subscription-required') }}
       </h2>
-      <i18n-t v-if="showExpiredTrialCopy" keypath="trial-ended-description" tag="p" class="mb-6 max-w-sm text-gray-600 dark:text-gray-400">
+      <div v-if="showNoTrialCopy" class="mb-6 max-w-sm text-gray-600 dark:text-gray-400">
+        <p>{{ t('no-trial-choose-plan-description') }}</p>
+        <p class="mt-2 text-sm font-medium text-gray-700 dark:text-gray-300" data-test="no-trial-money-back">
+          {{ t('no-trial-money-back-guarantee-description') }}
+        </p>
+      </div>
+      <i18n-t v-else-if="showExpiredTrialCopy" keypath="trial-ended-description" tag="p" class="mb-6 max-w-sm text-gray-600 dark:text-gray-400">
         <template #supportEmail>
           <a href="mailto:support@capgo.app" class="d-link font-medium text-amber-700 underline dark:text-amber-400">support@capgo.app</a>
         </template>

@@ -63,9 +63,9 @@ export type OnboardingDetailsEvent
 
 type AnalyticsPrimitive = string | number | boolean
 type AnalyticsProperties = Record<string, AnalyticsPrimitive>
-type CaptureEvent = (name: string, supaHost: string, properties?: AnalyticsProperties) => void
+type CaptureEvent = (name: string, apiHost: string, properties?: AnalyticsProperties) => void
 
-const captureOnboardingEvent: CaptureEvent = (name, _supaHost, properties) => {
+const captureOnboardingEvent: CaptureEvent = (name, _apiHost, properties) => {
   sendOnboardingEvent(name, properties)
 }
 
@@ -84,7 +84,7 @@ interface CreateOnboardingTelemetryIdentityOptions {
   flow: OnboardingAnalyticsFlow
   idFactory?: () => string
   onboardingVersion?: () => OnboardingAnalyticsVersion
-  supaHost: string
+  apiHost: string
 }
 
 export interface OnboardingStepCompletionProperties {
@@ -201,7 +201,7 @@ export function createOnboardingTelemetryIdentity(options: CreateOnboardingTelem
 
   function safelyCapture(name: string, properties: AnalyticsProperties) {
     try {
-      capture(name, options.supaHost, properties)
+      capture(name, options.apiHost, properties)
     }
     catch {
       // Analytics must never interrupt onboarding.
@@ -266,7 +266,7 @@ interface CreateOnboardingProgressTrackerOptions {
   onboardingVersion?: () => OnboardingAnalyticsVersion
   resumed: boolean
   steps: readonly OnboardingAnalyticsStep[]
-  supaHost: string
+  apiHost: string
 }
 
 export function createOnboardingProgressTracker(options: CreateOnboardingProgressTrackerOptions) {
@@ -297,7 +297,7 @@ export function createOnboardingProgressTracker(options: CreateOnboardingProgres
 
   function safelyCapture(name: string, properties: AnalyticsProperties) {
     try {
-      capture(name, options.supaHost, properties)
+      capture(name, options.apiHost, properties)
     }
     catch {
       // Analytics must never interrupt onboarding.

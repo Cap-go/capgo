@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import { getSupabaseWorktreeConfig } from '../../scripts/supabase-worktree-config'
 import { getSupabaseStatus } from '../../scripts/supabase-worktree-status'
 import { expect, test } from '../support/commands'
+import { CONSOLE_QUERY_ROUTE, consoleQueryError, consoleQueryFromResponse, consoleQueryMethod, consoleQueryPayload, parseConsoleQuery, routeConsoleQuery } from '../support/consoleQuery'
 
 const { ports: supabasePorts } = getSupabaseWorktreeConfig()
 const localSupabaseUrl = `http://127.0.0.1:${supabasePorts.api}`
@@ -87,6 +88,60 @@ async function continuePastChannelOnboardingIfShown(page: Page) {
   await expect(cliSetup).toBeVisible()
 }
 
+async function forceWebNativeOnboardingTreatments(email: string, password: string) {
+  const capgo = createClient(localSupabaseUrl, localSupabaseAnonKey)
+  const { data: sessionData, error: signInError } = await capgo.auth.signInWithPassword({ email, password })
+  if (signInError || !sessionData.user)
+    throw signInError ?? new Error('Cannot sign in treatment user')
+
+  // Experiment fixtures use a separate backend client; user sessions cannot
+  // override the server-managed assignment fields.
+  const configuredServiceKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_KEY
+  const status = configuredServiceKey ? null : getSupabaseStatus()
+  const serviceKey = configuredServiceKey || status?.SERVICE_ROLE_KEY || status?.SECRET_KEY
+  if (!serviceKey)
+    throw new Error('Local Supabase service key is required for treatment fixtures')
+  const adminClient = createClient(localSupabaseUrl, serviceKey, { auth: { persistSession: false } })
+  const { data: profile, error: profileError } = await adminClient
+    .from('users')
+    .select('onboarding')
+    .eq('id', sessionData.user.id)
+    .single()
+  if (profileError)
+    throw profileError
+
+  const onboarding = profile.onboarding && typeof profile.onboarding === 'object' && !Array.isArray(profile.onboarding)
+    ? profile.onboarding
+    : {}
+  const abtests = onboarding.abtests && typeof onboarding.abtests === 'object' && !Array.isArray(onboarding.abtests)
+    ? onboarding.abtests
+    : {}
+  const { error: updateError } = await adminClient
+    .from('users')
+    .update({
+      onboarding: {
+        ...onboarding,
+        abtests: {
+          ...abtests,
+          webnativeapp_publish_intent: {
+            assigned_at: new Date().toISOString(),
+            branch: 'A',
+          },
+          webnativeapp_development_environment: {
+            assigned_at: new Date().toISOString(),
+            branch: 'C',
+          },
+        },
+      },
+    })
+    .eq('id', sessionData.user.id)
+  if (updateError)
+    throw updateError
+
+  // End only this helper session; the browser must stay signed in.
+  await capgo.auth.signOut({ scope: 'local' })
+}
+
 async function expectProtectedRouteRedirect(page: Page, targetPath: string, expectedUrl: RegExp, expectedSelector: string) {
   const redirectedPage = await page.context().newPage()
 
@@ -122,6 +177,12 @@ async function returnFromOrganizationToAppName(page: Page) {
 
 test.describe('Registration', () => {
   test.beforeEach(async ({ page }) => {
+    // These tests cover the manual wizard. New users first choose AI or manual setup;
+    // the AI path has its own spec (ai-onboarding.spec.ts).
+    await page.addLocatorHandler(page.locator('[data-test="onboarding-setup-mode"]'), async () => {
+      await page.locator('[data-test="onboarding-setup-mode-manual"]').click()
+      await expect(page.locator('[data-test="onboarding-setup-mode"]')).toHaveCount(0)
+    })
     await page.goto('/register/')
   })
 
@@ -167,7 +228,7 @@ test.describe('Registration', () => {
     await expect(page.locator('[data-test="last_name"]')).toHaveCount(0)
     await page.fill('[data-test="email"]', email)
     await page.fill('[data-test="password"]', 'Password123!')
-    await page.route('**/auth/v1/signup', route => route.abort())
+    await page.route('**/private/console/auth/signup', route => route.abort())
     const registrationRequest = page.waitForRequest(request => request.url().endsWith('/auth/register') && request.method() === 'POST')
     await page.click('[data-test="submit"]')
     const registrationPayload = (await registrationRequest).postDataJSON()
@@ -177,9 +238,9 @@ test.describe('Registration', () => {
     await page.waitForURL(/\/onboarding\/name/)
     await continuePastProfileWelcome(page)
     await expectProtectedRouteRedirect(page, '/dashboard', /\/onboarding\/name/, '[data-test="onboarding-name-step"]')
-    await page.route('**/rest/v1/users?*', async (route) => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({ status: 503, json: { code: 'unavailable', message: 'Test profile load failure' } })
+    await routeConsoleQuery(page, 'users', async (route, query) => {
+      if (consoleQueryMethod(query) === 'GET') {
+        await route.fulfill(consoleQueryError(503, { code: 'unavailable', message: 'Test profile load failure' }))
         return
       }
       await route.fallback()
@@ -187,7 +248,7 @@ test.describe('Registration', () => {
     await page.reload()
     await expect(page.locator('[data-test="account-load-recovery"]')).toBeVisible()
     await expect(page.locator('[data-test="onboarding-name-step"]')).toHaveCount(0)
-    await page.unroute('**/rest/v1/users?*')
+    await page.unroute(CONSOLE_QUERY_ROUTE)
     await page.locator('[data-test="account-load-retry"]').click()
     await page.waitForURL(/\/onboarding\/name/)
     await continuePastProfileWelcome(page)
@@ -207,9 +268,9 @@ test.describe('Registration', () => {
     await page.fill('[data-test="onboarding-last-name"]', '  User  ')
     await expect(continueGoal).toBeEnabled()
 
-    await page.route('**/rest/v1/users?*', async (route) => {
-      if (route.request().method() === 'PATCH' && route.request().postDataJSON()?.first_name) {
-        await route.fulfill({ status: 500, json: { message: 'Test profile save failure' } })
+    await routeConsoleQuery(page, 'users', async (route, query) => {
+      if (consoleQueryMethod(query) === 'PATCH' && consoleQueryPayload(query)?.first_name) {
+        await route.fulfill(consoleQueryError(500, { message: 'Test profile save failure' }))
         return
       }
       await route.fallback()
@@ -218,23 +279,23 @@ test.describe('Registration', () => {
     await expect(page.getByText('Error while updating your account', { exact: true })).toBeVisible()
     await expect(page).toHaveURL(/\/onboarding\/name/)
     await expect(page.locator('[data-test="app-onboarding-name"]')).toHaveCount(0)
-    await page.unroute('**/rest/v1/users?*')
+    await page.unroute(CONSOLE_QUERY_ROUTE)
     await continueGoal.click()
     await expectOnboardingGoal(page)
     await page.click('[data-test="onboarding-intent-ota"]')
     await page.click('[data-test="app-onboarding-continue-intent"]')
     await continuePastDevelopmentEnvironmentIfShown(page)
 
-    const supabase = createClient(localSupabaseUrl, localSupabaseAnonKey)
-    const { data: signedIn, error: signInError } = await supabase.auth.signInWithPassword({ email, password: 'Password123!' })
+    const capgo = createClient(localSupabaseUrl, localSupabaseAnonKey)
+    const { data: signedIn, error: signInError } = await capgo.auth.signInWithPassword({ email, password: 'Password123!' })
     expect(signInError).toBeNull()
-    const { data: profile, error: profileError } = await supabase.from('users')
+    const { data: profile, error: profileError } = await capgo.from('users')
       .select('first_name, last_name')
       .eq('id', signedIn.user!.id)
       .single()
     expect(profileError).toBeNull()
     expect(profile).toEqual({ first_name: 'Example', last_name: 'User' })
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
 
     await expect(page.locator('[data-test="app-onboarding-existing-yes"]')).toHaveCount(0)
     await expect(page.locator('[data-test="app-onboarding-existing-no"]')).toHaveCount(0)
@@ -284,6 +345,10 @@ test.describe('Registration', () => {
     await continuePastChannelOnboardingIfShown(page)
     await expect(page.locator('[data-test="onboarding-technical-invite"]')).toBeVisible()
     await expect(page).toHaveURL(/\/app\/[^/]+\/getting-started$/)
+    // New manual signups see one next step, without task counts or the full list.
+    await expect(page.locator('[data-test="setup-checklist-instructions"]')).toContainText('Your next step')
+    await expect(page.locator('[data-test="setup-checklist-progress"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="setup-checklist-toggle"]')).toHaveCount(0)
   })
 
   test('should collect first and last names before the goal on the About you step on mobile', async ({ page }) => {
@@ -327,19 +392,20 @@ test.describe('Registration', () => {
       await continuePastProfileWelcome(page)
 
       const draftSaved = page.waitForResponse((response) => {
-        if (!response.url().includes('/rest/v1/users?') || response.request().method() !== 'PATCH' || !response.ok())
+        const query = response.ok() ? consoleQueryFromResponse(response) : null
+        if (!query || query.name !== 'users' || consoleQueryMethod(query) !== 'PATCH')
           return false
-        const draft = response.request().postDataJSON()?.onboarding?.profile_draft
+        const draft = consoleQueryPayload(query)?.onboarding?.profile_draft
         return draft?.first_name === 'Draft' && draft?.last_name === 'User'
       })
       await page.fill('[data-test="onboarding-first-name"]', 'Draft')
       await page.fill('[data-test="onboarding-last-name"]', 'User')
       await draftSaved
 
-      const supabase = createClient(localSupabaseUrl, localSupabaseAnonKey)
-      const { data: session, error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      const capgo = createClient(localSupabaseUrl, localSupabaseAnonKey)
+      const { data: session, error: signInError } = await capgo.auth.signInWithPassword({ email, password })
       expect(signInError).toBeNull()
-      const { data: profile, error } = await supabase.from('users')
+      const { data: profile, error } = await capgo.from('users')
         .select('first_name, last_name, onboarding')
         .eq('id', session.user!.id)
         .single()
@@ -347,7 +413,7 @@ test.describe('Registration', () => {
       expect(profile?.first_name || '').toBe('')
       expect(profile?.last_name || '').toBe('')
       expect(profile?.onboarding).toMatchObject({ profile_draft: { first_name: 'Draft', last_name: 'User' } })
-      await supabase.auth.signOut({ scope: 'local' })
+      await capgo.auth.signOut({ scope: 'local' })
 
       await page.reload()
       const firstName = page.locator('[data-test="onboarding-first-name"]')
@@ -362,8 +428,9 @@ test.describe('Registration', () => {
       await page.reload()
       await expect(page.locator('[data-test="onboarding-resume-restart"]')).toBeVisible()
       await page.click('[data-test="onboarding-resume-restart"]')
-      await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toBeVisible()
-      await continuePastProfileWelcome(page)
+      // Restart lands directly on an empty About you form; there is no welcome screen anymore.
+      await expect(page.locator('[data-test="onboarding-welcome-continue"]')).toHaveCount(0)
+      await expect(page.locator('[data-test="onboarding-name-step"]')).toBeVisible()
       await expect(firstName).toHaveValue('')
       await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('')
       await expect(page.locator('[data-test="onboarding-name-continue"]')).toBeDisabled()
@@ -382,12 +449,12 @@ test.describe('Registration', () => {
   test('should save an incomplete profile before creating a standalone organization', async ({ page }) => {
     const email = `standalone-profile-e2e-${Date.now()}@example.com`
     const password = 'Password123!'
-    const supabase = createClient(localSupabaseUrl, localSupabaseAnonKey)
-    const { data: signedUp, error: signUpError } = await supabase.auth.signUp({ email, password })
+    const capgo = createClient(localSupabaseUrl, localSupabaseAnonKey)
+    const { data: signedUp, error: signUpError } = await capgo.auth.signUp({ email, password })
     expect(signUpError).toBeNull()
     const { error: updateError } = await localAdminClient().from('users').upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '', onboarding: {} }, { onConflict: 'id' })
     expect(updateError).toBeNull()
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
 
     await loginToOnboarding(page, email, password)
     await page.goto('/onboarding/organization?source=org-switcher')
@@ -404,7 +471,8 @@ test.describe('Registration', () => {
 
     const writes: string[] = []
     page.on('request', (request) => {
-      if (request.method() === 'PATCH' && request.url().includes('/rest/v1/users?') && request.postDataJSON()?.last_name === 'User')
+      const query = parseConsoleQuery(request)
+      if (query?.name === 'users' && consoleQueryMethod(query) === 'PATCH' && consoleQueryPayload(query)?.last_name === 'User')
         writes.push('profile')
       if (request.method() === 'POST' && /\/organization(?:\?|$)/.test(request.url()))
         writes.push('organization')
@@ -418,27 +486,27 @@ test.describe('Registration', () => {
     await expect(page.locator('[data-test="onboarding-logo-action"]')).toBeVisible({ timeout: 60000 })
     expect(writes).toEqual(['profile', 'organization'])
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: signInError } = await capgo.auth.signInWithPassword({ email, password })
     expect(signInError).toBeNull()
-    const { data: profile, error: profileError } = await supabase.from('users')
+    const { data: profile, error: profileError } = await capgo.from('users')
       .select('first_name, last_name')
       .eq('id', signedUp.user!.id)
       .single()
     expect(profileError).toBeNull()
     expect(profile).toEqual({ first_name: 'Example', last_name: 'User' })
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
   })
 
   test('should complete a partial profile and skip both names for subsequent organizations', async ({ page }) => {
     const email = `partial-profile-e2e-${Date.now()}@example.com`
     const password = 'Password123!'
-    const supabase = createClient(localSupabaseUrl, localSupabaseAnonKey)
-    const { data: signedUp, error: signUpError } = await supabase.auth.signUp({ email, password })
+    const capgo = createClient(localSupabaseUrl, localSupabaseAnonKey)
+    const { data: signedUp, error: signUpError } = await capgo.auth.signUp({ email, password })
     expect(signUpError).toBeNull()
     const { data: seededProfile, error: updateError } = await localAdminClient().from('users').upsert({ id: signedUp.user!.id, email, first_name: 'Example', last_name: '', onboarding: {} }, { onConflict: 'id' }).select('first_name, last_name').single()
     expect(updateError).toBeNull()
     expect(seededProfile).toEqual({ first_name: 'Example', last_name: '' })
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
 
     await loginToOnboarding(page, email, password)
     await expect(page.locator('[data-test="onboarding-first-name"]')).toHaveValue('Example')
@@ -464,15 +532,15 @@ test.describe('Registration', () => {
     await createOrganization.click()
     await expect(page.locator('[data-test="onboarding-logo-action"]')).toBeVisible({ timeout: 60000 })
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: signInError } = await capgo.auth.signInWithPassword({ email, password })
     expect(signInError).toBeNull()
-    const { data: profile, error: profileError } = await supabase.from('users')
+    const { data: profile, error: profileError } = await capgo.from('users')
       .select('first_name, last_name')
       .eq('id', signedUp.user!.id)
       .single()
     expect(profileError).toBeNull()
     expect(profile).toEqual({ first_name: 'Example', last_name: 'User' })
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
 
     await page.goto('/onboarding/organization?source=org-switcher')
     await page.click('[data-test="onboarding-intent-ota"]')
@@ -484,12 +552,12 @@ test.describe('Registration', () => {
   test('should preserve an existing surname when saving the first name', async ({ page }) => {
     const email = `surname-profile-e2e-${Date.now()}@example.com`
     const password = 'Password123!'
-    const supabase = createClient(localSupabaseUrl, localSupabaseAnonKey)
-    const { data: signedUp, error: signUpError } = await supabase.auth.signUp({ email, password })
+    const capgo = createClient(localSupabaseUrl, localSupabaseAnonKey)
+    const { data: signedUp, error: signUpError } = await capgo.auth.signUp({ email, password })
     expect(signUpError).toBeNull()
     const { error: updateError } = await localAdminClient().from('users').upsert({ id: signedUp.user!.id, email, first_name: '', last_name: 'Existing', onboarding: {} }, { onConflict: 'id' })
     expect(updateError).toBeNull()
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
 
     await loginToOnboarding(page, email, password)
     await expect(page.locator('[data-test="onboarding-last-name"]')).toHaveValue('Existing')
@@ -501,15 +569,15 @@ test.describe('Registration', () => {
     await continuePastDevelopmentEnvironmentIfShown(page)
     await expect(page.locator('[data-test="app-onboarding-name"]')).toBeVisible()
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+    const { error: signInError } = await capgo.auth.signInWithPassword({ email, password })
     expect(signInError).toBeNull()
-    const { data: profile, error: profileError } = await supabase.from('users')
+    const { data: profile, error: profileError } = await capgo.from('users')
       .select('first_name, last_name')
       .eq('id', signedUp.user!.id)
       .single()
     expect(profileError).toBeNull()
     expect(profile).toEqual({ first_name: 'Example', last_name: 'Existing' })
-    await supabase.auth.signOut({ scope: 'local' })
+    await capgo.auth.signOut({ scope: 'local' })
   })
 
   test('should offer to continue or restart onboarding after a dropout', async ({ page }) => {
@@ -533,9 +601,9 @@ test.describe('Registration', () => {
     await continueFromAppNameToIcon(page)
     await Promise.all([
       page.waitForResponse((response) => {
-        if (!response.url().includes('/rest/v1/users') || response.request().method() !== 'PATCH' || !response.ok())
-          return false
-        return (response.request().postData() ?? '').includes('"step":"organization"')
+        // The onboarding step is saved through the console query endpoint (users update).
+        const query = response.ok() ? consoleQueryFromResponse(response) : null
+        return !!query && query.name === 'users' && consoleQueryMethod(query) === 'PATCH' && JSON.stringify(consoleQueryPayload(query) ?? {}).includes('"step":"organization"')
       }),
       page.click('[data-test="app-onboarding-continue"]'),
     ])
@@ -563,13 +631,12 @@ test.describe('Registration', () => {
     await expect(page.locator('[data-test="onboarding-org-name"]')).toHaveCount(0)
   })
 
-  test('should start WebNativeApp arrivals on Web2App with their website prefilled', async ({ page }) => {
+  test('should recommend WebNativeApp to treatment users publishing without existing users', async ({ page }) => {
     const uniqueSuffix = Date.now()
-    const email = `web2app-arrival-e2e-${uniqueSuffix}@example.com`
+    const email = `webnative-treatment-e2e-${uniqueSuffix}@example.com`
     const password = 'Password123!'
-    const appName = `Web2App Arrival ${uniqueSuffix}`
+    const appName = `WebNative Treatment ${uniqueSuffix}`
 
-    await page.goto('/register/?ref=webnativeapp&website=app.example.com')
     await page.fill('[data-test="email"]', email)
     await page.fill('[data-test="password"]', password)
     await page.click('[data-test="submit"]')
@@ -578,22 +645,33 @@ test.describe('Registration', () => {
     await continuePastProfileWelcome(page)
     await completeName(page)
     await expectOnboardingGoal(page)
-    const publishIntent = page.locator('[data-test="onboarding-intent-publish"]')
-    await expect(publishIntent).toBeVisible()
-    await expect(publishIntent).toContainText('Turn my website into an app')
-    await expect(publishIntent).toHaveAttribute('aria-pressed', 'true')
-    await page.click('[data-test="app-onboarding-continue-intent"]')
+    await forceWebNativeOnboardingTreatments(email, password)
+    await page.reload()
+    await expect(page.locator('[data-test="onboarding-resume-continue"]')).toBeVisible()
+    await page.locator('[data-test="onboarding-resume-continue"]').click()
 
+    await expect(page.locator('[data-test="onboarding-intent-publish"]')).toBeVisible()
+    await expect(page.locator('[data-test="onboarding-development-environment-hosted_builder"]')).toHaveCount(0)
+    await page.click('[data-test="onboarding-intent-publish"]')
+    await page.click('[data-test="app-onboarding-continue-intent"]')
+    await expect(page.locator('[data-test="onboarding-development-environment-hosted_builder"]')).toBeVisible()
+    await expect(page.locator('[data-test="onboarding-intent-publish"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="app-onboarding-skip-development-environment"]')).toBeVisible()
+    await expect(page.locator('[data-test="app-onboarding-continue-development-environment"]')).toHaveCount(0)
+    await page.click('[data-test="onboarding-development-environment-hosted_builder"]')
+    await expect(page.locator('[data-test="app-onboarding-continue-development-environment"]')).toBeVisible()
+    await page.click('[data-test="app-onboarding-continue-development-environment"]')
     await page.fill('[data-test="app-onboarding-name"]', appName)
     await continueFromAppNameToOrganization(page)
 
-    // Web2App is forced: no update-mode choice and no MAU question.
-    await expect(page.locator('[data-test="onboarding-web2app-title"]')).toBeVisible()
-    await expect(page.locator('[data-test="onboarding-update-mode-capgo"]')).toHaveCount(0)
-    await expect(page.locator('[data-test="onboarding-estimated-users"]')).toHaveCount(0)
-    await expect(page.locator('[data-test="onboarding-website-live-url"]')).toHaveValue('https://app.example.com/')
+    await page.locator('[data-test="onboarding-starting-out"]').click()
+    await expect(page.locator('[data-test="onboarding-webnative-recommendation"]')).toBeVisible()
+    await expect(page.locator('[data-test="onboarding-webnative-check-website"]')).toHaveAttribute('href', 'https://webnativeapp.com/?ref=capgo')
+    await expect(page.locator('[data-test="onboarding-create-org"]')).toHaveCount(0)
+
+    await page.click('[data-test="onboarding-webnative-continue-capgo"]')
+    await expect(page.locator('[data-test="onboarding-webnative-recommendation"]')).toHaveCount(0)
     await expect(page.locator('[data-test="onboarding-create-org"]')).toBeEnabled()
-    await expect(page.getByText(/webnative/i)).toHaveCount(0)
   })
 
   test('should allow new users to log out from org onboarding', async ({ page }) => {

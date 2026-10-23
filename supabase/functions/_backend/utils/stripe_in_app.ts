@@ -138,8 +138,16 @@ async function getSubscriptionDefaultPaymentMethod(c: Context, stripe: Stripe, c
 // newCardId is a card being saved right now: it must never be guessed as the primary.
 async function findSavedPaymentMethods(c: Context, stripe: Stripe, customerId: string, newCardId?: string) {
   const customer = await stripe.customers.retrieve(customerId, { expand: ['invoice_settings.default_payment_method'] })
-  if (customer.deleted)
-    return { defaultPaymentMethod: null, backupPaymentMethod: null, isCustomerDefault: false, spareCards: [], customerDefaultId: null }
+  if (customer.deleted) {
+    return {
+      defaultPaymentMethod: null,
+      backupPaymentMethod: null,
+      isCustomerDefault: false,
+      spareCards: [],
+      customerDefaultId: null,
+      subscriptionKnown: true,
+    }
+  }
   const [cards, subscriptionLookup] = await Promise.all([
     // Stripe's page maximum; customers never get near it, so older eligible cards are not missed.
     stripe.paymentMethods.list({ customer: customerId, type: 'card', limit: 100 }),
@@ -157,12 +165,22 @@ async function findSavedPaymentMethods(c: Context, stripe: Stripe, customerId: s
   // Cards Stripe may charge on its own (subscription card, customer default) are never spare
   // and never the removable backup: detaching the customer default would break credit auto top-up.
   const inUse = new Set([subscriptionDefault?.id, isCustomerDefault ? customerDefault.id : undefined, defaultPaymentMethod?.id])
-  const backupPaymentMethod = cards.data.find(paymentMethod => !inUse.has(paymentMethod.id)
-    && !isExpired(paymentMethod)
-    && (!defaultFingerprint || paymentMethod.card?.fingerprint !== defaultFingerprint)) ?? null
+  // Without a known subscription default, another saved card might be the live subscription card.
+  const backupPaymentMethod = subscriptionLookup.known
+    ? cards.data.find(paymentMethod => !inUse.has(paymentMethod.id)
+      && !isExpired(paymentMethod)
+      && (!defaultFingerprint || paymentMethod.card?.fingerprint !== defaultFingerprint)) ?? null
+    : null
   // Without the subscription card we cannot tell which cards are spare: detach nothing.
   const spareCards = subscriptionLookup.known ? cards.data.filter(paymentMethod => !inUse.has(paymentMethod.id)) : []
-  return { defaultPaymentMethod, backupPaymentMethod, isCustomerDefault, spareCards, customerDefaultId: isCustomerDefault ? customerDefault.id : null }
+  return {
+    defaultPaymentMethod,
+    backupPaymentMethod,
+    isCustomerDefault,
+    spareCards,
+    customerDefaultId: isCustomerDefault ? customerDefault.id : null,
+    subscriptionKnown: subscriptionLookup.known,
+  }
 }
 
 // Only one backup at a time: an older spare card must never come back as the backup.
@@ -258,10 +276,16 @@ export async function savePaymentMethodFromIntent(c: Context, ctx: InAppBillingC
   if (!paymentMethodId)
     throw simpleError('missing_payment_method', 'No card was saved')
   const paymentMethod = await ctx.stripe.paymentMethods.retrieve(paymentMethodId)
+  // Backup path resolves subscription role first so an unknown lookup never attaches or detaches.
+  const backupCards = role === 'backup'
+    ? await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId, paymentMethodId)
+    : null
+  if (backupCards && !backupCards.subscriptionKnown)
+    throw simpleError('subscription_lookup_unknown', 'Subscription payment method is temporarily unknown')
   if (paymentMethod.customer !== ctx.customerId)
     await ctx.stripe.paymentMethods.attach(paymentMethodId, { customer: ctx.customerId })
-  if (role === 'backup') {
-    const { defaultPaymentMethod, isCustomerDefault, spareCards } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId, paymentMethodId)
+  if (backupCards) {
+    const { defaultPaymentMethod, isCustomerDefault, spareCards } = backupCards
     if (defaultPaymentMethod && defaultPaymentMethod.id !== paymentMethodId) {
       const fingerprint = paymentMethod.card?.fingerprint
       if (fingerprint && fingerprint === defaultPaymentMethod.card?.fingerprint) {
@@ -302,7 +326,10 @@ export function parsePaymentMethodRole(value: unknown): PaymentMethodRole {
 
 // Only the backup can be removed: the default keeps renewals working.
 export async function removeBackupCard(c: Context, ctx: InAppBillingContext, paymentMethodId: string) {
-  const { backupPaymentMethod, spareCards, customerDefaultId } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId)
+  const { backupPaymentMethod, spareCards, customerDefaultId, subscriptionKnown } = await findSavedPaymentMethods(c, ctx.stripe, ctx.customerId)
+  // Refuse until the subscription default is verified: an unknown lookup can mislabel it as backup.
+  if (!subscriptionKnown)
+    throw simpleError('subscription_lookup_unknown', 'Subscription payment method is temporarily unknown')
   if (!backupPaymentMethod || backupPaymentMethod.id !== paymentMethodId || paymentMethodId === customerDefaultId)
     throw simpleError('invalid_payment_method', 'This card is not the backup card')
   await ctx.stripe.paymentMethods.detach(paymentMethodId)
@@ -328,7 +355,10 @@ function isCardError(error: unknown) {
 // The key is scoped to the failed charge: the webhook and Pay now share one backup charge per attempt,
 // and a later failed attempt (a new charge) is still eligible.
 export async function payInvoiceWithBackupCard(c: Context, stripe: Stripe, customerId: string, invoiceId: string, attempt: FailedAttempt = {}): Promise<BackupChargeResult> {
-  const { backupPaymentMethod } = await findSavedPaymentMethods(c, stripe, customerId)
+  const { backupPaymentMethod, subscriptionKnown } = await findSavedPaymentMethods(c, stripe, customerId)
+  // Unknown lookup: do not treat as no_backup (that would skip the webhook retry and send dunning).
+  if (!subscriptionKnown)
+    throw simpleError('subscription_lookup_unknown', 'Subscription payment method is temporarily unknown')
   if (!backupPaymentMethod)
     return 'no_backup'
   // A failed backup charge fires charge.failed again: never retry the card that just failed.
@@ -436,6 +466,13 @@ function getStripeErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Payment failed'
 }
 
+function isCapgoError(error: unknown, errorCode: string) {
+  if (!error || typeof error !== 'object' || !('cause' in error))
+    return false
+  const cause = error.cause
+  return !!cause && typeof cause === 'object' && 'error' in cause && cause.error === errorCode
+}
+
 // Only after a real decline, and only while the invoice is still open.
 async function tryBackupAfterDecline(c: Context, ctx: InAppBillingContext, invoiceId: string, attempt: FailedAttempt) {
   try {
@@ -449,6 +486,9 @@ async function tryBackupAfterDecline(c: Context, ctx: InAppBillingContext, invoi
     return await payInvoiceWithBackupCard(c, ctx.stripe, ctx.customerId, invoiceId, { chargeId: attempt.chargeId, paymentMethodId }) === 'paid'
   }
   catch (error) {
+    // Let the caller surface a retryable lookup failure instead of the primary card decline.
+    if (isCapgoError(error, 'subscription_lookup_unknown'))
+      throw error
     cloudlogErr({ requestId: c.get('requestId'), message: 'in-app backup card fallback', customerId: ctx.customerId, invoiceId, error })
     return false
   }

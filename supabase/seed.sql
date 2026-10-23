@@ -2172,7 +2172,9 @@ BEGIN
     WHERE r.name = public.rbac_role_org_super_admin()
     ON CONFLICT DO NOTHING;
 
-    -- org_admin: org management without billing updates or deletions
+    -- org_admin: org management without billing updates or org/app deletion.
+    -- Channel and bundle delete are included so Admin keys can create and clean
+    -- up channels (CI preview lifecycle) without needing Super Admin.
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r
     JOIN public.permissions p ON p.key IN (
@@ -2182,7 +2184,8 @@ BEGIN
       public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(),
       'app.manage_notifications',
       public.rbac_perm_app_build_native(), public.rbac_perm_app_read_audit(), public.rbac_perm_app_update_user_roles(), public.rbac_perm_app_manage_apikeys(),
-      public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_read_history(),
+      public.rbac_perm_bundle_delete(),
+      public.rbac_perm_channel_read(), public.rbac_perm_channel_update_settings(), public.rbac_perm_channel_delete(), public.rbac_perm_channel_read_history(),
       public.rbac_perm_channel_promote_bundle(), public.rbac_perm_channel_rollback_bundle(), public.rbac_perm_channel_manage_forced_devices(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
     )
     WHERE r.name = public.rbac_role_org_admin()
