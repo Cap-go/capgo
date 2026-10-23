@@ -41,21 +41,34 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+function capRetryDelayMs(delayMs: number): number {
+  return Math.min(Math.max(0, delayMs), CAPGO_API_MAX_RETRY_DELAY_MS)
+}
+
 function retryAfterHeaderDelayMs(response: Response): number | null {
   const retryAfter = response.headers.get('Retry-After')?.trim()
-  if (!retryAfter || !/^\d+$/.test(retryAfter))
+  if (!retryAfter)
     return null
-  const retryAfterSeconds = Number(retryAfter)
-  if (!Number.isSafeInteger(retryAfterSeconds) || retryAfterSeconds <= 0)
-    return null
-  return Math.min(retryAfterSeconds * 1000, CAPGO_API_MAX_RETRY_DELAY_MS)
+  if (/^\d+$/.test(retryAfter)) {
+    const retryAfterSeconds = Number(retryAfter)
+    if (!Number.isSafeInteger(retryAfterSeconds) || retryAfterSeconds < 0)
+      return null
+    return capRetryDelayMs(retryAfterSeconds * 1000)
+  }
+  const retryAt = Date.parse(retryAfter)
+  if (Number.isFinite(retryAt)) {
+    const waitMs = retryAt - Date.now()
+    if (waitMs >= 0)
+      return capRetryDelayMs(waitMs)
+  }
+  return null
 }
 
 function retryAfterFromPayload(payload: { moreInfo?: Record<string, unknown> } | null): number | null {
   const retryAfterSeconds = payload?.moreInfo?.retryAfterSeconds
-  if (typeof retryAfterSeconds !== 'number' || !Number.isFinite(retryAfterSeconds) || retryAfterSeconds <= 0)
+  if (typeof retryAfterSeconds !== 'number' || !Number.isFinite(retryAfterSeconds) || retryAfterSeconds < 0)
     return null
-  return Math.min(retryAfterSeconds * 1000, CAPGO_API_MAX_RETRY_DELAY_MS)
+  return capRetryDelayMs(retryAfterSeconds * 1000)
 }
 
 /** Transport failures and curated transient 503 responses from the Capgo API. */

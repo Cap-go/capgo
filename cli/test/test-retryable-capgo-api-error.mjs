@@ -27,6 +27,12 @@ assert.equal(categorizeCliError(databaseUnavailable), 'server_error')
 assert.equal(await isRetryableCapgoApiError(databaseUnavailable), true)
 assert.equal(await getCapgoApiRetryDelayMs(databaseUnavailable, 0), 2000)
 
+const immediateRetry = make503Error({
+  error: 'database_unavailable',
+  moreInfo: { retryAfterSeconds: 0 },
+}, { 'Retry-After': '0' })
+assert.equal(await getCapgoApiRetryDelayMs(immediateRetry, 0), 0)
+
 const generic503 = make503Error({ error: 'translation_unavailable' })
 assert.equal(await isRetryableCapgoApiError(generic503), false)
 
