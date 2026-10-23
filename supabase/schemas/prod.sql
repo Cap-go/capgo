@@ -29730,8 +29730,7 @@ GRANT ALL ON FUNCTION "public"."check_if_org_can_exist"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."check_org_encrypted_bundle_enforcement"("org_id" "uuid", "session_key" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."check_org_encrypted_bundle_enforcement"("org_id" "uuid", "session_key" "text") TO "authenticated";
+REVOKE ALL ON FUNCTION "public"."check_org_encrypted_bundle_enforcement"("org_id" "uuid", "session_key" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."check_org_encrypted_bundle_enforcement"("org_id" "uuid", "session_key" "text") TO "service_role";
 
 
