@@ -3,6 +3,7 @@ import type { PoolClient } from 'pg'
  * Default API keys provisioned by createApiKey() must never hold more rights
  * than their owner in any organization or app.
  */
+import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -242,6 +243,13 @@ describe('default API keys are capped at the owner rights', () => {
   })
 
   it('remediation does not fail when the org now requires API-key expiration', async () => {
+    // Test-owned org (rolled back with the transaction) so shared seed orgs are
+    // never modified.
+    const policyOrgId = randomUUID()
+    await query('INSERT INTO public.orgs(id, created_by, name, management_email) VALUES ($1, $2, $3, $4)', [policyOrgId, USER_ID, 'Default key policy test', `default-key-policy-${policyOrgId}@example.com`])
+    await query('DELETE FROM public.role_bindings WHERE org_id = $1::uuid AND principal_id = $2::uuid', [policyOrgId, USER_ID_2])
+    await bindUser(USER_ID_2, 'org_member', policyOrgId)
+
     await provisionDefaultKeys(USER_ID_2)
     await query(`
       UPDATE public.role_bindings rb
@@ -253,13 +261,13 @@ describe('default API keys are capped at the owner rights', () => {
         AND apikeys.name = 'default org admin'
         AND NOT (apikeys.id = ANY($3::bigint[]))
         AND rb.org_id = $2::uuid
-    `, [USER_ID_2, ORG_ID, preexistingKeyIds])
-    expect(await keyHasPermission(USER_ID_2, 'default org admin', 'org.update_user_roles', ORG_ID)).toBe(true)
-    await query('UPDATE public.orgs SET require_apikey_expiration = true WHERE id = $1::uuid', [ORG_ID])
+    `, [USER_ID_2, policyOrgId, preexistingKeyIds])
+    expect(await keyHasPermission(USER_ID_2, 'default org admin', 'org.update_user_roles', policyOrgId)).toBe(true)
+    await query('UPDATE public.orgs SET require_apikey_expiration = true WHERE id = $1::uuid', [policyOrgId])
 
     await query(REMEDIATION_MIGRATION_SQL)
 
-    expect(await keyHasPermission(USER_ID_2, 'default org admin', 'org.update_user_roles', ORG_ID)).toBe(false)
-    expect((await keyBindings(USER_ID_2, ORG_ID)).filter(binding => binding.name === 'default org admin')).toEqual([])
+    expect(await keyHasPermission(USER_ID_2, 'default org admin', 'org.update_user_roles', policyOrgId)).toBe(false)
+    expect((await keyBindings(USER_ID_2, policyOrgId)).filter(binding => binding.name === 'default org admin')).toEqual([])
   })
 })
