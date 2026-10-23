@@ -11,7 +11,7 @@ import IconRocket from '~icons/lucide/rocket'
 import IconTrash from '~icons/lucide/trash-2'
 import IconAndroid from '~icons/mdi/android'
 import IconApple from '~icons/mdi/apple'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
+import { defaultApiHost, useConsole } from '~/services/console'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 type StorePlatform = 'ios' | 'android'
@@ -76,7 +76,7 @@ const MAX_ICON_SIZE = 2048
 
 const { t } = useI18n()
 const route = useRoute()
-const supabase = useSupabase()
+const capgo = useConsole()
 const dialogStore = useDialogV2Store()
 
 const appId = ref('')
@@ -125,7 +125,7 @@ const iosCredentials = computed(() => state.value?.credentials.ios ?? null)
 const androidCredentials = computed(() => state.value?.credentials.android ?? null)
 
 async function authHeaders() {
-  const { data } = await supabase.auth.getSession()
+  const { data } = await capgo.auth.getSession()
   const token = data.session?.access_token
   if (!token)
     throw new Error(t('not-authenticated'))

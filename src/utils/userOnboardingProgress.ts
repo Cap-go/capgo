@@ -5,8 +5,6 @@ import type {
 } from '~/utils/onboardingProgressAnalytics'
 
 export const USER_ONBOARDING_STATUSES = ['in_progress', 'completed', 'abandoned'] as const
-// `publish_app_question` belongs to a retired question; it stays parseable so
-// saved progress resumes on the intent step.
 export const USER_ONBOARDING_STEPS = ['intent', 'publish_app_question', 'details', 'organization', 'choice', 'channel', 'install', 'setup'] as const
 export const USER_ONBOARDING_FLOWS = ['pre_org', 'existing_org'] as const
 export const USER_ONBOARDING_DEVELOPMENT_ENVIRONMENTS = ['hosted_builder', 'ai_assistant', 'hand_coded', 'other', 'local_project', 'exploring', 'skipped'] as const satisfies readonly OnboardingDevelopmentEnvironment[]
@@ -20,6 +18,8 @@ export type UserOnboardingDetailsStep = typeof USER_ONBOARDING_DETAILS_STEPS[num
 export type UserOnboardingSetupStage = typeof USER_ONBOARDING_SETUP_STAGES[number]
 
 export interface UserOnboardingProgress {
+  update_mode?: 'capgo' | 'website'
+  website_url?: string
   status: UserOnboardingStatus
   step: UserOnboardingStep
   flow: OnboardingAnalyticsFlow
@@ -37,9 +37,6 @@ export interface UserOnboardingProgress {
   imported_store_app_id?: string
   org_name?: string
   estimated_users_index?: number | null
-  // Only stored once the user picks a mode, so resume does not override the default.
-  update_mode?: 'capgo' | 'website'
-  website_url?: string
   onboarding_attempt_id?: string
   last_run_id?: string
   updated_at: string
@@ -66,18 +63,21 @@ export const USER_ONBOARDING_PROGRESS_FIELDS = {
   setup_stage: true,
   status: true,
   step: true,
-  store_url: true,
   update_mode: true,
-  updated_at: true,
   website_url: true,
+  store_url: true,
+  updated_at: true,
 } as const satisfies Record<keyof UserOnboardingProgress, true>
 
 export interface UserOnboardingProgressInput {
+  updateMode?: 'capgo' | 'website' | null
+  websiteUrl?: string
   status: UserOnboardingStatus
   step: UserOnboardingStep
   flow: OnboardingAnalyticsFlow
   developmentEnvironment?: OnboardingDevelopmentEnvironment | null
   intent?: OnboardingIntent | null
+  publishAppQuestion?: boolean
   detailsStep?: UserOnboardingDetailsStep
   finalStep?: 'setup' | 'install'
   setupStage?: UserOnboardingSetupStage
@@ -89,8 +89,6 @@ export interface UserOnboardingProgressInput {
   importedStoreAppId?: string
   orgName?: string
   estimatedUsersIndex?: number | null
-  updateMode?: 'capgo' | 'website' | null
-  websiteUrl?: string
   onboardingAttemptId?: string
   lastRunId?: string
   updatedAt?: string
@@ -212,13 +210,6 @@ function applyOptionalUserOnboardingFields(
   if (estimatedUsersIndex !== undefined)
     progress.estimated_users_index = estimatedUsersIndex
 
-  if (raw.update_mode === 'capgo' || raw.update_mode === 'website')
-    progress.update_mode = raw.update_mode
-
-  const websiteUrl = optionalTrimmedString(raw.website_url)
-  if (websiteUrl)
-    progress.website_url = websiteUrl
-
   const completedAt = optionalTrimmedString(raw.completed_at)
   if (completedAt)
     progress.completed_at = completedAt
@@ -255,6 +246,13 @@ export function parseUserOnboardingProgress(value: unknown): UserOnboardingProgr
   if (lastRunId && onboardingRunIdPattern.test(lastRunId))
     progress.last_run_id = lastRunId
 
+  if (raw.update_mode === 'capgo' || raw.update_mode === 'website')
+    progress.update_mode = raw.update_mode
+
+  const websiteUrl = optionalTrimmedString(raw.website_url)
+  if (websiteUrl)
+    progress.website_url = websiteUrl
+
   return progress
 }
 
@@ -271,6 +269,9 @@ export function buildUserOnboardingProgress(input: UserOnboardingProgressInput):
 
   if (input.intent)
     progress.intent = input.intent
+
+  if (input.publishAppQuestion || input.step === 'publish_app_question')
+    progress.publish_app_question = true
 
   if (input.detailsStep)
     progress.details_step = input.detailsStep
@@ -310,13 +311,6 @@ export function buildUserOnboardingProgress(input: UserOnboardingProgressInput):
   if (input.estimatedUsersIndex !== undefined)
     progress.estimated_users_index = input.estimatedUsersIndex
 
-  if (input.updateMode)
-    progress.update_mode = input.updateMode
-
-  const websiteUrl = optionalTrimmedString(input.websiteUrl)
-  if (websiteUrl)
-    progress.website_url = websiteUrl
-
   if (input.onboardingAttemptId && onboardingAttemptIdPattern.test(input.onboardingAttemptId))
     progress.onboarding_attempt_id = input.onboardingAttemptId
 
@@ -325,6 +319,13 @@ export function buildUserOnboardingProgress(input: UserOnboardingProgressInput):
 
   if (input.status === 'completed')
     progress.completed_at = optionalTrimmedString(input.completedAt) ?? progress.updated_at
+
+  if (input.updateMode)
+    progress.update_mode = input.updateMode
+
+  const websiteUrl = optionalTrimmedString(input.websiteUrl)
+  if (websiteUrl)
+    progress.website_url = websiteUrl
 
   return clampOnboardingPayload(progress)
 }
@@ -341,14 +342,33 @@ export function clampResumableOnboardingStep(
 export function resumableOnboardingFlowStep(
   progress: UserOnboardingProgress,
   flow: OnboardingAnalyticsFlow,
-): Exclude<UserOnboardingStep, 'publish_app_question'> {
+): UserOnboardingStep {
   const step = clampResumableOnboardingStep(progress.step, flow)
   if ((step === 'setup' || step === 'install') && (progress.setup_stage !== 'cli' || !progress.final_step))
     return 'channel'
-  // The retired development-environment question resumes on the intent step.
-  if (step === 'publish_app_question')
-    return 'intent'
+  if (progress.publish_app_question === true && (step === 'intent' || step === 'publish_app_question'))
+    return 'publish_app_question'
   return step
+}
+
+export function fallbackUsersOnboardingProgressForLegacyConstraint(
+  progress: UserOnboardingProgress,
+): UserOnboardingProgress {
+  if (progress.step !== 'publish_app_question')
+    return progress
+  return {
+    ...progress,
+    step: 'intent',
+    publish_app_question: true,
+  }
+}
+
+export function isUsersOnboardingCheckConstraintError(error: unknown): boolean {
+  if (!error || typeof error !== 'object')
+    return false
+  const { code, message } = error as { code?: unknown, message?: unknown }
+  return code === '23514'
+    || (typeof message === 'string' && message.includes('users_onboarding_valid'))
 }
 
 export function shouldPromptOnboardingResume(
