@@ -55,7 +55,7 @@ const greetingKey = dayjs().hour() < 12 ? 'good-morning' : 'good-afternoon'
     <!-- Content -->
     <div class="relative">
       <h1 class="mb-1 text-2xl font-bold md:text-3xl text-slate-800">
-        {{ t(greetingKey, { name: main.user?.first_name ?? '' }) }} 👋
+        {{ main.user?.first_name ? t(greetingKey, { name: main.user.first_name }) : t(`${greetingKey}-no-name`) }} 👋
       </h1>
       <p>{{ t('welcome-to-your-capg') }}</p>
     </div>

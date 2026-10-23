@@ -111,9 +111,7 @@ async function showDeleteConfirmationDialog(name: string, isPlural = false, askF
   }
   else {
     const baseMessage = t('alert-delete-named-confirm', { name })
-    const unsafeWarning = isPlural
-      ? t('you-are-deleting-unsafely-plural')
-      : t('you-are-deleting-unsafely')
+    const unsafeWarning = t('you-are-deleting-unsafely')
     const formattedWarning = unsafeWarning
       .replace('$1', '<b><u>')
       .replace('$2', '</u></b>')

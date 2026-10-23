@@ -105,7 +105,7 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     }
   }
 
-  const mauFeature = t('plan-mau', { count: formatNumberValue(displayedPlanMau(plan)) })
+  const mauFeature = t('plan-mau', { count: formatNumberValue(displayedPlanMau(plan)) }, displayedPlanMau(plan))
   const storageFeature = t('plan-storage', { count: formatNumberValue(plan.storage) })
   const bandwidthFeature = t('plan-bandwidth', { count: formatNumberValue(plan.bandwidth) })
 
@@ -695,7 +695,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
                 step="1"
                 class="w-full h-2 rounded-full appearance-none cursor-pointer accent-blue-600"
                 :style="{ background: `linear-gradient(to right, rgb(37 99 235) ${enterpriseSliderPercent}%, rgb(209 213 219) ${enterpriseSliderPercent}%)` }"
-                :aria-valuetext="t('plan-mau', { count: formatMau(enterpriseQuote.targetMau) })"
+                :aria-valuetext="t('plan-mau', { count: formatMau(enterpriseQuote.targetMau) }, enterpriseQuote.targetMau)"
                 :disabled="isMobile"
               >
               <div class="flex justify-between mt-1 text-[10px] text-gray-400">
