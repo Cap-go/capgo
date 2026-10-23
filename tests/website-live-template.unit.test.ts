@@ -68,6 +68,12 @@ function ensurePackedWebsiteLiveTemplate() {
     if (install.status !== 0)
       throw new Error(`website-live-app bun install failed: ${install.stderr || install.stdout || `exit ${install.status}`}`)
   }
+  // ios/App/App/public is gitignored; pack requires cap sync output (same as website_live_template.yml).
+  if (!existsSync(resolve(templateDir, 'ios/App/App/public/index.html'))) {
+    const sync = spawnSync('bunx', ['cap', 'sync'], { cwd: templateDir, encoding: 'utf8' })
+    if (sync.status !== 0)
+      throw new Error(`website-live-app cap sync failed: ${sync.stderr || sync.stdout || `exit ${sync.status}`}`)
+  }
   const pack = spawnSync('bun', ['scripts/pack-website-live-template.ts'], { cwd: repoRoot, encoding: 'utf8' })
   if (pack.status !== 0 || !existsSync(packedTemplateZip))
     throw new Error(`pack-website-live-template failed: ${pack.stderr || pack.stdout || `exit ${pack.status}`}`)

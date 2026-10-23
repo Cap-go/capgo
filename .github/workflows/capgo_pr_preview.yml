@@ -72,10 +72,12 @@ jobs:
           echo "bundle=${base_version}-pr.${PR_NUMBER}.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
       - name: Delete orphaned PR preview bundles
         timeout-minutes: 5
+        continue-on-error: true
         env:
           CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         # Failed uploads can leave R2-backed bundles that block manifest inventory on the next run.
+        # Soft-fail: a cleanup timeout must not block uploading the new PR preview bundle.
         run: bun scripts/cleanup-pr-preview-bundles.ts
       - name: Upload bundle to the PR channel
         env:
