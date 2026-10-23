@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { Json } from '~/types/supabase.types'
+import type { Json } from '~/types/database.types'
 import { onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
-import type { Database } from '~/types/supabase.types'
+import type { Database } from '~/types/database.types'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -11,9 +11,9 @@ import IconWrench from '~icons/heroicons/wrench'
 import RoleCapabilitiesHint from '~/components/forms/RoleCapabilitiesHint.vue'
 import ChannelAccessPanel from '~/components/permissions/ChannelAccessPanel.vue'
 import { invokeCapgoApi } from '~/services/capgoApi'
+import { useConsole } from '~/services/console'
 import { formatDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
-import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { getRbacRoleI18nKey } from '~/stores/organization'
 import { getErrorMessage } from '~/utils/errors'
@@ -70,7 +70,7 @@ interface PrincipalOption {
 
 const { t } = useI18n()
 const dialogStore = useDialogV2Store()
-const supabase = useSupabase()
+const capgo = useConsole()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const total = ref(0)
 const search = ref('')
@@ -124,7 +124,7 @@ function resetAssignScopeDefaults(scopeType: 'app' | 'channel') {
 
 async function loadAppInfo() {
   try {
-    const { data: dataApp } = await supabase
+    const { data: dataApp } = await capgo
       .from('apps')
       .select()
       .eq('app_id', props.appId)
@@ -158,13 +158,13 @@ async function loadAccessReferenceData() {
     return
 
   const [rolesResult, channelsResult] = await Promise.all([
-    supabase
+    capgo
       .from('roles')
       .select('id, name, scope_type, description, priority_rank')
       .in('scope_type', ['app', 'channel'])
       .eq('is_assignable', true)
       .order('priority_rank', { ascending: false }),
-    supabase
+    capgo
       .from('channels')
       .select('id, rbac_id, name')
       .eq('app_id', app.value.app_id)
@@ -254,7 +254,7 @@ async function fetchData() {
   isLoading.value = true
   try {
     // Use the secure RPC to fetch access
-    const { data, error } = await supabase
+    const { data, error } = await capgo
       .rpc('get_app_access_rbac', {
         p_app_id: app.value.id,
       })

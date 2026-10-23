@@ -7,12 +7,15 @@ interface BuildResponse { data: any[], count: number | null, error: { message: s
 const mocks = vi.hoisted(() => ({ api: vi.fn(), builds: [] as any[], onboarding: {} as Record<string, unknown>, countFailure: false, delayed: {} as Record<string, Promise<BuildResponse>> }))
 vi.mock('../src/services/capgoApi', () => ({ invokeCapgoApi: mocks.api }))
 vi.mock('../src/services/date', () => ({ formatDate: () => '' }))
-vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
+vi.mock('vue-i18n', () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+  createI18n: () => ({ global: { t: (key: string) => key }, install: () => {} }),
+}))
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('vue-sonner', () => ({ toast: { error: vi.fn() } }))
 vi.mock('../src/stores/dialogv2', () => ({ useDialogV2Store: () => ({}) }))
 vi.mock('../src/stores/organization', () => ({ useOrganizationStore: () => ({ currentOrganization: { gid: 'fixture-org' }, getOrgByAppId: () => ({ paying: true }), getAppByAppId: (appId: string) => ({ onboarding: mocks.onboarding[appId] }), awaitInitialLoad: async () => {} }) }))
-vi.mock('../src/services/supabase', () => ({ useSupabase: () => ({
+vi.mock('../src/services/console', () => ({ useConsole: () => ({
   from: () => {
     let appId = ''
     let head = false

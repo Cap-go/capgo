@@ -27,12 +27,12 @@ import IconLock from '~icons/heroicons/lock-closed'
 import BillingModal from '~/components/billing/BillingModal.vue'
 import CardFormModal from '~/components/billing/CardFormModal.vue'
 import TrialPlanPicker from '~/components/billing/TrialPlanPicker.vue'
+import { getLocalConfig, stripeEnabled } from '~/services/console'
 import { formatLocalDate } from '~/services/date'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { checkPermissions } from '~/services/permissions'
 import { pushEvent } from '~/services/posthog'
 import { formatStripeAmount, getTrialPlan, scheduleTrialPlan } from '~/services/stripe'
-import { getLocalConfig, stripeEnabled } from '~/services/supabase'
 import { isPendingOrganizationInvite, useOrganizationStore } from '~/stores/organization'
 import {
   getReachedTrialCardMilestones,
@@ -106,7 +106,7 @@ const showPicker = computed(() => (prompt.value?.plans.length ?? 0) > 1)
 function track(event: string) {
   if (!prompt.value)
     return
-  pushEvent(event, config.supaHost, {
+  pushEvent(event, config.apiHost, {
     org_id: prompt.value.orgId,
     milestone: prompt.value.milestone,
     trial_days_left: prompt.value.trialDaysLeft,
