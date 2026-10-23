@@ -263,10 +263,11 @@ BEGIN
   FROM (
     SELECT av.owner_org
     FROM public.app_versions AS av
+    INNER JOIN (
+      SELECT public.canceled_org_ids_past_grace(90) AS id
+    ) AS eligible_orgs ON eligible_orgs.id = av.owner_org
     WHERE av.deleted = false
       AND av.name NOT IN ('builtin', 'unknown')
-      AND public.canceled_org_may_receive_retention_deletion(av.owner_org, 90)
-      AND NOT public.canceled_org_retention_credit_purchase_exempt(av.owner_org)
     ORDER BY av.id
     LIMIT v_batch_size
   ) AS batch;
@@ -288,7 +289,6 @@ BEGIN
       AND av.name NOT IN ('builtin', 'unknown')
       AND av.owner_org = ANY (v_batch_org_ids)
       AND public.canceled_org_may_receive_retention_deletion(av.owner_org, 90)
-      AND NOT public.canceled_org_retention_credit_purchase_exempt(av.owner_org)
     ORDER BY av.id
     LIMIT v_batch_size
   ),
@@ -363,8 +363,9 @@ BEGIN
   FROM (
     SELECT a.owner_org
     FROM public.apps AS a
-    WHERE public.canceled_org_may_receive_retention_deletion(a.owner_org, 95)
-      AND NOT public.canceled_org_retention_credit_purchase_exempt(a.owner_org)
+    INNER JOIN (
+      SELECT public.canceled_org_ids_past_grace(95) AS id
+    ) AS eligible_orgs ON eligible_orgs.id = a.owner_org
     ORDER BY a.app_id
     LIMIT v_batch_size
   ) AS batch;
@@ -391,7 +392,6 @@ BEGIN
     LEFT JOIN public.users AS u ON u.id = a.user_id
     WHERE a.owner_org = ANY (v_batch_org_ids)
       AND public.canceled_org_may_receive_retention_deletion(a.owner_org, 95)
-      AND NOT public.canceled_org_retention_credit_purchase_exempt(a.owner_org)
     ORDER BY a.app_id
     LIMIT v_batch_size
   ),
