@@ -753,7 +753,7 @@ async function rescindInvitation(email: string) {
 async function didCancel() {
   dialogStore.openDialog({
     title: t('alert-confirm-delete'),
-    description: `${t('alert-not-reverse-message')} ${t('alert-delete-message')}?`,
+    description: t('alert-delete-member-confirm'),
     buttons: [
       {
         text: t('button-cancel'),
