@@ -2,7 +2,8 @@ import type { WebsiteLiveIconSet } from '../supabase/functions/_backend/utils/we
 import type { WebsiteLiveTemplateInput } from '../supabase/functions/_backend/utils/website_live_template.ts'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { decode, encode } from 'fast-png'
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
@@ -55,7 +56,7 @@ function input(overrides: Partial<WebsiteLiveTemplateInput> = {}): WebsiteLiveTe
   }
 }
 
-const repoRoot = resolve(__dirname, '..')
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const templateDir = resolve(repoRoot, 'templates/website-live-app')
 const packedTemplateZip = resolve(repoRoot, 'dist/website-live-template.zip')
 
