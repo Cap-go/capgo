@@ -22,10 +22,6 @@ BEGIN
   -- user-facing SECURITY DEFINER wrappers.
   IF pg_catalog.current_setting('role', true) IN ('authenticated', 'anon')
     OR v_claim_role IN ('authenticated', 'anon') THEN
-    IF TG_OP = 'UPDATE' AND NEW.email IS NOT DISTINCT FROM OLD.email THEN
-      RETURN NEW;
-    END IF;
-
     SELECT au.email INTO v_auth_email
     FROM auth.users AS au
     WHERE au.id = NEW.id;
@@ -52,7 +48,11 @@ CREATE TRIGGER enforce_users_email_from_auth
 BEFORE INSERT OR UPDATE OF email ON public.users
 FOR EACH ROW EXECUTE FUNCTION public.enforce_users_email_from_auth();
 
--- Realign profile emails that drifted from the auth email.
+-- Realign profile emails that drifted from the auth email. The on_user_update
+-- webhook is paused for this one-off statement so the previous (unverified)
+-- profile address is not pushed into Bento email-change/preference syncs.
+ALTER TABLE public.users DISABLE TRIGGER on_user_update;
+
 UPDATE public.users AS u
 SET email = au.email
 FROM auth.users AS au
@@ -60,6 +60,8 @@ WHERE au.id = u.id
   AND au.email IS NOT NULL
   AND au.email <> ''
   AND u.email IS DISTINCT FROM au.email;
+
+ALTER TABLE public.users ENABLE TRIGGER on_user_update;
 
 -- Resolve existing-account invitees from the confirmed auth email instead of
 -- the profile row. Unknown or unconfirmed addresses fall through to the

@@ -62,6 +62,17 @@ describe('public.users.email follows the auth email', () => {
 
     const { data } = await getSupabaseClient().from('users').select('email').eq('id', userId).single()
     expect(data?.email).toBe(ownEmail)
+
+    // A drifted profile email is realigned even when the client repeats it.
+    const { error: driftError } = await getSupabaseClient().from('users').update({ email: otherEmail }).eq('id', userId)
+    expect(driftError).toBeNull()
+    const repeat = await fetch(`${SUPABASE_BASE_URL}/rest/v1/users?id=eq.${userId}&select=email`, {
+      method: 'PATCH',
+      headers: restHeaders({ Prefer: 'return=representation' }),
+      body: JSON.stringify({ email: otherEmail }),
+    })
+    expect(repeat.status, await repeat.clone().text()).toBe(200)
+    expect(await repeat.json()).toEqual([{ email: ownEmail }])
   })
 
   it('stores the auth email when a client creates its own profile row', async () => {
