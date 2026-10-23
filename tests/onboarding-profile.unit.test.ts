@@ -60,10 +60,10 @@ afterEach(async () => {
 })
 
 describe('profile onboarding', () => {
-  it('always requires both names and ignores retired experiment assignments', () => {
+  it('always requires both names and keeps legacy experiment analytics versions', () => {
     expect(resolveOnboardingAnalyticsVersion({})).toBe(4)
     const abtests = { webnativeapp_publish_intent: { assigned_at: '2026-01-01', branch: 'A' } }
-    expect(resolveOnboardingAnalyticsVersion({ abtests })).toBe(4)
+    expect(resolveOnboardingAnalyticsVersion({ abtests })).toBe('5.A')
     state.user.onboarding = { version: 4 }
     const { container, profile } = mount()
     expect(container.querySelectorAll('input')).toHaveLength(2)
