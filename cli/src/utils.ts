@@ -26,6 +26,7 @@ import { buildCliRequestHeaders, validateCliRequestHeaderValue } from './analyti
 import { getGlobalAnalyticsProps } from './analytics/global-props'
 import { createTimedFetch, isApiInstrumentationEnabled } from './analytics/api-perf'
 import { CapgoApiHttpError } from './api/http-error'
+import { invokeCapgoCliApiResultWithRetry } from './shared/retryable-capgo-api-error'
 import { assertMinCliVersion } from './api/min-cli-version'
 import { sendCliEvent } from './app/debug'
 import { getActiveUploadReporter } from './bundle/reporter'
@@ -1921,11 +1922,11 @@ export async function setVersionManifest(
     name,
     manifest,
   }
-  const res = await invokeCapgoCliApi('private/set_manifest', {
+  const res = await invokeCapgoCliApiResultWithRetry(() => invokeCapgoCliApi('private/set_manifest', {
     apikey,
     body: data,
     apiHost: options?.apiHost,
-  })
+  }))
 
   if (res.error) {
     if (res.error instanceof CapgoApiHttpError) {
