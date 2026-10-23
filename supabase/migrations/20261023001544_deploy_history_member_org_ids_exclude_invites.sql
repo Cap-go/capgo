@@ -15,29 +15,28 @@ AS $$
   FROM public.org_users
   WHERE org_users.user_id = (SELECT auth.uid())
     AND org_users.is_invite IS FALSE
-    AND EXISTS (
-      SELECT 1
-      FROM public.role_bindings
-      WHERE role_bindings.org_id = org_users.org_id
-        AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
-        AND (
-          (
-            role_bindings.principal_type = public.rbac_principal_user()
-            AND role_bindings.principal_id = org_users.user_id
-          )
-          OR (
-            role_bindings.principal_type = public.rbac_principal_group()
-            AND EXISTS (
-              SELECT 1
-              FROM public.group_members
-              INNER JOIN public.groups
-                ON groups.id = group_members.group_id
-              WHERE group_members.group_id = role_bindings.principal_id
-                AND group_members.user_id = org_users.user_id
-                AND groups.org_id = org_users.org_id
-            )
-          )
-        )
+    AND (
+      EXISTS (
+        SELECT 1
+        FROM public.role_bindings
+        WHERE role_bindings.principal_type = public.rbac_principal_user()
+          AND role_bindings.principal_id = org_users.user_id
+          AND role_bindings.org_id = org_users.org_id
+          AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM public.group_members
+        INNER JOIN public.groups
+          ON groups.id = group_members.group_id
+        INNER JOIN public.role_bindings
+          ON role_bindings.principal_type = public.rbac_principal_group()
+          AND role_bindings.principal_id = group_members.group_id
+          AND role_bindings.org_id = groups.org_id
+          AND (role_bindings.expires_at IS NULL OR role_bindings.expires_at > now())
+        WHERE group_members.user_id = org_users.user_id
+          AND groups.org_id = org_users.org_id
+      )
     )
 $$;
 
