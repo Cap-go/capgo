@@ -917,8 +917,12 @@ Also applies to dialog/Teleport content, admin filters, and hidden utility input
 - `useConsole()` (`src/services/console.ts`) returns the console client
   (`src/services/consoleClient.ts`). Its `from`/`rpc`, storage, realtime and
   `functions.invoke` calls go to `/private/console/*`
-  (`supabase/functions/_backend/private/console_data.ts`), which replays them
-  with the caller's own JWT so RLS still applies.
+  (`supabase/functions/_backend/private/console_data.ts`). Table and RPC calls
+  are compiled to SQL and run through Drizzle on the primary database as the
+  caller's Postgres role (`authenticated`, or `anon` for `is_not_deleted`)
+  with the verified JWT claims set and `row_security` on, so RLS still applies.
+  Storage still uses the Supabase storage API. Do not point these queries at a
+  read replica: RLS helpers such as `auth.uid()` are not replicated.
 - Auth goes through `/private/console/auth/*`
   (`supabase/functions/_backend/private/console_auth_proxy.ts`), a relay to
   the auth provider's user-facing endpoints only (never admin). The console auth

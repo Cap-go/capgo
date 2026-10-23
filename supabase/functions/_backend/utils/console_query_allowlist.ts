@@ -1,7 +1,7 @@
 // Tables and RPCs the console is allowed to reach through /private/console/query.
 // This only bounds the surface; grants and RLS still decide record access because
-// every query runs with the caller's own JWT. tests/console-query-allowlist.unit.test.ts
-// keeps this list in sync with the console sources.
+// every query runs as the caller's Postgres role with the verified JWT claims set.
+// tests/console-query-allowlist.unit.test.ts keeps this list in sync with the console sources.
 export const CONSOLE_TABLES = new Set([
   'apikeys',
   'app_versions',
