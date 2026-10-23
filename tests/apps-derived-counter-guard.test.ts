@@ -8,6 +8,7 @@ import {
   resetAndSeedAppData,
   resetAppData,
   SUPABASE_ANON_KEY,
+  USER_ID,
 } from './test-utils.ts'
 
 if (!SUPABASE_ANON_KEY)
@@ -15,7 +16,10 @@ if (!SUPABASE_ANON_KEY)
 
 const id = randomUUID().replaceAll('-', '').slice(0, 12)
 const APPNAME = `com.app.counterguard.${id}`
+const INSERT_APP_ID = `${APPNAME}.insert`
 const DEVICE_ID = `counter-guard-${id}`
+const testOrgId = randomUUID()
+const testStripeCustomerId = `cus_counter_guard_${id}`
 
 interface AppCounters {
   channel_device_count: number
@@ -35,19 +39,27 @@ async function readCounters(): Promise<AppCounters> {
   }
 }
 
+function restHeaders(authHeaders: Record<string, string>) {
+  return {
+    ...authHeaders,
+    'apikey': SUPABASE_ANON_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+  }
+}
+
+async function parseJson(response: Response) {
+  const text = await response.text()
+  return text ? JSON.parse(text) as unknown : null
+}
+
 async function patchApp(authHeaders: Record<string, string>, body: Record<string, unknown>) {
   const response = await fetchTestRequest(getEndpointUrl(`/rest/v1/apps?app_id=eq.${APPNAME}`), {
     method: 'PATCH',
-    headers: {
-      ...authHeaders,
-      'apikey': SUPABASE_ANON_KEY,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation',
-    },
+    headers: restHeaders(authHeaders),
     body: JSON.stringify(body),
   })
-  const text = await response.text()
-  return { response, data: text ? JSON.parse(text) as unknown : null }
+  return { response, data: await parseJson(response) }
 }
 
 describe('apps derived counter guard', () => {
@@ -55,13 +67,21 @@ describe('apps derived counter guard', () => {
 
   beforeAll(async () => {
     authHeaders = await getAuthHeaders()
-    await resetAndSeedAppData(APPNAME)
+    await resetAndSeedAppData(APPNAME, {
+      orgId: testOrgId,
+      userId: USER_ID,
+      stripeCustomerId: testStripeCustomerId,
+    })
   })
 
   afterAll(async () => {
     await executeSQL('DELETE FROM public.channel_devices WHERE app_id = $1 AND device_id = $2', [APPNAME, DEVICE_ID])
+    await executeSQL('DELETE FROM public.apps WHERE app_id = $1', [INSERT_APP_ID])
     await resetAppData(APPNAME)
-  })
+    await executeSQL('DELETE FROM public.org_users WHERE org_id = $1::uuid', [testOrgId])
+    await executeSQL('DELETE FROM public.orgs WHERE id = $1::uuid', [testOrgId])
+    await executeSQL('DELETE FROM public.stripe_info WHERE customer_id = $1', [testStripeCustomerId])
+  }, 60000)
 
   it('app admin cannot change channel_device_count or manifest_bundle_count through PostgREST', async () => {
     const before = await readCounters()
@@ -81,6 +101,31 @@ describe('apps derived counter guard', () => {
     expect(Number(row.manifest_bundle_count)).toBe(before.manifest_bundle_count)
 
     expect(await readCounters()).toEqual(before)
+  })
+
+  it('app admin cannot seed counters when inserting an app through PostgREST', async () => {
+    const response = await fetchTestRequest(getEndpointUrl('/rest/v1/apps'), {
+      method: 'POST',
+      headers: { ...restHeaders(authHeaders), Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        app_id: INSERT_APP_ID,
+        name: `Counter guard insert ${id}`,
+        icon_url: '',
+        owner_org: testOrgId,
+        user_id: USER_ID,
+        channel_device_count: 50,
+        manifest_bundle_count: 50,
+      }),
+    })
+    const data = await parseJson(response)
+
+    expect(response.status, JSON.stringify(data)).toBe(201)
+    const [row] = await executeSQL<{ channel_device_count: string, manifest_bundle_count: string }>(
+      'SELECT channel_device_count, manifest_bundle_count FROM public.apps WHERE app_id = $1',
+      [INSERT_APP_ID],
+    )
+    expect(Number(row?.channel_device_count)).toBe(0)
+    expect(Number(row?.manifest_bundle_count)).toBe(0)
   })
 
   it('channel_device_count still follows channel_devices changes', async () => {

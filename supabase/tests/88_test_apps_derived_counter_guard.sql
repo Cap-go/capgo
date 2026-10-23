@@ -2,7 +2,7 @@
 -- client roles cannot write them, internal maintainers still can.
 BEGIN;
 
-SELECT plan(9);
+SELECT plan(11);
 
 CREATE TEMP TABLE tmp_apps_counter_guard_base AS
 SELECT channel_device_count, manifest_bundle_count
@@ -42,8 +42,34 @@ SELECT is(
   'app admin cannot change manifest_bundle_count'
 );
 
+-- capgkey (anon role) traffic with an all-mode key is also a client role.
 SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
+
+UPDATE public.apps
+SET channel_device_count = 777,
+    manifest_bundle_count = 777,
+    name = 'Counter guard capgkey rename'
+WHERE app_id = 'com.demo.app';
+
+SELECT set_config('request.headers', '{}', true);
 RESET ROLE;
+
+SELECT is(
+  (SELECT name FROM public.apps WHERE app_id = 'com.demo.app'),
+  'Counter guard capgkey rename'::varchar,
+  'capgkey update reached the row'
+);
+
+SELECT results_eq(
+  $$
+    SELECT channel_device_count, manifest_bundle_count
+    FROM public.apps
+    WHERE app_id = 'com.demo.app'
+  $$,
+  $$ SELECT channel_device_count, manifest_bundle_count FROM tmp_apps_counter_guard_base $$,
+  'capgkey (anon) cannot change counters'
+);
 
 -- Legit maintainer: channel_devices insert -> queue -> processor.
 INSERT INTO public.channel_devices (channel_id, app_id, device_id, owner_org)
@@ -64,7 +90,12 @@ SELECT is(
   'channel_device_count still follows channel_devices changes'
 );
 
--- SECURITY DEFINER rollup maintainer (runs as its owner).
+-- SECURITY DEFINER rollup maintainer (runs as its owner). Desync the counter
+-- first so the assertion proves the rollup rewrote it.
+UPDATE public.apps
+SET channel_device_count = 12345
+WHERE app_id = 'com.demo.app';
+
 SELECT public.refresh_app_rollups_after_demo_reset(
   (SELECT id FROM public.apps WHERE app_id = 'com.demo.app'),
   'com.demo.app',
