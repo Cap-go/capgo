@@ -161,7 +161,8 @@ function getWebsiteLiveCacheTag(appId) {
 function getWebsiteLiveAppId(request, url) {
   if (request.method !== 'GET' || url.pathname !== WEBSITE_LIVE_PATH)
     return null
-  const appId = url.searchParams.get('app_id')
+  // Same trim as the worker: padded app_id must share the purge Cache-Tag.
+  const appId = url.searchParams.get('app_id')?.trim() ?? ''
   return appId && appId.length <= 256 ? appId : null
 }
 

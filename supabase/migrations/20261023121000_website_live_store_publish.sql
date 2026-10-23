@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS public.website_live_store_credentials (
   secret_ciphertext text NOT NULL,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
   created_by uuid,
+  updated_by uuid,
   CONSTRAINT website_live_store_credentials_platform_check CHECK (platform IN ('ios', 'android')),
   CONSTRAINT website_live_store_credentials_app_platform_key UNIQUE (app_id, platform)
 );

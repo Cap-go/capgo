@@ -301,13 +301,13 @@ async function saveStoreSecret(c: Context, input: {
   const ciphertext = await encryptStoreSecret(c, input.secret)
   return withDb(c, async (db) => {
     const result = await db.execute(sql`
-      INSERT INTO public.website_live_store_credentials (app_id, platform, secret_ciphertext, metadata, created_by)
-      VALUES (${input.appId}, ${input.platform}, ${ciphertext}, ${JSON.stringify(input.metadata)}::jsonb, ${input.userId}::uuid)
+      INSERT INTO public.website_live_store_credentials (app_id, platform, secret_ciphertext, metadata, created_by, updated_by)
+      VALUES (${input.appId}, ${input.platform}, ${ciphertext}, ${JSON.stringify(input.metadata)}::jsonb, ${input.userId}::uuid, ${input.userId}::uuid)
       ON CONFLICT (app_id, platform) DO UPDATE SET
         updated_at = now(),
         secret_ciphertext = EXCLUDED.secret_ciphertext,
         metadata = EXCLUDED.metadata,
-        created_by = EXCLUDED.created_by
+        updated_by = EXCLUDED.updated_by
       RETURNING platform, updated_at, metadata
     `)
     return result.rows[0] as unknown as StoreCredentialSummary
@@ -633,7 +633,8 @@ export async function exportAndroidKeystore(c: Context, appId: string) {
 const ICON_BUCKET = 'images'
 
 function iconPrefix(app: WebsiteLiveApp): string {
-  return `org/${app.owner_org}/${app.app_id}/website_live/${crypto.randomUUID()}`
+  // Stable prefix so regenerations overwrite the same objects (no orphan UUID trees).
+  return `org/${app.owner_org}/${app.app_id}/website_live/icons`
 }
 
 async function putStorageObject(c: Context, key: string, bytes: Uint8Array, contentType: string) {

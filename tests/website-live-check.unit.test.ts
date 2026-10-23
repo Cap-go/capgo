@@ -175,7 +175,8 @@ describe('website live check', () => {
   it('accepts statically generated Nuxt sites and rejects Nuxt SSR', async () => {
     const generated = site({ 'https://app.example.com/': { body: '<html><head><meta name="viewport" content="width=device-width"></head><body><div id="__nuxt" data-server-rendered="true"></div><script>window.__NUXT__={staticAssetsBase:"/_nuxt/static/1"}</script></body></html>' } })
     expect(statusOf(await checkWebsiteLive('https://app.example.com/', generated.fetchImpl), 'static_shell')).toBe('pass')
-    const prerendered = site({ 'https://app.example.com/': { body: '<html><body><div id="__nuxt"></div><script type="application/json" id="__NUXT_DATA__" data-ssr="true">[{"prerenderedAt":1}]</script></body></html>' } })
+    // Include Nuxt SSR markers so the static exception (prerenderedAt) is what keeps this passing.
+    const prerendered = site({ 'https://app.example.com/': { body: '<html><body><div id="__nuxt" data-server-rendered="true"></div><script>window.__NUXT__={}</script><script type="application/json" id="__NUXT_DATA__" data-ssr="true">[{"prerenderedAt":1}]</script></body></html>' } })
     expect(statusOf(await checkWebsiteLive('https://app.example.com/', prerendered.fetchImpl), 'static_shell')).toBe('pass')
     const ssr = site({ 'https://app.example.com/': { body: '<html><body><div id="__nuxt" data-server-rendered="true"></div><script>window.__NUXT__={serverRendered:true}</script></body></html>' } })
     expect(statusOf(await checkWebsiteLive('https://app.example.com/', ssr.fetchImpl), 'static_shell')).toBe('fail')
