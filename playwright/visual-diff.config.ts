@@ -82,14 +82,12 @@ async function prepareProfileResumeScreenshot(page: Page) {
 }
 
 async function prepareAiOnboardingScreenshot(page: Page, setupMode: 'ai' | null) {
-  await page.route('**/rest/v1/users?*', async (route) => {
-    if (route.request().method() !== 'GET')
-      return route.fulfill({ json: [] })
-    const response = await route.fetch()
-    const json = await response.json()
-    const onboarding = { profile_completed_at: '2026-10-20T10:00:00.000Z', ...(setupMode ? { setup_mode: setupMode } : {}) }
-    const profile = (row: any) => ({ ...row, first_name: 'Example', last_name: 'User', onboarding })
-    await route.fulfill({ response, json: Array.isArray(json) ? json.map(profile) : profile(json) })
+  // Console reads users via Capgo `/console/query`, not PostgREST.
+  const onboarding = { profile_completed_at: '2026-10-20T10:00:00.000Z', ...(setupMode ? { setup_mode: setupMode } : {}) }
+  await routeConsoleQuery(page, 'users', async (route, query) => {
+    if (consoleQueryMethod(query) !== 'GET')
+      return route.fulfill(consoleQueryJson(consoleQueryRows(query, [])))
+    await forwardConsoleQuery(route, (row: any) => ({ ...row, first_name: 'Example', last_name: 'User', onboarding }))
   })
   await page.reload()
   // The base commit has no setup choice yet; only the head capture can wait for it.
@@ -448,9 +446,12 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     path: '/onboarding/ai',
     auth: true,
     prepare: async (page) => {
-      // Show the waiting state: the seeded org already owns apps.
-      // Match the prompt page's own app lookup whether or not the select list is percent-encoded.
-      await page.route(url => url.pathname.endsWith('/rest/v1/apps') && /^app_id,name$/.test(url.searchParams.get('select') ?? ''), route => route.fulfill({ json: [] }))
+      // Waiting state: hide seeded apps so the AI onboarding page keeps polling.
+      await routeConsoleQuery(page, 'apps', async (route, query) => {
+        if (consoleQueryMethod(query) === 'GET')
+          return route.fulfill(consoleQueryJson(consoleQueryRows(query, [])))
+        return route.fallback()
+      })
       // The first load may already have found the seeded app and moved on, so open the page again.
       await page.goto('/onboarding/ai')
       if (process.env.VISUAL_DIFF_PHASE === 'after')
