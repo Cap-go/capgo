@@ -14,7 +14,8 @@
 --      callers resolving an API-key owner (e.g. get_orgs_v7, cli helpers);
 --    - checking yourself: allowed;
 --    - checking someone else: the caller must hold org.read on the resolved
---      target org (same rule as get_org_user_access_rbac). Org-less scopes are
+--      target org (same rule as get_org_user_access_rbac), evaluated with the
+--      same password-policy mode as the calling checker. Org-less scopes are
 --      denied for other users.
 -- 2) The user path of both direct checkers calls the helper before any 2FA,
 --    password-policy or role evaluation and returns false when it denies.
@@ -26,7 +27,8 @@
 
 CREATE OR REPLACE FUNCTION public.rbac_caller_can_check_user_permission(
   p_target_user_id uuid,
-  p_org_id uuid
+  p_org_id uuid,
+  p_skip_password_policy boolean DEFAULT false
 )
 RETURNS boolean
 LANGUAGE plpgsql
@@ -52,6 +54,19 @@ BEGIN
     RETURN false;
   END IF;
 
+  -- Use the same gate mode as the checker that called us, so the
+  -- no-password-policy variant does not become password-gated here.
+  IF p_skip_password_policy THEN
+    RETURN public.rbac_check_permission_direct_no_password_policy(
+      public.rbac_perm_org_read(),
+      v_caller_id,
+      p_org_id,
+      NULL::character varying,
+      NULL::bigint,
+      NULL::text
+    );
+  END IF;
+
   RETURN public.rbac_check_permission_direct(
     public.rbac_perm_org_read(),
     v_caller_id,
@@ -63,14 +78,14 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.rbac_caller_can_check_user_permission(uuid, uuid) OWNER TO postgres;
+ALTER FUNCTION public.rbac_caller_can_check_user_permission(uuid, uuid, boolean) OWNER TO postgres;
 
-REVOKE ALL ON FUNCTION public.rbac_caller_can_check_user_permission(uuid, uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.rbac_caller_can_check_user_permission(uuid, uuid) FROM anon;
-REVOKE ALL ON FUNCTION public.rbac_caller_can_check_user_permission(uuid, uuid) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.rbac_caller_can_check_user_permission(uuid, uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.rbac_caller_can_check_user_permission(uuid, uuid, boolean) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rbac_caller_can_check_user_permission(uuid, uuid, boolean) FROM anon;
+REVOKE ALL ON FUNCTION public.rbac_caller_can_check_user_permission(uuid, uuid, boolean) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.rbac_caller_can_check_user_permission(uuid, uuid, boolean) TO service_role;
 
-COMMENT ON FUNCTION public.rbac_caller_can_check_user_permission(uuid, uuid) IS
+COMMENT ON FUNCTION public.rbac_caller_can_check_user_permission(uuid, uuid, boolean) IS
   'Internal guard for direct RBAC user checks. True for internal roles, sessions without an end-user JWT, and self checks; otherwise the JWT caller must hold org.read on the target org.';
 
 CREATE OR REPLACE FUNCTION public.rbac_check_permission_direct(
@@ -287,7 +302,7 @@ BEGIN
 
   -- A JWT session may only inspect another user's permissions inside an org
   -- it can read. Runs before the 2FA gate so nothing leaks.
-  IF NOT public.rbac_caller_can_check_user_permission(v_effective_user_id, v_effective_org_id) THEN
+  IF NOT public.rbac_caller_can_check_user_permission(v_effective_user_id, v_effective_org_id, true) THEN
     RETURN false;
   END IF;
 

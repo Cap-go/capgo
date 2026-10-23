@@ -4,6 +4,7 @@ import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
+  getPostgresClient,
   getSupabaseClient,
   ORG_ID,
   ORG_ID_2,
@@ -118,6 +119,57 @@ describe.skipIf(USE_CLOUDFLARE_WORKERS)('direct RBAC checks are bound to the cal
     // A blocked member looks up who can grant access (RbacPermissionOnlyModal).
     expect(await directCheck(member, 'rbac_check_permission_direct', 'org.update_user_roles', ORG_ADMIN_USER_ID, { orgId: ORG_ID })).toBe(true)
     expect(await directCheck(member, 'rbac_check_permission_direct_no_password_policy', 'org.update_user_roles', USER_ID, { orgId: ORG_ID })).toBe(true)
+  })
+
+  it('keeps the no-password-policy variant ungated by the caller\'s password policy', async () => {
+    const pool = await getPostgresClient()
+    const client = await pool.connect()
+    const orgId = randomUUID()
+    const claims = JSON.stringify({ sub: USER_ID, role: 'authenticated' })
+
+    try {
+      await client.query('BEGIN')
+      // The org creator (USER_ID) gets org_super_admin but has no password
+      // compliance record, so they fail this org's password policy.
+      await client.query(
+        `INSERT INTO public.orgs (id, name, management_email, created_by, password_policy_config)
+         VALUES ($1::uuid, $2, $3, $4::uuid, $5::jsonb)`,
+        [orgId, `rbac-direct-pp-${orgId}`, USER_EMAIL, USER_ID, JSON.stringify({
+          enabled: true,
+          min_length: 10,
+          require_uppercase: true,
+          require_number: true,
+          require_special: true,
+        })],
+      )
+      await client.query(
+        `INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
+         SELECT public.rbac_principal_user(), $1::uuid, r.id, public.rbac_scope_org(), $2::uuid, $3::uuid
+         FROM public.roles r
+         WHERE r.name = 'org_member'`,
+        [ORG_ADMIN_USER_ID, orgId, USER_ID],
+      )
+      await client.query(
+        `SELECT set_config('request.jwt.claims', $1, true),
+                set_config('request.jwt.claim.sub', $2, true),
+                set_config('request.jwt.claim.role', 'authenticated', true)`,
+        [claims, USER_ID],
+      )
+      await client.query('SET LOCAL ROLE authenticated')
+
+      const { rows } = await client.query(
+        `SELECT
+           public.rbac_check_permission_direct('org.read', $1::uuid, $2::uuid, NULL, NULL) AS gated,
+           public.rbac_check_permission_direct_no_password_policy('org.read', $1::uuid, $2::uuid, NULL, NULL) AS ungated`,
+        [ORG_ADMIN_USER_ID, orgId],
+      )
+      expect(rows[0].gated).toBe(false)
+      expect(rows[0].ungated).toBe(true)
+    }
+    finally {
+      await client.query('ROLLBACK')
+      client.release()
+    }
   })
 
   it('does not expose arbitrary-user admin probes to signed-in users', async () => {
