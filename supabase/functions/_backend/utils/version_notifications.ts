@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import { bypassHyperdriveCache } from '../plugin_runtime/utils/hyperdriveFreshRead.ts'
 import { closeClient, getPgClient } from './pg.ts'
 
 /** Check the exact queued entity, independently of the app's onboarding state. */
@@ -6,7 +7,7 @@ export async function shouldSkipVersionNotifications(c: Context, appId: string, 
   // Read the primary: replica lag must not make a newly created version look absent.
   const client = await getPgClient(c)
   try {
-    const { rows } = await client.query<{ skip_notifications: boolean }>(`
+    const { rows } = await client.query<{ skip_notifications: boolean }>(bypassHyperdriveCache(`
       SELECT (
         COALESCE(v.deleted, false) OR v.deleted_at IS NOT NULL
         OR EXISTS (
@@ -43,7 +44,7 @@ export async function shouldSkipVersionNotifications(c: Context, appId: string, 
           WHERE deployment.id = $3 AND deployment.app_id = v.app_id
             AND deployment.version_id = v.id
         ))
-    `, [versionId, appId, deploymentId ?? null])
+    `), [versionId, appId, deploymentId ?? null])
 
     // Demo reset removes both the entity and its provenance. Old queue messages
     // for removed entities must not resurrect milestone notifications.

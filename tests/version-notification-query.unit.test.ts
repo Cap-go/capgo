@@ -72,6 +72,24 @@ describe('version notification provenance on Postgres', () => {
     expect(await shouldSkipVersionNotifications(context, 'nonexistent.app', Number.MAX_SAFE_INTEGER)).toBe(true)
   })
 
+  it('reads fresh eligibility after a version changes behind a Hyperdrive query cache', async () => {
+    const cache = new Map<string, Awaited<ReturnType<typeof database.query>>>()
+    mocks.query.mockImplementation(async (sql: string, params: unknown[]) => {
+      const key = JSON.stringify([sql, params])
+      // Hyperdrive excludes queries containing stable functions such as now().
+      const cacheable = !/\bnow\s*\(/i.test(sql)
+      if (cacheable && cache.has(key))
+        return cache.get(key)
+      const result = await database.query(sql, params)
+      if (cacheable)
+        cache.set(key, result)
+      return result
+    })
+    expect(await shouldSkipVersionNotifications(context, appId, 123)).toBe(false)
+    await database.exec('UPDATE public.app_versions SET deleted = true WHERE id = 123')
+    expect(await shouldSkipVersionNotifications(context, appId, 123)).toBe(true)
+  })
+
   it('propagates a rejected primary query and still closes the client', async () => {
     const failure = new Error('temporary primary query failure')
     mocks.query.mockRejectedValueOnce(failure)
