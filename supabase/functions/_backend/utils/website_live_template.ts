@@ -438,8 +438,9 @@ function patchCapacitorJson(text: string, path: string, manifest: WebsiteLiveTem
   patched.appId = input.bundleId
   patched.appName = input.appName
   const updater = patched.plugins?.CapacitorUpdater
-  if (updater && typeof updater === 'object')
-    updater.appId = input.capgoAppId
+  if (!updater || typeof updater !== 'object')
+    throw simpleError('template_patch_failed', `Template ${path} is missing plugins.CapacitorUpdater`, { path })
+  updater.appId = input.capgoAppId
   const indent = /\n(\s+)"/.exec(text)?.[1] ?? '  '
   return `${JSON.stringify(patched, null, indent)}${text.endsWith('\n') ? '\n' : ''}`
 }

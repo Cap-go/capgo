@@ -409,19 +409,13 @@ export async function createDistributionCertificate(creds: AscCredentials): Prom
   }
   catch (error) {
     const message = error instanceof Error ? error.message : ''
-    const definite = /maximum number of certificates|already have a current .*certificate/i.test(message)
-    const ambiguous = message.includes('ENTITY_ERROR.ATTRIBUTE.INVALID') || message.includes('There is a problem with the request entity')
-    if (definite || ambiguous) {
+    if (/maximum number of certificates|already have a current .*certificate/i.test(message)) {
       let existing: AscCertificateSummary[] = []
       try {
         existing = await listDistributionCertificates(token)
       }
-      catch {
-        if (!definite)
-          throw error
-      }
-      if (definite || existing.length > 0)
-        throw new AscCertificateLimitError(existing)
+      catch {}
+      throw new AscCertificateLimitError(existing)
     }
     throw error
   }
@@ -459,9 +453,10 @@ export async function createAppStoreProfile(
 ): Promise<AppStoreProfileResult> {
   const token = await createAscToken(creds)
   const existing = await ascFetch(token, `/profiles?filter[name]=${encodeURIComponent(name)}&limit=200`)
+  const staleProfileIds: string[] = []
   for (const profile of existing?.data ?? []) {
-    if (profile?.attributes?.name === name)
-      await ascFetch(token, `/profiles/${encodeURIComponent(String(profile.id))}`, { method: 'DELETE' })
+    if (profile?.attributes?.name === name && profile?.id)
+      staleProfileIds.push(String(profile.id))
   }
 
   const body = await ascFetch(token, '/profiles', {
@@ -480,6 +475,10 @@ export async function createAppStoreProfile(
   const profileContentBase64: unknown = body?.data?.attributes?.profileContent
   if (!body?.data?.id || typeof profileContentBase64 !== 'string')
     quickError(502, 'asc_invalid_response', 'App Store Connect did not return the created provisioning profile')
+  for (const profileId of staleProfileIds) {
+    if (profileId !== String(body.data.id))
+      await ascFetch(token, `/profiles/${encodeURIComponent(profileId)}`, { method: 'DELETE' })
+  }
   return {
     profileId: String(body.data.id),
     name: String(body.data.attributes?.name ?? name),

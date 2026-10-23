@@ -5,7 +5,7 @@ Native iOS and Android shell used by the Capgo **Web2App** plan, which turns a c
 The app is a Capacitor 8 project with `@capgo/capacitor-updater` in **website mode**:
 
 - `www/index.html` is a small offline/loading page. It is the built-in bundle and has no external assets.
-- When the app launches or resumes, the plugin calls `GET https://plugin.capgo.app/website_live?app_id=<appId>`. The response is `{ allowed, mode, website_url, check_interval_seconds }`.
+- When the app launches or resumes, the plugin calls `GET https://plugin.capgo.app/website_live?app_id=<appId>`. Allowed responses are `{ allowed: true, mode: 'website', website_url, check_interval_seconds }`. Denied responses omit `website_url` and may include an optional `reason` (`full_capgo`, `need_plan_upgrade`, or `missing_website_url`) plus `check_interval_seconds` when the app stays in website mode.
 - If the website is allowed, the plugin downloads the entry HTML and the same-origin assets of `website_url` into a local bundle and applies it right away. Capgo does not host any bundle bytes.
 - The customer website must call `CapacitorUpdater.notifyAppReady()` within `appReadyTimeout`. Otherwise the plugin rolls back and skips that website version for 24 hours.
 

@@ -65,16 +65,21 @@ function arrivalStorage(): Storage | null {
 }
 
 // Kept across redirects that drop the query string, such as /onboarding/name.
-export function rememberWeb2AppArrival(arrival: Web2AppArrival, now = Date.now()) {
+// Scoped to `userId` so one account's referral cannot leak into another on the same browser.
+export function rememberWeb2AppArrival(arrival: Web2AppArrival, now = Date.now(), userId?: string | null) {
   try {
-    arrivalStorage()?.setItem(WEB2APP_ARRIVAL_STORAGE_KEY, JSON.stringify({ ...arrival, savedAt: now }))
+    arrivalStorage()?.setItem(WEB2APP_ARRIVAL_STORAGE_KEY, JSON.stringify({
+      ...arrival,
+      savedAt: now,
+      userId: userId ?? null,
+    }))
   }
   catch {
     // Private mode or a full quota: the query string still covers the direct path.
   }
 }
 
-export function readRememberedWeb2AppArrival(now = Date.now()): Web2AppArrival | null {
+export function readRememberedWeb2AppArrival(now = Date.now(), userId?: string | null): Web2AppArrival | null {
   let raw: string | null = null
   try {
     raw = arrivalStorage()?.getItem(WEB2APP_ARRIVAL_STORAGE_KEY) ?? null
@@ -88,8 +93,19 @@ export function readRememberedWeb2AppArrival(now = Date.now()): Web2AppArrival |
     const parsed: unknown = JSON.parse(raw)
     if (typeof parsed !== 'object' || parsed === null)
       return null
-    const { savedAt, websiteUrl } = parsed as { savedAt?: unknown, websiteUrl?: unknown }
+    const { savedAt, websiteUrl, userId: savedUserId } = parsed as {
+      savedAt?: unknown
+      websiteUrl?: unknown
+      userId?: unknown
+    }
     if (typeof savedAt !== 'number' || now - savedAt > WEB2APP_ARRIVAL_MAX_AGE_MS || savedAt > now)
+      return null
+    // Entries without a userId are legacy; ignore them so they cannot cross accounts.
+    if (typeof savedUserId !== 'string' || !savedUserId)
+      return null
+    if (userId && savedUserId !== userId)
+      return null
+    if (!userId)
       return null
     return { websiteUrl: typeof websiteUrl === 'string' ? normalizeWebsiteLiveUrl(websiteUrl) : null }
   }

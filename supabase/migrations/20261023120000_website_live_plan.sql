@@ -82,7 +82,7 @@ ALTER TABLE public.apps
 ALTER TABLE public.apps
   DROP CONSTRAINT IF EXISTS apps_update_mode_check;
 ALTER TABLE public.apps
-  ADD CONSTRAINT apps_update_mode_check CHECK (update_mode IN ('capgo', 'website'));
+  ADD CONSTRAINT apps_update_mode_check CHECK (update_mode IN ('capgo', 'website')) NOT VALID;
 
 ALTER TABLE public.apps
   DROP CONSTRAINT IF EXISTS apps_website_url_check;
@@ -94,13 +94,21 @@ ALTER TABLE public.apps
       -- Root of the domain only: the updater stores files relative to the bundle root.
       -- Public domain names only (no IP literals, localhost or single-label hosts).
       AND website_url ~ '^https://([A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+([A-Za-z]{2,63}|xn--[A-Za-z0-9-]{1,59})(:[0-9]{1,5})?/?$'
+      AND (
+        website_url !~ ':[0-9]'
+        OR pg_catalog.substring(website_url from ':(\d+)')::integer <= 65535
+      )
     )
-  );
+  ) NOT VALID;
 
 ALTER TABLE public.apps
   DROP CONSTRAINT IF EXISTS apps_website_mode_requires_url;
 ALTER TABLE public.apps
-  ADD CONSTRAINT apps_website_mode_requires_url CHECK (update_mode <> 'website' OR website_url IS NOT NULL);
+  ADD CONSTRAINT apps_website_mode_requires_url CHECK (update_mode <> 'website' OR website_url IS NOT NULL) NOT VALID;
+
+ALTER TABLE public.apps VALIDATE CONSTRAINT apps_update_mode_check;
+ALTER TABLE public.apps VALIDATE CONSTRAINT apps_website_url_check;
+ALTER TABLE public.apps VALIDATE CONSTRAINT apps_website_mode_requires_url;
 
 COMMENT ON COLUMN public.apps.update_mode IS
   'capgo: classic Capgo updates (bundles, channels, stats). website: Web2App, the updater downloads the static site at website_url after GET /website_live allows it.';
@@ -110,6 +118,10 @@ COMMENT ON COLUMN public.apps.website_url IS
 -- 3) Purge the plugin edge cache (incl. /website_live answers) when the update
 -- mode or website URL changes. Same function as 20261004012047 plus the two
 -- new apps columns in the change detection tuple.
+-- Trial-based plan_valid flips at 00:00 UTC on trial_at::date without a
+-- stripe_info write, so /website_live (and other plugin caches on this tag)
+-- must cap TTL at that boundary (planValidityTtlCapSeconds); purge alone is
+-- not enough on the date rollover.
 CREATE OR REPLACE FUNCTION public.invalidate_updates_edge_cache()
 RETURNS trigger
 LANGUAGE plpgsql

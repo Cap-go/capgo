@@ -181,7 +181,9 @@ onMounted(async () => {
   }
   void loadAppSettingIcon(rawIconUrl, iconLoadRun)
   initializeRetentionPreset()
-  await loadChannels()
+  // Web2App hides channel controls; skip the channels fetch.
+  if (!appUpdateModeStore.isWebsiteMode(props.appId))
+    await loadChannels()
   isLoading.value = false
   isFirstLoading.value = false
 })

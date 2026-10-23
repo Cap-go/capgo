@@ -325,14 +325,26 @@ export async function deleteStoreCredential(c: Context, appId: string, platform:
   })
 }
 
+function isUnexpiredCertificateExpiresAt(value: unknown): boolean {
+  if (value == null || value === '')
+    return false
+  const expiresAt = Date.parse(String(value))
+  return Number.isFinite(expiresAt) && expiresAt > Date.now()
+}
+
+interface ReusableIosCertificate {
+  secret: IosStoreSecret
+  certificateExpiresAt: string | null
+}
+
 /**
  * Apple allows very few distribution certificates per team, so automatic
  * signing reuses one already created for another app of the same org and team.
  */
-async function findReusableIosCertificate(c: Context, ownerOrg: string, appId: string, ascIssuerId: string): Promise<IosStoreSecret | null> {
+async function findReusableIosCertificate(c: Context, ownerOrg: string, appId: string, ascIssuerId: string): Promise<ReusableIosCertificate | null> {
   const rows = await withDb(c, async (db) => {
     const result = await db.execute(sql`
-      SELECT credentials.secret_ciphertext
+      SELECT credentials.secret_ciphertext, credentials.metadata ->> 'certificate_expires_at' AS certificate_expires_at
       FROM public.website_live_store_credentials credentials
       JOIN public.apps apps ON apps.app_id = credentials.app_id
       WHERE apps.owner_org = ${ownerOrg}::uuid
@@ -340,22 +352,44 @@ async function findReusableIosCertificate(c: Context, ownerOrg: string, appId: s
         AND credentials.platform = 'ios'
         AND credentials.metadata ->> 'mode' = 'automatic'
         AND credentials.metadata ->> 'asc_issuer_id' = ${ascIssuerId}
+        AND credentials.metadata ->> 'certificate_expires_at' IS NOT NULL
+        AND (credentials.metadata ->> 'certificate_expires_at')::timestamptz > now()
       ORDER BY credentials.updated_at DESC
       LIMIT 5
     `)
-    return result.rows as { secret_ciphertext: string }[]
+    return result.rows as { secret_ciphertext: string, certificate_expires_at: string | null }[]
   })
   for (const row of rows) {
+    if (!isUnexpiredCertificateExpiresAt(row.certificate_expires_at))
+      continue
     try {
       const secret = await decryptStoreSecret<IosStoreSecret>(c, row.secret_ciphertext)
-      if (secret.certificateId && secret.certificateP12Base64)
-        return secret
+      if (secret.certificateId && secret.certificateP12Base64) {
+        return {
+          secret,
+          certificateExpiresAt: row.certificate_expires_at,
+        }
+      }
     }
     catch (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot read reusable iOS certificate', error })
     }
   }
   return null
+}
+
+async function findExistingAppIosCertificate(c: Context, appId: string): Promise<ReusableIosCertificate | null> {
+  const summary = (await listStoreCredentialSummaries(c, appId)).find(row => row.platform === 'ios')
+  const certificateExpiresAt = summary?.metadata?.certificate_expires_at
+  if (certificateExpiresAt != null && !isUnexpiredCertificateExpiresAt(certificateExpiresAt))
+    return null
+  const secret = await getStoreSecret<IosStoreSecret>(c, appId, 'ios')
+  if (secret?.mode !== 'automatic' || !secret.certificateId || !secret.certificateP12Base64)
+    return null
+  return {
+    secret,
+    certificateExpiresAt: typeof certificateExpiresAt === 'string' ? certificateExpiresAt : null,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -418,13 +452,16 @@ export async function saveIosCredentials(c: Context, input: {
   }
   else {
     const bundleIdResourceId = await ensureAscBundleId(ascCreds, bundleId, input.app.name || bundleId)
-    // An issuer ID belongs to one Apple team: reuse the certificate made for another app of this org.
-    let certificate = await findReusableIosCertificate(c, input.app.owner_org, input.app.app_id, input.ascIssuerId)
-    let certificateId = certificate?.certificateId
-    let teamId = certificate?.teamId ?? ''
-    let p12Base64 = certificate?.certificateP12Base64
-    let p12Password = certificate?.certificatePassword
-    if (!certificate) {
+    // Reuse this app's distribution cert when re-saving; otherwise borrow from another app on the same team.
+    const reusable = (await findExistingAppIosCertificate(c, input.app.app_id))
+      ?? (await findReusableIosCertificate(c, input.app.owner_org, input.app.app_id, input.ascIssuerId))
+    let certificateId = reusable?.secret.certificateId
+    let teamId = reusable?.secret.teamId ?? ''
+    let p12Base64 = reusable?.secret.certificateP12Base64
+    let p12Password = reusable?.secret.certificatePassword
+    if (reusable?.certificateExpiresAt)
+      certificateExpiresAt = reusable.certificateExpiresAt
+    if (!reusable) {
       try {
         const created = await createDistributionCertificate(ascCreds)
         certificateId = created.certificateId
@@ -449,7 +486,6 @@ export async function saveIosCredentials(c: Context, input: {
     })
     const parsedProfile = parseMobileProvision(profile.profileContentBase64)
     profileExpiresAt = parsedProfile.expirationDate
-    certificate = null
     secret = {
       mode: 'automatic',
       ascKeyId: input.ascKeyId,
@@ -522,6 +558,8 @@ export async function saveAndroidCredentials(c: Context, input: {
     generatedKeystore = { keystoreBase64: generated.keystoreBase64, keyAlias: generated.alias, password: generated.storePassword }
   }
   else if (input.keystoreBase64) {
+    if (existing)
+      throw simpleError('android_keystore_exists', 'This app already has an upload key. Delete it first if you really want a new one; Google Play only accepts the key it already knows.')
     if (!input.keyAlias || !input.storePassword)
       throw simpleError('missing_android_keystore_fields', 'Key alias and keystore password are required with an uploaded keystore')
     secret = {

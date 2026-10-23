@@ -1030,12 +1030,14 @@ function applyDefaultPreOrgDetails() {
 function applyWeb2AppArrival() {
   if (!props.preOrg || flowStep.value !== 'intent')
     return
-  const arrival = parseWeb2AppArrival(route.query) ?? readRememberedWeb2AppArrival()
+  const arrival = parseWeb2AppArrival(route.query)
+    ?? readRememberedWeb2AppArrival(Date.now(), onboardingUserId.value)
   if (!arrival)
     return
   if (arrival.websiteUrl && !normalizedWebsiteLiveUrl.value)
     websiteLiveUrlInput.value = arrival.websiteUrl
-  if (hasWebsiteLivePlan.value && (!selectedIntent.value || arrival.websiteUrl))
+  // Keep an explicit saved intent; only default to publish when none is set yet.
+  if (hasWebsiteLivePlan.value && !selectedIntent.value)
     selectedIntent.value = 'publish'
 }
 

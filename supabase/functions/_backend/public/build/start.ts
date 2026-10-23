@@ -83,7 +83,7 @@ function normalizeStartedBuildStatus(status?: string): string {
   return status && status.toLowerCase() !== 'pending' ? status : 'running'
 }
 
-async function markBuildAsFailed(
+export async function markBuildAsFailed(
   c: Context,
   jobId: string,
   appId: string,

@@ -23,7 +23,7 @@ export interface WebsiteLiveIconSet {
   androidLegacy192: Uint8Array
   /** 192x192 RGBA, circle-masked (transparent outside). mipmap-xxxhdpi/ic_launcher_round.png */
   androidRound192: Uint8Array
-  /** 432x432 RGBA, icon in the central 288x288 safe zone. mipmap-xxxhdpi/ic_launcher_foreground.png */
+  /** 432x432 RGBA, icon in the central 264x264 safe zone. mipmap-xxxhdpi/ic_launcher_foreground.png */
   androidForeground432: Uint8Array
   /** 512x512 RGB (no alpha). Google Play store listing icon. */
   playStore512: Uint8Array

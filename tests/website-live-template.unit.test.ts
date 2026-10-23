@@ -1,5 +1,6 @@
 import type { WebsiteLiveIconSet } from '../supabase/functions/_backend/utils/website_live_icons.ts'
 import type { WebsiteLiveTemplateInput } from '../supabase/functions/_backend/utils/website_live_template.ts'
+import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { decode, encode } from 'fast-png'
@@ -52,6 +53,23 @@ function input(overrides: Partial<WebsiteLiveTemplateInput> = {}): WebsiteLiveTe
     icons: icons(),
     ...overrides,
   }
+}
+
+const repoRoot = resolve(__dirname, '..')
+const templateDir = resolve(repoRoot, 'templates/website-live-app')
+const packedTemplateZip = resolve(repoRoot, 'dist/website-live-template.zip')
+
+function ensurePackedWebsiteLiveTemplate() {
+  if (existsSync(packedTemplateZip))
+    return
+  if (!existsSync(resolve(templateDir, 'node_modules/@capacitor/ios'))) {
+    const install = spawnSync('bun', ['install', '--frozen-lockfile'], { cwd: templateDir, encoding: 'utf8' })
+    if (install.status !== 0)
+      throw new Error(`website-live-app bun install failed: ${install.stderr || install.stdout || `exit ${install.status}`}`)
+  }
+  const pack = spawnSync('bun', ['scripts/pack-website-live-template.ts'], { cwd: repoRoot, encoding: 'utf8' })
+  if (pack.status !== 0 || !existsSync(packedTemplateZip))
+    throw new Error(`pack-website-live-template failed: ${pack.stderr || pack.stdout || `exit ${pack.status}`}`)
 }
 
 const GRADLEW = '#!/bin/sh\necho gradle\n'
@@ -258,9 +276,9 @@ describe('website live template patching', () => {
     expect(() => patchWebsiteLiveTemplate(template, input({ bundleId: 'com.my_app.Shop2', appName: 'a'.repeat(30) }))).not.toThrow()
   })
 
-  const realZip = resolve(__dirname, '../dist/website-live-template.zip')
-  it.skipIf(!existsSync(realZip))('patches the real packed template', () => {
-    const template = new Uint8Array(readFileSync(realZip))
+  it('patches the real packed template', () => {
+    ensurePackedWebsiteLiveTemplate()
+    const template = new Uint8Array(readFileSync(packedTemplateZip))
     const manifest = JSON.parse(strFromU8(unzipSync(template, { filter: f => f.name === 'manifest.json' })['manifest.json']))
     const start = performance.now()
     const patched = patchWebsiteLiveTemplate(template, input())

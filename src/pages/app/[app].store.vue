@@ -112,6 +112,8 @@ const playServiceAccountJson = ref('')
 const playServiceAccountFileName = ref('')
 const generatedKeystore = ref<GeneratedKeystore | null>(null)
 const websiteCheck = ref<WebsiteCheck | null>(null)
+/** URL the current `websiteCheck` result was produced for; clear the result when the input diverges. */
+const websiteCheckUrl = ref('')
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
@@ -205,8 +207,14 @@ async function refresh(sections: FormSection[] = []) {
       applyState(next, sections)
   }
   catch (error) {
-    if (requestedAppId === appId.value)
-      loadError.value = error instanceof Error ? error.message : String(error)
+    if (requestedAppId !== appId.value)
+      return
+    const message = error instanceof Error ? error.message : String(error)
+    // Polling must not wipe a loaded page; only the first load uses the full-page banner.
+    if (!state.value)
+      loadError.value = message
+    else
+      toast.error(message)
   }
   finally {
     if (requestedAppId === appId.value)
@@ -242,13 +250,17 @@ async function run(action: string, task: () => Promise<void>, success: string) {
 
 function saveDetails(force = false) {
   return run('details', async () => {
+    const checkedUrl = websiteUrl.value.trim()
+    // "Save anyway" only applies to the URL that produced the incompatible check.
+    if (force && (!websiteCheck.value || websiteCheckUrl.value !== checkedUrl))
+      throw new Error(t('store-publish-check-website-stale'))
     try {
       const next = await storeFetch<StoreState & { website_check: WebsiteCheck | null }>('', {
         method: 'PUT',
         body: JSON.stringify({
           app_id: appId.value,
           // Empty means "keep the current value": clearing is blocked in the UI.
-          website_url: websiteUrl.value.trim() || undefined,
+          website_url: checkedUrl || undefined,
           app_name: appName.value.trim() || undefined,
           version_name: versionName.value.trim(),
           icon_background_color: iconBackgroundColor.value.toUpperCase(),
@@ -256,12 +268,16 @@ function saveDetails(force = false) {
           force: force || undefined,
         }),
       })
-      if (applyState(next, ['details']) && next.website_check)
+      if (applyState(next, ['details']) && next.website_check) {
         websiteCheck.value = next.website_check
+        websiteCheckUrl.value = checkedUrl
+      }
     }
     catch (error) {
-      if (error instanceof StoreRequestError && error.code === 'website_not_compatible' && error.moreInfo?.website_check)
+      if (error instanceof StoreRequestError && error.code === 'website_not_compatible' && error.moreInfo?.website_check) {
         websiteCheck.value = error.moreInfo.website_check
+        websiteCheckUrl.value = checkedUrl
+      }
       throw error
     }
   }, t('store-publish-saved'))
@@ -269,10 +285,12 @@ function saveDetails(force = false) {
 
 function checkWebsite() {
   return run('check', async () => {
+    const checkedUrl = websiteUrl.value.trim()
     websiteCheck.value = await storeFetch<WebsiteCheck>('/check', {
       method: 'POST',
-      body: JSON.stringify({ app_id: appId.value, website_url: websiteUrl.value.trim() || undefined }),
+      body: JSON.stringify({ app_id: appId.value, website_url: checkedUrl || undefined }),
     })
+    websiteCheckUrl.value = checkedUrl
   }, t('store-publish-website-checked'))
 }
 
@@ -529,9 +547,17 @@ watch(() => route.params, (params) => {
     state.value = null
     generatedKeystore.value = null
     websiteCheck.value = null
+    websiteCheckUrl.value = ''
     void refresh()
   }
 }, { immediate: true })
+
+watch(websiteUrl, (next) => {
+  if (websiteCheck.value && websiteCheckUrl.value !== next.trim()) {
+    websiteCheck.value = null
+    websiteCheckUrl.value = ''
+  }
+})
 
 onBeforeUnmount(() => {
   if (pollTimer)
@@ -592,7 +618,14 @@ onBeforeUnmount(() => {
                   <span class="text-slate-700 dark:text-slate-200"><span class="font-medium">{{ websiteCheckLabel(check.id) }}:</span> {{ check.detail }}</span>
                 </li>
               </ul>
-              <button v-if="!websiteCheck.compatible" type="button" class="mt-3 d-btn d-btn-outline d-btn-error d-btn-xs" :disabled="busy !== null || isClearingRequiredDetail" data-test="store-save-anyway" @click="saveDetails(true)">
+              <button
+                v-if="!websiteCheck.compatible && websiteCheckUrl === websiteUrl.trim()"
+                type="button"
+                class="mt-3 d-btn d-btn-outline d-btn-error d-btn-xs"
+                :disabled="busy !== null || isClearingRequiredDetail"
+                data-test="store-save-anyway"
+                @click="saveDetails(true)"
+              >
                 {{ t('store-publish-save-anyway') }}
               </button>
             </div>

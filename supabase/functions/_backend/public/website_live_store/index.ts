@@ -41,7 +41,7 @@ import {
 import { hasControlCharacters, patchWebsiteLiveTemplate } from '../../utils/website_live_template.ts'
 import { assertNativeBuildConcurrencyAvailable } from '../build/concurrency.ts'
 import { createNativeBuildRequest, ensureBuildTimePlanAllowed } from '../build/request.ts'
-import { startBuildForRequest } from '../build/start.ts'
+import { markBuildAsFailed, startBuildForRequest } from '../build/start.ts'
 
 export const app = createHono('', version)
 
@@ -155,13 +155,15 @@ async function loadStoreState(c: Context<MiddlewareKeyVariables>, appId: string)
     getStoreConfig(c, appId),
     listStoreCredentialSummaries(c, appId),
   ])
-  const { data: builds } = await supabaseAdmin(c)
+  const { data: builds, error: buildsError } = await supabaseAdmin(c)
     .from('build_requests')
     .select('id, builder_job_id, platform, status, last_error, created_at, updated_at')
     .eq('app_id', appId)
     .eq('build_config->>source', WEBSITE_LIVE_BUILD_SOURCE)
     .order('created_at', { ascending: false })
     .limit(10)
+  if (buildsError)
+    return quickError(500, 'build_history_unavailable', 'Could not load Web2App build history')
   return {
     app_id: appId,
     template_version: WEBSITE_LIVE_TEMPLATE_VERSION,
@@ -358,7 +360,14 @@ app.post('/publish', middlewareAuth(), async (c) => {
     build_credentials: buildCredentials,
     ios_dependency_manager: body.platform === 'ios' ? 'spm' : null,
   })
-  await uploadToBuilder(c, { builderUploadUrl: created.builderUploadUrl, uploadPath: created.upload_path, bytes: projectZip })
+  try {
+    await uploadToBuilder(c, { builderUploadUrl: created.builderUploadUrl, uploadPath: created.upload_path, bytes: projectZip })
+  }
+  catch (error) {
+    const message = error instanceof Error ? error.message : 'Project upload to the build service failed'
+    await markBuildAsFailed(c, created.builderJob.jobId, body.app_id, message)
+    throw error
+  }
   const started = await startBuildForRequest(c, {
     jobId: created.builderJob.jobId,
     appId: body.app_id,

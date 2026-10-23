@@ -204,6 +204,8 @@ function externalBootAssets(html: string, origin: string): string[] {
       continue
     try {
       const url = new URL(decodeHtml(reference), origin)
+      if (!url.host)
+        continue
       if (url.origin !== origin)
         external.add(url.host)
     }

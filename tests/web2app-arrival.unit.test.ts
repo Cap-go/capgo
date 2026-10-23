@@ -73,26 +73,33 @@ describe('web2App arrival query params', () => {
     expect(parseWeb2AppArrival(web2AppArrivalQuery(nested!))).toEqual({ websiteUrl: 'https://app.example.com/' })
   })
 
-  it('remembers an arrival across email confirmation for a week', () => {
+  it('remembers an arrival across email confirmation for a week, scoped to the account', () => {
     const store = stubLocalStorage()
     const savedAt = Date.UTC(2026, 9, 1)
-    rememberWeb2AppArrival({ websiteUrl: 'https://app.example.com/' }, savedAt)
+    const userId = 'user-a'
+    rememberWeb2AppArrival({ websiteUrl: 'https://app.example.com/' }, savedAt, userId)
     expect(store.size).toBe(1)
-    expect(readRememberedWeb2AppArrival(savedAt + 1000)).toEqual({ websiteUrl: 'https://app.example.com/' })
-    expect(readRememberedWeb2AppArrival(savedAt + 8 * 24 * 60 * 60 * 1000)).toBeNull()
-    clearRememberedWeb2AppArrival()
+    expect(readRememberedWeb2AppArrival(savedAt + 1000, userId)).toEqual({ websiteUrl: 'https://app.example.com/' })
+    expect(readRememberedWeb2AppArrival(savedAt + 1000, 'user-b')).toBeNull()
     expect(readRememberedWeb2AppArrival(savedAt + 1000)).toBeNull()
+    expect(readRememberedWeb2AppArrival(savedAt + 8 * 24 * 60 * 60 * 1000, userId)).toBeNull()
+    clearRememberedWeb2AppArrival()
+    expect(readRememberedWeb2AppArrival(savedAt + 1000, userId)).toBeNull()
   })
 
   it('ignores corrupted remembered arrivals and works without storage', () => {
     const store = stubLocalStorage()
+    const userId = 'user-a'
     store.set('capgo:web2app-arrival', '{not json')
-    expect(readRememberedWeb2AppArrival()).toBeNull()
-    store.set('capgo:web2app-arrival', JSON.stringify({ savedAt: Date.now(), websiteUrl: 'http://insecure.example.com' }))
-    expect(readRememberedWeb2AppArrival()).toEqual({ websiteUrl: null })
+    expect(readRememberedWeb2AppArrival(Date.now(), userId)).toBeNull()
+    store.set('capgo:web2app-arrival', JSON.stringify({ savedAt: Date.now(), websiteUrl: 'http://insecure.example.com', userId }))
+    expect(readRememberedWeb2AppArrival(Date.now(), userId)).toEqual({ websiteUrl: null })
+    // Legacy entries without userId must not leak across accounts.
+    store.set('capgo:web2app-arrival', JSON.stringify({ savedAt: Date.now(), websiteUrl: 'https://app.example.com/' }))
+    expect(readRememberedWeb2AppArrival(Date.now(), userId)).toBeNull()
     vi.unstubAllGlobals()
-    expect(readRememberedWeb2AppArrival()).toBeNull()
-    expect(() => rememberWeb2AppArrival({ websiteUrl: null })).not.toThrow()
+    expect(readRememberedWeb2AppArrival(Date.now(), userId)).toBeNull()
+    expect(() => rememberWeb2AppArrival({ websiteUrl: null }, Date.now(), userId)).not.toThrow()
   })
 
   it('carries arrival params from /register into onboarding', () => {
@@ -102,7 +109,7 @@ describe('web2App arrival query params', () => {
     // Stored only once the account exists, never on page load.
     const sessionSet = registerSource.indexOf('capgo.auth.setSession(registered.session)')
     expect(sessionSet).toBeGreaterThan(registerSource.indexOf('async function submit('))
-    expect(registerSource.indexOf('rememberWeb2AppArrival(web2AppArrival)')).toBeGreaterThan(sessionSet)
+    expect(registerSource.indexOf('rememberWeb2AppArrival(web2AppArrival, Date.now(), registered.session.user.id)')).toBeGreaterThan(sessionSet)
     expect(registerSource).toMatch(/window\.location\.href = `https:\/\/capgo\.app\/register\/\$\{window\.location\.search\}`/)
   })
 })

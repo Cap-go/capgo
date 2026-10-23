@@ -1,12 +1,13 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { CacheHelper } from '../utils/cache.ts'
 import { quickError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { buildPlanValidationExpression, closeClient, getDrizzleClient, getPgClient, logPgError } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
+import { planValidityTtlCapSeconds } from '../utils/updatesEdgeCache.ts'
 import { updatesAppCacheTag } from '../utils/updatesCacheTag.ts'
 import { isStripeConfigured, isValidAppId } from '../utils/utils.ts'
 
@@ -25,6 +26,7 @@ export interface WebsiteLiveAppRow {
   update_mode: string | null
   website_url: string | null
   plan_valid: boolean
+  plan_trial_at: string | null
 }
 
 export interface WebsiteLiveResponse {
@@ -65,11 +67,19 @@ async function queryWebsiteLiveApp(c: Context, appId: string): Promise<WebsiteLi
     const planValid = buildPlanValidationExpression([], schema.apps.owner_org)
     // Release CI adds the columns to the replica subscriber before the
     // primary migration runs, so they can be selected directly.
+    const planTrialAt = sql<string | null>`(
+      SELECT ${schema.stripe_info.trial_at}
+      FROM ${schema.stripe_info}
+      WHERE ${schema.stripe_info.customer_id} = (
+        SELECT ${schema.orgs.customer_id} FROM ${schema.orgs} WHERE ${schema.orgs.id} = ${schema.apps.owner_org}
+      )
+    )`
     const row = await drizzleClient
       .select({
         update_mode: schema.apps.update_mode,
         website_url: schema.apps.website_url,
         plan_valid: planValid,
+        plan_trial_at: planTrialAt,
       })
       .from(schema.apps)
       .where(eq(schema.apps.app_id, appId))
@@ -114,8 +124,12 @@ app.get('/', async (c) => {
   }
 
   const response = buildWebsiteLiveResponse(row, isStripeConfigured(c))
+  const trialTtlCap = planValidityTtlCapSeconds(row)
+  const cacheTtlSeconds = trialTtlCap === undefined
+    ? WEBSITE_LIVE_CACHE_TTL_SECONDS
+    : Math.max(1, Math.min(WEBSITE_LIVE_CACHE_TTL_SECONDS, trialTtlCap))
   cloudlog({ requestId: c.get('requestId'), message: 'website_live', app_id: appId, allowed: response.allowed, mode: response.mode, reason: response.reason })
-  await cache.putJson(cacheKey, response, WEBSITE_LIVE_CACHE_TTL_SECONDS, { tags: [updatesAppCacheTag(appId)] })
+  await cache.putJson(cacheKey, response, cacheTtlSeconds, { tags: [updatesAppCacheTag(appId)] })
   c.header('X-Website-Live-Cache', 'miss')
-  return c.json(response, 200, cacheHeaders(appId, WEBSITE_LIVE_CACHE_TTL_SECONDS))
+  return c.json(response, 200, cacheHeaders(appId, cacheTtlSeconds))
 })
