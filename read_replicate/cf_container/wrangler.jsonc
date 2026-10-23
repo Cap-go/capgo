@@ -1,0 +1,63 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "capgo-pg-cluster",
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "containers": [
+    {
+      "class_name": "PgNode",
+      "image": "./Dockerfile",
+      // 4 vCPU / 12 GiB / 20 GB disk: the largest instance Containers offer.
+      // The whole replicated database + WAL headroom must fit in 20 GB.
+      "instance_type": "standard-4",
+      "max_instances": 12
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "PG_NODE", "class_name": "PgNode" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PgNode"] }],
+  "r2_buckets": [{ "binding": "WAL", "bucket_name": "capgo-pg-wal" }],
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": {
+    "CLUSTER": "capgo-eu",
+    "WAL_BUCKET": "capgo-pg-wal",
+    "PUBLICATION_NAME": "capgo_google_eu_2_pub",
+    "SUBSCRIPTION_NAME": "capgo_cf_primary_sub",
+    "ARCHIVE_TIMEOUT": "30",
+    "BACKUP_INTERVAL_HOURS": "24"
+  },
+  // Test bed: bun run pgcf:init (defaults to --env preprod). Containers, DO
+  // bindings, R2 and vars are not inherited by envs, so they are repeated.
+  "env": {
+    "preprod": {
+      "name": "capgo-pg-cluster-preprod",
+      "containers": [
+        {
+          "class_name": "PgNode",
+          "image": "./Dockerfile",
+          "instance_type": "standard-4",
+          "max_instances": 4
+        }
+      ],
+      "durable_objects": {
+        "bindings": [{ "name": "PG_NODE", "class_name": "PgNode" }]
+      },
+      "r2_buckets": [{ "binding": "WAL", "bucket_name": "capgo-pg-wal-preprod" }],
+      "triggers": { "crons": ["* * * * *"] },
+      "vars": {
+        "CLUSTER": "capgo-preprod",
+        "WAL_BUCKET": "capgo-pg-wal-preprod",
+        "PUBLICATION_NAME": "capgo_cf_preprod_pub",
+        "SUBSCRIPTION_NAME": "capgo_cf_preprod_sub",
+        "ARCHIVE_TIMEOUT": "30",
+        "BACKUP_INTERVAL_HOURS": "24"
+      }
+    }
+  }
+  // Secrets (set by init_primary.ts): ADMIN_TOKEN, R2_ENDPOINT, R2_ACCESS_KEY_ID,
+  // R2_SECRET_ACCESS_KEY, POSTGRES_PASSWORD, READER_PASSWORD, SOURCE_CONNINFO
+}

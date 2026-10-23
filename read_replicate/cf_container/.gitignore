@@ -1,0 +1,3 @@
+.cluster-state.*.json
+.secrets.tmp.json
+node_modules/
