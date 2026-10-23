@@ -23,7 +23,7 @@ export const DEFAULT_DATE_RANGE_PRESET = '24h' as const satisfies RollingDateRan
 /** Default rolling window for logs table toolbars. */
 export const TABLE_DATE_RANGE_DEFAULT = '30min' as const satisfies RollingDateRangePreset
 
-/** Default rolling window for the devices table: 30 min opened empty for most apps. */
+/** Default rolling window for the devices table: 7 days, so most apps open with devices listed. */
 export const DEVICES_TABLE_DATE_RANGE_DEFAULT = '7day' as const satisfies RollingDateRangePreset
 
 /** Rolling window lengths for preset modes (ms before `now`). */
