@@ -1,11 +1,11 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { CacheHelper } from '../utils/cache.ts'
 import { quickError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { buildPlanValidationExpression, closeClient, getDrizzleClient, getPgClient, logPgError } from '../utils/pg.ts'
+import { buildPlanTrialAtExpression, buildPlanValidationExpression, closeClient, getDrizzleClient, getPgClient, logPgError } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { planValidityTtlCapSeconds } from '../utils/updatesEdgeCache.ts'
 import { updatesAppCacheTag } from '../utils/updatesCacheTag.ts'
@@ -67,19 +67,12 @@ async function queryWebsiteLiveApp(c: Context, appId: string): Promise<WebsiteLi
     const planValid = buildPlanValidationExpression([], schema.apps.owner_org)
     // Release CI adds the columns to the replica subscriber before the
     // primary migration runs, so they can be selected directly.
-    const planTrialAt = sql<string | null>`(
-      SELECT ${schema.stripe_info.trial_at}
-      FROM ${schema.stripe_info}
-      WHERE ${schema.stripe_info.customer_id} = (
-        SELECT ${schema.orgs.customer_id} FROM ${schema.orgs} WHERE ${schema.orgs.id} = ${schema.apps.owner_org}
-      )
-    )`
     const row = await drizzleClient
       .select({
         update_mode: schema.apps.update_mode,
         website_url: schema.apps.website_url,
         plan_valid: planValid,
-        plan_trial_at: planTrialAt,
+        plan_trial_at: buildPlanTrialAtExpression(),
       })
       .from(schema.apps)
       .where(eq(schema.apps.app_id, appId))

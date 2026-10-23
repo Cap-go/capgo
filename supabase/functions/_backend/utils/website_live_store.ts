@@ -378,13 +378,18 @@ async function findReusableIosCertificate(c: Context, ownerOrg: string, appId: s
   return null
 }
 
-async function findExistingAppIosCertificate(c: Context, appId: string): Promise<ReusableIosCertificate | null> {
+async function findExistingAppIosCertificate(c: Context, appId: string, ascIssuerId: string): Promise<ReusableIosCertificate | null> {
   const summary = (await listStoreCredentialSummaries(c, appId)).find(row => row.platform === 'ios')
   const certificateExpiresAt = summary?.metadata?.certificate_expires_at
   if (certificateExpiresAt != null && !isUnexpiredCertificateExpiresAt(certificateExpiresAt))
     return null
+  // Metadata is the cheap gate; the secret must still match the issuer currently being saved.
+  if (summary?.metadata?.asc_issuer_id != null && summary.metadata.asc_issuer_id !== ascIssuerId)
+    return null
   const secret = await getStoreSecret<IosStoreSecret>(c, appId, 'ios')
   if (secret?.mode !== 'automatic' || !secret.certificateId || !secret.certificateP12Base64)
+    return null
+  if (secret.ascIssuerId !== ascIssuerId)
     return null
   return {
     secret,
@@ -453,7 +458,7 @@ export async function saveIosCredentials(c: Context, input: {
   else {
     const bundleIdResourceId = await ensureAscBundleId(ascCreds, bundleId, input.app.name || bundleId)
     // Reuse this app's distribution cert when re-saving; otherwise borrow from another app on the same team.
-    const reusable = (await findExistingAppIosCertificate(c, input.app.app_id))
+    const reusable = (await findExistingAppIosCertificate(c, input.app.app_id, input.ascIssuerId))
       ?? (await findReusableIosCertificate(c, input.app.owner_org, input.app.app_id, input.ascIssuerId))
     let certificateId = reusable?.secret.certificateId
     let teamId = reusable?.secret.teamId ?? ''
