@@ -240,4 +240,26 @@ describe('default API keys are capped at the owner rights', () => {
     // Bindings within the owner's rights are untouched.
     expect(await keyBindings(USER_ID_2, ORG_ID_2)).toContainEqual({ name: 'default app uploader', role_name: 'org_member', scope_type: 'org', org_id: ORG_ID_2, app_id: null })
   })
+
+  it('remediation does not fail when the org now requires API-key expiration', async () => {
+    await provisionDefaultKeys(USER_ID_2)
+    await query(`
+      UPDATE public.role_bindings rb
+      SET role_id = (SELECT id FROM public.roles WHERE name = 'org_admin')
+      FROM public.apikeys
+      WHERE rb.principal_type = public.rbac_principal_apikey()
+        AND rb.principal_id = apikeys.rbac_id
+        AND apikeys.user_id = $1::uuid
+        AND apikeys.name = 'default org admin'
+        AND NOT (apikeys.id = ANY($3::bigint[]))
+        AND rb.org_id = $2::uuid
+    `, [USER_ID_2, ORG_ID, preexistingKeyIds])
+    expect(await keyHasPermission(USER_ID_2, 'default org admin', 'org.update_user_roles', ORG_ID)).toBe(true)
+    await query('UPDATE public.orgs SET require_apikey_expiration = true WHERE id = $1::uuid', [ORG_ID])
+
+    await query(REMEDIATION_MIGRATION_SQL)
+
+    expect(await keyHasPermission(USER_ID_2, 'default org admin', 'org.update_user_roles', ORG_ID)).toBe(false)
+    expect((await keyBindings(USER_ID_2, ORG_ID)).filter(binding => binding.name === 'default org admin')).toEqual([])
+  })
 })

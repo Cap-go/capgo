@@ -150,9 +150,22 @@ INNER JOIN (
 INNER JOIN public.roles AS roles
   ON roles.id = owner_role.role_id
   AND roles.scope_type = public.rbac_scope_org()
+INNER JOIN public.apikeys AS key_row
+  ON key_row.rbac_id = excessive.principal_id
+INNER JOIN public.orgs AS org_row
+  ON org_row.id = excessive.org_id
 WHERE excessive.scope_type = public.rbac_scope_org()
   AND excessive.role_name = public.rbac_role_org_admin()
   AND roles.name <> public.rbac_role_org_super_admin()
+  -- Skip keys that no longer satisfy the org's API-key expiration policy
+  -- (enforced by role_bindings_enforce_apikey_expiration_policy); they only
+  -- lose the excessive binding.
+  AND NOT (org_row.require_apikey_expiration AND key_row.expires_at IS NULL)
+  AND NOT (
+    org_row.max_apikey_expiration_days IS NOT NULL
+    AND key_row.expires_at IS NOT NULL
+    AND key_row.expires_at > pg_catalog.clock_timestamp() + pg_catalog.make_interval(days => org_row.max_apikey_expiration_days)
+  )
 ORDER BY excessive.principal_id, excessive.org_id, roles.priority_rank DESC, roles.name
 ON CONFLICT DO NOTHING;
 
