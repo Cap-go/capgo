@@ -27,6 +27,7 @@ describe('roleCapabilities', () => {
     ])
     expect(splitCapabilityList('  One ; Two ;  ')).toEqual(['One', 'Two'])
     expect(splitCapabilityList('一；二؛ three')).toEqual(['一', '二', 'three'])
+    expect(splitCapabilityList('Old | pipe | list')).toEqual(['Old', 'pipe', 'list'])
     expect(splitCapabilityList('')).toEqual([])
     expect(splitCapabilityList(null)).toEqual([])
   })

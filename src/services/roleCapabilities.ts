@@ -47,8 +47,9 @@ export function splitCapabilityList(value: string | null | undefined): string[] 
     return []
 
   return value
-    // Also split on full-width (CJK) and Arabic semicolons that translations may use.
-    .split(/[;；؛]/)
+    // Also split on full-width (CJK) and Arabic semicolons that translations may use,
+    // and on "|" used by catalogs translated before the separator changed.
+    .split(/[;；؛|]/)
     .map(item => item.trim())
     .filter(Boolean)
 }
