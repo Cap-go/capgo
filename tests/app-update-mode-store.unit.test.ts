@@ -6,7 +6,7 @@ interface Result { data: Row | null, error: Error | null }
 
 const queue: Array<Promise<Result>> = []
 
-vi.mock('~/services/supabase', () => {
+vi.mock('~/services/console', () => {
   function builder() {
     const chain: Record<string, unknown> = {}
     for (const method of ['select', 'eq', 'update'])
@@ -14,7 +14,7 @@ vi.mock('~/services/supabase', () => {
     chain.maybeSingle = () => queue.shift() ?? Promise.resolve({ data: null, error: null })
     return chain
   }
-  return { useSupabase: () => ({ from: () => builder() }) }
+  return { useConsole: () => ({ from: () => builder() }) }
 })
 
 const { useAppUpdateModeStore } = await import('../src/stores/appUpdateMode')
