@@ -134,7 +134,8 @@ app.get('/images/read', async (c) => {
   const path = query.data.path.split('/').map(encodeURIComponent).join('/')
   const upstream = new URL(`/storage/v1/object/sign/images/${path}`, getEnv(c, 'SUPABASE_URL'))
   upstream.searchParams.set('token', query.data.token)
-  const response = await fetch(upstream, { redirect: 'error', signal: AbortSignal.timeout(10000) })
+  // Workers supports manual redirects; reject non-2xx responses without following them.
+  const response = await fetch(upstream, { redirect: 'manual', signal: AbortSignal.timeout(10000) })
   if (!response.ok) {
     let status = 403
     if (response.status >= 500)
