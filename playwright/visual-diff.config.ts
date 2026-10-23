@@ -525,20 +525,17 @@ export const visualDiffRoutes: VisualDiffRoute[] = [
     prepare: async (page) => {
       // Trial org whose first device just installed an update, with no card on file yet.
       await page.route('**/private/config', route => route.fulfill({ json: { stripeEnabled: true } }))
-      await page.route('**/rest/v1/rpc/get_orgs_v7', async (route) => {
+      await routeConsoleQuery(page, 'get_orgs_v7', async (route) => {
         const response = await route.fetch()
-        const json = await response.json().catch(() => null)
-        const rows = Array.isArray(json) ? json.map(org => ({ ...org, paying: false, trial_left: 9 })) : json
-        await route.fulfill({ response, json: rows })
+        const json = await response.json().catch(() => null) as { data?: unknown } | null
+        const rows = Array.isArray(json?.data)
+          ? json.data.map((org: any) => ({ ...org, paying: false, trial_left: 9 }))
+          : json?.data
+        await route.fulfill({ response, json: { ...json, data: rows } })
       })
-      await page.route('**/rest/v1/apps?*', async (route) => {
-        const response = await route.fetch()
-        const json = await response.json().catch(() => null)
-        const withOtaSuccess = (row: any) => row?.app_id === 'com.demo.app' && row?.onboarding !== undefined
-          ? { ...row, onboarding: { ...row.onboarding, features: { ...row.onboarding?.features, ota: { started_at: '2026-10-20T09:00:00.000Z', succeeded_at: '2026-10-20T10:00:00.000Z' } } } }
-          : row
-        await route.fulfill({ response, json: Array.isArray(json) ? json.map(withOtaSuccess) : withOtaSuccess(json) })
-      })
+      await routeConsoleQuery(page, 'apps', route => forwardConsoleQuery(route, (row: any) => row?.app_id === 'com.demo.app' && row?.onboarding !== undefined
+        ? { ...row, onboarding: { ...row.onboarding, features: { ...row.onboarding?.features, ota: { started_at: '2026-10-20T09:00:00.000Z', succeeded_at: '2026-10-20T10:00:00.000Z' } } } }
+        : row))
       let promptRequested = false
       await page.route('**/private/stripe_billing/trial-plan', (route) => {
         promptRequested = true
