@@ -37,8 +37,9 @@ export async function currentBundleInternal(channel: string, appId: string, opti
   }
 
   const client = await createCapgoClient(options.apikey, options.apiHost)
-  await check2FAComplianceForApp(client, appId, silent)
-  await resolveUserIdFromApiKey(client, options.apikey)
+  // The preflight validates the key; only re-check it when Capgo could not be reached.
+  if (!await check2FAComplianceForApp(client, appId, silent))
+    await resolveUserIdFromApiKey(client, options.apikey)
 
   if (!channel) {
     if (!silent)

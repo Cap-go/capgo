@@ -81,12 +81,12 @@ export async function addChannelInternal(channelId: string, appId: string, optio
   const client = await createCapgoClient(options.apikey, options.apiHost, silent)
   // Creating a channel needs the exact RBAC permission. The backend and channels
   // INSERT RLS remain authoritative, so a key without app.create_channel is denied.
-  await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'app.create_channel', silent)
+  const preflight = await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'app.create_channel', silent)
 
   if (!silent)
     log.info(`Creating channel ${appId}#${channelId} to Capgo`)
 
-  const orgId = await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
+  const orgId = preflight?.orgId ?? await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
   const res = await createChannel({
     apikey: options.apikey!,
     silent,

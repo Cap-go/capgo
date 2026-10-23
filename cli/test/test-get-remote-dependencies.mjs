@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict'
 
-const { getRemoteDependencies } = await import('../src/utils.ts')
+const { getRemoteChecksums, getRemoteDependencies } = await import('../src/utils.ts')
 
 const options = {
   apikey: 'test-remote-deps-key',
@@ -14,11 +14,24 @@ const channel = 'production'
 const originalFetch = globalThis.fetch
 let responseStatus = 200
 let responseBody = {}
+const bundleLookups = []
+const currentBundleRequests = []
 
 globalThis.fetch = async (input) => {
   const url = String(input)
+  if (url.includes('/bundle?')) {
+    bundleLookups.push(url)
+    const params = new URL(url).searchParams
+    if (params.get('app_id') !== appId || params.get('version') !== '1.0.0')
+      throw new Error(`unexpected bundle lookup ${url}`)
+    return new Response(JSON.stringify([{ id: 1, name: '1.0.0', checksum: 'legacy-sum' }]), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
   if (!url.includes('channel/current-bundle'))
     return originalFetch(input)
+  currentBundleRequests.push(url)
   return new Response(JSON.stringify(responseBody), {
     status: responseStatus,
     headers: { 'Content-Type': 'application/json' },
@@ -120,6 +133,24 @@ await test('throws when current-bundle returns an unexpected API error', async (
     () => getRemoteDependencies(options.apikey, appId, channel, options),
     /FunctionsHttpError|cannot_access_channel|403/,
   )
+})
+
+await test('getRemoteChecksums reads the checksum from current-bundle in one request', async () => {
+  bundleLookups.length = 0
+  currentBundleRequests.length = 0
+  setCurrentBundleResponse({ disable_auto_update: 'none', bundle_name: '1.0.0', bundle_id: 1, checksum: 'abc', native_packages: [] })
+  assert.equal(await getRemoteChecksums(options.apikey, appId, channel, options), 'abc')
+  assert.equal(currentBundleRequests.length, 1)
+  assert.equal(bundleLookups.length, 0)
+})
+
+await test('getRemoteChecksums falls back to a bundle lookup on backends without checksum', async () => {
+  bundleLookups.length = 0
+  currentBundleRequests.length = 0
+  setCurrentBundleResponse({ disable_auto_update: 'none', bundle_name: '1.0.0', bundle_id: 1, native_packages: [] })
+  assert.equal(await getRemoteChecksums(options.apikey, appId, channel, options), 'legacy-sum')
+  assert.equal(currentBundleRequests.length, 1)
+  assert.equal(bundleLookups.length, 1)
 })
 
 globalThis.fetch = originalFetch

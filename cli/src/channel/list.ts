@@ -27,8 +27,8 @@ export async function listChannelsInternal(appId: string, options: OptionsBase, 
   }
 
   const client = await createCapgoClient(options.apikey, options.apiHost)
-  await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'app.read_channels', silent)
-  const orgId = await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
+  const preflight = await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'app.read_channels', silent)
+  const orgId = preflight?.orgId ?? await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
 
   if (!silent)
     log.info('Querying available channels in Capgo')

@@ -117,3 +117,30 @@ test('keeps unavailable apps behind the existing not-found page', async ({ page 
   await expect(page.locator('[data-test="getting-started-setup"]')).toHaveCount(0)
   expect(await page.evaluate(() => (window as any).onboardingSetupPreview.state.setupWrites)).toEqual([])
 })
+
+test('opens Builder on a query change while the channel-treatment flow stays mounted', async ({ page }) => {
+  await page.goto(`${gettingStarted}?assignment=both-ota&otaProgress=1&channelTreatment=1&legacyChannel=1&setupStage=channel-routing`)
+  await expect(page.locator('[data-test="channel-default-routing-animation"]')).toBeVisible()
+  await expect(page.getByRole('tab', { name: 'Builder', exact: true })).toHaveCount(0)
+  await page.evaluate(async () => {
+    await (window as any).onboardingSetupPreview.navigate(`${location.pathname}${location.search}&path=builder`)
+  })
+  await expect(page.getByRole('tab', { name: 'Builder', exact: true })).toHaveAttribute('aria-selected', 'true')
+  expect(await page.evaluate(() => (window as any).onboardingSetupPreview.events.filter((event: string) => event === 'getting-started-mounted'))).toHaveLength(1)
+})
+
+for (const assignment of ['builder-only', 'both-ota']) {
+  test(`opens the real untouched ${assignment} Builder checklist without replaying setup`, async ({ page }) => {
+    await page.goto(`${gettingStarted}?assignment=${assignment}&platform=android&checklistState=pending&showChecklist=1&path=builder&legacyChannel=1&channelTreatment=1&setupStage=channel-routing`)
+    await expect(page.locator('[data-test="builder-step-start_setup"]')).toHaveAttribute('data-status', 'pending')
+    await expect(page.locator('[data-test="setup-goal-chooser"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="channel-default-routing-animation"]')).toHaveCount(0)
+    await expect(page.locator('[data-test="builder-introduction"]')).toHaveCount(0)
+    if (assignment === 'both-ota')
+      await expect(page.getByRole('tab', { name: 'Builder', exact: true })).toHaveAttribute('aria-selected', 'true')
+    const state = await page.evaluate(() => (window as any).onboardingSetupPreview.state)
+    expect(state.setupWrites).toEqual([])
+    expect(state.userWrites).toEqual([])
+    expect(state.builderActivationRequests).toEqual([])
+  })
+}

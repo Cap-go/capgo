@@ -32,7 +32,7 @@ export async function deleteBundleInternal(bundleId: string, appId: string, opti
   }
 
   const client = await createCapgoClient(options.apikey, options.apiHost)
-  await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'bundle.delete', silent)
+  const preflight = await checkAppExistsAndHasPermissionOrgErr(client, options.apikey, appId, 'bundle.delete', silent)
 
   if (!silent) {
     log.info(`Deleting bundle ${appId}@${bundleId} from Capgo`)
@@ -45,7 +45,7 @@ export async function deleteBundleInternal(bundleId: string, appId: string, opti
     apiHost: options.apiHost,
   })
 
-  const orgId = await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
+  const orgId = preflight?.orgId ?? await getOrganizationId(options.apikey!, appId, { apiHost: options.apiHost })
   await sendEvent(options.apikey, {
     channel: 'app',
     event: 'Bundle Deleted',

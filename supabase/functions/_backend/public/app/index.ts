@@ -3,9 +3,10 @@ import type { CreateDemoApp } from './demo.ts'
 import type { CreateApp } from './post.ts'
 import type { FetchStoreMetadataBody } from './store_metadata.ts'
 import { getBodyOrQuery, honoFactory, useCors } from '../../utils/hono.ts'
-import { middlewareKey, middlewareAuth } from '../../utils/hono_middleware.ts'
+import { middlewareAuth, middlewareKey } from '../../utils/hono_middleware.ts'
 import { deleteApp } from './delete.ts'
 import { createDemoApp } from './demo.ts'
+import { enableBuilderOnboarding, getBuilderOnboardingAccess } from './enable_builder.ts'
 import { get, getAll } from './get.ts'
 import { post } from './post.ts'
 import { put } from './put.ts'
@@ -43,6 +44,9 @@ app.post('/', middlewareAuth(), async (c) => {
   const body = await getBodyOrQuery<CreateApp>(c)
   return post(c, body)
 })
+
+app.post('/:id/onboarding/builder', middlewareAuth({ preferApiKey: true }), c => enableBuilderOnboarding(c, c.req.param('id')))
+app.get('/:id/onboarding/builder', middlewareAuth({ preferApiKey: true }), c => getBuilderOnboardingAccess(c, c.req.param('id')))
 
 app.put('/:id', middlewareAuth({ preferApiKey: true }), async (c) => {
   const id = c.req.param('id')

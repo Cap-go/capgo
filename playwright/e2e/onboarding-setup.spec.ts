@@ -26,8 +26,12 @@ test.describe('Actionable onboarding setup checklist', () => {
     await expect(page.getByRole('heading', { name: 'Set up your first live update' })).toBeVisible()
   })
 
-  test('shows one task at a time, keeps every task one click away and distinguishes inspecting a task from completing it', async ({ page }) => {
+  test('shows all steps by default, allows hiding them and distinguishes inspecting a task from completing it', async ({ page }) => {
     const toggle = page.locator('[data-test="setup-checklist-toggle"]')
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    await expect(toggle).toHaveText('Hide steps')
+    await expect(page.locator('[data-test="app-onboarding-cli-step-add_channel"]')).toBeVisible()
+    await toggle.click()
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
     await expect(toggle).toHaveText('Show all 7 steps')
     await expect(page.locator('[data-test="app-onboarding-cli-step-add_channel"]')).toBeHidden()
@@ -85,11 +89,36 @@ test.describe('Actionable onboarding setup checklist', () => {
     await expect.poll(() => page.evaluate(() => (window as any).onboardingSetupPreview.events)).toContain('hide')
   })
 
-  test('follows persisted progress, counts skipped tasks, and stops polling on completion', async ({ page }) => {
+  test('follows persisted progress, stops polling on completion, and keeps CI/CD optional', async ({ page, context }) => {
     const time = new Date('2026-09-16T12:00:00Z')
     await page.clock.install({ time: new Date(time.getTime() - 60_000) })
     await page.clock.pauseAt(time)
+    await page.setViewportSize({ width: 390, height: 844 })
     await page.goto(fixture)
+    const optionalStep = page.locator('[data-test="setup-checklist-cicd-step"]')
+    const cicdGuide = optionalStep.getByRole('link', { name: 'CI/CD integration guide', exact: true })
+    const cicdHref = 'https://capgo.app/docs/getting-started/cicd-integration/'
+    await expect(page.locator('[data-test="onboarding-setup-cli"] nav ol > li')).toHaveCount(7)
+    await expect(page.locator('ol [data-test="setup-checklist-cicd-step"]')).toHaveCount(0)
+    await expect(optionalStep).toContainText('Optional next step')
+    await expect(optionalStep).toContainText('Automate updates with CI/CD')
+    await expect(optionalStep.locator('button, input')).toHaveCount(0)
+    await expect(cicdGuide).toHaveAttribute('href', cicdHref)
+    await expect(cicdGuide).toHaveAttribute('target', '_blank')
+    await expect(cicdGuide).toHaveAttribute('rel', 'noopener noreferrer')
+    await context.route(cicdHref, route => route.fulfill({ contentType: 'text/html', body: 'Documentation preview' }))
+    const popupPromise = page.waitForEvent('popup')
+    await cicdGuide.click()
+    const popup = await popupPromise
+    await popup.waitForLoadState()
+    expect(popup.url()).toBe(cicdHref)
+    await popup.close()
+    expect(await page.evaluate(() => {
+      const { appWrites, setupWrites, userWrites, skips, steps, outcome } = (window as any).onboardingSetupPreview.state
+      return { appWrites, setupWrites, userWrites, skips, steps, outcome }
+    })).toEqual({ appWrites: [], setupWrites: [], userWrites: [], skips: [], steps: {}, outcome: 'in_progress' })
+    await expect(page.locator('[data-test^="app-onboarding-cli-step-"]')).toHaveCount(7)
+    await expect(page.locator('[data-test="setup-checklist-progress"]')).toHaveText('0 of 7 complete')
     await page.evaluate(() => {
       (window as any).onboardingSetupPreview.state.steps = {
         login_cli_mcp: { status: 'done' },
@@ -137,6 +166,13 @@ test.describe('Actionable onboarding setup checklist', () => {
     })
     await advanceProgressPolls(page, 1)
     await expect(page.getByRole('heading', { name: 'Guided setup complete' })).toBeVisible()
+    await expect(page.locator('[data-test^="app-onboarding-cli-step-"]')).toHaveCount(7)
+    await expect(page.locator('[data-test="setup-checklist-progress"]')).toHaveText('6 of 7 complete')
+    const toggle = page.locator('[data-test="setup-checklist-toggle"]')
+    if (await toggle.getAttribute('aria-expanded') === 'false')
+      await toggle.click()
+    await cicdGuide.scrollIntoViewIfNeeded()
+    await expect(cicdGuide).toBeVisible()
     await expect(page.getByRole('button', { name: 'Explore dashboard', exact: true })).toHaveCount(0)
     const requests = await page.evaluate(() => (window as any).onboardingSetupPreview.state.requests)
     const channelRequests = await page.evaluate(() => (window as any).onboardingSetupPreview.state.channelRequests)
@@ -562,7 +598,7 @@ test.describe('Actionable onboarding setup checklist', () => {
     await page.goto(`${fixture}?version=1`)
     await expect(page.locator(instructions).getByRole('heading', { name: 'Start guided setup' })).toBeVisible()
     const toggle = page.locator('[data-test="setup-checklist-toggle"]')
-    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
     await expect(page.locator('[data-test="app-onboarding-cli-step-test_update"]')).toBeVisible()
     await page.locator('[data-test="app-onboarding-cli-step-run_device"] button').click()
     await expect(toggle).toHaveAttribute('aria-expanded', 'false')
@@ -589,7 +625,7 @@ test.describe('Actionable onboarding setup checklist', () => {
     await page.setViewportSize({ width: 1190, height: 1322 })
     await page.goto(fixture)
     await expect(page.locator('[data-test="setup-checklist-toggle"]')).toBeVisible()
-    await expect(page.locator('[data-test="app-onboarding-cli-step-test_update"]')).toBeHidden()
+    await expect(page.locator('[data-test="app-onboarding-cli-step-test_update"]')).toBeVisible()
     const commandButton = await page.locator('[data-test="setup-checklist-copy-command"]').boundingBox()
     const aiButton = await page.locator('[data-test="setup-checklist-copy-ai"]').boundingBox()
     expect(commandButton).not.toBeNull()
@@ -744,7 +780,7 @@ test.describe('Dashboard exploration and returning to v3 setup', () => {
 test('asks to finish or explicitly skip a step passed over by out-of-order setup', async ({ page }) => {
   // The AI (or the user) created a channel before running `npx @capgo/cli init`.
   await page.goto(`${fixture}?channel=1`)
-  await expect(page.locator('[data-test="setup-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.locator('[data-test="setup-checklist-toggle"]')).toHaveAttribute('aria-expanded', 'true')
   // The first unfinished step stays the current task — no orange alarm banner.
   await expect(page.locator(instructions)).toContainText('Current task · 1 of 7')
   await expect(page.locator('[data-test="app-onboarding-command-copy"]')).toBeVisible()

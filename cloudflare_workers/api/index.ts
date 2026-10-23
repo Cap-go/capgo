@@ -12,6 +12,7 @@ import { app as channel_device } from '../../supabase/functions/_backend/private
 import { app as channel_stats } from '../../supabase/functions/_backend/private/channel_stats.ts'
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as configBuilder } from '../../supabase/functions/_backend/private/config_builder.ts'
+import { app as console_data } from '../../supabase/functions/_backend/private/console_data.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
 import { app as credits } from '../../supabase/functions/_backend/private/credits.ts'
 import { app as customDomains } from '../../supabase/functions/_backend/private/custom_domains.ts'
@@ -19,12 +20,12 @@ import { app as deleted_failed_version } from '../../supabase/functions/_backend
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
 import { app as emailPreferences } from '../../supabase/functions/_backend/private/email_preferences.ts'
 import { app as events } from '../../supabase/functions/_backend/private/events.ts'
-import { app as finalize_bundle_upload } from '../../supabase/functions/_backend/private/finalize_bundle_upload.ts'
 import { app as groups } from '../../supabase/functions/_backend/private/groups.ts'
 import { app as invite_existing_user_to_org } from '../../supabase/functions/_backend/private/invite_existing_user_to_org.ts'
 import { app as invite_new_user_to_org } from '../../supabase/functions/_backend/private/invite_new_user_to_org.ts'
 import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
+import { app as agent_identity } from '../../supabase/functions/_backend/private/agent_identity.ts'
 import { app as mcp_oauth } from '../../supabase/functions/_backend/private/mcp_oauth.ts'
 import { app as native_observe_stats } from '../../supabase/functions/_backend/private/native_observe_stats.ts'
 import { app as notification_self_proof } from '../../supabase/functions/_backend/private/notification_self_proof.ts'
@@ -168,6 +169,7 @@ appPrivate.route('/website_stats', publicStats)
 appPrivate.route('/cli', cli)
 appPrivate.route('/billing_region', billing_region)
 appPrivate.route('/config', config)
+appPrivate.route('/console', console_data)
 appPrivate.route('/config/builder', configBuilder)
 appPrivate.route('/custom_domains', customDomains)
 appPrivate.route('/accept_invitation', accept_invitation)
@@ -176,6 +178,7 @@ appPrivate.route('/devices', devices_priv)
 appPrivate.route('/channel_device', channel_device)
 appPrivate.route('/log_as', log_as)
 appPrivate.route('/mcp_oauth', mcp_oauth)
+appPrivate.route('/agent_identity', agent_identity)
 appPrivate.route('/invite_new_user_to_org', invite_new_user_to_org)
 appPrivate.route('/invite_existing_user_to_org', invite_existing_user_to_org)
 appPrivate.route('/set_org_email', set_org_email)
@@ -205,7 +208,6 @@ appPrivate.route('/create_device', create_device)
 appPrivate.route('/latency', latency)
 appPrivate.route('/replay', replay)
 appPrivate.route('/events', events)
-appPrivate.route('/finalize_bundle_upload', finalize_bundle_upload)
 appPrivate.route('/groups', groups)
 appPrivate.route('/role_bindings', role_bindings)
 appPrivate.route('/website_preview', website_preview)
@@ -285,6 +287,7 @@ createAllCatch(appPrivate, functionNamePrivate)
 createAllCatch(appTriggers, functionNameTriggers)
 createAllCatch(appScheduled, functionNameScheduled)
 
+export { ConsoleEvents } from './console_events.ts'
 export default {
   fetch: app.fetch,
   queue: processApiQueueBatch,
