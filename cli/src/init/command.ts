@@ -5766,6 +5766,8 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
         return
     }
 
+    // Match the OTA flow actually entered, including the existing fallback when
+    // optional assignment detection fails. Positive Builder handoffs return above.
     await enableInitOtaChecklist(appId, options, undefined, pLog.warn)
     if (stepToSkip < 1)
       markStepDone(1)

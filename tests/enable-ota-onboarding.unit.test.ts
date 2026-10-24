@@ -42,6 +42,15 @@ describe('OTA checklist activation', () => {
     expect(enableOtaChecklist(result)).toEqual(result)
   })
 
+  it.concurrent.each(['completed', 'skipped'])('normalizes a numeric OTA version without reopening %s setup', (outcome) => {
+    const original = { getting_started_dismissed_at: at, setup: { todo_list_version: 4, ota_todo_list_version: 1, paths: ['ota', 'builder'], selected_path: 'builder', outcome, completed_at: at, steps: { ota: { add_code: { status: 'done', at } }, builder } } }
+    const snapshot = structuredClone(original)
+    const result = enableOtaChecklist(original)
+    expect(result).toEqual({ ...original, setup: { ...original.setup, ota_todo_list_version: '1' } })
+    expect(original).toEqual(snapshot)
+    expect(enableOtaChecklist(result)).toEqual(result)
+  })
+
   it.concurrent.each([1, 2])('carries legacy v%s step history into the OTA checklist', (version) => {
     const login = { status: 'done', at, annotation: 'keep' }
     const steps = { [version === 1 ? 'add_app' : 'login_cli_mcp']: login, add_code: { status: 'skipped', at } }

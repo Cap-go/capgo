@@ -39,6 +39,8 @@ export function enableOtaChecklist(value: unknown): JsonObject {
   // An existing OTA checklist, including completed or dismissed setup, is unchanged.
   if (version === '3' || (version === '4' && setup.ota_todo_list_version === '1'))
     return onboarding
+  if (version === '4' && setup.ota_todo_list_version === 1)
+    return { ...onboarding, setup: { ...setup, ota_todo_list_version: '1' } }
 
   const steps = { ...object(setup.steps) }
   const previousOta = version === '4' ? object(steps.ota) : steps
