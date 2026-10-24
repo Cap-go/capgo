@@ -109,11 +109,11 @@ describe('console query sql', () => {
       kind: 'table',
       name: 'apps',
       args: [],
-      operations: [{ method: 'select', args: ['app_id'] }, { method: 'in', args: ['owner_org', ['26ea0eda-8c6d-4094-9058-934db2c29593']] }],
+      operations: [{ method: 'select', args: ['app_id'] }, { method: 'in', args: ['owner_org', ['11111111-1111-4111-8111-111111111111']] }],
     })
     const oneOrg = dialect.sqlToQuery(drizzleFrom(orgs.text, orgs.values))
     expect(oneOrg.sql).toContain('= ANY($1::uuid[])')
-    expect(oneOrg.params).toEqual([['26ea0eda-8c6d-4094-9058-934db2c29593']])
+    expect(oneOrg.params).toEqual([['11111111-1111-4111-8111-111111111111']])
 
     const onboarding = compile({
       kind: 'table',
@@ -275,7 +275,7 @@ describe('console query sql', () => {
     expect(probe.text).toBe('SELECT to_jsonb(public."is_not_deleted"("email_check" => $1::varchar)) AS data')
     expect(probe.values).toEqual(['nobody@example.com'])
     const members = compile({ kind: 'rpc', name: 'get_org_members', args: [{ guild_id: 'org-1' }], operations: [] })
-    expect(members.text).toContain('jsonb_agg(to_jsonb(q)) FROM public."get_org_members"("guild_id" => $1::uuid) AS q')
+    expect(members.text).toContain('jsonb_agg(to_jsonb(q)) FROM (SELECT * FROM public."get_org_members"("guild_id" => $1::uuid) AS q LIMIT 1000) AS q')
     expect(members.returnsSet).toBe(true)
   })
 
@@ -312,6 +312,8 @@ describe('console query sql', () => {
 
     const rpc = compile({ kind: 'rpc', name: 'is_platform_admin', args: [], operations: [] })
     expect(shapeConsoleQueryResult(rpc, [{ data: false }]).data).toBe(false)
+    expect(shapeConsoleQueryResult(rpc, [{ data: '{"step":1}' }]).data).toBe('{"step":1}')
+    expect(shapeConsoleQueryResult(rpc, [{ data: { step: 1 } }]).data).toEqual({ step: 1 })
   })
 
   it('reads function signatures from the array text node-pg leaves unparsed', () => {
@@ -410,10 +412,10 @@ describe('console query sql', () => {
       functions: [orgs, orgsForUser, scalarSet, permission].filter(item => item != null),
     }
     const listed = compileConsoleQuery(parsed, { kind: 'rpc', name: 'get_orgs_v7', args: [], operations: [] })
-    expect(listed.text).toContain('jsonb_agg(to_jsonb(q)) FROM public."get_orgs_v7"() AS q')
+    expect(listed.text).toContain('jsonb_agg(to_jsonb(q)) FROM (SELECT * FROM public."get_orgs_v7"() AS q LIMIT 1000) AS q')
     expect(listed.text).not.toContain('q(val)')
     const ids = compileConsoleQuery(parsed, { kind: 'rpc', name: 'list_ids', args: [], operations: [] })
-    expect(ids.text).toContain('jsonb_agg(to_jsonb(q.val)) FROM public."list_ids"() AS q(val)')
+    expect(ids.text).toContain('jsonb_agg(to_jsonb(q.val)) FROM (SELECT val FROM public."list_ids"() AS q(val) LIMIT 1000) AS q')
 
     const check = compileConsoleQuery(parsed, {
       kind: 'rpc',
@@ -556,6 +558,20 @@ describe('console query sql', () => {
     })
     expect(counted.text).toContain('DELETE FROM "public"."users" AS t WHERE t."id" = $1::uuid RETURNING *')
     expect(counted.head).toBe(true)
+
+    const ordered = compile({
+      kind: 'table',
+      name: 'users',
+      args: [],
+      operations: [
+        { method: 'update', args: [{ email: 'person@example.com' }] },
+        { method: 'eq', args: ['id', 'user-1'] },
+        { method: 'select', args: [] },
+        { method: 'order', args: ['email', { ascending: true }] },
+      ],
+    })
+    expect(ordered.text).toContain('ORDER BY w."email" ASC')
+    expect(ordered.text).not.toContain('ORDER BY t.')
   })
 
   it('does not treat a quoted placeholder as a bind', () => {

@@ -812,7 +812,7 @@ function compileTable(catalog: QueryCatalog, request: ConsoleQueryRequest): Comp
   let head = false
   let cardinality: CompiledConsoleQuery['cardinality'] = 'many'
   const filters: string[] = []
-  const orders: string[] = []
+  const orderSpecs: { column: string, options: Record<string, unknown> }[] = []
   let limit: number | null = null
   let offset = 0
   let rows: Record<string, unknown>[] | null = null
@@ -883,7 +883,7 @@ function compileTable(catalog: QueryCatalog, request: ConsoleQueryRequest): Comp
         fail('PGRST100', 'Invalid order')
       const options = optionsOf(args[1])
       rejectEmbeddedModifier(options)
-      orders.push(orderSql(catalog, request.name, 't', args[0], options))
+      orderSpecs.push({ column: args[0], options })
       continue
     }
     if (operation.method === 'or') {
@@ -925,7 +925,11 @@ function compileTable(catalog: QueryCatalog, request: ConsoleQueryRequest): Comp
   }
   const where = [...innerSql('t', fields), ...filters]
   const whereSql = where.length ? ` WHERE ${where.join(' AND ')}` : ''
-  const order = orders.length ? ` ORDER BY ${orders.join(', ')}` : ''
+  // Writes page from "written w". Ordering by t there is not in scope.
+  const orderAlias = verb === 'select' ? 't' : 'w'
+  const order = orderSpecs.length
+    ? ` ORDER BY ${orderSpecs.map(item => orderSql(catalog, request.name, orderAlias, item.column, item.options)).join(', ')}`
+    : ''
   const rowLimit = Math.min(limit ?? (cardinality === 'many' ? MAX_ROWS : 2), MAX_ROWS)
   const limitSql = head ? '' : ` LIMIT ${rowLimit}${offset > 0 ? ` OFFSET ${offset}` : ''}`
 
@@ -1077,10 +1081,7 @@ function pageRange(args: unknown[]): { limit: number, offset: number } {
 // only limits the one aggregated row, which drops the page the console asked for.
 function setReturningSql(call: string, composite: boolean, limit: number | null, offset: number): string {
   const aggregate = composite ? 'jsonb_agg(to_jsonb(q))' : 'jsonb_agg(to_jsonb(q.val))'
-  if (limit == null && offset === 0) {
-    const from = composite ? `${call} AS q` : `${call} AS q(val)`
-    return `SELECT COALESCE((SELECT ${aggregate} FROM ${from}), '[]'::jsonb) AS data`
-  }
+  // Same ceiling as table reads. PostgREST also stops at max-rows.
   const rowLimit = Math.min(limit ?? MAX_ROWS, MAX_ROWS)
   const page = ` LIMIT ${rowLimit}${offset > 0 ? ` OFFSET ${offset}` : ''}`
   const source = composite
@@ -1199,7 +1200,9 @@ export function shapeConsoleQueryResult(compiled: CompiledConsoleQuery, rows: Ar
   if (compiled.head)
     return { data: null, error: null, count: total, status: 200 }
   if (compiled.kind === 'rpc' && !compiled.returnsSet) {
-    const value = rows.length ? normalizeJson(rows[0]?.data) : null
+    // node-pg already decodes jsonb. Parsing a string again turns a JSON string
+    // that looks like an object into an object.
+    const value = rows.length ? (rows[0]?.data ?? null) : null
     if (compiled.cardinality === 'one' && value == null)
       return missingRow(0)
     if (compiled.cardinality === 'maybe' && value == null)

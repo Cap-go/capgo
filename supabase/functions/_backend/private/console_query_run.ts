@@ -39,7 +39,7 @@ async function readCatalog(client: PgQueryClient): Promise<QueryCatalog> {
     JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
     JOIN pg_catalog.pg_type AS t ON t.oid = a.atttypid
     WHERE n.nspname = 'public'
-      AND c.relkind IN ('r', 'p')
+      AND c.relkind IN ('r', 'p', 'v')
       AND a.attnum > 0
       AND NOT a.attisdropped
   `)
@@ -264,9 +264,13 @@ async function applyRole(db: { execute: (query: SQL) => Promise<unknown> }, sess
     pg_catalog.set_config('request.jwt.claim.aal', ${session.role === 'authenticated' ? session.claims.aal ?? '' : ''}, true),
     pg_catalog.set_config('request.headers', ${'{}'}, true)
   `)
-  // SET ROLE drops the login role's BYPASSRLS before the query runs. Fail closed
-  // if the role cannot be assumed; never continue as the service connection.
-  await db.execute(session.role === 'anon' ? sql`SET LOCAL ROLE anon` : sql`SET LOCAL ROLE authenticated`)
+  // SET ROLE changes current_user and leaves session_user as the login role.
+  // Triggers and helpers treat session_user = postgres as a service caller.
+  // SESSION AUTHORIZATION changes both and drops BYPASSRLS. Fail closed if the
+  // role cannot be assumed; never continue as the service connection.
+  await db.execute(session.role === 'anon'
+    ? sql`SET LOCAL SESSION AUTHORIZATION anon`
+    : sql`SET LOCAL SESSION AUTHORIZATION authenticated`)
   await db.execute(sql`SET LOCAL row_security = on`)
 }
 
