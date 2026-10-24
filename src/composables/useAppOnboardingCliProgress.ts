@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, toValue, watch } from 'vue'
 import { getAppOnboardingStepIds, parseAppOnboarding } from '~/services/appOnboarding'
 import { invokeCapgoApi } from '~/services/capgoApi'
 import { FunctionsHttpError } from '~/services/consoleClient'
+import { withUsageProvenSteps } from '~/utils/appOnboardingProgress'
 import { hasDualOnboardingChecklists } from '~/utils/dualOnboardingChecklists'
 
 interface ProgressResponse {
@@ -16,7 +17,7 @@ export function useAppOnboardingCliProgress(appId: MaybeRefOrGetter<string>, ini
   const reportedOnboarding = ref(parseAppOnboarding(toValue(initialOnboarding)))
   const hasChannel = ref<boolean | null>(null)
   const onboarding = computed(() => {
-    const reported = reportedOnboarding.value
+    const reported = withUsageProvenSteps(reportedOnboarding.value, rawOnboarding.value)
     if (hasChannel.value === null)
       return reported
     const steps = { ...reported.steps }
