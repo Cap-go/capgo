@@ -112,6 +112,98 @@ export interface QueryCatalog {
   functions: QueryFunction[]
 }
 
+export interface CatalogFunctionRow {
+  name: string
+  returns_set: boolean
+  arg_count: number
+  arg_names: unknown
+  arg_modes: unknown
+  return_kind: string
+  arg_types: unknown
+}
+
+// node-pg leaves name[] and "char"[] as text (`{varchar}`, `{i}`, `{}`).
+// text[] arrives as a real array. Both have to become the same string list.
+export function readPgTextArray(value: unknown): string[] | null {
+  if (value == null)
+    return null
+  if (Array.isArray(value))
+    return value.map(item => item == null ? '' : String(item))
+  if (typeof value !== 'string')
+    return null
+  const literal = value.trim()
+  if (!literal.startsWith('{') || !literal.endsWith('}'))
+    return null
+  const body = literal.slice(1, -1)
+  if (!body)
+    return []
+  const items: string[] = []
+  let index = 0
+  while (index < body.length) {
+    if (body[index] === '"') {
+      let token = ''
+      index += 1
+      while (index < body.length) {
+        const char = body[index]
+        if (char === '\\') {
+          token += body[index + 1] ?? ''
+          index += 2
+          continue
+        }
+        if (char === '"') {
+          if (body[index + 1] === '"') {
+            token += '"'
+            index += 2
+            continue
+          }
+          index += 1
+          break
+        }
+        token += char
+        index += 1
+      }
+      items.push(token)
+    }
+    else {
+      const end = body.indexOf(',', index)
+      const stop = end === -1 ? body.length : end
+      const token = body.slice(index, stop)
+      items.push(token === 'NULL' ? '' : token)
+      index = stop
+    }
+    if (body[index] === ',')
+      index += 1
+  }
+  return items
+}
+
+function inputArgNames(names: string[], modes: string[] | null, argCount: number): string[] {
+  // Null modes means every argument is an input. An empty mode list is the same.
+  if (!modes?.length)
+    return names.slice(0, argCount)
+  const inputs: string[] = []
+  for (let index = 0; index < modes.length; index++) {
+    const mode = modes[index]
+    if (mode === 'i' || mode === 'b' || mode === 'v')
+      inputs.push(names[index] ?? '')
+  }
+  return inputs
+}
+
+export function functionFromCatalogRow(row: CatalogFunctionRow): QueryFunction | null {
+  const argNames = inputArgNames(readPgTextArray(row.arg_names) ?? [], readPgTextArray(row.arg_modes), Number(row.arg_count))
+  const argTypes = readPgTextArray(row.arg_types) ?? []
+  if (argNames.length !== argTypes.length)
+    return null
+  return {
+    name: row.name,
+    argNames,
+    argTypes,
+    returnsSet: row.returns_set === true,
+    returnsComposite: row.return_kind === 'c',
+  }
+}
+
 export interface ConsoleQueryOperation {
   method: string
   args: unknown[]
@@ -471,7 +563,7 @@ function predicateSql(params: Params, target: QueryTarget, operator: string, val
     const token = comparison[operator]
     if (!token)
       fail('PGRST100', 'Unsupported filter')
-    const cast = operator === 'cs' || operator === 'cd' || operator === 'ov' ? castOf(target.udt) : castOf(target.udt)
+    const cast = castOf(target.udt)
     const bound = cast === 'jsonb' ? jsonbLiteral(value) : value
     sql = `${target.expression} ${token} ${params.add(bound, cast)}`
   }
@@ -579,11 +671,11 @@ function writeRows(value: unknown): Record<string, unknown>[] {
   const rows = Array.isArray(value) ? value : [value]
   if (!rows.length || rows.some(row => !row || typeof row !== 'object' || Array.isArray(row)))
     fail('PGRST100', 'Invalid write body')
-  const keys = Object.keys(rows[0] as Record<string, unknown>).sort()
+  const keys = Object.keys(rows[0] as Record<string, unknown>).sort((left, right) => left.localeCompare(right))
   if (!keys.length)
     fail('PGRST100', 'Invalid write body')
   for (const row of rows) {
-    const rowKeys = Object.keys(row as Record<string, unknown>).sort()
+    const rowKeys = Object.keys(row as Record<string, unknown>).sort((left, right) => left.localeCompare(right))
     if (rowKeys.length !== keys.length || rowKeys.some((key, index) => key !== keys[index]))
       fail('PGRST100', 'Write rows must have the same columns')
   }

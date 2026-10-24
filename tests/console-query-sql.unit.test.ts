@@ -1,6 +1,6 @@
 import type { QueryCatalog, QueryColumn, QueryForeignKey, QueryFunction } from '../supabase/functions/_backend/private/console_query_sql'
 import { describe, expect, it } from 'vitest'
-import { compileConsoleQuery, shapeConsoleQueryResult } from '../supabase/functions/_backend/private/console_query_sql'
+import { compileConsoleQuery, functionFromCatalogRow, shapeConsoleQueryResult } from '../supabase/functions/_backend/private/console_query_sql'
 
 function column(name: string, udt: string): QueryColumn {
   return { name, udt }
@@ -292,5 +292,49 @@ describe('console query sql', () => {
 
     const rpc = compile({ kind: 'rpc', name: 'is_platform_admin', args: [], operations: [] })
     expect(shapeConsoleQueryResult(rpc, [{ data: false }]).data).toBe(false)
+  })
+
+  it('reads function signatures from the array text node-pg leaves unparsed', () => {
+    const zero = functionFromCatalogRow({
+      name: 'is_platform_admin',
+      returns_set: false,
+      arg_count: 0,
+      arg_names: null,
+      arg_modes: null,
+      return_kind: 'b',
+      arg_types: '{}',
+    })
+    const named = functionFromCatalogRow({
+      name: 'is_not_deleted',
+      returns_set: false,
+      arg_count: 1,
+      arg_names: ['email_check'],
+      arg_modes: '{i}',
+      return_kind: 'b',
+      arg_types: '{varchar}',
+    })
+    const withOut = functionFromCatalogRow({
+      name: 'example',
+      returns_set: false,
+      arg_count: 1,
+      arg_names: '{email_check,result}',
+      arg_modes: '{i,o}',
+      return_kind: 'b',
+      arg_types: '{varchar}',
+    })
+    expect(zero?.argNames).toEqual([])
+    expect(named?.argNames).toEqual(['email_check'])
+    expect(named?.argTypes).toEqual(['varchar'])
+    expect(withOut?.argNames).toEqual(['email_check'])
+
+    const parsed: QueryCatalog = {
+      columns: new Map(),
+      foreignKeys: [],
+      functions: [zero, named].filter(item => item != null),
+    }
+    expect(compileConsoleQuery(parsed, { kind: 'rpc', name: 'is_platform_admin', args: [], operations: [] }).text).toContain('public."is_platform_admin"()')
+    const deleted = compileConsoleQuery(parsed, { kind: 'rpc', name: 'is_not_deleted', args: [{ email_check: 'nobody@example.com' }], operations: [] })
+    expect(deleted.text).toContain('public."is_not_deleted"("email_check" => $1::varchar)')
+    expect(deleted.values).toEqual(['nobody@example.com'])
   })
 })

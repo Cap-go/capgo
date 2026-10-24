@@ -7,7 +7,7 @@ import { sql } from 'drizzle-orm'
 import { CONSOLE_RPCS } from '../utils/console_query_allowlist.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, withPgTransaction } from '../utils/pg.ts'
-import { compileConsoleQuery, ConsoleQueryError, consoleQueryFailure, shapeConsoleQueryResult } from './console_query_sql.ts'
+import { compileConsoleQuery, ConsoleQueryError, consoleQueryFailure, functionFromCatalogRow, shapeConsoleQueryResult } from './console_query_sql.ts'
 
 // Console reads and writes stay on the primary. RLS calls auth.uid() and other
 // functions that logical replicas do not have.
@@ -27,17 +27,6 @@ let catalogTask: Promise<QueryCatalog> | null = null
 
 export function clearConsoleQueryCatalogCache() {
   catalogTask = null
-}
-
-function inputArgNames(names: Array<string | null> | null, modes: string[] | null, argCount: number): string[] {
-  if (!modes)
-    return names?.slice(0, argCount).map(name => name ?? '') ?? []
-  const inputs: string[] = []
-  for (let index = 0; index < modes.length; index++) {
-    if (modes[index] === 'i' || modes[index] === 'b' || modes[index] === 'v')
-      inputs.push(names?.[index] ?? '')
-  }
-  return inputs
 }
 
 async function readCatalog(client: PgQueryClient): Promise<QueryCatalog> {
@@ -87,11 +76,11 @@ async function readCatalog(client: PgQueryClient): Promise<QueryCatalog> {
       p.proargmodes AS arg_modes,
       ret.typtype AS return_kind,
       ARRAY(
-        SELECT typ.typname
+        SELECT typ.typname::text
         FROM unnest(p.proargtypes::oid[]) WITH ORDINALITY AS args(oid, ord)
         JOIN pg_catalog.pg_type AS typ ON typ.oid = args.oid
         ORDER BY args.ord
-      ) AS arg_types
+      )::text[] AS arg_types
     FROM pg_catalog.pg_proc AS p
     JOIN pg_catalog.pg_namespace AS n ON n.oid = p.pronamespace
     JOIN pg_catalog.pg_type AS ret ON ret.oid = p.prorettype
@@ -107,17 +96,9 @@ async function readCatalog(client: PgQueryClient): Promise<QueryCatalog> {
   }
   const fns: QueryFunction[] = []
   for (const row of functions.rows) {
-    const argNames = inputArgNames(row.arg_names, row.arg_modes, row.arg_count)
-    const argTypes = row.arg_types ?? []
-    if (argNames.length !== argTypes.length)
-      continue
-    fns.push({
-      name: row.name,
-      argNames,
-      argTypes,
-      returnsSet: row.returns_set,
-      returnsComposite: row.return_kind === 'c',
-    })
+    const fn = functionFromCatalogRow(row)
+    if (fn)
+      fns.push(fn)
   }
   return { columns: columnMap, foreignKeys: keys.rows, functions: fns }
 }
