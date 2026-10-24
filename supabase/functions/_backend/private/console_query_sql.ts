@@ -104,6 +104,8 @@ export interface QueryFunction {
   argTypes: string[]
   returnsSet: boolean
   returnsComposite: boolean
+  /** Trailing input arguments that have SQL defaults. Callers may omit them. */
+  defaultCount: number
 }
 
 export interface QueryCatalog {
@@ -120,6 +122,7 @@ export interface CatalogFunctionRow {
   arg_modes: unknown
   return_kind: string
   arg_types: unknown
+  default_count?: unknown
 }
 
 // node-pg leaves name[] and "char"[] as text (`{varchar}`, `{i}`, `{}`).
@@ -190,17 +193,29 @@ function inputArgNames(names: string[], modes: string[] | null, argCount: number
   return inputs
 }
 
+function defaultCountOf(value: unknown, argCount: number): number {
+  const count = Number(value ?? 0)
+  if (!Number.isInteger(count) || count <= 0)
+    return 0
+  return Math.min(count, argCount)
+}
+
 export function functionFromCatalogRow(row: CatalogFunctionRow): QueryFunction | null {
   const argNames = inputArgNames(readPgTextArray(row.arg_names) ?? [], readPgTextArray(row.arg_modes), Number(row.arg_count))
   const argTypes = readPgTextArray(row.arg_types) ?? []
   if (argNames.length !== argTypes.length)
     return null
+  const returnsSet = row.returns_set === true
+  // RETURNS TABLE is a set of record (typtype p). A one-column alias keeps only
+  // the first column, so the row has to be read as a composite.
+  const returnsComposite = row.return_kind === 'c' || (returnsSet && row.return_kind === 'p')
   return {
     name: row.name,
     argNames,
     argTypes,
-    returnsSet: row.returns_set === true,
-    returnsComposite: row.return_kind === 'c',
+    returnsSet,
+    returnsComposite,
+    defaultCount: defaultCountOf(row.default_count, argNames.length),
   }
 }
 
@@ -985,6 +1000,21 @@ function compileTable(catalog: QueryCatalog, request: ConsoleQueryRequest): Comp
   }
 }
 
+// Defaults are a suffix of the input arguments. A call matches when every
+// required name is present and every provided name belongs to the function.
+// Two matches is ambiguous, the same way PostgREST refuses to pick one.
+function rpcMatchesCall(fn: QueryFunction, name: string, keys: string[]): boolean {
+  if (fn.name !== name || fn.argNames.length !== fn.argTypes.length)
+    return false
+  const optionalCount = Math.min(Math.max(fn.defaultCount ?? 0, 0), fn.argNames.length)
+  const requiredCount = fn.argNames.length - optionalCount
+  for (let index = 0; index < requiredCount; index++) {
+    if (!keys.includes(fn.argNames[index]))
+      return false
+  }
+  return keys.every(key => fn.argNames.includes(key))
+}
+
 function compileRpc(catalog: QueryCatalog, request: ConsoleQueryRequest): CompiledConsoleQuery {
   if (!IDENTIFIER.test(request.name))
     fail('PGRST100', 'Invalid identifier')
@@ -1005,11 +1035,17 @@ function compileRpc(catalog: QueryCatalog, request: ConsoleQueryRequest): Compil
   }
   const args = request.args[0] === undefined ? {} : optionsOf(request.args[0])
   const keys = Object.keys(args)
-  const matches = catalog.functions.filter(fn => fn.name === request.name && fn.argNames.length === keys.length && keys.every(key => fn.argNames.includes(key)) && fn.argNames.length === fn.argTypes.length)
+  const matches = catalog.functions.filter(fn => rpcMatchesCall(fn, request.name, keys))
   if (matches.length !== 1)
     fail('PGRST202', `Could not find the function public.${request.name}(${keys.join(', ')})`)
   const fn = matches[0]
-  const callArgs = fn.argNames.map((name, index) => `${quoteIdent(name)} => ${valueSql(params, fn.argTypes[index], args[name])}`)
+  const callArgs: string[] = []
+  for (let index = 0; index < fn.argNames.length; index++) {
+    const name = fn.argNames[index]
+    if (!keys.includes(name))
+      continue
+    callArgs.push(`${quoteIdent(name)} => ${valueSql(params, fn.argTypes[index], args[name])}`)
+  }
   const call = `public.${quoteIdent(fn.name)}(${callArgs.join(', ')})`
   const text = fn.returnsSet
     ? fn.returnsComposite

@@ -21,6 +21,7 @@ interface FunctionRow {
   arg_modes: string[] | null
   return_kind: string
   arg_types: string[] | null
+  default_count: number | string | null
 }
 
 let catalogTask: Promise<QueryCatalog> | null = null
@@ -72,6 +73,7 @@ async function readCatalog(client: PgQueryClient): Promise<QueryCatalog> {
     SELECT p.proname AS name,
       p.proretset AS returns_set,
       p.pronargs AS arg_count,
+      p.pronargdefaults AS default_count,
       p.proargnames AS arg_names,
       p.proargmodes AS arg_modes,
       ret.typtype AS return_kind,

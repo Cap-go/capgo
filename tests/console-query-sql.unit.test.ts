@@ -10,8 +10,8 @@ function key(name: string, sourceTable: string, sourceColumn: string, targetTabl
   return { name, sourceTable, sourceColumn, targetTable, targetColumn, unique }
 }
 
-function fn(name: string, argNames: string[], argTypes: string[], returnsSet = false, returnsComposite = false): QueryFunction {
-  return { name, argNames, argTypes, returnsSet, returnsComposite }
+function fn(name: string, argNames: string[], argTypes: string[], returnsSet = false, returnsComposite = false, defaultCount = 0): QueryFunction {
+  return { name, argNames, argTypes, returnsSet, returnsComposite, defaultCount }
 }
 
 const catalog: QueryCatalog = {
@@ -336,5 +336,88 @@ describe('console query sql', () => {
     const deleted = compileConsoleQuery(parsed, { kind: 'rpc', name: 'is_not_deleted', args: [{ email_check: 'nobody@example.com' }], operations: [] })
     expect(deleted.text).toContain('public."is_not_deleted"("email_check" => $1::varchar)')
     expect(deleted.values).toEqual(['nobody@example.com'])
+  })
+
+  it('returns every column of a table function and omits defaulted arguments', () => {
+    const orgs = functionFromCatalogRow({
+      name: 'get_orgs_v7',
+      returns_set: true,
+      arg_count: 0,
+      arg_names: '{gid,name}',
+      arg_modes: '{t,t}',
+      return_kind: 'p',
+      arg_types: '{}',
+      default_count: 0,
+    })
+    const orgsForUser = functionFromCatalogRow({
+      name: 'get_orgs_v7',
+      returns_set: true,
+      arg_count: 1,
+      arg_names: '{userid,gid,name}',
+      arg_modes: '{i,t,t}',
+      return_kind: 'p',
+      arg_types: '{uuid}',
+      default_count: 0,
+    })
+    const scalarSet = functionFromCatalogRow({
+      name: 'list_ids',
+      returns_set: true,
+      arg_count: 0,
+      arg_names: null,
+      arg_modes: null,
+      return_kind: 'b',
+      arg_types: '{}',
+    })
+    const permission = functionFromCatalogRow({
+      name: 'rbac_check_permission',
+      returns_set: false,
+      arg_count: 4,
+      arg_names: '{p_permission_key,p_org_id,p_app_id,p_channel_id}',
+      arg_modes: null,
+      return_kind: 'b',
+      arg_types: '{text,uuid,varchar,int8}',
+      default_count: '3',
+    })
+    expect(orgs?.argNames).toEqual([])
+    expect(orgs?.returnsComposite).toBe(true)
+    expect(orgsForUser?.argNames).toEqual(['userid'])
+    expect(scalarSet?.returnsComposite).toBe(false)
+    expect(permission?.defaultCount).toBe(3)
+
+    const parsed: QueryCatalog = {
+      columns: new Map(),
+      foreignKeys: [],
+      functions: [orgs, orgsForUser, scalarSet, permission].filter(item => item != null),
+    }
+    const listed = compileConsoleQuery(parsed, { kind: 'rpc', name: 'get_orgs_v7', args: [], operations: [] })
+    expect(listed.text).toContain('jsonb_agg(to_jsonb(q)) FROM public."get_orgs_v7"() AS q')
+    expect(listed.text).not.toContain('q(val)')
+    const ids = compileConsoleQuery(parsed, { kind: 'rpc', name: 'list_ids', args: [], operations: [] })
+    expect(ids.text).toContain('jsonb_agg(to_jsonb(q.val)) FROM public."list_ids"() AS q(val)')
+
+    const check = compileConsoleQuery(parsed, {
+      kind: 'rpc',
+      name: 'rbac_check_permission',
+      args: [{ p_permission_key: 'org.read_billing', p_org_id: 'org-1' }],
+      operations: [],
+    })
+    expect(check.text).toContain('public."rbac_check_permission"("p_permission_key" => $1::text, "p_org_id" => $2::uuid)')
+    expect(check.text).not.toContain('p_app_id')
+    expect(check.text).not.toContain('p_channel_id')
+    expect(check.values).toEqual(['org.read_billing', 'org-1'])
+    expect(() => compileConsoleQuery(parsed, {
+      kind: 'rpc',
+      name: 'rbac_check_permission',
+      args: [{ p_org_id: 'org-1' }],
+      operations: [],
+    })).toThrow(/Could not find the function/)
+    expect(() => compileConsoleQuery({
+      columns: new Map(),
+      foreignKeys: [],
+      functions: [
+        fn('ambiguous', ['a'], ['text']),
+        fn('ambiguous', ['a', 'b'], ['text', 'text'], false, false, 1),
+      ],
+    }, { kind: 'rpc', name: 'ambiguous', args: [{ a: 'x' }], operations: [] })).toThrow(/Could not find the function/)
   })
 })
