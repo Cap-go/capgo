@@ -1,7 +1,7 @@
 import type { QueryCatalog, QueryColumn, QueryForeignKey, QueryFunction } from '../supabase/functions/_backend/private/console_query_sql'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { describe, expect, it } from 'vitest'
-import { ConsoleQueryRollback, drizzleFrom, finishConsoleQuery, readSqlError, statusForSqlState } from '../supabase/functions/_backend/private/console_query_run'
+import { drizzleFrom, finishConsoleQuery, readSqlError, statusForSqlState } from '../supabase/functions/_backend/private/console_query_run'
 import { compileConsoleQuery, functionFromCatalogRow, shapeConsoleQueryResult } from '../supabase/functions/_backend/private/console_query_sql'
 
 function column(name: string, udt: string): QueryColumn {
@@ -615,7 +615,7 @@ describe('console query sql', () => {
     })
   })
 
-  it('rolls back when singular cardinality fails', () => {
+  it('throws a rollback signal when singular cardinality fails', () => {
     const ok = { data: [{ id: 'a' }], error: null, count: null, status: 200 }
     expect(finishConsoleQuery(ok)).toBe(ok)
 
@@ -629,13 +629,9 @@ describe('console query sql', () => {
       count: null,
       status: 406,
     }
-    expect(() => finishConsoleQuery(failed)).toThrow(ConsoleQueryRollback)
-    try {
-      finishConsoleQuery(failed)
-    }
-    catch (error) {
-      expect(error).toBeInstanceOf(ConsoleQueryRollback)
-      expect((error as ConsoleQueryRollback).result).toEqual(failed)
-    }
+    expect(() => finishConsoleQuery(failed)).toThrowError(expect.objectContaining({
+      name: 'ConsoleQueryRollback',
+      result: failed,
+    }))
   })
 })
