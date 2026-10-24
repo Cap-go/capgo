@@ -1,7 +1,7 @@
 import type { QueryCatalog, QueryColumn, QueryForeignKey, QueryFunction } from '../supabase/functions/_backend/private/console_query_sql'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { describe, expect, it } from 'vitest'
-import { drizzleFrom } from '../supabase/functions/_backend/private/console_query_run'
+import { drizzleFrom, readSqlError, statusForSqlState } from '../supabase/functions/_backend/private/console_query_run'
 import { compileConsoleQuery, functionFromCatalogRow, shapeConsoleQueryResult } from '../supabase/functions/_backend/private/console_query_sql'
 
 function column(name: string, udt: string): QueryColumn {
@@ -230,6 +230,9 @@ describe('console query sql', () => {
       operations: [{ method: 'upsert', args: [[{ group_id: 'g', user_id: 'u' }], { onConflict: 'group_id,user_id', ignoreDuplicates: true }] }],
     })
     expect(ignored.text).toContain('ON CONFLICT ("group_id", "user_id") DO NOTHING')
+    expect(ignored.text).not.toContain('RETURNING')
+    expect(ignored.minimal).toBe(true)
+    expect(shapeConsoleQueryResult(ignored, [{ row: { group_id: 'g' } }])).toEqual({ data: null, error: null, count: null, status: 200 })
 
     const update = compile({
       kind: 'table',
@@ -240,6 +243,7 @@ describe('console query sql', () => {
     expect(update.text).toContain('SET "onboarding" = $3::jsonb')
     expect(update.text).toContain('t."id" = $1::uuid')
     expect(update.text).toContain('t."onboarding" = $2::jsonb')
+    expect(update.text).not.toContain('RETURNING')
     expect(update.values).toEqual(['user-1', '{"step":1}', '{"step":1}'])
   })
 
@@ -495,5 +499,103 @@ describe('console query sql', () => {
       operations: [{ method: 'eq', args: ['id', 1] }],
     })
     expect(channel.text).toContain('t."id" = $1::bigint')
+  })
+
+  it('keeps a json string on writes and parses filter in lists', () => {
+    const update = compile({
+      kind: 'table',
+      name: 'users',
+      args: [],
+      operations: [{ method: 'update', args: [{ onboarding: '1.0' }] }, { method: 'eq', args: ['id', 'user-1'] }, { method: 'select', args: [] }],
+    })
+    expect(update.text).toContain('RETURNING')
+    expect(update.values).toEqual(['user-1', '"1.0"'])
+
+    const filter = compile({
+      kind: 'table',
+      name: 'users',
+      args: [],
+      operations: [{ method: 'filter', args: ['onboarding', 'eq', '1.0'] }],
+    })
+    expect(filter.values).toEqual(['1.0'])
+
+    const listed = compile({
+      kind: 'table',
+      name: 'channels',
+      args: [],
+      operations: [{ method: 'filter', args: ['id', 'in', '(5,6,7)'] }],
+    })
+    expect(listed.text).toContain('t."id" = ANY($1::bigint[])')
+    expect(listed.values).toEqual([['5', '6', '7']])
+
+    const excluded = compile({
+      kind: 'table',
+      name: 'channels',
+      args: [],
+      operations: [{ method: 'not', args: ['id', 'in', '(5,6)'] }],
+    })
+    expect(excluded.text).toContain('NOT (t."id" = ANY($1::bigint[]))')
+    expect(excluded.values).toEqual([['5', '6']])
+
+    const noted = compileConsoleQuery({
+      ...catalog,
+      functions: [...catalog.functions, fn('save_note', ['payload'], ['jsonb'])],
+    }, {
+      kind: 'rpc',
+      name: 'save_note',
+      args: [{ payload: '1.0' }],
+      operations: [],
+    })
+    expect(noted.values).toEqual(['"1.0"'])
+
+    const counted = compile({
+      kind: 'table',
+      name: 'users',
+      args: [],
+      operations: [{ method: 'delete', args: [undefined, { count: 'exact', head: true }] }, { method: 'eq', args: ['id', 'user-1'] }],
+    })
+    expect(counted.text).toContain('DELETE FROM "public"."users" AS t WHERE t."id" = $1::uuid RETURNING *')
+    expect(counted.head).toBe(true)
+  })
+
+  it('does not treat a quoted placeholder as a bind', () => {
+    const dialect = new PgDialect()
+    const quoted = dialect.sqlToQuery(drizzleFrom('select \'$1\', "$1", $1::uuid', ['real-id']))
+    expect(quoted.sql).toContain('\'$1\'')
+    expect(quoted.sql).toContain('"$1"')
+    expect(quoted.params).toEqual(['real-id'])
+
+    const repeated = dialect.sqlToQuery(drizzleFrom('select $1::text, $1::text', ['a']))
+    expect(repeated.params).toEqual(['a', 'a'])
+
+    const dollar = dialect.sqlToQuery(drizzleFrom('select $body$ $1 $body$, $1::text', ['kept']))
+    expect(dollar.sql).toContain('$body$ $1 $body$')
+    expect(dollar.params).toEqual(['kept'])
+  })
+
+  it('maps permission failures by session and rethrows connection failures', () => {
+    expect(statusForSqlState('42501', 'authenticated')).toBe(403)
+    expect(statusForSqlState('42501', 'anon')).toBe(401)
+    expect(statusForSqlState('23505', 'authenticated')).toBe(409)
+    expect(statusForSqlState('42P01', 'authenticated')).toBe(400)
+
+    const denied = new Error('Failed query: update users params: person@example.com')
+    Object.assign(denied, {
+      cause: Object.assign(new Error('permission denied for table users'), {
+        name: 'DatabaseError',
+        code: '42501',
+        severity: 'ERROR',
+      }),
+    })
+    expect(readSqlError(denied)).toEqual({ code: '42501', message: 'permission denied for table users' })
+
+    expect(readSqlError(Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }))).toBeNull()
+    for (const code of ['08006', '53300', '57P01']) {
+      expect(readSqlError(Object.assign(new Error('connection failed'), { name: 'DatabaseError', code, severity: 'FATAL' }))).toBeNull()
+    }
+    expect(readSqlError(Object.assign(new Error('canceling statement due to statement timeout'), { name: 'DatabaseError', code: '57014', severity: 'ERROR' }))).toEqual({
+      code: '57014',
+      message: 'canceling statement due to statement timeout',
+    })
   })
 })

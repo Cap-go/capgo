@@ -7,6 +7,7 @@ import { sql } from 'drizzle-orm'
 import { CONSOLE_RPCS } from '../utils/console_query_allowlist.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, withPgTransaction } from '../utils/pg.ts'
+import { readPgErrorField } from '../utils/pg_errors.ts'
 import { compileConsoleQuery, ConsoleQueryError, consoleQueryFailure, functionFromCatalogRow, shapeConsoleQueryResult } from './console_query_sql.ts'
 
 // Console reads and writes stay on the primary. RLS calls auth.uid() and other
@@ -116,22 +117,68 @@ function loadCatalog(client: PgQueryClient): Promise<QueryCatalog> {
   return catalogTask
 }
 
+function bindValue(value: unknown): SQL {
+  // sql`${array}` becomes a parenthesized list of parameters. `.in()` needs one array value.
+  return Array.isArray(value) ? sql`${sql.param(value)}` : sql`${value}`
+}
+
+// Placeholders are $N outside quotes. A $N inside a literal or identifier
+// (a JSON key "$1", or the characters $1 in a quoted label) is text.
 export function drizzleFrom(text: string, values: unknown[]): SQL {
-  const parts = text.split(/\$(\d+)/)
   const chunks: SQL[] = []
-  for (let index = 0; index < parts.length; index++) {
-    if (index % 2 === 0) {
-      if (parts[index])
-        chunks.push(sql.raw(parts[index]))
-    }
-    else {
-      const value = values[Number(parts[index]) - 1]
-      // sql`${array}` becomes a parenthesized list of parameters. `.in()` needs one array value.
-      chunks.push(Array.isArray(value) ? sql`${sql.param(value)}` : sql`${value}`)
-    }
+  let raw = ''
+  const pushRaw = () => {
+    if (!raw)
+      return
+    chunks.push(sql.raw(raw))
+    raw = ''
   }
+  const takeQuote = (quote: '\'' | '"', from: number): number => {
+    raw += quote
+    for (let index = from; index < text.length; index++) {
+      raw += text[index]
+      if (text[index] !== quote)
+        continue
+      if (text[index + 1] === quote) {
+        raw += text[index + 1]
+        index++
+        continue
+      }
+      return index
+    }
+    return text.length - 1
+  }
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index]
+    if (char === '\'' || char === '"') {
+      index = takeQuote(char, index + 1)
+      continue
+    }
+    if (char === '$') {
+      const dollarQuote = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(text.slice(index))
+      if (dollarQuote) {
+        const closer = dollarQuote[0]
+        const end = text.indexOf(closer, index + closer.length)
+        const stop = end === -1 ? text.length : end + closer.length
+        raw += text.slice(index, stop)
+        index = stop - 1
+        continue
+      }
+      const placeholder = /^\$(\d+)/.exec(text.slice(index))
+      if (placeholder) {
+        pushRaw()
+        chunks.push(bindValue(values[Number(placeholder[1]) - 1]))
+        index += placeholder[0].length - 1
+        continue
+      }
+    }
+    raw += char
+  }
+  pushRaw()
   if (chunks.length === 1)
     return chunks[0]
+  if (!chunks.length)
+    return sql.raw('')
   return sql.join(chunks, sql.raw(''))
 }
 
@@ -143,26 +190,63 @@ function rowsOf(result: unknown): Array<Record<string, unknown>> {
   return []
 }
 
-function readSqlError(error: unknown): { code: string, message: string } | null {
+const NODE_ERROR_CODES = new Set([
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'ECONNABORTED',
+  'ETIMEDOUT',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'EPIPE',
+  'EAI_AGAIN',
+  'ENOTFOUND',
+])
+
+function isInfrastructureSqlState(code: string): boolean {
+  // Connection, capacity, and shutdown. A statement timeout (57014) stays a query result.
+  return code.startsWith('08') || code.startsWith('53') || code === '57P01' || code === '57P02' || code === '57P03'
+}
+
+function isDriverQueryError(error: unknown, code: string): boolean {
+  if (!/^[0-9A-Z]{5}$/.test(code))
+    return false
+  const severity = readPgErrorField(error, 'severity')
+  if (typeof severity === 'string' && /^(?:ERROR|FATAL|PANIC|WARNING)$/i.test(severity))
+    return true
+  if (readPgErrorField(error, 'routine') !== undefined)
+    return true
+  return readPgErrorField(error, 'name') === 'DatabaseError'
+}
+
+function driverMessage(error: unknown): string {
+  const message = readPgErrorField(error, 'message')
+  if (typeof message === 'string' && message.length > 0 && !message.startsWith('Failed query:'))
+    return message
+  return 'Database error'
+}
+
+// Connection and node failures stay thrown so a read can retry. Only a driver
+// SQLSTATE becomes the PostgREST-shaped body, and never the Drizzle wrapper text.
+export function readSqlError(error: unknown): { code: string, message: string } | null {
   let current: unknown = error
   for (let depth = 0; depth < 8 && current; depth++) {
-    if (typeof current === 'object' && current !== null && 'code' in current) {
-      const code = (current as { code?: unknown }).code
-      if (typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code)) {
-        const message = current instanceof Error ? current.message : 'Database error'
-        return { code, message }
-      }
+    const code = readPgErrorField(current, 'code')
+    if (typeof code === 'string') {
+      if (NODE_ERROR_CODES.has(code) || isInfrastructureSqlState(code))
+        return null
+      if (isDriverQueryError(current, code))
+        return { code, message: driverMessage(current) }
     }
-    current = typeof current === 'object' && current !== null && 'cause' in current
-      ? (current as { cause?: unknown }).cause
-      : undefined
+    current = readPgErrorField(current, 'cause')
   }
   return null
 }
 
-function statusForSqlState(code: string): number {
+export function statusForSqlState(code: string, role: ConsoleQuerySession['role']): number {
+  // 42501 is "permission denied". An anonymous caller has no session (401).
+  // An authenticated caller does, so the same SQLSTATE is forbidden (403).
   if (code === '42501')
-    return 401
+    return role === 'authenticated' ? 403 : 401
   if (code.startsWith('23'))
     return 409
   return 400
@@ -210,7 +294,7 @@ export async function runConsoleQuery(c: Context, request: ConsoleQueryRequest, 
       data: null,
       error: { message: sqlError.message, code: sqlError.code, details: null },
       count: null,
-      status: statusForSqlState(sqlError.code),
+      status: statusForSqlState(sqlError.code, session.role),
     }
   }
   finally {

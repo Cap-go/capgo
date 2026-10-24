@@ -257,6 +257,8 @@ export interface CompiledConsoleQuery {
   count: boolean
   kind: 'table' | 'rpc'
   returnsSet: boolean
+  // Write with no .select(), count, or head. PostgREST return=minimal: data is null.
+  minimal?: boolean
 }
 
 export interface ConsoleQueryFailure {
@@ -781,8 +783,10 @@ function orderSql(catalog: QueryCatalog, table: string, parentAlias: string, col
 function valueSql(params: Params, udt: string, value: unknown, cast = castOf(udt)): string {
   if (value === null)
     return 'NULL'
+  // Write bodies and RPC args are JSON values. A string must stay a JSON string.
+  // Filter predicates keep jsonbLiteral, because PostgREST filter text is raw JSON.
   if (isJsonUdt(udt))
-    return params.add(jsonbLiteral(value), cast)
+    return params.add(JSON.stringify(value), cast)
   return params.add(value, cast)
 }
 
@@ -900,7 +904,12 @@ function compileTable(catalog: QueryCatalog, request: ConsoleQueryRequest): Comp
         fail('PGRST100', 'Invalid filter')
       const operator = normalizeOperator(args[1])
       const target = resolveTarget(catalog, request.name, 't', fields, args[0])
-      filters.push(predicateSql(params, target, operator.operator, args[2], operator.negate || operation.method === 'not'))
+      // .in() from the builder is already an array. filter/not pass the PostgREST
+      // text form, so "(5,6,7)" is a list rather than one element.
+      const value = operator.operator === 'in' && typeof args[2] === 'string'
+        ? parseFilterValue('in', args[2])
+        : args[2]
+      filters.push(predicateSql(params, target, operator.operator, value, operator.negate || operation.method === 'not'))
       continue
     }
     const operator = OPERATOR_ALIASES[operation.method]
@@ -950,9 +959,14 @@ function compileTable(catalog: QueryCatalog, request: ConsoleQueryRequest): Comp
 
   if (!rows && verb !== 'delete')
     fail('PGRST100', 'Invalid write body')
+  // RETURNING applies SELECT RLS. A write that did not ask for rows, a count,
+  // or a head must not do that, or an insert allowed by INSERT policy fails
+  // when the caller cannot select the new row. That is PostgREST return=minimal.
+  const returnRows = selectText !== null || count || head
+  const returning = returnRows ? ' RETURNING *' : ''
   let writing: string
   if (verb === 'delete') {
-    writing = `DELETE FROM "public".${quoteIdent(request.name)} AS t${whereSql} RETURNING *`
+    writing = `DELETE FROM "public".${quoteIdent(request.name)} AS t${whereSql}${returning}`
   }
   else if (verb === 'update') {
     const assignments = Object.keys(rows![0]).map((key) => {
@@ -961,7 +975,7 @@ function compileTable(catalog: QueryCatalog, request: ConsoleQueryRequest): Comp
       const column = columnByName(columns, key)
       return `${quoteIdent(key)} = ${valueSql(params, column.udt, rows![0][key])}`
     })
-    writing = `UPDATE "public".${quoteIdent(request.name)} AS t SET ${assignments.join(', ')}${whereSql} RETURNING *`
+    writing = `UPDATE "public".${quoteIdent(request.name)} AS t SET ${assignments.join(', ')}${whereSql}${returning}`
   }
   else {
     const keys = Object.keys(rows![0])
@@ -981,7 +995,19 @@ function compileTable(catalog: QueryCatalog, request: ConsoleQueryRequest): Comp
         : `DO UPDATE SET ${(updates.length ? updates : onConflict).map(key => `${quoteIdent(key)} = EXCLUDED.${quoteIdent(key)}`).join(', ')}`
       conflict = ` ON CONFLICT (${onConflict.map(key => quoteIdent(key)).join(', ')}) ${action}`
     }
-    writing = `INSERT INTO "public".${quoteIdent(request.name)} (${keys.map(key => quoteIdent(key)).join(', ')}) VALUES ${tuples.join(', ')}${conflict} RETURNING *`
+    writing = `INSERT INTO "public".${quoteIdent(request.name)} (${keys.map(key => quoteIdent(key)).join(', ')}) VALUES ${tuples.join(', ')}${conflict}${returning}`
+  }
+  if (!returnRows) {
+    return {
+      text: writing,
+      values: params.values,
+      cardinality,
+      head: false,
+      count: false,
+      kind: 'table',
+      returnsSet: false,
+      minimal: true,
+    }
   }
   const returned = projectionSql(catalog, request.name, 'w', selectText === null || star, selectText === null ? [] : fields, { next: 1 })
   const page = head
@@ -1167,6 +1193,8 @@ function missingRow(found: number): ConsoleQueryResult {
 }
 
 export function shapeConsoleQueryResult(compiled: CompiledConsoleQuery, rows: Array<Record<string, unknown>>): ConsoleQueryResult {
+  if (compiled.minimal)
+    return { data: null, error: null, count: null, status: 200 }
   const total = compiled.count || compiled.head ? readCount(rows) : null
   if (compiled.head)
     return { data: null, error: null, count: total, status: 200 }
