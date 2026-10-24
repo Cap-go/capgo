@@ -4,6 +4,7 @@ import type { JWTClaims } from '../utils/hono.ts'
 import type { PgQueryClient } from '../utils/pg.ts'
 import type { ConsoleQueryRequest, ConsoleQueryResult, QueryCatalog, QueryColumn, QueryForeignKey, QueryFunction } from './console_query_sql.ts'
 import { sql } from 'drizzle-orm'
+import { escapeLiteral } from 'pg'
 import { CONSOLE_RPCS } from '../utils/console_query_allowlist.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, withPgTransaction } from '../utils/pg.ts'
@@ -31,9 +32,21 @@ export function clearConsoleQueryCatalogCache() {
   catalogTask = null
 }
 
-async function readCatalog(client: PgQueryClient): Promise<QueryCatalog> {
-  const columns = await client.query<{ table_name: string, column_name: string, udt: string }>(`
-    SELECT c.relname AS table_name, a.attname AS column_name, t.typname AS udt
+interface CatalogQueryRow {
+  columns: Array<{ table_name: string, column_name: string, udt: string }> | null
+  foreign_keys: QueryForeignKey[] | null
+  functions: FunctionRow[] | null
+}
+
+// One statement. A cold isolate pays one round trip, then the result stays in memory.
+const CATALOG_SQL = `
+SELECT
+  COALESCE((
+    SELECT json_agg(json_build_object(
+      'table_name', c.relname,
+      'column_name', a.attname,
+      'udt', t.typname
+    ))
     FROM pg_catalog.pg_attribute AS a
     JOIN pg_catalog.pg_class AS c ON c.oid = a.attrelid
     JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
@@ -42,20 +55,22 @@ async function readCatalog(client: PgQueryClient): Promise<QueryCatalog> {
       AND c.relkind IN ('r', 'p', 'v')
       AND a.attnum > 0
       AND NOT a.attisdropped
-  `)
-  const keys = await client.query<QueryForeignKey>(`
-    SELECT con.conname AS name,
-      src.relname AS "sourceTable",
-      sa.attname AS "sourceColumn",
-      dst.relname AS "targetTable",
-      da.attname AS "targetColumn",
-      EXISTS (
+  ), '[]'::json) AS columns,
+  COALESCE((
+    SELECT json_agg(json_build_object(
+      'name', con.conname,
+      'sourceTable', src.relname,
+      'sourceColumn', sa.attname,
+      'targetTable', dst.relname,
+      'targetColumn', da.attname,
+      'unique', EXISTS (
         SELECT 1
         FROM pg_catalog.pg_constraint AS uniq
         WHERE uniq.conrelid = con.conrelid
           AND uniq.contype IN ('u', 'p')
           AND uniq.conkey = con.conkey
-      ) AS "unique"
+      )
+    ))
     FROM pg_catalog.pg_constraint AS con
     JOIN pg_catalog.pg_class AS src ON src.oid = con.conrelid
     JOIN pg_catalog.pg_namespace AS sn ON sn.oid = src.relnamespace
@@ -69,41 +84,53 @@ async function readCatalog(client: PgQueryClient): Promise<QueryCatalog> {
       AND sn.nspname = 'public'
       AND dn.nspname = 'public'
       AND cardinality(con.conkey) = 1
-  `)
-  const functions = await client.query<FunctionRow>(`
-    SELECT p.proname AS name,
-      p.proretset AS returns_set,
-      p.pronargs AS arg_count,
-      p.pronargdefaults AS default_count,
-      p.proargnames AS arg_names,
-      p.proargmodes AS arg_modes,
-      ret.typtype AS return_kind,
-      ARRAY(
+  ), '[]'::json) AS foreign_keys,
+  COALESCE((
+    SELECT json_agg(json_build_object(
+      'name', p.proname,
+      'returns_set', p.proretset,
+      'arg_count', p.pronargs,
+      'default_count', p.pronargdefaults,
+      'arg_names', p.proargnames,
+      'arg_modes', p.proargmodes,
+      'return_kind', ret.typtype,
+      'arg_types', ARRAY(
         SELECT typ.typname::text
         FROM unnest(p.proargtypes::oid[]) WITH ORDINALITY AS args(oid, ord)
         JOIN pg_catalog.pg_type AS typ ON typ.oid = args.oid
         ORDER BY args.ord
-      )::text[] AS arg_types
+      )
+    ))
     FROM pg_catalog.pg_proc AS p
     JOIN pg_catalog.pg_namespace AS n ON n.oid = p.pronamespace
     JOIN pg_catalog.pg_type AS ret ON ret.oid = p.prorettype
     WHERE n.nspname = 'public'
       AND p.proname = ANY($1::text[])
-  `, [[...CONSOLE_RPCS]])
+  ), '[]'::json) AS functions
+`
 
+export function catalogFromPayload(row: CatalogQueryRow): QueryCatalog {
   const columnMap = new Map<string, QueryColumn[]>()
-  for (const row of columns.rows) {
-    const list = columnMap.get(row.table_name) ?? []
-    list.push({ name: row.column_name, udt: row.udt })
-    columnMap.set(row.table_name, list)
+  for (const column of row.columns ?? []) {
+    const list = columnMap.get(column.table_name) ?? []
+    list.push({ name: column.column_name, udt: column.udt })
+    columnMap.set(column.table_name, list)
   }
-  const fns: QueryFunction[] = []
-  for (const row of functions.rows) {
-    const fn = functionFromCatalogRow(row)
+  const functions: QueryFunction[] = []
+  for (const entry of row.functions ?? []) {
+    const fn = functionFromCatalogRow(entry)
     if (fn)
-      fns.push(fn)
+      functions.push(fn)
   }
-  return { columns: columnMap, foreignKeys: keys.rows, functions: fns }
+  return { columns: columnMap, foreignKeys: row.foreign_keys ?? [], functions }
+}
+
+async function readCatalog(client: PgQueryClient): Promise<QueryCatalog> {
+  const result = await client.query<CatalogQueryRow>(CATALOG_SQL, [[...CONSOLE_RPCS]])
+  const row = result.rows[0]
+  if (!row)
+    throw new Error('console catalog query returned no row')
+  return catalogFromPayload(row)
 }
 
 function loadCatalog(client: PgQueryClient): Promise<QueryCatalog> {
@@ -271,40 +298,51 @@ export function finishConsoleQuery(result: ConsoleQueryResult): ConsoleQueryResu
   return result
 }
 
-async function applyRole(db: { execute: (query: SQL) => Promise<unknown> }, session: ConsoleQuerySession) {
+// Claims are escaped literals in one simple query with BEGIN. A parameterized
+// multi-statement query is rejected by Postgres. The role word is one of the
+// two fixed roles, never a value from the token.
+export function consoleRoleSetupSql(session: ConsoleQuerySession): string {
   const claims = session.role === 'authenticated'
     ? { ...session.claims, sub: session.claims.sub, role: 'authenticated' }
     : { role: 'anon' }
-  await db.execute(sql`SELECT
-    pg_catalog.set_config('request.jwt.claims', ${JSON.stringify(claims)}, true),
-    pg_catalog.set_config('request.jwt.claim.sub', ${session.role === 'authenticated' ? session.claims.sub : ''}, true),
-    pg_catalog.set_config('request.jwt.claim.role', ${session.role}, true),
-    pg_catalog.set_config('request.jwt.claim.email', ${session.role === 'authenticated' ? session.claims.email ?? '' : ''}, true),
-    pg_catalog.set_config('request.jwt.claim.aal', ${session.role === 'authenticated' ? session.claims.aal ?? '' : ''}, true),
-    pg_catalog.set_config('request.headers', ${'{}'}, true)
-  `)
+  const role = session.role === 'anon' ? 'anon' : 'authenticated'
+  return `SELECT
+    pg_catalog.set_config('request.jwt.claims', ${escapeLiteral(JSON.stringify(claims))}, true),
+    pg_catalog.set_config('request.jwt.claim.sub', ${escapeLiteral(session.role === 'authenticated' ? session.claims.sub : '')}, true),
+    pg_catalog.set_config('request.jwt.claim.role', ${escapeLiteral(role)}, true),
+    pg_catalog.set_config('request.jwt.claim.email', ${escapeLiteral(session.role === 'authenticated' ? session.claims.email ?? '' : '')}, true),
+    pg_catalog.set_config('request.jwt.claim.aal', ${escapeLiteral(session.role === 'authenticated' ? session.claims.aal ?? '' : '')}, true),
+    pg_catalog.set_config('request.headers', ${escapeLiteral('{}')}, true);
+SET LOCAL ROLE ${role};
+SET LOCAL row_security = on`
+}
+
+async function executeCompiled(client: PgQueryClient, compiled: ReturnType<typeof compileConsoleQuery>): Promise<ConsoleQueryResult> {
+  // Filters carry emails and search text. Keep them out of the query log.
+  const db = getDrizzleClient(client, { logger: false })
+  const result = await db.execute(drizzleFrom(compiled.text, compiled.values))
+  return finishConsoleQuery(shapeConsoleQueryResult(compiled, rowsOf(result)))
+}
+
+export async function runConsoleQuery(c: Context, request: ConsoleQueryRequest, session: ConsoleQuerySession): Promise<ConsoleQueryResult> {
+  const pool = await getPgClient(c, false)
   // Hosted Supabase does not make the postgres login a superuser, and
   // SET SESSION AUTHORIZATION requires one. SET LOCAL ROLE is the switch this
   // database already allows: it changes current_user and drops BYPASSRLS.
   // session_user stays the login role. The request role GUC above is what
   // user-facing checks must read. Fail closed if the role cannot be assumed.
-  await db.execute(session.role === 'anon'
-    ? sql`SET LOCAL ROLE anon`
-    : sql`SET LOCAL ROLE authenticated`)
-  await db.execute(sql`SET LOCAL row_security = on`)
-}
-
-export async function runConsoleQuery(c: Context, request: ConsoleQueryRequest, session: ConsoleQuerySession): Promise<ConsoleQueryResult> {
-  const pool = await getPgClient(c, false)
+  const setupSql = consoleRoleSetupSql(session)
   try {
+    // The catalog read must run as the login role, before SET LOCAL ROLE.
+    // A warm isolate already has it, so the role switch shares the BEGIN round trip.
+    if (catalogTask) {
+      const compiled = compileConsoleQuery(await catalogTask, request)
+      return await withPgTransaction(pool, client => executeCompiled(client, compiled), { appendSql: setupSql })
+    }
     return await withPgTransaction(pool, async (client) => {
-      const catalog = await loadCatalog(client)
-      const compiled = compileConsoleQuery(catalog, request)
-      // Filters carry emails and search text. Keep them out of the query log.
-      const db = getDrizzleClient(client, { logger: false })
-      await applyRole(db, session)
-      const result = await db.execute(drizzleFrom(compiled.text, compiled.values))
-      return finishConsoleQuery(shapeConsoleQueryResult(compiled, rowsOf(result)))
+      const compiled = compileConsoleQuery(await loadCatalog(client), request)
+      await client.query(setupSql)
+      return executeCompiled(client, compiled)
     })
   }
   catch (error) {
