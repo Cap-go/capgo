@@ -1,5 +1,7 @@
 import type { QueryCatalog, QueryColumn, QueryForeignKey, QueryFunction } from '../supabase/functions/_backend/private/console_query_sql'
+import { PgDialect } from 'drizzle-orm/pg-core'
 import { describe, expect, it } from 'vitest'
+import { drizzleFrom } from '../supabase/functions/_backend/private/console_query_run'
 import { compileConsoleQuery, functionFromCatalogRow, shapeConsoleQueryResult } from '../supabase/functions/_backend/private/console_query_sql'
 
 function column(name: string, udt: string): QueryColumn {
@@ -98,6 +100,20 @@ describe('console query sql', () => {
     })
     expect(listed.text).toContain('t."principal_id" = ANY($1::text[])')
     expect(listed.values).toEqual([['a', 'b']])
+    const dialect = new PgDialect()
+    const bound = dialect.sqlToQuery(drizzleFrom(listed.text, listed.values))
+    expect(bound.sql).toContain('= ANY($1::text[])')
+    expect(bound.params).toEqual([['a', 'b']])
+
+    const orgs = compile({
+      kind: 'table',
+      name: 'apps',
+      args: [],
+      operations: [{ method: 'select', args: ['app_id'] }, { method: 'in', args: ['owner_org', ['26ea0eda-8c6d-4094-9058-934db2c29593']] }],
+    })
+    const oneOrg = dialect.sqlToQuery(drizzleFrom(orgs.text, orgs.values))
+    expect(oneOrg.sql).toContain('= ANY($1::uuid[])')
+    expect(oneOrg.params).toEqual([['26ea0eda-8c6d-4094-9058-934db2c29593']])
 
     const onboarding = compile({
       kind: 'table',

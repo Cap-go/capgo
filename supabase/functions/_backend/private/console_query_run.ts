@@ -116,7 +116,7 @@ function loadCatalog(client: PgQueryClient): Promise<QueryCatalog> {
   return catalogTask
 }
 
-function drizzleFrom(text: string, values: unknown[]): SQL {
+export function drizzleFrom(text: string, values: unknown[]): SQL {
   const parts = text.split(/\$(\d+)/)
   const chunks: SQL[] = []
   for (let index = 0; index < parts.length; index++) {
@@ -125,7 +125,9 @@ function drizzleFrom(text: string, values: unknown[]): SQL {
         chunks.push(sql.raw(parts[index]))
     }
     else {
-      chunks.push(sql`${values[Number(parts[index]) - 1]}`)
+      const value = values[Number(parts[index]) - 1]
+      // sql`${array}` becomes a parenthesized list of parameters. `.in()` needs one array value.
+      chunks.push(Array.isArray(value) ? sql`${sql.param(value)}` : sql`${value}`)
     }
   }
   if (chunks.length === 1)
