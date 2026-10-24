@@ -1,0 +1,92 @@
+import type { Ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { invokeCapgoApi } from '~/services/capgoApi'
+import { formatNumber } from '~/services/formatLocale'
+import { stripeAmountToMajorUnits } from '../../supabase/functions/shared/stripe-amount.ts'
+
+const STORAGE_KEY = 'capgo_plan_currency'
+
+// Smallest-unit amounts per currency, straight from the Stripe prices (currency_options).
+type PlanPriceAmounts = Record<string, { month: Record<string, number>, year: Record<string, number> }>
+
+interface PlanPricesResponse {
+  // Currencies sold on every plan and interval (only the locked one for a billed customer).
+  currencies: string[]
+  currency: string | null
+  lockedCurrency: string | null
+  prices: PlanPriceAmounts
+}
+
+export interface PlanAmounts {
+  month: number
+  year: number
+}
+
+function readStoredCurrency() {
+  try {
+    return globalThis.localStorage?.getItem(STORAGE_KEY) ?? null
+  }
+  catch {
+    return null
+  }
+}
+
+// Major-unit monthly/yearly amounts for one currency, or null when Stripe does not sell the plan in it.
+export function getPlanAmounts(prices: PlanPriceAmounts, productId: string, currency: string): PlanAmounts | null {
+  const plan = prices[productId]
+  const month = plan?.month[currency]
+  const year = plan?.year[currency]
+  if (month === undefined || year === undefined)
+    return null
+  return { month: stripeAmountToMajorUnits(month, currency), year: stripeAmountToMajorUnits(year, currency) }
+}
+
+export function formatPlanAmount(value: number, code: string, options: Intl.NumberFormatOptions = {}) {
+  return formatNumber(value, { style: 'currency', currency: code.toUpperCase(), currencyDisplay: 'narrowSymbol', ...options })
+}
+
+export function usePlanPrices(orgId: Ref<string | undefined>) {
+  const data = ref<PlanPricesResponse | null>(null)
+  // True once the request settled, success or not: checkout waits for it.
+  const ready = ref(false)
+  const storedCurrency = ref(readStoredCurrency())
+
+  watch(orgId, async (id) => {
+    data.value = null
+    ready.value = false
+    if (!id)
+      return
+    const { data: response, error } = await invokeCapgoApi<PlanPricesResponse>(`private/plan_prices?orgId=${encodeURIComponent(id)}`, { method: 'GET' })
+    if (orgId.value !== id)
+      return
+    data.value = !error && response ? response : null
+    ready.value = true
+  }, { immediate: true })
+
+  const currencies = computed(() => data.value?.currencies ?? [])
+  const lockedCurrency = computed(() => data.value?.lockedCurrency ?? null)
+  // The org is billed in a currency these plans are not sold in: checkout would be rejected.
+  const lockedCurrencyUnavailable = computed(() => !!lockedCurrency.value && !currencies.value.includes(lockedCurrency.value))
+  const currency = computed(() => {
+    if (lockedCurrency.value)
+      return lockedCurrencyUnavailable.value ? null : lockedCurrency.value
+    if (storedCurrency.value && currencies.value.includes(storedCurrency.value))
+      return storedCurrency.value
+    return data.value?.currency ?? null
+  })
+
+  function setCurrency(code: string) {
+    storedCurrency.value = code
+    try {
+      globalThis.localStorage?.setItem(STORAGE_KEY, code)
+    }
+    catch {}
+  }
+
+  // Null until Stripe prices load: callers fall back to the USD amounts stored on the plan.
+  function amountsFor(productId: string) {
+    return data.value && currency.value ? getPlanAmounts(data.value.prices, productId, currency.value) : null
+  }
+
+  return { amountsFor, currencies, currency, lockedCurrency, lockedCurrencyUnavailable, ready, setCurrency }
+}

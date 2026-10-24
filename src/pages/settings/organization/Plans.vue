@@ -16,10 +16,11 @@ import RbacPermissionOnlyModal from '~/components/RbacPermissionOnlyModal.vue'
 import { useBillingPaidAt } from '~/composables/useBillingPaidAt'
 import { getCreditPricingSteps, getCurrentPlanNameOrg } from '~/services/console'
 import { ENTERPRISE_MAU_STOPS, formatMau, getOrgExtraMau, quoteEnterpriseScale } from '~/services/enterpriseScale'
-import { formatNumber, formatNumberValue } from '~/services/formatLocale'
+import { formatNumberValue, getFormatLocale } from '~/services/formatLocale'
 import { isNativeAppStoreContext } from '~/services/nativeCompliance'
 import { shouldShowExpiredTrialPlansState, shouldShowPlanFailureBanner } from '~/services/paymentRequired'
 import { checkPermissions } from '~/services/permissions'
+import { formatPlanAmount, usePlanPrices } from '~/services/planPrices'
 import { createPlansVisitTracker } from '~/services/plansVisitTracking'
 import { getSignupAttributionEventTags } from '~/services/signupAttribution'
 import { startSubscriptionCheckout } from '~/services/stripe'
@@ -170,8 +171,29 @@ const enterpriseQuote = computed(() => {
   return quoteEnterpriseScale(pricingSteps.value, plan.mau, plan.price_m, ENTERPRISE_MAU_STOPS[enterpriseMauIndex.value])
 })
 
-function formatUsd(value: number) {
-  return formatNumber(value, { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol', maximumFractionDigits: 0 })
+// Real Stripe amounts per currency (price currency_options); USD from the plans table until they load.
+const { amountsFor, currencies: priceCurrencies, currency: priceCurrency, lockedCurrency, lockedCurrencyUnavailable, ready: pricesReady, setCurrency } = usePlanPrices(billingOrgId)
+
+function planAmounts(plan: Database['public']['Tables']['plans']['Row']) {
+  const stripeAmounts = amountsFor(plan.stripe_id)
+  return stripeAmounts && priceCurrency.value
+    ? { ...stripeAmounts, currency: priceCurrency.value }
+    : { month: plan.price_m, year: plan.price_y, currency: 'usd' }
+}
+
+// Enterprise extra MAU is created in Stripe with the same tier figures in every plan currency.
+function formatPlanPrice(plan: Database['public']['Tables']['plans']['Row'], value: number) {
+  return formatPlanAmount(value, planAmounts(plan).currency, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+}
+
+function currencyLabel(code: string) {
+  try {
+    const name = new Intl.DisplayNames([getFormatLocale()], { type: 'currency' }).of(code.toUpperCase())
+    return name ? `${code.toUpperCase()} - ${name}` : code.toUpperCase()
+  }
+  catch {
+    return code.toUpperCase()
+  }
 }
 
 // Enterprise card lists the MAU picked on the slider, other plans their allowance.
@@ -222,6 +244,8 @@ async function startPlanCheckout(plan: Database['public']['Tables']['plans']['Ro
     orgId: currentOrganization.value?.gid ?? '',
     // Enterprise only: MAU added to the plan quota, billed on the same subscription.
     extraMau: isEnterprisePlan(plan) ? enterpriseQuote.value?.extraMau : undefined,
+    // Only a currency Stripe sells this plan in; otherwise Checkout uses the price default.
+    currency: amountsFor(plan.stripe_id) ? priceCurrency.value ?? undefined : undefined,
   })
 }
 
@@ -292,7 +316,7 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
   // get the current url
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id) {
-    const checkoutIsYearly = hasYearlyDiscount(plan) ? isYearly.value : false
+    const checkoutIsYearly = isCheckoutYearly(plan)
     const session = await startPlanCheckout(plan, checkoutIsYearly)
     if (!session) {
       toast.error(t('billing-checkout-error'))
@@ -311,17 +335,24 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
 }
 
 function hasYearlyDiscount(plan: Database['public']['Tables']['plans']['Row']): boolean {
-  return plan.price_y > 0 && Math.round(plan.price_y / 12) < plan.price_m
+  const { month, year } = planAmounts(plan)
+  return year > 0 && Math.round(year / 12) < month
+}
+
+// Yearly only when this currency's price is actually discounted; drives checkout and current-plan state.
+function isCheckoutYearly(plan: Database['public']['Tables']['plans']['Row']) {
+  return isYearly.value && hasYearlyDiscount(plan)
+}
+
+function isCurrentSubscription(plan: Database['public']['Tables']['plans']['Row']) {
+  return !!currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isCheckoutYearly(plan)
 }
 
 function getPrice(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): number {
-  if (t === 'm' || !hasYearlyDiscount(plan)) {
-    return plan.price_m
-  }
-  else {
-    const p = plan.price_y
-    return Math.round(p / 12)
-  }
+  const { month, year } = planAmounts(plan)
+  if (t === 'm' || !hasYearlyDiscount(plan))
+    return month
+  return Math.round(year / 12)
 }
 
 function isYearlyPlan(plan: Database['public']['Tables']['plans']['Row'], t: 'm' | 'y'): boolean {
@@ -503,13 +534,13 @@ function buttonName(p: Database['public']['Tables']['plans']['Row']) {
   if (isMobile)
     return t('check-on-web')
   if (isEnterprisePlan(p) && enterpriseQuote.value) {
-    if (isCurrentEnterpriseScale(p) && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value)
+    if (isCurrentEnterpriseScale(p) && isCurrentSubscription(p))
       return t('Current')
     if (currentEnterpriseMau.value)
       return t('enterprise-scale-change', { mau: formatMau(enterpriseQuote.value.targetMau) })
     return t('enterprise-scale-get', { mau: formatMau(enterpriseQuote.value.targetMau) })
   }
-  if (currentPlan.value?.name === p.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) {
+  if (currentPlan.value?.name === p.name && isCurrentSubscription(p)) {
     return t('Current')
   }
   if (showExpiredTrialState.value)
@@ -525,9 +556,12 @@ function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
   // Above the allowance, checkout needs the MAU price to add the extra MAU item.
   if (isEnterprisePlan(plan) && enterpriseMauIndex.value > 0 && !enterpriseQuote.value)
     return true
+  // Wait for the billing currency, and never start a checkout Stripe would reject for currency.
+  if (!pricesReady.value || lockedCurrencyUnavailable.value)
+    return true
   if (isEnterprisePlan(plan) && !isCurrentEnterpriseScale(plan))
     return isMobile
-  return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) || isMobile
+  return (currentPlan.value?.name === plan.name && isCurrentSubscription(plan)) || isMobile
 }
 
 function isRecommended(p: Database['public']['Tables']['plans']['Row']) {
@@ -592,25 +626,44 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           </p>
         </div>
 
-        <!-- Toggle -->
-        <div class="flex items-center p-1 bg-gray-200 rounded-lg dark:bg-base-200">
-          <button
-            type="button"
-            class="py-1.5 px-4 text-sm font-medium rounded-md transition-all duration-200"
-            :class="segmentVal === 'm' ? 'bg-white dark:bg-base-100 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
-            @click="segmentVal = 'm'"
-          >
-            {{ t('monthly-plan') }}
-          </button>
-          <button
-            type="button"
-            class="flex gap-2 items-center py-1.5 px-4 text-sm font-medium rounded-md transition-all duration-200"
-            :class="segmentVal === 'y' ? 'bg-white dark:bg-base-100 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
-            @click="segmentVal = 'y'"
-          >
-            {{ t('yearly') }}
-            <span class="py-0.5 px-1.5 text-xs font-bold text-green-600 bg-green-100 rounded-full dark:text-green-400 dark:bg-green-900/30">{{ t('yearly-two-months-free') }}</span>
-          </button>
+        <div class="flex flex-col items-start gap-2 sm:items-end">
+          <!-- Toggle -->
+          <div class="flex items-center p-1 bg-gray-200 rounded-lg dark:bg-base-200">
+            <button
+              type="button"
+              class="py-1.5 px-4 text-sm font-medium rounded-md transition-all duration-200"
+              :class="segmentVal === 'm' ? 'bg-white dark:bg-base-100 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
+              @click="segmentVal = 'm'"
+            >
+              {{ t('monthly-plan') }}
+            </button>
+            <button
+              type="button"
+              class="flex gap-2 items-center py-1.5 px-4 text-sm font-medium rounded-md transition-all duration-200"
+              :class="segmentVal === 'y' ? 'bg-white dark:bg-base-100 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'"
+              @click="segmentVal = 'y'"
+            >
+              {{ t('yearly') }}
+              <span class="py-0.5 px-1.5 text-xs font-bold text-green-600 bg-green-100 rounded-full dark:text-green-400 dark:bg-green-900/30">{{ t('yearly-two-months-free') }}</span>
+            </button>
+          </div>
+          <!-- Billing currency: only currencies set on the Stripe prices -->
+          <label v-if="priceCurrencies.length > 1 && !lockedCurrency" class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+            {{ t('plans-display-currency') }}
+            <select
+              data-test="plans-currency-select"
+              class="d-select d-select-xs d-select-bordered"
+              :value="priceCurrency"
+              @change="setCurrency(($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="code in priceCurrencies" :key="code" :value="code">
+                {{ currencyLabel(code) }}
+              </option>
+            </select>
+          </label>
+          <p v-if="lockedCurrency" data-test="plans-currency-locked" class="text-xs text-gray-500 dark:text-gray-400">
+            {{ t(lockedCurrencyUnavailable ? 'plans-currency-unavailable' : 'plans-currency-locked', { currency: lockedCurrency.toUpperCase() }) }}
+          </p>
         </div>
       </div>
 
@@ -659,21 +712,21 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <div v-if="isEnterprisePlan(p) && enterpriseQuote" class="mb-6 shrink-0" data-test="enterprise-scale">
             <div class="flex items-baseline">
               <span class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                {{ formatUsd(getPrice(p, segmentVal) + enterpriseQuote.extraMauPriceMonthly) }}
+                {{ formatPlanPrice(p, getPrice(p, segmentVal) + enterpriseQuote.extraMauPriceMonthly) }}
               </span>
               <span class="ml-1 text-sm font-medium text-gray-500 dark:text-gray-400">/{{ t('mo') }}</span>
             </div>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               <template v-if="enterpriseQuote.extraMau > 0">
                 <template v-if="isYearlyPlan(p, segmentVal) && hasYearlyDiscount(p)">
-                  {{ t('enterprise-scale-breakdown-yearly', { base: formatUsd(p.price_y), extra: formatUsd(enterpriseQuote.extraMauPriceMonthly * 12), mau: formatMau(enterpriseQuote.extraMau) }) }}
+                  {{ t('enterprise-scale-breakdown-yearly', { base: formatPlanPrice(p, planAmounts(p).year), extra: formatPlanPrice(p, enterpriseQuote.extraMauPriceMonthly * 12), mau: formatMau(enterpriseQuote.extraMau) }) }}
                 </template>
                 <template v-else>
-                  {{ t('enterprise-scale-breakdown', { base: formatUsd(getPrice(p, segmentVal)), extra: formatUsd(enterpriseQuote.extraMauPriceMonthly), mau: formatMau(enterpriseQuote.extraMau) }) }}
+                  {{ t('enterprise-scale-breakdown', { base: formatPlanPrice(p, getPrice(p, segmentVal)), extra: formatPlanPrice(p, enterpriseQuote.extraMauPriceMonthly), mau: formatMau(enterpriseQuote.extraMau) }) }}
                 </template>
               </template>
               <template v-else-if="isYearlyPlan(p, segmentVal)">
-                {{ hasYearlyDiscount(p) ? t('billed-annually-at') : t('billed-monthly-at') }} ${{ hasYearlyDiscount(p) ? p.price_y : p.price_m }}
+                {{ hasYearlyDiscount(p) ? t('billed-annually-at') : t('billed-monthly-at') }} {{ formatPlanPrice(p, hasYearlyDiscount(p) ? planAmounts(p).year : planAmounts(p).month) }}
               </template>
             </p>
 
@@ -714,12 +767,12 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <div v-else class="mb-6 shrink-0">
             <div class="flex items-baseline">
               <span class="text-3xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-                ${{ getPrice(p, segmentVal) }}
+                {{ formatPlanPrice(p, getPrice(p, segmentVal)) }}
               </span>
               <span class="ml-1 text-sm font-medium text-gray-500 dark:text-gray-400">/{{ t('mo') }}</span>
             </div>
             <p v-if="isYearlyPlan(p, segmentVal)" class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {{ hasYearlyDiscount(p) ? t('billed-annually-at') : t('billed-monthly-at') }} ${{ hasYearlyDiscount(p) ? p.price_y : p.price_m }}
+              {{ hasYearlyDiscount(p) ? t('billed-annually-at') : t('billed-monthly-at') }} {{ formatPlanPrice(p, hasYearlyDiscount(p) ? planAmounts(p).year : planAmounts(p).month) }}
             </p>
           </div>
 

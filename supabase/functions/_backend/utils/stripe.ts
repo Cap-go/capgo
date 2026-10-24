@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { BillingAccount } from './stripe_billing.ts'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
+import { stripeMinorUnitDivisor } from '../../shared/stripe-amount.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import {
@@ -750,6 +751,47 @@ async function getPriceIds(c: Context, planId: string, recurrence: string, billi
   return { priceId }
 }
 
+// Stripe sets unit_amount_decimal alone for sub-unit amounts.
+function readStripeUnitAmount(source: { unit_amount?: number | null, unit_amount_decimal?: unknown }) {
+  if (typeof source.unit_amount === 'number')
+    return source.unit_amount
+  if (source.unit_amount_decimal === null || source.unit_amount_decimal === undefined)
+    return null
+  const decimal = Number(String(source.unit_amount_decimal))
+  return Number.isFinite(decimal) ? decimal : null
+}
+
+// Smallest-unit amount per currency, exactly as configured on the Stripe price (currency_options).
+export function getPriceCurrencyAmounts(price: Pick<Stripe.Price, 'currency' | 'unit_amount' | 'unit_amount_decimal' | 'currency_options'>): Record<string, number> {
+  const amounts: Record<string, number> = {}
+  for (const [currency, option] of Object.entries(price.currency_options ?? {})) {
+    const amount = readStripeUnitAmount(option)
+    if (amount !== null)
+      amounts[currency.toLowerCase()] = amount
+  }
+  const amount = readStripeUnitAmount(price)
+  if (amount !== null)
+    amounts[price.currency.toLowerCase()] = amount
+  return amounts
+}
+
+// The price Checkout would sell for this plan, with every currency it is sold in.
+export async function getCheckoutPlanPrice(c: Context, planProductId: string, recurrence: 'month' | 'year', billingAccount: BillingAccount): Promise<Stripe.Price | null> {
+  const resolvedPlanId = await resolveCheckoutPlanProductId(c, planProductId, billingAccount)
+  const { priceId } = await getPriceIds(c, resolvedPlanId, recurrence, billingAccount)
+  if (!priceId)
+    return null
+  return await getStripe(c, billingAccount).prices.retrieve(priceId, { expand: ['currency_options'] })
+}
+
+// A customer is pinned to one currency once Stripe has billed them; null means any currency is allowed.
+export async function getStripeCustomerCurrency(c: Context, customerId: string, billingAccount: BillingAccount): Promise<string | null> {
+  const customer = await getStripe(c, billingAccount).customers.retrieve(customerId)
+  if (customer.deleted)
+    return null
+  return customer.currency?.toLowerCase() ?? null
+}
+
 export interface MeteredData {
   [key: string]: string
 }
@@ -839,6 +881,18 @@ export function buildExtraMauTiers(steps: MauTierStep[], includedMau: number, in
   return tiers
 }
 
+// Same tier figures, re-expressed in the currency's smallest unit (JPY has none, KWD has 1,000).
+export function scaleTiersToCurrency(tiers: Stripe.PriceCreateParams.Tier[], currency: string): Stripe.PriceCreateParams.Tier[] {
+  const divisor = stripeMinorUnitDivisor(currency)
+  return tiers.map(({ unit_amount, ...tier }) => {
+    const amount = (unit_amount ?? 0) * divisor / 100
+    if (Number.isInteger(amount))
+      return { ...tier, unit_amount: amount }
+    // Plain string on purpose: the SDK form-encodes a Stripe.Decimal as its internal fields.
+    return { ...tier, unit_amount_decimal: String(amount) as unknown as Stripe.Decimal }
+  })
+}
+
 // Short stable hash so a tier change gets a new price (lookup keys are unique).
 function hashString(value: string) {
   let hash = 0x811C9DC5
@@ -850,7 +904,9 @@ function hashString(value: string) {
 }
 
 // Found by lookup key, created (with its product) on first use.
-async function getExtraMauPriceId(c: Context, includedMau: number, interval: 'month' | 'year', taxBehavior: Stripe.Price.TaxBehavior | null, billingAccount: BillingAccount = 'ee') {
+// `extraCurrencies` mirrors the plan price's currency_options with the same tier figures, so a
+// non-USD checkout can bill both items in one currency.
+async function getExtraMauPriceId(c: Context, includedMau: number, interval: 'month' | 'year', taxBehavior: Stripe.Price.TaxBehavior | null, billingAccount: BillingAccount = 'ee', extraCurrencies: string[] = []) {
   const { data: steps, error } = await supabaseAdmin(c)
     .from('capgo_credits_steps')
     .select('step_min, step_max, price_per_unit')
@@ -860,7 +916,11 @@ async function getExtraMauPriceId(c: Context, includedMau: number, interval: 'mo
     throw simpleError('mau_tiers_not_found', 'Cannot load MAU price tiers', { error })
 
   const tiers = buildExtraMauTiers(steps, includedMau, interval)
-  const lookupKey = `${EXTRA_MAU_LOOKUP_KEY_PREFIX}${interval}_${hashString(JSON.stringify({ includedMau, tiers }))}`
+  const currencies = [...new Set(extraCurrencies.map(currency => currency.toLowerCase()))].filter(currency => currency !== 'usd').sort((a, b) => a.localeCompare(b))
+  const currencyTiers = Object.fromEntries(currencies.map(currency => [currency, scaleTiersToCurrency(tiers, currency)]))
+  const hashInput = currencies.length ? { includedMau, tiers, currencyTiers } : { includedMau, tiers }
+  const lookupKey = `${EXTRA_MAU_LOOKUP_KEY_PREFIX}${interval}_${hashString(JSON.stringify(hashInput))}`
+  const taxBehaviorParam = taxBehavior && taxBehavior !== 'unspecified' ? { tax_behavior: taxBehavior } : {}
   const existing = await getStripe(c, billingAccount).prices.list({ lookup_keys: [lookupKey], active: true, limit: 1 })
   if (existing.data[0])
     return existing.data[0].id
@@ -881,7 +941,10 @@ async function getExtraMauPriceId(c: Context, includedMau: number, interval: 'mo
       lookup_key: lookupKey,
       nickname: `Enterprise extra MAU (${interval})`,
       metadata: { capgo_kind: EXTRA_MAU_PRICE_KIND, included_mau: String(includedMau) },
-      ...(taxBehavior && taxBehavior !== 'unspecified' ? { tax_behavior: taxBehavior } : {}),
+      ...taxBehaviorParam,
+      ...(currencies.length
+        ? { currency_options: Object.fromEntries(currencies.map(currency => [currency, { tiers: currencyTiers[currency], ...taxBehaviorParam }])) }
+        : {}),
     })
   }
   catch (error) {
@@ -974,6 +1037,17 @@ function toCheckoutSessionResult(session: Stripe.Checkout.Session, publishableKe
   return { url: null, clientSecret: session.client_secret, publishableKey, sessionId: session.id }
 }
 
+// The server owns the currency: a billed customer keeps theirs even when the client sends none.
+async function resolveCheckoutCurrency(c: Context, customerId: string, billingAccount: BillingAccount, planCurrencies: string[], requestedCurrency: string | undefined) {
+  const customerCurrency = await getStripeCustomerCurrency(c, customerId, billingAccount)
+  if (customerCurrency && requestedCurrency && customerCurrency !== requestedCurrency)
+    throw simpleError('currency_locked', 'This organization is already billed in another currency', { currency: requestedCurrency, customerCurrency })
+  const checkoutCurrency = customerCurrency ?? requestedCurrency
+  if (checkoutCurrency && !planCurrencies.includes(checkoutCurrency))
+    throw simpleError('invalid_currency', 'This plan is not sold in the requested currency', { currency: checkoutCurrency })
+  return checkoutCurrency
+}
+
 export interface CheckoutOptions {
   clientReferenceId?: string
   attributionId?: string
@@ -982,10 +1056,13 @@ export interface CheckoutOptions {
   extraMau?: ExtraMauCheckout
   // Embedded session rendered in Capgo instead of the hosted page.
   embedded?: boolean
+  // Lowercase ISO currency; must be one of the plan price's Stripe currency_options.
+  currency?: string
 }
 
 export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, options: CheckoutOptions = {}): Promise<CheckoutSessionResult> {
   const { clientReferenceId, attributionId, datafastAttribution, affonsoReferral, extraMau, embedded } = options
+  const requestedCurrency = options.currency?.trim().toLowerCase() || undefined
   const billingAccount = await getBillingAccountForCustomer(c, customerId)
   assertBillingAccountReachableForUser(c, billingAccount, customerId)
   if (!isStripeConfiguredForAccount(c, billingAccount))
@@ -996,11 +1073,13 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
   if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [{ price: prices.priceId, quantity: 1 }]
+  const planPrice = await getStripe(c, billingAccount).prices.retrieve(prices.priceId, { expand: ['currency_options'] })
+  const planCurrencies = Object.keys(getPriceCurrencyAmounts(planPrice))
+  const checkoutCurrency = await resolveCheckoutCurrency(c, customerId, billingAccount, planCurrencies, requestedCurrency)
   if (extraMau && extraMau.extraMau > 0) {
     // Same interval as the plan: Checkout bills every item of a subscription together.
     const interval = recurrence === 'year' ? 'year' : 'month'
-    const planPrice = await getStripe(c, billingAccount).prices.retrieve(prices.priceId)
-    const extraMauPriceId = await getExtraMauPriceId(c, extraMau.includedMau, interval, planPrice.tax_behavior ?? null, billingAccount)
+    const extraMauPriceId = await getExtraMauPriceId(c, extraMau.includedMau, interval, planPrice.tax_behavior ?? null, billingAccount, planCurrencies)
     lineItems.push({ price: extraMauPriceId, quantity: extraMau.extraMau / EXTRA_MAU_UNIT })
   }
   const metadata = {
@@ -1027,6 +1106,7 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
     tax_id_collection: { enabled: true },
     saved_payment_method_options: CHECKOUT_SAVED_PAYMENT_METHOD_OPTIONS,
     line_items: lineItems,
+    ...(checkoutCurrency ? { currency: checkoutCurrency } : {}),
   })
   return toCheckoutSessionResult(session, publishableKey)
 }

@@ -1,0 +1,140 @@
+import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { BillingAccount } from '../utils/stripe_billing.ts'
+import { Hono } from 'hono/tiny'
+import { CacheHelper } from '../utils/cache.ts'
+import { simpleError, useCors } from '../utils/hono.ts'
+import { middlewareAuth } from '../utils/hono_jwt.ts'
+import { cloudlogErr, serializeError } from '../utils/logging.ts'
+import { getCheckoutPlanPrice, getPriceCurrencyAmounts, getStripeCustomerCurrency } from '../utils/stripe.ts'
+import { getBillingAccountForCustomer, getRequestCountry, isStripeConfiguredForAccount } from '../utils/stripe_billing.ts'
+import { supabaseClient } from '../utils/supabase.ts'
+
+const PLAN_PRICES_CACHE_PATH = '/private/plan_prices'
+const PLAN_PRICES_TTL_SECONDS = 60 * 60
+const DEFAULT_CURRENCY = 'usd'
+
+const EURO_COUNTRIES = new Set(['AD', 'AT', 'BE', 'BG', 'CY', 'DE', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'IE', 'IT', 'LT', 'LU', 'LV', 'MC', 'ME', 'MT', 'NL', 'PT', 'SI', 'SK', 'SM', 'VA', 'XK'])
+
+// Smallest-unit amounts per currency, keyed by plan product id (plans.stripe_id) and interval.
+export type PlanPriceAmounts = Record<string, { month: Record<string, number>, year: Record<string, number> }>
+
+// Only picks among currencies Stripe actually sells; it never sets an amount.
+export function currencyForCountry(country: string | null | undefined) {
+  if (!country)
+    return null
+  const code = country.toUpperCase()
+  if (EURO_COUNTRIES.has(code))
+    return 'eur'
+  if (code === 'GB')
+    return 'gbp'
+  if (code === 'US')
+    return 'usd'
+  return null
+}
+
+// Currencies every plan and interval is sold in: a plan whose price failed to load disables them all,
+// so switching never leaves a card on a fallback price.
+export function getCommonCurrencies(prices: PlanPriceAmounts) {
+  const sets = Object.values(prices).flatMap(plan => [plan.month, plan.year])
+  if (!sets.length)
+    return []
+  return Object.keys(sets[0]).filter(currency => sets.every(amounts => currency in amounts)).sort((a, b) => a.localeCompare(b))
+}
+
+export function pickCurrency(currencies: string[], lockedCurrency: string | null, country: string | null) {
+  if (lockedCurrency)
+    return currencies.includes(lockedCurrency) ? lockedCurrency : null
+  const local = currencyForCountry(country)
+  if (local && currencies.includes(local))
+    return local
+  return currencies.includes(DEFAULT_CURRENCY) ? DEFAULT_CURRENCY : currencies[0] ?? null
+}
+
+async function loadPlanPrices(c: Context, authorization: string, billingAccount: BillingAccount): Promise<{ prices: PlanPriceAmounts, complete: boolean }> {
+  const { data: plans, error } = await supabaseClient(c, authorization)
+    .from('plans')
+    .select('stripe_id')
+  if (error)
+    throw simpleError('plans_not_found', 'Cannot load plans', { error })
+
+  let complete = true
+  const entries = await Promise.all((plans ?? []).map(async ({ stripe_id }) => {
+    try {
+      const [month, year] = await Promise.all([
+        getCheckoutPlanPrice(c, stripe_id, 'month', billingAccount),
+        getCheckoutPlanPrice(c, stripe_id, 'year', billingAccount),
+      ])
+      // A null price means the lookup and its stored-ID fallback both failed: do not cache it.
+      if (!month || !year)
+        complete = false
+      return [stripe_id, {
+        month: month ? getPriceCurrencyAmounts(month) : {},
+        year: year ? getPriceCurrencyAmounts(year) : {},
+      }] as const
+    }
+    catch (priceError) {
+      // One broken plan must not hide the others; its empty amounts disable localized currencies.
+      complete = false
+      cloudlogErr({ requestId: c.get('requestId'), message: 'plan_prices price lookup failed', planProductId: stripe_id, error: serializeError(priceError) })
+      return [stripe_id, { month: {}, year: {} }] as const
+    }
+  }))
+  return { prices: Object.fromEntries(entries), complete }
+}
+
+async function getPlanPrices(c: Context, authorization: string, billingAccount: BillingAccount) {
+  const cache = new CacheHelper(c)
+  const key = cache.buildRequest(PLAN_PRICES_CACHE_PATH, { account: billingAccount })
+  const cached = await cache.matchJson<PlanPriceAmounts>(key, { timeoutMs: 200 })
+  if (cached)
+    return cached
+  const { prices, complete } = await loadPlanPrices(c, authorization, billingAccount)
+  // Never cache a partial catalog: the next request retries the failed plans.
+  if (complete)
+    await cache.putJson(key, prices, PLAN_PRICES_TTL_SECONDS, { timeoutMs: 200 })
+  return prices
+}
+
+export const app = new Hono<MiddlewareKeyVariables>()
+
+app.use('/', useCors)
+
+// Plan prices in every currency configured on the Stripe prices, plus which one this org should see.
+app.get('/', middlewareAuth, async (c) => {
+  const orgId = c.req.query('orgId')
+  if (!orgId)
+    throw simpleError('no_org_id_provided', 'No org_id provided')
+  const authorization = c.get('authorization')
+  if (!authorization)
+    throw simpleError('not_authorized', 'Not authorized')
+
+  // RLS: only members of the org can read its billing currency.
+  const { data: org, error } = await supabaseClient(c, authorization)
+    .from('orgs')
+    .select('customer_id')
+    .eq('id', orgId)
+    .single()
+  if (error || !org)
+    throw simpleError('not_authorized', 'Not authorized')
+
+  const billingAccount = org.customer_id ? await getBillingAccountForCustomer(c, org.customer_id) : 'ee'
+  if (!isStripeConfiguredForAccount(c, billingAccount))
+    return c.json({ currencies: [], currency: null, lockedCurrency: null, prices: {} })
+
+  // Fail closed: an unknown customer currency must not unlock currencies checkout would reject.
+  const [prices, lockedCurrency] = await Promise.all([
+    getPlanPrices(c, authorization, billingAccount),
+    org.customer_id ? getStripeCustomerCurrency(c, org.customer_id, billingAccount) : null,
+  ])
+  // A pinned customer can only check out in its own currency; empty when the catalog lacks it.
+  const common = getCommonCurrencies(prices)
+  const currencies = lockedCurrency ? common.filter(currency => currency === lockedCurrency) : common
+  return c.json({
+    currencies,
+    // Null means no currency is sold on every plan: the page shows the stored USD prices.
+    currency: pickCurrency(currencies, lockedCurrency, getRequestCountry(c)),
+    lockedCurrency,
+    prices,
+  })
+})
