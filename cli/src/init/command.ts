@@ -5465,7 +5465,8 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   flushDeferredCommandInvocation(options.apikey)
   activeInitTelemetry?.setAuth('', options.apikey)
 
-  const handoffBuilderOnlySetup = (targetAppId: string | undefined, projectDir = initialCwd) => tryBuilderOnlyInit(targetAppId, options, {
+  const handoffBuilderOnlySetup = (targetAppId: string | undefined, projectDir = initialCwd, knownBuilderOnly = false) => tryBuilderOnlyInit(targetAppId, options, {
+    knownBuilderOnly,
     warn: pLog.warn,
     beforeLaunch: async () => {
       await finishActiveCliReplay()
@@ -5727,7 +5728,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   if (appId)
     globalAppId = appId
   activeInitTelemetry?.setScope(appId)
-  if (pendingOnboardingSelection.builderOnly && await handoffBuilderOnlySetup(appId, selectedProjectDir))
+  if (pendingOnboardingSelection.builderOnly && await handoffBuilderOnlySetup(appId, selectedProjectDir, true))
     return
   await ensureCapacitorProjectReady(orgId, options.apikey, appId, pendingOnboardingSelection.pendingApp)
   selectedPackageJsonPath = path.resolve(globalPathToPackageJson ?? join(findRoot(cwd()), PACKNAME))
