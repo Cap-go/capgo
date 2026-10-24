@@ -528,9 +528,11 @@ export async function withPgTransaction<T>(pgPool: PgClient, run: (client: PgQue
   try {
     // Bound the transaction on the same round trip as BEGIN so an abandoned
     // request cannot pin the Hyperdrive origin connection with no timeout.
+    // BEGIN stays inside this try: appended setup can fail after the
+    // transaction is open, and that failure has to roll it back.
     const accessMode = getPgAccessMode(pgPool) === 'read only' ? 'read only' : 'read write'
-    await client.query(transactionBeginSql(accessMode, options?.appendSql))
     try {
+      await client.query(transactionBeginSql(accessMode, options?.appendSql))
       const result = await run(client)
       await client.query('COMMIT')
       return result
