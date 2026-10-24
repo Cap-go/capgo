@@ -5,11 +5,11 @@ import { HTTPException } from 'hono/http-exception'
 import { Hono } from 'hono/tiny'
 import { CacheHelper } from '../utils/cache.ts'
 import { buildVersionUsageChannelFilterCF, escapeSqlString, formatDateCF, PUBLIC_FAILURE_ACTIONS, runQueryToCFA } from '../utils/cloudflare.ts'
-import { parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareAuth } from '../utils/hono_jwt.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { closeClient, getPgClient, logPgError } from '../utils/pg.ts'
-import { checkPermission } from '../utils/rbac.ts'
+import { checkPermission, getDeniedChannelIdsForPermission } from '../utils/rbac.ts'
 import { readDeviceVersionCounts } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -737,13 +737,32 @@ function toChannelContext(candidates: ReleaseCandidates, channel: CandidateChann
   }
 }
 
+// Candidates are cached per app and shared by every reader, so channels where
+// this caller is denied channel.read_history are dropped per request, after
+// the cache: neither their deploy history nor their release/rollout state is
+// returned, and they are never picked as the default channel.
+function withoutDeniedHistory(candidates: ReleaseCandidates, deniedChannelIds: Set<number>): ReleaseCandidates {
+  if (deniedChannelIds.size === 0)
+    return candidates
+  return {
+    channels: candidates.channels.filter(channel => !deniedChannelIds.has(channel.id)),
+    deployments: candidates.deployments.filter(deployment => deployment.channel_id === null || !deniedChannelIds.has(deployment.channel_id)),
+  }
+}
+
 async function readReleaseLive(
   c: Context<MiddlewareKeyVariables>,
   appId: string,
   channelId?: number,
   versionName?: string,
 ): Promise<ReleaseLiveResponse | ReleaseLiveEmptyResponse> {
-  const candidates = await loadReleaseCandidates(c, appId)
+  const [allCandidates, deniedHistoryChannelIds] = await Promise.all([
+    loadReleaseCandidates(c, appId),
+    getDeniedChannelIdsForPermission(c, 'channel.read_history', appId),
+  ])
+  if (channelId !== undefined && deniedHistoryChannelIds.has(channelId))
+    throw quickError(403, 'channel_access_denied', 'You can\'t access this channel history', { app_id: appId, channel_id: channelId })
+  const candidates = withoutDeniedHistory(allCandidates, deniedHistoryChannelIds)
   const channel = pickChannel(candidates, channelId, versionName)
   const context = toChannelContext(candidates, channel)
   if (!channel)
@@ -865,6 +884,7 @@ app.post('/', middlewareAuth, async (c) => {
 })
 
 export const releaseLiveTestUtils = {
+  withoutDeniedHistory,
   pickDefaultChannel,
   pickChannel,
   pickRelease,

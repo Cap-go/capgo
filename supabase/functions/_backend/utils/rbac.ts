@@ -268,6 +268,64 @@ export async function checkPermission(
 }
 
 /**
+ * List the channels of an app where the caller is denied a channel-scoped permission.
+ *
+ * Use this when a route returns data for several channels at once (for example
+ * deploy history across an app) and must drop rows for channels the caller
+ * cannot see. Only channels carrying an explicit override for the permission
+ * can differ from the app-level result, so those are the only candidates, and
+ * each one is evaluated with rbac_check_permission_direct so the outcome
+ * matches checkPermission() with a concrete channelId.
+ *
+ * Fails closed: infrastructure errors throw instead of returning an empty list.
+ */
+export async function getDeniedChannelIdsForPermission(
+  c: Context<MiddlewareKeyVariables>,
+  permission: Permission,
+  appId: string,
+): Promise<Set<number>> {
+  const auth = c.get('auth')
+  if (!auth?.userId)
+    return quickError(401, 'not_authenticated', 'Authentication required')
+
+  const { userId, apikey } = auth
+  const apikeyString = apikey?.key ?? c.get('capgkey') ?? null
+
+  let pgClient
+  try {
+    pgClient = await getPgClient(c)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const result = await drizzleClient.execute(
+      sql`SELECT candidates.id
+        FROM (
+          SELECT DISTINCT ch.id, ch.owner_org, ch.app_id
+          FROM public.channel_permission_overrides o
+          INNER JOIN public.channels ch ON ch.id = o.channel_id
+          WHERE ch.app_id = ${appId}
+            AND o.permission_key = ${permission}
+        ) AS candidates
+        WHERE NOT public.rbac_check_permission_direct(
+          ${permission},
+          ${userId}::uuid,
+          candidates.owner_org,
+          candidates.app_id,
+          candidates.id,
+          ${apikeyString}
+        )`,
+    )
+    return new Set((result.rows as Array<{ id: number | string }>).map(row => Number(row.id)))
+  }
+  catch (e) {
+    handlePermissionCheckError(c, permission, { appId }, e, 'checkPermission')
+    return quickError(403, 'permission_denied', `Permission denied: ${permission}`, { permission, appId })
+  }
+  finally {
+    if (pgClient)
+      closeClient(c, pgClient)
+  }
+}
+
+/**
  * Require a permission, throwing an error if not allowed.
  * Use this for endpoints that should return 403 if permission is denied.
  *
