@@ -1,7 +1,7 @@
 import type { QueryCatalog, QueryColumn, QueryForeignKey, QueryFunction } from '../supabase/functions/_backend/private/console_query_sql'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { describe, expect, it } from 'vitest'
-import { drizzleFrom, readSqlError, statusForSqlState } from '../supabase/functions/_backend/private/console_query_run'
+import { ConsoleQueryRollback, drizzleFrom, finishConsoleQuery, readSqlError, statusForSqlState } from '../supabase/functions/_backend/private/console_query_run'
 import { compileConsoleQuery, functionFromCatalogRow, shapeConsoleQueryResult } from '../supabase/functions/_backend/private/console_query_sql'
 
 function column(name: string, udt: string): QueryColumn {
@@ -613,5 +613,29 @@ describe('console query sql', () => {
       code: '57014',
       message: 'canceling statement due to statement timeout',
     })
+  })
+
+  it('rolls back when singular cardinality fails', () => {
+    const ok = { data: [{ id: 'a' }], error: null, count: null, status: 200 }
+    expect(finishConsoleQuery(ok)).toBe(ok)
+
+    const failed = {
+      data: null,
+      error: {
+        code: 'PGRST116',
+        message: 'JSON object requested, multiple (or no) rows returned',
+        details: 'The result contains 2 rows',
+      },
+      count: null,
+      status: 406,
+    }
+    expect(() => finishConsoleQuery(failed)).toThrow(ConsoleQueryRollback)
+    try {
+      finishConsoleQuery(failed)
+    }
+    catch (error) {
+      expect(error).toBeInstanceOf(ConsoleQueryRollback)
+      expect((error as ConsoleQueryRollback).result).toEqual(failed)
+    }
   })
 })

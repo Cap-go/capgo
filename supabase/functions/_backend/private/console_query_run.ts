@@ -252,6 +252,25 @@ export function statusForSqlState(code: string, role: ConsoleQuerySession['role'
   return 400
 }
 
+// Thrown inside the transaction so withPgTransaction rolls the statement back.
+// PostgREST does the same when .single() / .maybeSingle() rejects the row count:
+// the caller sees the error and the mutation does not stay committed.
+export class ConsoleQueryRollback extends Error {
+  readonly result: ConsoleQueryResult
+
+  constructor(result: ConsoleQueryResult) {
+    super(result.error?.message ?? 'console query failed')
+    this.name = 'ConsoleQueryRollback'
+    this.result = result
+  }
+}
+
+export function finishConsoleQuery(result: ConsoleQueryResult): ConsoleQueryResult {
+  if (result.error)
+    throw new ConsoleQueryRollback(result)
+  return result
+}
+
 async function applyRole(db: { execute: (query: SQL) => Promise<unknown> }, session: ConsoleQuerySession) {
   const claims = session.role === 'authenticated'
     ? { ...session.claims, sub: session.claims.sub, role: 'authenticated' }
@@ -284,10 +303,12 @@ export async function runConsoleQuery(c: Context, request: ConsoleQueryRequest, 
       const db = getDrizzleClient(client, { logger: false })
       await applyRole(db, session)
       const result = await db.execute(drizzleFrom(compiled.text, compiled.values))
-      return shapeConsoleQueryResult(compiled, rowsOf(result))
+      return finishConsoleQuery(shapeConsoleQueryResult(compiled, rowsOf(result)))
     })
   }
   catch (error) {
+    if (error instanceof ConsoleQueryRollback)
+      return error.result
     if (error instanceof ConsoleQueryError)
       return consoleQueryFailure(error)
     const sqlError = readSqlError(error)
