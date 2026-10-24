@@ -61,6 +61,21 @@ function compile(request: Parameters<typeof compileConsoleQuery>[1]) {
 }
 
 describe('console query sql', () => {
+  it('keeps an apostrophe literal in an or filter', () => {
+    const compiled = compile({
+      kind: 'table',
+      name: 'channels',
+      args: [],
+      operations: [
+        { method: 'select', args: ['id, name'] },
+        { method: 'or', args: ['name.ilike.%O\'Reilly%,id.in.(42)'] },
+      ],
+    })
+    expect(compiled.text).toContain('t."name" ILIKE $1')
+    expect(compiled.text).toContain('OR t."id" = ANY($2::bigint[])')
+    expect(compiled.values).toEqual(['%O\'Reilly%', ['42']])
+  })
+
   it('compiles an equality filter and keeps the value out of the SQL text', () => {
     const compiled = compile({
       kind: 'table',

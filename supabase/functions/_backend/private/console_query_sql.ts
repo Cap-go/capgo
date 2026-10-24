@@ -370,21 +370,23 @@ function splitTop(input: string, separator: string): string[] {
   const parts: string[] = []
   let start = 0
   let depth = 0
-  let quote: '"' | '\'' | null = null
+  // PostgREST quotes a filter value with double quotes. An apostrophe in a
+  // name such as O'Reilly is a literal character, not a quote.
+  let quoted = false
   for (let index = 0; index < input.length; index++) {
     const char = input[index]
-    if (quote) {
-      if (char === quote) {
-        if (input[index + 1] === quote) {
+    if (quoted) {
+      if (char === '"') {
+        if (input[index + 1] === '"') {
           index++
           continue
         }
-        quote = null
+        quoted = false
       }
       continue
     }
-    if (char === '"' || char === '\'') {
-      quote = char
+    if (char === '"') {
+      quoted = true
       continue
     }
     if (char === '(')
