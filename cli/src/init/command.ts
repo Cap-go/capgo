@@ -43,6 +43,7 @@ import { loginInitInBrowser, shouldStartInitBrowserLogin } from './browser-login
 import { selectOnboardingChannel } from './channel-selection'
 import { assertNoWindowsCommandLineBreaks, createMissingExecutableError, getAvailablePackageManagers, getMissingPackageManagerExecutable, getPackageManagerInfo, preparePackageManagerCommandEnvironment, probeExecutable, probePackageManagerCommand, resolveExecutableProbeError, spawnCommand as spawn, spawnCommandSync as spawnSync, waitForCommandResult } from './command-execution'
 import { reportInitOnboardingStep } from './onboarding-report'
+import { enableInitOtaChecklist } from './ota-checklist'
 import { cancel as pCancel, confirm as pConfirm, intro as pIntro, isCancel as pIsCancel, log as pLog, outro as pOutro, select as pSelect, spinner as pSpinner, text as pText } from './prompts'
 import { finishActiveCliReplay, getActiveCliReplaySessionId, isCliTelemetryDisabled, startInitReplay } from './replay'
 import { appendInitStreamingLine, clearInitStreamingOutput, INIT_CANCEL, pushInitLog, setInitCodeDiff, setInitEncryptionSummary, setInitVersionWarning, startInitStreamingOutput, stopInitInkSession, updateInitStreamingStatus, waitForInitLogSkip, waitForInitStreamingContinue } from './runtime'
@@ -5763,8 +5764,11 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
       activeInitTelemetry?.setScope(appId)
       if (await handoffBuilderOnlySetup(appId, selectedProjectDir))
         return
-      markStepDone(1)
     }
+
+    await enableInitOtaChecklist(appId, options, undefined, pLog.warn)
+    if (stepToSkip < 1)
+      markStepDone(1)
 
     if (stepToSkip < 2) {
       renderCurrentStep(2)
