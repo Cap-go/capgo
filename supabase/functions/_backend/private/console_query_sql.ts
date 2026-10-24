@@ -8,6 +8,9 @@ const IDENTIFIER = /^[a-z_][a-z0-9_]*$/
 const JSON_PATH = /^([a-z_][a-z0-9_]*)->>(([a-z_][a-z0-9_]*)|"([^"]+)")$/
 const MAX_ROWS = 1000
 
+// Column filters widen integers and similar types. Comparisons accept that.
+// RPC arguments cannot reuse these casts: PostgreSQL resolves an explicit
+// ::bigint against an integer parameter as a different function.
 const CAST_BY_UDT: Record<string, string> = {
   uuid: 'uuid',
   text: 'text',
@@ -31,6 +34,21 @@ const CAST_BY_UDT: Record<string, string> = {
   _uuid: 'uuid[]',
   _int2: 'bigint[]',
   _int4: 'bigint[]',
+  _int8: 'bigint[]',
+}
+
+const RPC_ARGUMENT_CAST: Record<string, string> = {
+  bpchar: 'bpchar',
+  int2: 'smallint',
+  int4: 'integer',
+  int8: 'bigint',
+  float4: 'real',
+  float8: 'double precision',
+  json: 'json',
+  timestamp: 'timestamp',
+  _varchar: 'varchar[]',
+  _int2: 'smallint[]',
+  _int4: 'integer[]',
   _int8: 'bigint[]',
 }
 
@@ -315,6 +333,10 @@ function castOf(udt: string): string {
   if (IDENTIFIER.test(udt))
     return udt
   fail('PGRST100', 'Unsupported column type')
+}
+
+function argumentCast(udt: string): string {
+  return RPC_ARGUMENT_CAST[udt] ?? castOf(udt)
 }
 
 function arrayCast(udt: string): string {
@@ -756,14 +778,12 @@ function orderSql(catalog: QueryCatalog, table: string, parentAlias: string, col
   return `${parentAlias}.${quoteIdent(column)} ${direction}${nulls}`
 }
 
-function valueSql(params: Params, udt: string, value: unknown): string {
+function valueSql(params: Params, udt: string, value: unknown, cast = castOf(udt)): string {
   if (value === null)
     return 'NULL'
   if (isJsonUdt(udt))
-    return params.add(jsonbLiteral(value), 'jsonb')
-  if (Array.isArray(value) || castOf(udt).endsWith('[]'))
-    return params.add(value, castOf(udt))
-  return params.add(value, castOf(udt))
+    return params.add(jsonbLiteral(value), cast)
+  return params.add(value, cast)
 }
 
 function conflictColumns(columns: QueryColumn[], value: unknown): string[] {
@@ -1015,11 +1035,41 @@ function rpcMatchesCall(fn: QueryFunction, name: string, keys: string[]): boolea
   return keys.every(key => fn.argNames.includes(key))
 }
 
+function pageLimit(args: unknown[]): number {
+  if (typeof args[0] !== 'number' || !Number.isInteger(args[0]) || args[0] < 0)
+    fail('PGRST100', 'Invalid limit')
+  return args[0]
+}
+
+function pageRange(args: unknown[]): { limit: number, offset: number } {
+  if (typeof args[0] !== 'number' || typeof args[1] !== 'number' || !Number.isInteger(args[0]) || !Number.isInteger(args[1]) || args[0] < 0 || args[1] < args[0])
+    fail('PGRST100', 'Invalid range')
+  return { offset: args[0], limit: args[1] - args[0] + 1 }
+}
+
+// Limit the function output before jsonb_agg. A LIMIT on the aggregate query
+// only limits the one aggregated row, which drops the page the console asked for.
+function setReturningSql(call: string, composite: boolean, limit: number | null, offset: number): string {
+  const aggregate = composite ? 'jsonb_agg(to_jsonb(q))' : 'jsonb_agg(to_jsonb(q.val))'
+  if (limit == null && offset === 0) {
+    const from = composite ? `${call} AS q` : `${call} AS q(val)`
+    return `SELECT COALESCE((SELECT ${aggregate} FROM ${from}), '[]'::jsonb) AS data`
+  }
+  const rowLimit = Math.min(limit ?? MAX_ROWS, MAX_ROWS)
+  const page = ` LIMIT ${rowLimit}${offset > 0 ? ` OFFSET ${offset}` : ''}`
+  const source = composite
+    ? `SELECT * FROM ${call} AS q${page}`
+    : `SELECT val FROM ${call} AS q(val)${page}`
+  return `SELECT COALESCE((SELECT ${aggregate} FROM (${source}) AS q), '[]'::jsonb) AS data`
+}
+
 function compileRpc(catalog: QueryCatalog, request: ConsoleQueryRequest): CompiledConsoleQuery {
   if (!IDENTIFIER.test(request.name))
     fail('PGRST100', 'Invalid identifier')
   const params = new Params()
   let cardinality: CompiledConsoleQuery['cardinality'] = 'many'
+  let limit: number | null = null
+  let offset = 0
   for (const operation of request.operations) {
     if (operation.method === 'throwOnError')
       continue
@@ -1029,6 +1079,16 @@ function compileRpc(catalog: QueryCatalog, request: ConsoleQueryRequest): Compil
     }
     if (operation.method === 'maybeSingle') {
       cardinality = 'maybe'
+      continue
+    }
+    if (operation.method === 'limit') {
+      limit = pageLimit(operation.args)
+      continue
+    }
+    if (operation.method === 'range') {
+      const page = pageRange(operation.args)
+      limit = page.limit
+      offset = page.offset
       continue
     }
     fail('PGRST100', 'Unsupported RPC modifier')
@@ -1044,15 +1104,23 @@ function compileRpc(catalog: QueryCatalog, request: ConsoleQueryRequest): Compil
     const name = fn.argNames[index]
     if (!keys.includes(name))
       continue
-    callArgs.push(`${quoteIdent(name)} => ${valueSql(params, fn.argTypes[index], args[name])}`)
+    callArgs.push(`${quoteIdent(name)} => ${valueSql(params, fn.argTypes[index], args[name], argumentCast(fn.argTypes[index]))}`)
   }
   const call = `public.${quoteIdent(fn.name)}(${callArgs.join(', ')})`
-  const text = fn.returnsSet
-    ? fn.returnsComposite
-      ? `SELECT COALESCE((SELECT jsonb_agg(to_jsonb(q)) FROM ${call} AS q), '[]'::jsonb) AS data`
-      : `SELECT COALESCE((SELECT jsonb_agg(to_jsonb(q.val)) FROM ${call} AS q(val)), '[]'::jsonb) AS data`
-    : `SELECT to_jsonb(${call}) AS data`
-  return { text, values: params.values, cardinality, head: false, count: false, kind: 'rpc', returnsSet: fn.returnsSet }
+  if (!fn.returnsSet) {
+    if (limit != null || offset > 0)
+      fail('PGRST100', 'Unsupported RPC modifier')
+    return { text: `SELECT to_jsonb(${call}) AS data`, values: params.values, cardinality, head: false, count: false, kind: 'rpc', returnsSet: false }
+  }
+  return {
+    text: setReturningSql(call, fn.returnsComposite, limit, offset),
+    values: params.values,
+    cardinality,
+    head: false,
+    count: false,
+    kind: 'rpc',
+    returnsSet: true,
+  }
 }
 
 export function compileConsoleQuery(catalog: QueryCatalog, request: ConsoleQueryRequest): CompiledConsoleQuery {

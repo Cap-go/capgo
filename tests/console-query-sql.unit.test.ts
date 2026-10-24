@@ -436,4 +436,64 @@ describe('console query sql', () => {
       ],
     }, { kind: 'rpc', name: 'ambiguous', args: [{ a: 'x' }], operations: [] })).toThrow(/Could not find the function/)
   })
+
+  it('preserves RPC argument types and pages set-returning functions', () => {
+    const apps = fn(
+      'get_org_apps_with_last_upload',
+      ['p_org_id', 'p_search', 'p_sort_by', 'p_sort_desc', 'p_limit', 'p_offset'],
+      ['uuid', 'text', 'text', 'bool', 'int4', 'int4'],
+      true,
+      true,
+      5,
+    )
+    const uploads = fn(
+      'get_bundle_upload_daily_counts',
+      ['p_app_ids', 'p_start', 'p_end'],
+      ['_varchar', 'timestamptz', 'timestamptz'],
+      true,
+      true,
+    )
+    const parsed: QueryCatalog = {
+      columns: new Map(),
+      foreignKeys: [],
+      functions: [apps, uploads],
+    }
+    const listed = compileConsoleQuery(parsed, {
+      kind: 'rpc',
+      name: 'get_org_apps_with_last_upload',
+      args: [{ p_org_id: 'org-1', p_limit: 10, p_offset: 20 }],
+      operations: [],
+    })
+    expect(listed.text).toContain('"p_limit" => $2::integer')
+    expect(listed.text).toContain('"p_offset" => $3::integer')
+    expect(listed.text).not.toContain('bigint')
+    expect(listed.values).toEqual(['org-1', 10, 20])
+
+    const page = compileConsoleQuery(parsed, {
+      kind: 'rpc',
+      name: 'get_bundle_upload_daily_counts',
+      args: [{ p_app_ids: ['com.demo.app'], p_start: '2026-01-01T00:00:00.000Z', p_end: '2026-01-02T00:00:00.000Z' }],
+      operations: [{ method: 'range', args: [0, 999] }],
+    })
+    expect(flat(page.text)).toContain('jsonb_agg(to_jsonb(q)) FROM (SELECT * FROM public."get_bundle_upload_daily_counts"("p_app_ids" => $1::varchar[], "p_start" => $2::timestamptz, "p_end" => $3::timestamptz) AS q LIMIT 1000) AS q')
+    expect(page.text).not.toContain('text[]')
+    expect(page.text).not.toContain('OFFSET')
+    expect(page.values).toEqual([['com.demo.app'], '2026-01-01T00:00:00.000Z', '2026-01-02T00:00:00.000Z'])
+
+    const next = compileConsoleQuery(parsed, {
+      kind: 'rpc',
+      name: 'get_bundle_upload_daily_counts',
+      args: [{ p_app_ids: ['com.demo.app'], p_start: '2026-01-01T00:00:00.000Z', p_end: '2026-01-02T00:00:00.000Z' }],
+      operations: [{ method: 'range', args: [1000, 2999] }],
+    })
+    expect(next.text).toContain('LIMIT 1000 OFFSET 1000')
+
+    const channel = compile({
+      kind: 'table',
+      name: 'channels',
+      args: [],
+      operations: [{ method: 'eq', args: ['id', 1] }],
+    })
+    expect(channel.text).toContain('t."id" = $1::bigint')
+  })
 })
