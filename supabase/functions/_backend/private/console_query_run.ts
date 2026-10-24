@@ -283,13 +283,14 @@ async function applyRole(db: { execute: (query: SQL) => Promise<unknown> }, sess
     pg_catalog.set_config('request.jwt.claim.aal', ${session.role === 'authenticated' ? session.claims.aal ?? '' : ''}, true),
     pg_catalog.set_config('request.headers', ${'{}'}, true)
   `)
-  // SET ROLE changes current_user and leaves session_user as the login role.
-  // Triggers and helpers treat session_user = postgres as a service caller.
-  // SESSION AUTHORIZATION changes both and drops BYPASSRLS. Fail closed if the
-  // role cannot be assumed; never continue as the service connection.
+  // Hosted Supabase does not make the postgres login a superuser, and
+  // SET SESSION AUTHORIZATION requires one. SET LOCAL ROLE is the switch this
+  // database already allows: it changes current_user and drops BYPASSRLS.
+  // session_user stays the login role. The request role GUC above is what
+  // user-facing checks must read. Fail closed if the role cannot be assumed.
   await db.execute(session.role === 'anon'
-    ? sql`SET LOCAL SESSION AUTHORIZATION anon`
-    : sql`SET LOCAL SESSION AUTHORIZATION authenticated`)
+    ? sql`SET LOCAL ROLE anon`
+    : sql`SET LOCAL ROLE authenticated`)
   await db.execute(sql`SET LOCAL row_security = on`)
 }
 
